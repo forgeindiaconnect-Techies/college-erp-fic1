@@ -59,6 +59,28 @@ const formatRoomNo = (room) => {
   return `Room ${name}`;
 };
 
+const getDayDateInfo = (dayName) => {
+  const now = new Date();
+  const currentDayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat
+  const daysMap = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+  const targetDayOfWeek = daysMap[dayName] || 1;
+
+  let diff = targetDayOfWeek - currentDayOfWeek;
+  const targetDate = new Date(now);
+  targetDate.setDate(now.getDate() + diff);
+
+  const isToday = diff === 0;
+  const isTomorrow = diff === 1;
+  const dateFormatted = targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  return {
+    isToday,
+    isTomorrow,
+    dateFormatted,
+    fullDateStr: targetDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  };
+};
+
 const HodTimetable = () => {
   const hodSession = getHodSession();
   const HOD_DEPT = hodSession.dept;
@@ -232,6 +254,36 @@ const HodTimetable = () => {
         </div>
       </div>
 
+      {/* LIVE DAY TRACKER BANNER */}
+      {(() => {
+        const todayInfo = getDayDateInfo(new Date().toLocaleDateString('en-US', { weekday: 'long' }));
+        const tomorrowName = new Date(Date.now() + 86400000).toLocaleDateString('en-US', { weekday: 'long' });
+        const tomorrowInfo = getDayDateInfo(tomorrowName);
+        return (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(37,99,235,0.06), rgba(147,51,234,0.06))',
+            border: '1px solid rgba(37,99,235,0.2)',
+            borderRadius: '12px',
+            padding: '0.75rem 1.25rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            color: '#1e293b'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2563eb', boxShadow: '0 0 0 3px rgba(37,99,235,0.2)' }} />
+              <span>Live Day Tracker: <strong style={{ color: '#2563eb' }}>Today is {todayInfo.fullDateStr} (TODAY)</strong> • <strong style={{ color: '#9333ea' }}>Tomorrow is {tomorrowInfo.fullDateStr} (TOMORROW)</strong></span>
+            </div>
+            <span style={{ fontSize: '0.75rem', background: '#ffffff', border: '1px solid #cbd5e1', padding: '0.2rem 0.6rem', borderRadius: '6px', color: '#475569' }}>
+              Weekly Matrix
+            </span>
+          </div>
+        );
+      })()}
+
       {/* WEEKLY TIMETABLE MATRIX CONTAINER */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto" style={{ maxHeight: '72vh' }}>
@@ -244,11 +296,39 @@ const HodTimetable = () => {
                 >
                   TIMING / PERIOD
                 </th>
-                {DAYS_ORDER.map(dayName => (
-                  <th key={dayName} className="p-3 border-r border-gray-200 text-center font-bold" style={{ background: '#f8fafc', color: '#1e293b' }}>
-                    {dayName}
-                  </th>
-                ))}
+                {DAYS_ORDER.map(dayName => {
+                  const info = getDayDateInfo(dayName);
+                  return (
+                    <th 
+                      key={dayName} 
+                      className="p-3 border-r border-gray-200 text-center font-bold" 
+                      style={{ 
+                        background: info.isToday ? '#eff6ff' : info.isTomorrow ? '#faf5ff' : '#f8fafc', 
+                        color: info.isToday ? '#1d4ed8' : info.isTomorrow ? '#6b21a8' : '#1e293b',
+                        borderBottom: info.isToday ? '3px solid #2563eb' : info.isTomorrow ? '3px solid #9333ea' : undefined
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>{dayName}</span>
+                          {info.isToday && (
+                            <span style={{ background: '#2563eb', color: '#ffffff', fontSize: '9px', padding: '1px 5px', borderRadius: '8px', fontWeight: 800 }}>
+                              TODAY
+                            </span>
+                          )}
+                          {info.isTomorrow && (
+                            <span style={{ background: '#9333ea', color: '#ffffff', fontSize: '9px', padding: '1px 5px', borderRadius: '8px', fontWeight: 800 }}>
+                              TOMORROW
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '10px', fontWeight: 500, opacity: 0.75, textTransform: 'none' }}>
+                          {info.dateFormatted}
+                        </span>
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
 
@@ -446,7 +526,11 @@ const HodTimetable = () => {
                     onChange={e => setFormDay(e.target.value)}
                     style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#f8fafc', fontWeight: 600, outline: 'none' }}
                   >
-                    {DAYS_ORDER.map(d => <option key={d} value={d}>{d}</option>)}
+                    {DAYS_ORDER.map(d => {
+                      const info = getDayDateInfo(d);
+                      const tag = info.isToday ? ' • TODAY' : info.isTomorrow ? ' • TOMORROW' : '';
+                      return <option key={d} value={d}>{d} ({info.dateFormatted}){tag}</option>;
+                    })}
                   </select>
                 </div>
 

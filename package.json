@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "node backend/server.js",
     "dev": "vite",
     "dev:backend": "node --watch backend/server.js",
     "dev:full": "concurrently -k -p \"[{name}]\" -n \"FRONTEND,BACKEND\" -c \"cyan,yellow\" \"vite\" \"node --watch backend/server.js\"",

@@ -50,6 +50,28 @@ const formatRoomNo = (room) => {
   return `Room ${name}`;
 };
 
+const getDayDateInfo = (dayName) => {
+  const now = new Date();
+  const currentDayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat
+  const daysMap = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+  const targetDayOfWeek = daysMap[dayName] || 1;
+
+  let diff = targetDayOfWeek - currentDayOfWeek;
+  const targetDate = new Date(now);
+  targetDate.setDate(now.getDate() + diff);
+
+  const isToday = diff === 0;
+  const isTomorrow = diff === 1;
+  const dateFormatted = targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  return {
+    isToday,
+    isTomorrow,
+    dateFormatted,
+    fullDateStr: targetDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  };
+};
+
 const StaffTimetable = () => {
   const [activeTab, setActiveTab] = useState('my'); // 'my' or 'department'
   const [loading, setLoading] = useState(true);
@@ -227,11 +249,39 @@ const StaffTimetable = () => {
                 >
                   TIMING / PERIOD
                 </th>
-                {DAYS_ORDER.map(dayName => (
-                  <th key={dayName} className="p-3 border-r border-gray-200 text-center font-bold" style={{ background: '#f8fafc', color: '#1e293b' }}>
-                    {dayName}
-                  </th>
-                ))}
+                {DAYS_ORDER.map(dayName => {
+                  const info = getDayDateInfo(dayName);
+                  return (
+                    <th 
+                      key={dayName} 
+                      className="p-3 border-r border-gray-200 text-center font-bold" 
+                      style={{ 
+                        background: info.isToday ? '#eff6ff' : info.isTomorrow ? '#faf5ff' : '#f8fafc', 
+                        color: info.isToday ? '#1d4ed8' : info.isTomorrow ? '#6b21a8' : '#1e293b',
+                        borderBottom: info.isToday ? '3px solid #2563eb' : info.isTomorrow ? '3px solid #9333ea' : undefined
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>{dayName}</span>
+                          {info.isToday && (
+                            <span style={{ background: '#2563eb', color: '#ffffff', fontSize: '9px', padding: '1px 5px', borderRadius: '8px', fontWeight: 800 }}>
+                              TODAY
+                            </span>
+                          )}
+                          {info.isTomorrow && (
+                            <span style={{ background: '#9333ea', color: '#ffffff', fontSize: '9px', padding: '1px 5px', borderRadius: '8px', fontWeight: 800 }}>
+                              TOMORROW
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '10px', fontWeight: 500, opacity: 0.75, textTransform: 'none' }}>
+                          {info.dateFormatted}
+                        </span>
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
 
