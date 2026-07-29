@@ -387,6 +387,19 @@ const Dashboard = () => {
 
         <div className="stat-card glass-card">
           <div className="stat-icon-wrapper bg-icon-primary" style={{ background: "#EEEDFE", color: "#3C3489" }}>
+            <Briefcase size={18} />
+          </div>
+          <div className="stat-details">
+            <h3>Total Staff</h3>
+            <p className="stat-value">{totalStaffCount}</p>
+            <p className="stat-change positive">
+              <TrendingUp size={12} /> Active Faculty
+            </p>
+          </div>
+        </div>
+
+        <div className="stat-card glass-card">
+          <div className="stat-icon-wrapper bg-icon-primary" style={{ background: "#EEEDFE", color: "#3C3489" }}>
             <GraduationCap size={18} />
           </div>
           <div className="stat-details">
