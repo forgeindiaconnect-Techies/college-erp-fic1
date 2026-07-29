@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Mail, Phone, X, BookOpen, Download } from 'lucide-react';
 import { getStaff, createStaff, updateStaff, getDepartments } from '../../api/index';
 import { io } from 'socket.io-client';
+import { getBackendURL } from '../../utils/backendUrl';
 import '../../pages/staff/StaffManagement.css';
 
 const SUBJECTS = ['Data Structures', 'DBMS', 'Networks', 'OS', 'Machine Learning', 'Circuits', 'Thermodynamics', 'Fluid Mechanics', 'Structural Analysis'];
@@ -25,7 +26,7 @@ const SubAdminStaff = () => {
     fetchStaff();
     fetchDepartments();
     
-    const socket = io('http://localhost:5000');
+    const socket = io(getBackendURL());
     socket.on('staffUpdated', () => {
       fetchStaff();
     });

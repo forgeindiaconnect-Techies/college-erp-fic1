@@ -42,6 +42,7 @@ import {
 import '../../pages/Dashboard.css';
 import { getStaff } from '../../api/index.js';
 import { io } from 'socket.io-client';
+import { getBackendURL } from '../../utils/backendUrl';
 
 // Seed data representing faculty and HODs
 const initialFaculty = [
@@ -182,7 +183,7 @@ export default function PrincipalFacultyPerformance() {
     fetchFacultyData();
     
     // Auto-refresh when staff is updated elsewhere
-    const socket = io('http://localhost:5000');
+    const socket = io(getBackendURL());
     socket.on('staffUpdated', () => {
       fetchFacultyData();
     });

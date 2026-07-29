@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
+import { getBackendURL } from '../utils/backendUrl';
 
 let sharedSocket = null;
 let subscriberCount = 0;
 
 const getSocket = () => {
   if (!sharedSocket || sharedSocket.disconnected) {
-    const backendUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
-    sharedSocket = io(backendUrl, {
+    sharedSocket = io(getBackendURL(), {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,

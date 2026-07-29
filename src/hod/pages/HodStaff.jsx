@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Edit2, Mail, Phone, X, BookOpen, Clock, CheckCircle, Plus } from 'lucide-react';
 import { getStaff, updateStaff, createStaff, getEmployeeAttendanceStats } from '../../api/index';
 import { io } from 'socket.io-client';
+import { getBackendURL } from '../../utils/backendUrl';
 import './HodStaff.css';
 
 // Try to grab logged in HOD session
@@ -51,7 +52,7 @@ const HodStaff = () => {
   useEffect(() => {
     fetchStaff();
     
-    const socket = io('http://localhost:5000');
+    const socket = io(getBackendURL());
     socket.on('staffUpdated', () => {
       fetchStaff();
     });

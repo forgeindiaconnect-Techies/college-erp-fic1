@@ -34,6 +34,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { io } from 'socket.io-client';
+import { getBackendURL } from '../../utils/backendUrl';
 import { getWelfareRecords, updateWelfareRecord, approveScholarship } from '../../api/index.js';
 import '../../pages/Dashboard.css';
 
@@ -176,7 +177,7 @@ export default function PrincipalStudentWelfare() {
     
     fetchCases();
     
-    const socket = io('http://localhost:5000');
+    const socket = io(getBackendURL());
     socket.on('welfareUpdated', fetchCases);
     return () => socket.disconnect();
   }, []);

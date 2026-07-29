@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
+import { getBackendURL } from '../utils/backendUrl';
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '../api';
 import { AuthContext } from './AuthContext';
 import { Bell, AlertTriangle, CheckCircle, Info, X } from 'lucide-react';
@@ -79,9 +80,7 @@ export const NotificationProvider = ({ children }) => {
     fetchNotifications();
 
     // Determine target socket server URL
-    const socketUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:5000' 
-      : `${window.location.protocol}//${window.location.hostname}:5000`;
+    const socketUrl = getBackendURL();
 
     const socket = io(socketUrl, {
       reconnectionAttempts: 10,
