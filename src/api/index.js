@@ -1,27 +1,25 @@
 import axios from 'axios';
 
-// PRODUCTION (Vercel): use relative '/api' — Vercel rewrites /api/* → Render backend (no CORS)
-// LOCAL DEV: use 'http://localhost:5000/api' via Vite proxy
+// In production (Vercel), use the Render backend URL.
+// In local dev, use localhost via the Vite proxy.
 const getBaseURL = () => {
-  // Explicit env override (optional)
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  // On Vercel (any non-localhost hostname) use the relative path
-  // so Vercel's rewrite rules forward it to Render backend
-  if (typeof window !== 'undefined' &&
-      !window.location.hostname.includes('localhost') &&
-      !window.location.hostname.includes('127.0.0.1')) {
-    return '/api';
+  // If running on Vercel (not localhost), use the Render backend directly
+  if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+    return 'https://college-erp-software.onrender.com/api';
   }
   return 'http://localhost:5000/api';
 };
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  withCredentials: false,
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+    'Expires': '0'
   }
 });
 
