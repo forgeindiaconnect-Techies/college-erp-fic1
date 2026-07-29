@@ -1,0 +1,175 @@
+.student-attendance-page { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.page-header-student { display: flex; justify-content: space-between; align-items: center; }
+.header-left-s { display: flex; align-items: center; gap: 1rem; }
+.btn-back-s {
+  background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main);
+  padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
+  display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; transition: all 0.2s ease;
+}
+.btn-back-s:hover { background: var(--bg-primary); border-color: #14b8a6; color: #14b8a6; }
+
+/* Analytics Grid */
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.analytics-card {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-left: 4px solid var(--border-color);
+}
+.analytics-card.primary { border-left-color: #14b8a6; }
+.analytics-card.success { border-left-color: #10b981; }
+.analytics-card.danger { border-left-color: #ef4444; }
+.analytics-card.warning { border-left-color: #f59e0b; }
+.analytics-card.info { border-left-color: #3b82f6; }
+
+.analytics-card span { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+.analytics-card h2 { font-size: 1.8rem; font-weight: 800; margin: 0; color: var(--text-main); }
+.analytics-card.primary h2 { color: #14b8a6; }
+
+.table-section-card-s { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.table-header-row-s { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding: 1.25rem 1.5rem; background: var(--bg-secondary); }
+.table-header-row-s h3 { font-size: 1.05rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main); }
+.table-container-s { width: 100%; overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; text-align: left; }
+th { padding: 1rem 1.5rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); background: rgba(0,0,0,0.02); font-weight: 700; border-bottom: 1px solid var(--border-color); }
+td { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); color: var(--text-main); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: rgba(0,0,0,0.01); }
+
+.status-badge-cell { font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 0.25rem; }
+.status-badge-cell.present { background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.2); }
+.status-badge-cell.absent { background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.2); }
+.status-badge-cell.leave { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: rgba(245, 158, 11, 0.2); }
+
+.date-cell { display: flex; align-items: center; gap: 0.4rem; font-size: 0.88rem; font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.text-muted { color: var(--text-muted); }
+
+/* Progress Bar */
+.progress-bar-bg { width: 100%; height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden; margin-top: 0.5rem; }
+.progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+.progress-bar-fill.safe { background: #10b981; }
+.progress-bar-fill.warning { background: #f59e0b; }
+.progress-bar-fill.danger { background: #ef4444; }
+
+.subject-cell-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.2rem; }
+.subject-cell-subtitle { font-size: 0.75rem; color: var(--text-muted); }
+
+/* Layout Grid for Sub-tables */
+.attendance-tables-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+@media (min-width: 1024px) {
+  .attendance-tables-grid { grid-template-columns: 3fr 2fr; }
+}
+
+/* Parent Attendance specific styling */
+.attendance-hero-card {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 2.5rem;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(16, 185, 129, 0.05));
+  border-radius: 20px;
+}
+
+.hero-progress-circle-wrapper {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 6px solid #10b981;
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.3);
+}
+
+.hero-progress-text {
+  text-align: center;
+}
+
+.hero-progress-text h2 {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0;
+  color: #10b981;
+}
+
+.hero-progress-text span {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.hero-details h3 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-main);
+}
+
+.summary-status-tag-row {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.badge-success-s {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.badge-danger-s {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.badge-neutral-s {
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.search-box-attendance {
+  background: var(--bg-primary);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  border: 1px solid var(--border-color);
+}
+
+.search-box-attendance input {
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--text-main);
+  font-size: 0.9rem;
+}

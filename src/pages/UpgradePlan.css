@@ -1,0 +1,229 @@
+.upgrade-container {
+  min-height: 100vh;
+  background-color: #F8FAFC;
+  color: #0F172A;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 100px 20px 60px 20px;
+  box-sizing: border-box;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.upgrade-header {
+  text-align: center;
+  margin-bottom: 60px;
+  max-width: 650px;
+  animation: slideDown 0.6s ease-out forwards;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.upgrade-header h1 {
+  font-size: 42px;
+  font-weight: 800;
+  margin-bottom: 16px;
+  color: #0F172A;
+  letter-spacing: -1px;
+}
+
+.upgrade-header p {
+  color: #475569;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.pricing-cards {
+  display: flex;
+  gap: 32px;
+  max-width: 1150px;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.pricing-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 20px;
+  padding: 40px 32px;
+  width: 330px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.pricing-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border-color: #CBD5E1;
+}
+
+.pricing-card.popular {
+  border: 2px solid #6366F1;
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.15), 0 8px 10px -6px rgba(99, 102, 241, 0.1);
+  transform: scale(1.03);
+  z-index: 10;
+}
+
+.pricing-card.popular:hover {
+  transform: scale(1.03) translateY(-8px);
+  box-shadow: 0 25px 35px -5px rgba(99, 102, 241, 0.2), 0 15px 15px -10px rgba(99, 102, 241, 0.15);
+}
+
+.popular-badge {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #6366F1;
+  color: white;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.plan-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.pricing-card h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #0F172A;
+}
+
+.price {
+  font-size: 42px;
+  font-weight: 800;
+  margin-bottom: 16px;
+  color: #0F172A;
+  letter-spacing: -1px;
+}
+
+.price span {
+  font-size: 16px;
+  font-weight: 500;
+  color: #64748B;
+  letter-spacing: normal;
+}
+
+.plan-desc {
+  color: #475569;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 32px;
+  min-height: 48px;
+}
+
+.plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 40px 0;
+  flex-grow: 1;
+}
+
+.plan-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: #334155;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.plan-features li svg {
+  color: #6366F1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.btn-subscribe {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+/* Starter Button */
+.btn-starter {
+  background: #F1F5F9;
+  color: #0F172A;
+  border: 1px solid #E2E8F0;
+}
+.btn-starter:hover:not(:disabled) {
+  background: #E2E8F0;
+  border-color: #CBD5E1;
+}
+
+/* Premium Button */
+.popular-btn {
+  background: #0F172A;
+  color: white;
+}
+.popular-btn:hover:not(:disabled) {
+  background: #1E293B;
+  transform: translateY(-1px);
+}
+
+/* Elite Button */
+.btn-elite {
+  background: #FFFFFF;
+  color: #0F172A;
+  border: 1px solid #CBD5E1;
+}
+.btn-elite:hover:not(:disabled) {
+  background: #F8FAFC;
+  border-color: #94A3B8;
+}
+
+.btn-subscribe:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+@media (max-width: 1024px) {
+  .pricing-card.popular {
+    transform: scale(1);
+  }
+  .pricing-card.popular:hover {
+    transform: translateY(-8px);
+  }
+}
+

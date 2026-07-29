@@ -1,0 +1,55 @@
+.assignments-management-staff { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.search-card-assignments { padding: 0.25rem 0; overflow: hidden; }
+
+.assignments-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+@media (max-width: 768px) { .assignments-grid { grid-template-columns: 1fr; } }
+
+.assignment-card {
+  padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+  transition: all 0.3s ease;
+}
+.assignment-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--primary); }
+
+.assignment-card-header { display: flex; justify-content: space-between; align-items: center; }
+.assignment-class-badge {
+  background: rgba(55, 48, 165, 0.12); color: var(--primary); font-size: 0.75rem;
+  font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 6px; border: 1px solid rgba(55, 48, 165, 0.2);
+}
+
+.btn-delete-assignment {
+  background: transparent; border: none; color: var(--text-muted); cursor: pointer;
+  padding: 0.25rem; border-radius: 4px; display: flex; transition: all 0.2s ease;
+}
+.btn-delete-assignment:hover { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+.assignment-card-body { display: flex; flex-direction: column; gap: 0.5rem; }
+.assignment-title { font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin: 0; }
+.assignment-subject-tag {
+  font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; margin: 0; font-weight: 500;
+}
+.assignment-desc { font-size: 0.88rem; color: var(--text-main); font-style: italic; margin: 0.5rem 0 0; line-height: 1.45; }
+
+.assignment-card-footer {
+  display: flex; align-items: center; gap: 1rem; border-top: 1px solid var(--border-color);
+  padding-top: 1rem; flex-wrap: wrap; margin-top: auto;
+}
+.assignment-meta-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-muted); }
+.assignment-meta-item strong { color: var(--text-main); }
+.meta-icon { color: var(--text-muted); }
+
+.assignment-deadline-badge {
+  margin-left: auto; font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 20px; text-transform: uppercase;
+}
+.assignment-deadline-badge.active { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+.assignment-deadline-badge.today { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+.assignment-deadline-badge.overdue { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+
+.no-assignments-banner {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 4rem 2rem; text-align: center;
+}
+.no-assignments-banner h3 { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.5rem; }
+.no-assignments-banner p { max-width: 400px; margin: 0; }
+
+.assignment-skeleton-card { display: flex; flex-direction: column; gap: 0.75rem; padding: 1.5rem; }

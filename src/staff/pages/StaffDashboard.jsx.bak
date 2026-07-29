@@ -1,0 +1,574 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  BookOpen, Users, CalendarCheck, BookOpenCheck,
+  ClipboardList, Calendar, FileText, CheckCircle, Clock,
+  ArrowRight, Activity, Plus, AlertCircle
+} from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { getStudents, getAllMarks, getAllAttendance, getExams, getNotifications } from '../../api/index';
+import useRealtimeSync from '../../hooks/useRealtimeSync';
+import './StaffDashboard.css';
+import CollegeInfoCard from '../../components/common/CollegeInfoCard';
+
+// Fallback session
+const DEFAULT_SESSION = {
+  id: 'STF001',
+  name: 'Dr. Ananya Rao',
+  dept: 'Computer Science',
+  deptCode: 'CS',
+  role: 'Staff',
+  email: 'ananya@college.edu',
+  subjects: ['Data Structures', 'DBMS']
+};
+
+
+
+const MOCK_LEAVES = [];
+
+const MOCK_ASSIGNMENTS = [];
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const StaffDashboard = () => {
+  const navigate = useNavigate();
+  const [animate, setAnimate] = useState(false);
+  const [staffSession, setStaffSession] = useState(DEFAULT_SESSION);
+
+  // States for DB
+  const [students, setStudents] = useState([]);
+  const [timetable, setTimetable] = useState([]);
+  const [marks, setMarks] = useState([]);
+  const [attendanceLogs, setAttendanceLogs] = useState({});
+  const [assignments, setAssignments] = useState([]);
+  const [leaves, setLeaves] = useState([]);
+  const [exams, setExams] = useState([]);
+
+  // Leave Form State
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({ type: 'Casual Leave', startDate: '', endDate: '', reason: '' });
+  const [leaveSuccess, setLeaveSuccess] = useState(false);
+
+  // 10. Notifications
+  const [notifications, setNotifications] = useState([]);
+
+  const loadDashboardData = useCallback(async () => {
+    try {
+      const [studRes, marksRes, attRes, examsRes, notifRes] = await Promise.all([
+        getStudents(),
+        getAllMarks(),
+        getAllAttendance(),
+        getExams().catch(() => ({ data: [] })),
+        getNotifications().catch(() => ({ data: [] }))
+      ]);
+
+      if (notifRes?.data && Array.isArray(notifRes.data)) setNotifications(notifRes.data);
+      if (studRes?.data) setStudents(studRes.data);
+      if (examsRes?.data) setExams(examsRes.data);
+      if (marksRes?.data) {
+        const mappedMarks = marksRes.data.map(m => ({
+          id: m.studentId,
+          name: m.studentName,
+          dept: m.department,
+          sem: m.semester,
+          internal: m.internalMarks,
+          external: m.semesterMarks,
+          arrears: m.arrearStatus === 'Arrear' ? 1 : 0
+        }));
+        setMarks(mappedMarks);
+      }
+      if (attRes?.data) {
+        const dailyMap = {};
+        attRes.data.forEach(record => {
+          const dateStr = new Date(record.date).toLocaleDateString('en-CA');
+          if (!dailyMap[dateStr]) {
+            dailyMap[dateStr] = {};
+          }
+          dailyMap[dateStr][record.studentId] = record.status?.toLowerCase() || 'present';
+        });
+        setAttendanceLogs(dailyMap);
+      }
+    } catch (err) {
+      console.error('Failed to load live staff dashboard data:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    // 1. Session check
+    const session = sessionStorage.getItem('staff_session');
+    let activeStaff = DEFAULT_SESSION;
+    if (session) {
+      activeStaff = JSON.parse(session);
+      setStaffSession(activeStaff);
+    } else {
+      navigate('/staff/login');
+      return;
+    }
+
+    loadDashboardData();
+
+    // Timetable Setup
+    const timetableRaw = localStorage.getItem(`erp_timetable_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
+    if (timetableRaw) setTimetable(JSON.parse(timetableRaw));
+
+    // Assignments Setup
+    const assignRaw = localStorage.getItem(`erp_assignments_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
+    if (assignRaw) {
+      setAssignments(JSON.parse(assignRaw));
+    } else {
+      localStorage.setItem(`erp_assignments_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(MOCK_ASSIGNMENTS));
+      setAssignments([]);
+    }
+
+    // Leaves Setup
+    const leaveRaw = localStorage.getItem(`erp_leave_requests_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
+    if (leaveRaw) {
+      setLeaves(JSON.parse(leaveRaw));
+    } else {
+      localStorage.setItem(`erp_leave_requests_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(MOCK_LEAVES));
+      setLeaves([]);
+    }
+
+    // Trigger animations
+    const t = setTimeout(() => setAnimate(true), 100);
+    return () => clearTimeout(t);
+  }, [navigate, loadDashboardData]);
+
+  // Auto-refresh when student/marks/attendance/exam data changes
+  useRealtimeSync(loadDashboardData, ['students', 'marks', 'attendance', 'exams']);
+
+  // Calculations scoped to current staff member
+  const staffName = staffSession.name;
+  const staffId = staffSession.referenceId || staffSession.id || staffSession._id || 'STF001';
+  const staffDept = staffSession.dept;
+
+  const [mySubjects, setMySubjects] = useState([]);
+  const [myClasses, setMyClasses] = useState([]);
+
+  useEffect(() => {
+    let dynSubjects = [];
+    let classesMap = [];
+    
+    // Prioritize subjects from the authenticated database session
+    if (staffSession.subjects && Array.isArray(staffSession.subjects) && staffSession.subjects.length > 0) {
+      dynSubjects = staffSession.subjects;
+      classesMap = dynSubjects.map(sub => ({
+        subject: sub,
+        sem: 'Sem 3', // default fallback sem
+        dept: staffDept
+      }));
+    } else {
+      // Fallback to local storage if needed
+      let deptInitialized = false;
+      const savedSubjects = localStorage.getItem(`erp_subjects_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
+      if (savedSubjects) {
+        const allSubs = JSON.parse(savedSubjects);
+        const deptSubs = allSubs.filter(s => s.dept === staffDept);
+        
+        if (deptSubs.length > 0) {
+          deptInitialized = true;
+          const mySubs = deptSubs.filter(sub => {
+            if (!sub.teacher) return false;
+            const t = sub.teacher.toLowerCase().trim();
+            const n = (staffSession.name || '').toLowerCase().trim();
+            return t.includes(n) || n.includes(t);
+          });
+          dynSubjects = [...new Set(mySubs.map(s => s.name))];
+          classesMap = mySubs.map(sub => ({
+            subject: sub.name,
+            sem: sub.sem || 'Sem 3',
+            dept: staffDept
+          }));
+        }
+      }
+      
+      if (dynSubjects.length === 0) {
+        dynSubjects = ['General Course'];
+        classesMap = dynSubjects.map(sub => ({
+          subject: sub,
+          sem: 'Sem 3',
+          dept: staffDept
+        }));
+      }
+    }
+    
+    setMySubjects(dynSubjects);
+    setMyClasses(classesMap);
+  }, [staffDept, staffSession.subjects, staffSession.name]);
+
+  // 3. Timetable filter
+  const myTimetable = timetable.filter(slot => slot.dept === staffDept);
+  const totalClasses = myTimetable.length;
+
+  const todayName = DAYS[new Date().getDay()] || 'Monday';
+  const todayClasses = myTimetable.filter(slot => slot.day?.toLowerCase() === todayName.toLowerCase()).length;
+
+  // 4. Students Assigned (Unique students in their department and target semesters)
+  const targetSems = myClasses.map(c => c.sem);
+  const myStudents = students.filter(s => s.dept === staffDept && targetSems.includes(s.sem));
+  const studentsAssignedCount = myStudents.length;
+
+  // 5. Attendance Pending (If attendance for today's date hasn't been logged for their students)
+  const todayDateStr = new Date().toLocaleDateString('en-CA');
+  const todayAttendance = attendanceLogs[todayDateStr] || {};
+  const attendanceLoggedCount = myStudents.filter(s => todayAttendance[s.id] !== undefined).length;
+  const attendancePending = myStudents.length > 0 && attendanceLoggedCount < myStudents.length;
+
+  // 6. Marks Pending (Students taught by them who do not have grades entered in erp_marks)
+  const myMarks = marks.filter(m => m.dept === staffDept && targetSems.includes(m.sem));
+  // Let's check how many have internal/external marks unset or zero
+  const marksPendingCount = myMarks.filter(m => m.internal === 0 || m.external === 0).length;
+
+  // 7. Assignments Given (Assignments created by this staff member)
+  const myAssignments = assignments.filter(a => a.faculty === staffName);
+  const assignmentsGivenCount = myAssignments.length;
+
+  // 8. Leave requests for this staff
+  const myLeaves = leaves.filter(l => l.staffId === staffId);
+
+  // 9. Exams in staff's department
+  const myExams = exams.filter(ex => ex.dept?.toLowerCase() === staffSession.dept?.toLowerCase());
+
+  // Leave Form Submission
+  const handleApplyLeave = (e) => {
+    e.preventDefault();
+    const newLeave = {
+      id: String(Date.now()),
+      staffId: staffId,
+      staffName: staffName,
+      type: leaveForm.type,
+      startDate: leaveForm.startDate,
+      endDate: leaveForm.endDate,
+      reason: leaveForm.reason,
+      status: 'Pending'
+    };
+    const updatedLeaves = [...leaves, newLeave];
+    setLeaves(updatedLeaves);
+    localStorage.setItem(`erp_leave_requests_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(updatedLeaves));
+    setLeaveSuccess(true);
+    setTimeout(() => {
+      setLeaveModalOpen(false);
+      setLeaveForm({ type: 'Casual Leave', startDate: '', endDate: '', reason: '' });
+      setLeaveSuccess(false);
+    }, 1000);
+  };
+
+  // Chart: Mock performance average across subjects taught
+  const chartData = mySubjects.length > 0 ? mySubjects.map((sub) => ({
+    name: sub.length > 15 ? sub.substring(0, 15) + '...' : sub,
+    Performance: 70 + Math.floor(Math.random() * 20),
+    PassRate: 80 + Math.floor(Math.random() * 15)
+  })) : [
+    { name: 'General', Performance: 85, PassRate: 90 },
+    { name: 'Elective 1', Performance: 75, PassRate: 82 },
+    { name: 'Elective 2', Performance: 88, PassRate: 95 }
+  ];
+
+  return (
+    <div className={`staff-dashboard ${animate ? 'animate-fade-in' : ''}`}>
+      {/* Welcome Banner */}
+      <div className="staff-welcome-banner">
+        <div className="staff-welcome-text">
+          <h1>Welcome, {staffName?.replace('Dr. ', '')?.replace('Prof. ', '') || 'Faculty'}</h1>
+          <p className="staff-welcome-sub">Department of <strong>{staffDept}</strong> · Classroom Instructor</p>
+        </div>
+      </div>
+
+      {/* ── 6 Dashboard Cards ── */}
+      <div className="staff-stats-grid">
+        <div className="staff-stat-card" style={{ border: '1px solid #E3E5EC' }}>
+          <div className="staff-stat-icon" style={{ background: '#EEEDFE', color: 'var(--primary)' }}>
+            <Users size={22} />
+          </div>
+          <div>
+            <p className="staff-stat-label">Students Assigned</p>
+            <p className="staff-stat-value">{studentsAssignedCount}</p>
+            <p className="staff-stat-sub text-muted">Across subjects</p>
+          </div>
+        </div>
+
+        <div className="staff-stat-card" style={{ border: '1px solid #E3E5EC' }}>
+          <div className="staff-stat-icon" style={{ background: '#FAEEDA', color: 'var(--warning)' }}>
+            <CalendarCheck size={22} />
+          </div>
+          <div>
+            <p className="staff-stat-label">Attendance Status</p>
+            <p className={`staff-stat-value text-sm ${attendancePending ? 'text-danger' : 'text-success'}`} style={{ marginTop: '5px', fontSize: '1.2rem', fontWeight: 700 }}>
+              {attendancePending ? 'Pending Today' : 'Logged Today'}
+            </p>
+            <p className="staff-stat-sub text-muted">{attendanceLoggedCount} of {studentsAssignedCount} logged</p>
+          </div>
+        </div>
+
+        <div className="staff-stat-card" style={{ border: '1px solid #E3E5EC' }}>
+          <div className="staff-stat-icon" style={{ background: '#FAEEDA', color: 'var(--warning)' }}>
+            <BookOpenCheck size={22} />
+          </div>
+          <div>
+            <p className="staff-stat-label">Marks Pending</p>
+            <p className="staff-stat-value">{marksPendingCount}</p>
+            <p className="staff-stat-sub text-danger">{marksPendingCount > 0 ? 'Requires uploads' : 'All marks loaded'}</p>
+          </div>
+        </div>
+
+        <div className="staff-stat-card" style={{ border: '1px solid #E3E5EC' }}>
+          <div className="staff-stat-icon" style={{ background: '#EEEDFE', color: 'var(--primary)' }}>
+            <ClipboardList size={22} />
+          </div>
+          <div>
+            <p className="staff-stat-label">Assignments Given</p>
+            <p className="staff-stat-value">{assignmentsGivenCount}</p>
+            <p className="staff-stat-sub text-muted">Created coursework</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Grid Content */}
+      <div className="staff-grid-row">
+        {/* Left Column: Charts, Subjects & Classes */}
+        <div className="staff-col-main">
+          {/* Performance Analytics Chart */}
+          <div className="glass-card staff-chart-card">
+            <h3>Average Class Performance (%)</h3>
+            <p className="text-muted text-sm">Class average tracker across evaluation milestones</p>
+            <div style={{ height: '240px', width: '100%', marginTop: '1.25rem' }}>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="staffPerfGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+                  <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
+                  <YAxis domain={[60, 100]} stroke="var(--text-muted)" fontSize={11} tickLine={false} />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', background: 'var(--bg-secondary)', color: 'var(--text-main)', boxShadow: 'var(--shadow-md)', fontSize: 12 }} />
+                  <Area type="monotone" dataKey="Performance" name="Class Average %" stroke="#3b82f6" strokeWidth={2.5} fill="url(#staffPerfGrad)" dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: 'white' }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* My Subjects & My Classes Row */}
+          <div className="staff-split-row">
+            <div className="glass-card flex-1">
+              <div className="staff-card-header">
+                <h3><BookOpen size={18} className="text-primary" /> My Subjects</h3>
+                <span className="badge-blue">{mySubjects.length} Active</span>
+              </div>
+              <div className="staff-list">
+                {mySubjects.map((sub, idx) => (
+                  <div key={idx} className="staff-list-item">
+                    <div className="item-icon-circle blue">
+                      <BookOpen size={16} />
+                    </div>
+                    <div className="item-info">
+                      <p className="item-title">{sub}</p>
+                      <p className="item-subtitle">{staffDept} Department</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="glass-card flex-1">
+              <div className="staff-card-header">
+                <h3><Users size={18} className="text-success" /> My Classes</h3>
+                <span className="badge-green">{myClasses.length} Scheduled</span>
+              </div>
+              <div className="staff-list">
+                {myClasses.map((cls, idx) => (
+                  <div key={idx} className="staff-list-item">
+                    <div className="item-icon-circle green">
+                      <Users size={16} />
+                    </div>
+                    <div className="item-info">
+                      <p className="item-title">{cls.dept} - {cls.sem}</p>
+                      <p className="item-subtitle">Subject: {cls.subject}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Leave Requests & Timeline */}
+        <div className="staff-col-side">
+          <div className="glass-card leave-status-card">
+            <div className="staff-card-header" style={{ marginBottom: '1.25rem' }}>
+              <h3><FileText size={18} className="text-warning-cgpa" /> Leave Requests</h3>
+              <button className="btn-add-leave" onClick={() => setLeaveModalOpen(true)}>
+                <Plus size={14} /> New Request
+              </button>
+            </div>
+
+            <div className="leave-list">
+              {myLeaves.length === 0 ? (
+                <p className="no-leave-data">No leave history recorded.</p>
+              ) : (
+                myLeaves.map(l => (
+                  <div key={l.id} className="leave-item">
+                    <div className="leave-item-header">
+                      <span className="leave-type">{l.type}</span>
+                      <span className={`status-badge-leave ${l.status?.toLowerCase() || ''}`}>
+                        {l.status}
+                      </span>
+                    </div>
+                    <p className="leave-dates"><Clock size={12} /> {l.startDate} to {l.endDate}</p>
+                    <p className="leave-reason">"{l.reason}"</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Campus Alerts & Notifications */}
+          <div className="glass-card leave-status-card" style={{ marginTop: '1.5rem' }}>
+            <div className="staff-card-header" style={{ marginBottom: '1.25rem' }}>
+              <h3><AlertCircle size={18} className="text-warning-cgpa" /> Campus Alerts & Board</h3>
+              {notifications.length > 0 && (
+                <span className="badge-blue" style={{ background: '#ef44441a', color: '#ef4444', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
+                  {notifications.filter(n => !n.isRead).length} NEW
+                </span>
+              )}
+            </div>
+
+            <div className="leave-list" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+              {notifications.length === 0 ? (
+                <p className="no-leave-data">No announcements available.</p>
+              ) : (
+                notifications.map((n, i) => (
+                  <div key={n._id || i} className="leave-item" style={{ borderLeft: `3px solid ${n.type === 'Warning' ? '#ef4444' : n.type === 'Success' ? '#10b981' : '#f59e0b'}`, paddingLeft: '0.75rem', marginBottom: '0.8rem' }}>
+                    <div className="leave-item-header" style={{ marginBottom: '4px' }}>
+                      <span className="leave-type" style={{ color: 'var(--text-main)', fontWeight: 700, fontSize: '0.85rem' }}>{n.title}</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(n.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <p className="leave-reason" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                      {n.message}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Dynamic Upcoming Exams */}
+          <div className="glass-card leave-status-card" style={{ marginTop: '1.5rem' }}>
+            <div className="staff-card-header" style={{ marginBottom: '1.25rem' }}>
+              <h3><Calendar size={18} className="text-primary" /> Upcoming Exams</h3>
+              <span className="badge-blue" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
+                {myExams.length} Active
+              </span>
+            </div>
+
+            <div className="leave-list" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+              {myExams.length === 0 ? (
+                <p className="no-leave-data">No exams scheduled for your department.</p>
+              ) : (
+                myExams.map((ex, i) => (
+                  <div key={ex._id || ex.id || i} className="leave-item" style={{ borderLeft: '3px solid #8b5cf6', paddingLeft: '0.75rem', marginBottom: '0.8rem' }}>
+                    <div className="leave-item-header">
+                      <span className="leave-type" style={{ color: 'var(--text-main)', fontWeight: 700 }}>{ex.name}</span>
+                      <span className="status-badge-leave approved" style={{ background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', fontSize: '0.7rem', padding: '1px 5px', borderRadius: '4px' }}>
+                        {ex.sem || 'Sem 3'}
+                      </span>
+                    </div>
+                    <p className="leave-dates" style={{ fontSize: '0.82rem', margin: '2px 0 4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <BookOpen size={12} className="text-muted" /> {ex.subject}
+                    </p>
+                    <p className="leave-reason" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                      📅 <strong>{ex.date}</strong> · ⏱ {ex.time} <br />
+                      📍 Venue: <strong>{ex.room || ex.hall || 'Main Hall'}</strong> ({ex.maxMarks} Marks)
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Quick Actions Portal */}
+          <div className="glass-card quick-actions-card">
+            <h3>Quick Actions</h3>
+            <div className="quick-actions-grid">
+              <button className="action-btn" onClick={() => navigate('/staff/attendance')}>
+                <CalendarCheck size={20} />
+                <span>Mark Attendance</span>
+              </button>
+              <button className="action-btn" onClick={() => navigate('/staff/marks')}>
+                <BookOpenCheck size={20} />
+                <span>Upload Marks</span>
+              </button>
+              <button className="action-btn" onClick={() => navigate('/staff/assignments')}>
+                <ClipboardList size={20} />
+                <span>Assignments</span>
+              </button>
+              <button className="action-btn" onClick={() => navigate('/staff/timetable')}>
+                <Calendar size={20} />
+                <span>Timetable</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* LEAVE MODAL */}
+      {leaveModalOpen && (
+        <div className="modal-overlay" onClick={() => setLeaveModalOpen(false)}>
+          <div className="modal-card glass-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>Apply for Leave</h2>
+                <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: '2px' }}>Submit a request to your Head of Department.</p>
+              </div>
+              <button className="btn-icon" onClick={() => setLeaveModalOpen(false)}><AlertCircle size={20} /></button>
+            </div>
+
+            {leaveSuccess && (
+              <div className="modal-success-flash">
+                <CheckCircle size={18} /> Leave request submitted successfully!
+              </div>
+            )}
+
+            <form onSubmit={handleApplyLeave} className="modal-form">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Leave Type</label>
+                  <select value={leaveForm.type} onChange={e => setLeaveForm({ ...leaveForm, type: e.target.value })}>
+                    <option value="Casual Leave">Casual Leave</option>
+                    <option value="Sick Leave">Sick Leave</option>
+                    <option value="Maternity/Paternity Leave">Maternity/Paternity Leave</option>
+                    <option value="Duty Leave">Duty Leave</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Start Date</label>
+                  <input type="date" required value={leaveForm.startDate} onChange={e => setLeaveForm({ ...leaveForm, startDate: e.target.value })} />
+                </div>
+
+                <div className="form-group">
+                  <label>End Date</label>
+                  <input type="date" required value={leaveForm.endDate} onChange={e => setLeaveForm({ ...leaveForm, endDate: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '1rem' }}>
+                <label>Reason for Leave</label>
+                <textarea required placeholder="Brief description of reason..." rows="3" value={leaveForm.reason} onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })} />
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" className="btn-ghost" onClick={() => setLeaveModalOpen(false)}>Cancel</button>
+                <button type="submit" className="btn-primary">Submit Request</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default StaffDashboard;

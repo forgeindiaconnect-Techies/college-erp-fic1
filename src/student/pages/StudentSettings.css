@@ -1,0 +1,21 @@
+.student-settings-page { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.settings-card-s { padding: 2rem; max-width: 800px; }
+
+.settings-form-s { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.form-grid-settings-s {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+@media (max-width: 600px) { .form-grid-settings-s { grid-template-columns: 1fr; } }
+
+.btn-save-settings-s {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  background: linear-gradient(135deg, #14b8a6, #0d9488); color: white;
+  padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem;
+  border: none; cursor: pointer; transition: all 0.3s ease;
+  width: max-content; font-family: inherit;
+}
+.btn-save-settings-s:hover { transform: translateY(-1px); }

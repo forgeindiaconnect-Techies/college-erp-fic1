@@ -1,0 +1,647 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Calendar, Check, X, Users, Save, Search,
+  Filter, CheckCircle, AlertTriangle, ArrowLeft,
+  Clock, ShieldAlert, HeartPulse, UserMinus, CalendarCheck
+} from 'lucide-react';
+import { getStudents, getAllAttendance, createAttendance, getTimetable, getMyFacultyAllocations } from '../../api/index';
+import CustomSelect from '../../components/CustomSelect';
+import './StaffAttendance.css';
+
+// Fallback session
+const DEFAULT_SESSION = {
+  name: 'Dr. Ananya Rao',
+  dept: 'Computer Science Engineering',
+  deptCode: 'CS',
+  role: 'Staff',
+  subjects: ['Data Structures', 'DBMS']
+};
+
+const getTodayDateStr = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const r = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${r}`;
+};
+
+const AVATAR_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#6366F1'];
+const getInitials = (name) => name.replace('Dr. ', '').replace('Prof. ', '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+// DEPT_SUBJECTS removed as it is fetched from MongoDB
+const StaffAttendance = () => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [staffSession, setStaffSession] = useState(DEFAULT_SESSION);
+
+  // Database states
+  const [students, setStudents] = useState([]);
+  const [rawAttendanceList, setRawAttendanceList] = useState([]);
+  
+  // Timetable states
+  const [timetable, setTimetable] = useState({ times: [], schedule: [] });
+
+  // Filter & selection states
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedPeriod, setSelectedPeriod] = useState('Period 1');
+  const [selectedDate, setSelectedDate] = useState(getTodayDateStr());
+  const [search, setSearch] = useState('');
+  const [targetSem, setTargetSem] = useState('Sem 6'); 
+  const [targetSection, setTargetSection] = useState('A'); 
+  const [subjectsList, setSubjectsList] = useState([]);
+  const [sectionsList, setSectionsList] = useState([]);
+  const [periodsList, setPeriodsList] = useState([]);
+
+  // Marking state
+  const [markingState, setMarkingState] = useState({});
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  const loadData = async (activeStaff, sem) => {
+    try {
+      setLoading(true);
+      const [studRes, attRes, ttRes, allocRes] = await Promise.all([
+        getStudents().catch(() => ({ data: [] })),
+        getAllAttendance().catch(() => ({ data: [] })),
+        getTimetable(activeStaff.dept, sem).catch(() => ({ data: { times: [], schedule: [] } })),
+        getMyFacultyAllocations().catch(() => ({ data: [] }))
+      ]);
+
+      const backendStudents = studRes?.data || [];
+      const erpStudents = JSON.parse(localStorage.getItem(`erp_students_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
+      
+      const combinedStudents = [...backendStudents];
+      erpStudents.forEach(ls => {
+        if (!combinedStudents.find(cs => cs.id === ls.id || cs.rollNo === ls.rollNo)) {
+          combinedStudents.push(ls);
+        }
+      });
+      setStudents(combinedStudents);
+
+      let backendAtt = attRes?.data || [];
+      const localAtt = JSON.parse(localStorage.getItem(`erp_attendance_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
+      
+      const combinedAtt = [...backendAtt];
+      localAtt.forEach(ls => {
+        if (!combinedAtt.find(ca => ca._id === ls._id)) {
+          combinedAtt.push(ls);
+        }
+      });
+      setRawAttendanceList(combinedAtt);
+
+      const ttData = ttRes?.data || { times: [], schedule: [] };
+      setTimetable(ttData);
+
+      // Extract subjects/sections from allocations for this staff
+      const allocations = allocRes?.data || [];
+      const dynSubjects = [];
+      const dynSections = [];
+      allocations.forEach(alloc => {
+        if (alloc.semester === sem && alloc.subjectId) {
+          if (!dynSubjects.includes(alloc.subjectId.subjectName)) dynSubjects.push(alloc.subjectId.subjectName);
+          if (!dynSections.includes(alloc.section)) dynSections.push(alloc.section);
+        }
+      });
+      if (dynSubjects.length === 0) dynSubjects.push('No Subjects Assigned');
+      if (dynSections.length === 0) dynSections.push('A');
+      
+      setSubjectsList(dynSubjects);
+      setSectionsList(dynSections);
+      if (!dynSubjects.includes(selectedSubject)) setSelectedSubject(dynSubjects[0]);
+      if (!dynSections.includes(targetSection)) setTargetSection(dynSections[0]);
+
+      // Extract periods
+      const times = ttData.times || [];
+      const dynPeriods = times.map((t, i) => `Period ${i + 1} (${t})`);
+      setPeriodsList(dynPeriods.length > 0 ? dynPeriods : ['Period 1']);
+      if (!dynPeriods.includes(selectedPeriod)) {
+        setSelectedPeriod(dynPeriods.length > 0 ? dynPeriods[0] : 'Period 1');
+      }
+
+    } catch (err) {
+      console.error('Failed to load attendance page data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const session = sessionStorage.getItem('staff_session');
+    let activeStaff = DEFAULT_SESSION;
+    if (session) {
+      activeStaff = JSON.parse(session);
+      setStaffSession(activeStaff);
+    } else {
+      navigate('/staff/login');
+      return;
+    }
+    loadData(activeStaff, targetSem);
+  }, [navigate, targetSem]); // Reload timetable when sem changes
+
+  const staffDept = staffSession.dept;
+
+  // Filter students based on dept, sem, and section
+  const myClassStudents = students.filter(s => 
+    (s.dept === staffDept || s.department === staffDept) && 
+    (s.sem === targetSem || s.semester === targetSem) &&
+    (s.section === targetSection)
+  );
+
+  // Compute records with current percentage
+  const getStudentRecords = () => {
+    return myClassStudents.map(s => {
+      const matches = rawAttendanceList.filter(r => r.studentId === (s.id || s._id));
+      const presentDays = matches.filter(r => r.status === 'Present').length;
+      const totalDays = matches.length;
+      let baseAtt = 85;
+      if (s.attendance) {
+        const parsed = parseInt(String(s.attendance).replace('%', '').trim());
+        if (!isNaN(parsed)) baseAtt = parsed;
+      }
+      const percent = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : baseAtt;
+
+      return {
+        ...s,
+        presentDays,
+        absentDays: totalDays - presentDays,
+        percent,
+        totalDays
+      };
+    });
+  };
+
+  const records = getStudentRecords();
+  const filteredRecords = records.filter(r => 
+    r.name.toLowerCase().includes(search.toLowerCase()) || (r.id || r._id || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Initial Marking State
+  useEffect(() => {
+    const initialMarking = {};
+    const formattedDate = new Date(selectedDate);
+    formattedDate.setUTCHours(0, 0, 0, 0);
+
+    // See if attendance already exists for this exact session
+    const existingSessionRecords = rawAttendanceList.filter(r => {
+      const rDate = new Date(r.attendanceDate || r.date);
+      rDate.setUTCHours(0,0,0,0);
+      return rDate.getTime() === formattedDate.getTime() && 
+             (r.subjectId === selectedSubject || r.subject === selectedSubject) && 
+             (r.periodId === selectedPeriod.split(' ')[1] || r.period === selectedPeriod.split(' ')[1]);
+    });
+
+    myClassStudents.forEach(s => {
+      const existingRecord = existingSessionRecords.find(r => r.studentId === (s.id || s._id));
+      initialMarking[s.id || s._id] = existingRecord ? existingRecord.status : '';
+    });
+    setMarkingState(initialMarking);
+    setSaveError(''); // Clear error on change
+  }, [selectedDate, selectedSubject, selectedPeriod, rawAttendanceList, students, targetSem, targetSection]);
+
+  // Bulk marking
+  const handleBulkMark = (status) => {
+    const updated = { ...markingState };
+    filteredRecords.forEach(r => {
+      updated[r.id || r._id] = status;
+    });
+    setMarkingState(updated);
+  };
+
+  const handleMarkStudent = (studentId, status) => {
+    setMarkingState(prev => ({
+      ...prev,
+      [studentId]: status
+    }));
+  };
+
+  const isSessionAlreadyMarked = () => {
+    const formattedDate = new Date(selectedDate);
+    formattedDate.setUTCHours(0, 0, 0, 0);
+    return rawAttendanceList.some(r => {
+      const rDate = new Date(r.attendanceDate || r.date);
+      rDate.setUTCHours(0,0,0,0);
+      return rDate.getTime() === formattedDate.getTime() && 
+             (r.subjectId === selectedSubject || r.subject === selectedSubject) && 
+             (r.periodId === selectedPeriod.split(' ')[1] || r.period === selectedPeriod.split(' ')[1]);
+    });
+  };
+
+  // Save attendance
+  const handleSaveAttendance = async () => {
+    // If session is already marked, we can still re-submit it (Edit flow)
+
+    const unmarked = myClassStudents.filter(s => !markingState[s.id || s._id]);
+    if (unmarked.length > 0) {
+      alert(`Please mark attendance for all students. ${unmarked.length} student(s) unmarked.`);
+      return;
+    }
+
+    const bulkRecords = myClassStudents.map(s => ({
+      tenantId: sessionStorage.getItem('tenantId') || 'mock_college_id',
+      studentId: s.id || s._id,
+      studentName: s.name,
+      department: staffDept,
+      semester: targetSem,
+      attendanceDate: new Date(selectedDate),
+      periodId: selectedPeriod.split(' ')[1],
+      status: markingState[s.id || s._id],
+      subjectId: selectedSubject,
+      markedBy: staffSession.name
+    }));
+
+    try {
+      const res = await createAttendance(bulkRecords);
+      if (res?.status === 201 || res?.status === 200) {
+        setSaveSuccess(true);
+        setSaveError('');
+        await loadData(staffSession, targetSem);
+        setTimeout(() => {
+          setSaveSuccess(false);
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Failed to save attendance via API, persisting locally:', err);
+      // Fallback to localStorage
+      try {
+        const existingLocal = JSON.parse(localStorage.getItem(`erp_attendance_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
+        
+        const bulkRecords = myClassStudents.map(s => ({
+          _id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          studentId: s.id || s._id,
+          studentName: s.name,
+          department: staffDept,
+          semester: targetSem,
+          date: new Date(selectedDate).toISOString(),
+          period: selectedPeriod.split(' ')[1],
+          status: markingState[s.id || s._id],
+          subject: selectedSubject,
+          markedBy: staffSession.name
+        }));
+        
+        localStorage.setItem(`erp_attendance_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify([...existingLocal, ...bulkRecords]));
+        setSaveSuccess(true);
+        setSaveError('');
+        await loadData(staffSession, targetSem);
+        setTimeout(() => {
+          setSaveSuccess(false);
+        }, 2000);
+      } catch (e) {
+        setSaveError(err.response?.data?.message || 'Failed to save attendance locally.');
+      }
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (filteredRecords.length === 0) {
+      alert("No students to export.");
+      return;
+    }
+    
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += `Subject: ${selectedSubject}, Date: ${selectedDate}, Period: ${selectedPeriod}, Faculty: ${staffSession.name}\n\n`;
+    csvContent += "Register No,Student Name,Marked Status,Overall Percentage\n";
+    
+    filteredRecords.forEach(r => {
+      const status = markingState[r.id || r._id] || 'Not Marked';
+      csvContent += `${r.id || r._id},${r.name},${status},${r.percent}%\n`;
+    });
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Attendance_Report_${selectedSubject}_${selectedDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const getColor = (p) => p >= 90 ? 'var(--success)' : p >= 75 ? 'var(--warning)' : 'var(--danger)';
+
+  // Analytics Computation
+  const markedStudents = myClassStudents.filter(s => markingState[s.id || s._id]);
+  const presentCount = markedStudents.filter(s => markingState[s.id || s._id] === 'Present').length;
+  const absentCount = markedStudents.filter(s => markingState[s.id || s._id] === 'Absent').length;
+  const leaveCount = markedStudents.filter(s => markingState[s.id || s._id] === 'On Leave').length;
+  const medicalCount = markedStudents.filter(s => markingState[s.id || s._id] === 'Medical Leave').length;
+  const totalMarked = markedStudents.length;
+  const attRate = totalMarked > 0 ? ((presentCount / totalMarked) * 100).toFixed(1) : 0;
+
+  return (
+    <div className="attendance-management-staff animate-fade-in">
+      {/* Faculty Info Banner */}
+      <div className="mb-4 border rounded-xl p-4 flex justify-between items-center" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm"
+            style={{ backgroundColor: 'var(--primary)', color: 'white' }}
+          >
+            {getInitials(staffSession.name)}
+          </div>
+          <div>
+            <h3 className="font-semibold text-[var(--text-main)] m-0">{staffSession.name}</h3>
+            <p className="text-sm text-[var(--text-muted)] m-0">{staffSession.dept} Department</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="font-medium m-0" style={{ color: 'var(--text-main)' }}>{new Date(selectedDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          <p className="text-sm font-semibold m-0" style={{ color: 'var(--primary)' }}>{selectedSubject !== 'No Subjects Assigned' ? selectedSubject : ''}</p>
+        </div>
+      </div>
+
+      <div className="page-header-staff" style={{ marginTop: 0 }}>
+        <div className="header-left">
+          
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h1 style={{ color: 'var(--text-main)', fontSize: '1.6rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CalendarCheck style={{ color: 'var(--primary)' }} size={28} /> Take Attendance
+            </h1>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem', marginBottom: 0 }}>
+              Record period-wise roll call for your assigned subjects.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {saveSuccess && (
+        <div className="success-banner mb-4">
+          <CheckCircle size={18} /> Attendance submitted successfully to central database!
+        </div>
+      )}
+      {saveError && (
+        <div className="p-4 mb-4 bg-red-50 text-red-600 border border-red-200 rounded-lg flex items-center gap-2 font-medium dark:bg-red-900/20 dark:border-red-800/30">
+          <AlertTriangle size={18} /> {saveError}
+        </div>
+      )}
+
+      {/* Course, Period & Date Selector Row */}
+      <div className="glass-card selection-card">
+        <div className="selectors-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          <div className="selector-group">
+            <label><Users size={14} /> Class Group (Semester)</label>
+            <CustomSelect
+              value={targetSem}
+              onChange={e => setTargetSem(e.target.value)}
+              options={['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6', 'Sem 7', 'Sem 8'].map(sem => ({ value: sem, label: `${staffDept} - ${sem}` }))}
+              placeholder="Select Class Group"
+            />
+          </div>
+
+          <div className="selector-group">
+            <label><Filter size={14} /> Section</label>
+            <CustomSelect
+              value={targetSection}
+              onChange={e => setTargetSection(e.target.value)}
+              options={sectionsList.map(s => ({ value: s, label: `Section ${s}` }))}
+              placeholder="Select Section"
+            />
+          </div>
+
+          <div className="selector-group">
+            <label><Filter size={14} /> Assigned Subject</label>
+            <CustomSelect
+              value={selectedSubject}
+              onChange={e => setSelectedSubject(e.target.value)}
+              options={subjectsList.map(sub => ({ value: sub, label: sub }))}
+              placeholder="Select Assigned Subject"
+            />
+          </div>
+
+          <div className="selector-group">
+            <label><Clock size={14} /> Period / Hour</label>
+            <CustomSelect
+              value={selectedPeriod}
+              onChange={e => setSelectedPeriod(e.target.value)}
+              options={periodsList.map(p => ({ value: p, label: p }))}
+              placeholder="Select Period / Hour"
+            />
+          </div>
+
+          <div className="selector-group">
+            <label><Calendar size={14} /> Attendance Date</label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              className="selector-date"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Analytics Banner */}
+      {!loading && filteredRecords.length > 0 && (
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <div className="glass-card p-4 text-center" style={{ flex: '1', minWidth: '120px' }}>
+            <p className="text-sm text-[var(--text-muted)] font-medium mb-1">Total Students</p>
+            <h3 className="text-xl font-bold text-[var(--text-main)] m-0">{myClassStudents.length}</h3>
+          </div>
+          <div className="glass-card p-4 text-center" style={{ flex: '1', minWidth: '120px', border: '1px solid #E3E5EC' }}>
+            <p className="text-sm text-[var(--text-muted)] font-medium mb-1">Present</p>
+            <h3 className="text-xl font-bold" style={{ color: '#10b981', margin: 0 }}>{presentCount}</h3>
+          </div>
+          <div className="glass-card p-4 text-center" style={{ flex: '1', minWidth: '120px', border: '1px solid #E3E5EC' }}>
+            <p className="text-sm text-[var(--text-muted)] font-medium mb-1">Absent</p>
+            <h3 className="text-xl font-bold" style={{ color: '#ef4444', margin: 0 }}>{absentCount}</h3>
+          </div>
+          <div className="glass-card p-4 text-center" style={{ flex: '1', minWidth: '120px', border: '1px solid #E3E5EC' }}>
+            <p className="text-sm text-[var(--text-muted)] font-medium mb-1">On Leave</p>
+            <h3 className="text-xl font-bold" style={{ color: '#f97316', margin: 0 }}>{leaveCount + medicalCount}</h3>
+          </div>
+          <div className="glass-card p-4 text-center" style={{ flex: '1', minWidth: '120px', border: '1px solid #E3E5EC' }}>
+            <p className="text-sm text-[var(--text-muted)] font-medium mb-1">Live Rate</p>
+            <h3 className="text-xl font-bold" style={{ color: '#3b82f6', margin: 0 }}>{attRate}%</h3>
+          </div>
+        </div>
+      )}
+
+      {/* Directory / Marking Panel */}
+      <div className="glass-card table-section-card">
+        <div className="table-filters-bar flex flex-wrap gap-4 justify-between items-center p-4 border-b border-[var(--border-color)]">
+          <div className="search-box-attendance flex-1 min-w-[250px]">
+            <Search size={17} className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search student by name or register no..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="bulk-actions-group flex gap-2">
+            <button className="px-4 py-2 bg-blue-500/10 text-blue-600 rounded-lg text-sm font-semibold hover:bg-blue-500/20 transition-colors flex items-center gap-2" onClick={handleExportCSV}>
+              Download CSV
+            </button>
+            <button className="px-4 py-2 bg-green-500/10 text-green-600 rounded-lg text-sm font-semibold hover:bg-green-500/20 transition-colors" onClick={() => handleBulkMark('Present')}>
+              Mark All Present
+            </button>
+            <button className="px-4 py-2 bg-red-500/10 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-500/20 transition-colors" onClick={() => handleBulkMark('Absent')}>
+              Mark All Absent
+            </button>
+          </div>
+        </div>
+
+        <div className="table-container-attendance">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-[var(--bg-secondary)] text-[var(--text-muted)] text-sm">
+                <th className="p-4" style={{ width: '50px' }}>#</th>
+                <th className="p-4">Student Details</th>
+                <th className="p-4">Register No</th>
+                <th className="p-4">Overall %</th>
+                <th className="p-4">Current Attendance</th>
+                <th className="p-4 text-center">Mark Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <tr key={i} className="border-b border-[var(--border-color)]">
+                    {Array.from({ length: 6 }).map((_, j) => (
+                      <td key={j} className="p-4">
+                        <div className="skeleton" style={{ height: '20px', borderRadius: '4px' }}></div>
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : filteredRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-[var(--text-muted)]">No students registered in this class.</td>
+                </tr>
+              ) : (
+                filteredRecords.map((r, idx) => {
+                  const status = markingState[r.id || r._id] || '';
+                  const disabledRow = false; // Staff can now edit attendance
+                  
+                  const formattedDate = new Date(selectedDate);
+                  formattedDate.setUTCHours(0, 0, 0, 0);
+                  const savedRecord = rawAttendanceList.find(record => {
+                    const rDate = new Date(record.attendanceDate || record.date);
+                    rDate.setUTCHours(0,0,0,0);
+                    return record.studentId === (r.id || r._id) &&
+                           rDate.getTime() === formattedDate.getTime() && 
+                           (record.subjectId === selectedSubject || record.subject === selectedSubject) && 
+                           (record.periodId === selectedPeriod.split(' ')[1] || record.period === selectedPeriod.split(' ')[1]);
+                  });
+                  const savedStatus = savedRecord ? savedRecord.status : null;
+
+                  return (
+                    <tr key={r.id || r._id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-secondary)] transition-colors">
+                      <td className="p-4 text-[var(--text-muted)]">{idx + 1}</td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                            style={{ backgroundColor: AVATAR_COLORS[idx % AVATAR_COLORS.length] }}
+                          >
+                            {getInitials(r.name)}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-[var(--text-main)] m-0">{r.name}</p>
+                            <p className="text-xs text-[var(--text-muted)] m-0">{r.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4"><span className="font-mono text-sm bg-[var(--bg-secondary)] px-2 py-1 rounded text-[var(--text-main)]">{r.id || r._id}</span></td>
+                      <td className="p-4 font-bold" style={{ color: getColor(r.percent) }}>{r.percent}%</td>
+                      <td className="p-4">
+                        {status ? (
+                          <span 
+                            style={{ 
+                              padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', border: '1px solid',
+                              ...(status === 'Present' ? { backgroundColor: '#dcfce7', color: '#16a34a', borderColor: '#bbf7d0' } :
+                                  status === 'Absent' ? { backgroundColor: '#fee2e2', color: '#dc2626', borderColor: '#fecaca' } :
+                                  status === 'Leave' ? { backgroundColor: '#ffedd5', color: '#ea580c', borderColor: '#fed7aa' } :
+                                  { backgroundColor: '#e0f2fe', color: '#0284c7', borderColor: '#bae6fd' })
+                            }}
+                          >
+                            {status} {status === 'Present' ? '(P)' : status === 'Absent' ? '(A)' : status === 'Leave' ? '(L)' : '(M)'}
+                          </span>
+                        ) : savedStatus ? (
+                          <span 
+                            style={{ 
+                              padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold',
+                              ...(savedStatus === 'Present' ? { backgroundColor: '#dcfce7', color: '#16a34a' } :
+                                  savedStatus === 'Absent' ? { backgroundColor: '#fee2e2', color: '#dc2626' } :
+                                  savedStatus === 'Leave' ? { backgroundColor: '#ffedd5', color: '#ea580c' } :
+                                  { backgroundColor: '#e0f2fe', color: '#0284c7' })
+                            }}
+                          >
+                            {savedStatus} {savedStatus === 'Present' ? '(P)' : savedStatus === 'Absent' ? '(A)' : savedStatus === 'Leave' ? '(L)' : '(M)'}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-semibold px-2 py-1 bg-gray-100 text-gray-500 rounded-md border border-gray-200">Not Marked</span>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            disabled={disabledRow}
+                            className={`mark-btn ${(status || savedStatus) === 'Present' ? 'btn-p-active' : 'btn-p-inactive'}`}
+                            style={{}}
+                            onClick={() => handleMarkStudent(r.id || r._id, 'Present')}
+                            title="Present"
+                          >
+                            <Check size={14} className="mr-1" /> P
+                          </button>
+                          <button
+                            type="button"
+                            disabled={disabledRow}
+                            className={`mark-btn ${(status || savedStatus) === 'Absent' ? 'btn-a-active' : 'btn-a-inactive'}`}
+                            style={{}}
+                            onClick={() => handleMarkStudent(r.id || r._id, 'Absent')}
+                            title="Absent"
+                          >
+                            <X size={14} className="mr-1" /> A
+                          </button>
+                          <button
+                            type="button"
+                            disabled={disabledRow}
+                            className={`mark-btn ${(status || savedStatus) === 'Leave' ? 'btn-l-active' : 'btn-l-inactive'}`}
+                            style={{}}
+                            onClick={() => handleMarkStudent(r.id || r._id, 'Leave')}
+                            title="On Leave"
+                          >
+                            <UserMinus size={14} className="mr-1" /> L
+                          </button>
+                          <button
+                            type="button"
+                            disabled={disabledRow}
+                            className={`mark-btn ${!(status || savedStatus) || (status || savedStatus) === 'Not Marked' ? 'btn-m-active' : 'btn-m-inactive'}`}
+                            style={{}}
+                            onClick={() => handleMarkStudent(r.id || r._id, 'Not Marked')}
+                            title="Clear"
+                          >
+                            <HeartPulse size={14} className="mr-1" /> M
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] flex flex-col justify-center items-center rounded-b-xl gap-4">
+          <p className="text-sm text-[var(--text-muted)] flex items-center justify-center gap-2 m-0">
+            <ShieldAlert size={16} /> 
+            {isSessionAlreadyMarked() ? 'This session is already logged. You can modify and re-submit.' : 'Double check statuses before saving.'}
+          </p>
+          <button
+            type="button"
+            className="flex items-center justify-center w-full max-w-md gap-2 px-6 py-3.5 bg-blue-600 text-white text-lg font-bold rounded-xl shadow-xl hover:bg-blue-700 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:transform-none"
+            onClick={handleSaveAttendance}
+            disabled={filteredRecords.length === 0}
+          >
+            <Save size={20} /> Submit Attendance Now
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default StaffAttendance;

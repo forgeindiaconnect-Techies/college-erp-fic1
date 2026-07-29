@@ -1,0 +1,19 @@
+<svg width="200" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <mask id="swoosh-mask">
+      <rect x="0" y="0" width="200" height="60" fill="white" />
+      <path d="M14 44 Q 25 10 60 10 Q 35 22 14 44 Z" fill="black" stroke="black" stroke-width="3.5" stroke-linejoin="round" />
+    </mask>
+  </defs>
+
+  <g mask="url(#swoosh-mask)">
+    <rect x="15" y="14" width="10" height="30" fill="white" />
+    <rect x="25" y="14" width="20" height="7" fill="white" />
+    <rect x="25" y="25.5" width="15" height="6" fill="white" />
+    <rect x="25" y="37" width="20" height="7" fill="white" />
+  </g>
+  
+  <path d="M14 44 Q 25 10 60 10 Q 35 22 14 44 Z" fill="#0066CC" />
+  
+  <text x="49" y="44" fill="white" font-size="34" font-weight="bold" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" letter-spacing="1">RPSYS</text>
+</svg>

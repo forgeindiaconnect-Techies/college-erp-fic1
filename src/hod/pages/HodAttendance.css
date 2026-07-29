@@ -1,0 +1,84 @@
+.attendance-page { display: flex; flex-direction: column; gap: 2rem; }
+.page-header { display: flex; justify-content: space-between; align-items: flex-end; }
+.page-header h1 { font-size: 1.8rem; margin-bottom: 0.4rem; }
+.text-muted { color: var(--text-muted); }
+
+.sm-summary-row { display: grid; gap: 1.2rem; }
+.four-col { grid-template-columns: repeat(4, 1fr); }
+.sm-summary-card { padding: 1.2rem 1.5rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.sm-summary-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
+.sm-summary-value { font-size: 1.8rem; font-weight: 700; color: var(--text-main); }
+
+.alert-banner {
+  display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap;
+  background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25);
+  border-radius: var(--border-radius); padding: 1.2rem 1.5rem;
+  color: var(--danger); font-size: 0.95rem;
+}
+.alert-names { display: flex; flex-wrap: wrap; gap: 0.5rem; width: 100%; margin-top: 0.5rem; }
+.alert-name-tag { background: rgba(239,68,68,0.1); padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.8rem; font-weight: 500; }
+
+.attendance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+.col-span-2 { grid-column: span 2; }
+.col-span-3 { grid-column: span 3; }
+.chart-section { padding: 1.5rem; }
+.chart-section h3 { font-size: 1.1rem; font-weight: 600; }
+
+/* Mark Attendance Interactive Panel */
+.mark-attendance-panel { display: flex; flex-direction: column; }
+.form-row-compact { display: flex; gap: 0.75rem; }
+.form-group-compact { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; }
+.form-group-compact label { font-size: 0.76rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+.form-group-compact input, .form-group-compact select {
+  padding: 0.45rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);
+  background: var(--bg-primary); color: var(--text-main); font-size: 0.84rem; font-family: inherit; outline: none;
+}
+.form-group-compact input:focus, .form-group-compact select:focus { border-color: var(--primary); }
+.att-sheet-label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-top: 0.5rem; }
+.marking-sheet-list {
+  display: flex; flex-direction: column; gap: 0.5rem; max-height: 190px; overflow-y: auto;
+  border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; background: var(--bg-primary);
+}
+.no-marking-data { font-size: 0.8rem; color: var(--text-muted); font-style: italic; text-align: center; padding: 1rem; }
+.marking-row { display: flex; justify-content: justify-between; align-items: center; justify-content: space-between; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border-color); }
+.marking-row:last-child { border-bottom: none; }
+.marking-name { font-size: 0.84rem; font-weight: 500; }
+.marking-toggle-btn {
+  padding: 0.25rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease;
+}
+.marking-toggle-btn.present { background: rgba(16,185,129,0.15); color: #059669; border: 1px solid rgba(16,185,129,0.25); }
+.marking-toggle-btn.absent { background: rgba(239,68,68,0.15); color: #dc2626; border: 1px solid rgba(239,68,68,0.25); }
+.w-full { width: 100%; }
+
+.table-header-row { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 1.5rem 0; }
+.table-header-row h3 { font-size: 1.1rem; font-weight: 600; }
+.legend-row { display: flex; gap: 1rem; }
+.legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.bg-success { background: var(--success); }
+.bg-warning { background: var(--warning); }
+.bg-danger { background: var(--danger); }
+
+.table-container { width: 100%; overflow-x: auto; margin-top: 1rem; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; }
+th { text-align: left; padding: 0.875rem 1rem; font-size: 0.78rem; color: var(--text-muted); border-bottom: 1px solid var(--border-color); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(0,0,0,0.015); }
+td { padding: 0.9rem 1rem; font-size: 0.9rem; border-bottom: 1px solid var(--border-color); transition: background 0.15s; }
+tr:hover td { background: rgba(79,70,229,0.04); }
+
+.roll-no { font-weight: 600; font-family: monospace; font-size: 0.85rem; color: var(--primary); }
+.badge-outline { padding: 0.2rem 0.7rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.8rem; font-weight: 500; background: var(--bg-primary); color: var(--text-muted); }
+.font-semibold { font-weight: 600; }
+.text-success { color: var(--success); } .text-danger { color: var(--danger); } .text-warning-cgpa { color: var(--warning); }
+
+.att-bar-cell { display: flex; align-items: center; gap: 0.75rem; }
+.att-bar-bg { width: 80px; height: 6px; background: var(--border-color); border-radius: 3px; overflow: hidden; }
+.att-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+.status-badge { padding: 0.25rem 0.7rem; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+.status-active { background: rgba(16,185,129,0.12); color: var(--success); }
+.status-low { background: rgba(245,158,11,0.12); color: var(--warning); }
+.status-inactive { background: rgba(239,68,68,0.1); color: var(--danger); }
+.filter-select-wrapper { display: flex; align-items: center; gap: 0.5rem; background-color: var(--bg-primary); border: 1px solid var(--border-color); padding: 0.6rem 1rem; border-radius: 8px; }
+.filter-select { border: none; background: transparent; outline: none; font-size: 0.9rem; cursor: pointer; color: var(--text-main); }
+.skeleton { background: linear-gradient(90deg, var(--bg-primary) 25%, var(--border-color) 50%, var(--bg-primary) 75%); background-size: 1000px 100%; animation: shimmer 2s infinite linear; border-radius: 4px; }
+@keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }

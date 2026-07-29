@@ -1,0 +1,33 @@
+.student-marks-page { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.marks-hero-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+@media (max-width: 768px) { .marks-hero-summary-grid { grid-template-columns: 1fr; } }
+
+.summary-grade-card {
+  padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem;
+  transition: all 0.3s ease;
+}
+.summary-grade-card:hover { transform: translateY(-2px); border-color: #14b8a6; box-shadow: var(--shadow-sm); }
+.summary-grade-card h2 { font-size: 1.75rem; font-weight: 800; margin: 0; }
+.summary-label { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.25rem; }
+
+.icon-s {
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; padding: 0.75rem;
+}
+.icon-s.teal { background: rgba(20, 184, 166, 0.1); color: #14b8a6; }
+.icon-s.blue { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+.icon-s.red { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+.current-sem-badge {
+  background: rgba(20, 184, 166, 0.1); color: #14b8a6;
+  border: 1px solid rgba(20, 184, 166, 0.2); font-size: 0.75rem; font-weight: 700;
+  padding: 0.25rem 0.65rem; border-radius: 6px;
+}
+.text-danger { color: #ef4444; }
+.text-success { color: #10b981; }

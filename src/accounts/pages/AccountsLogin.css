@@ -1,0 +1,252 @@
+.accounts-login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-main);
+  position: relative;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+}
+
+.accounts-login-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.accounts-bg-circle {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
+}
+
+.a-c1 {
+  width: 400px;
+  height: 400px;
+  background: #f59e0b;
+  top: -100px;
+  left: -100px;
+}
+
+.a-c2 {
+  width: 500px;
+  height: 500px;
+  background: #10b981;
+  bottom: -150px;
+  right: -100px;
+}
+
+.dark .accounts-bg-circle {
+  opacity: 0.15;
+}
+
+.accounts-login-card {
+  position: relative;
+  z-index: 1;
+  background: var(--card-bg);
+  padding: 40px;
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid var(--border-color);
+  animation: aFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes aFadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.accounts-login-brand {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.accounts-login-logo {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  box-shadow: 0 10px 15px -3px rgba(245, 158, 11, 0.3);
+}
+
+.accounts-login-brand h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.accounts-login-brand p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.accounts-demo-hint {
+  background-color: var(--bg-secondary);
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px dashed #f59e0b;
+  margin-bottom: 24px;
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+  color: var(--text-main);
+}
+
+.a-demo-badge {
+  background-color: #f59e0b;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  align-self: center;
+}
+
+.accounts-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.accounts-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.accounts-field label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.accounts-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.accounts-field-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--text-muted);
+}
+
+.accounts-input-wrapper input {
+  width: 100%;
+  padding: 12px 14px 12px 40px;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  color: var(--text-main);
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.accounts-input-wrapper input:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+.accounts-eye-btn {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+}
+
+.accounts-eye-btn:hover {
+  color: var(--text-main);
+}
+
+.accounts-login-btn {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  border: none;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.2);
+  margin-top: 10px;
+}
+
+.accounts-login-btn:hover:not(.loading) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(245, 158, 11, 0.3);
+}
+
+.accounts-login-btn.loading {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+.accounts-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: aSpin 0.8s linear infinite;
+}
+
+@keyframes aSpin {
+  to { transform: rotate(360deg); }
+}
+
+.accounts-error {
+  background-color: #fef2f2;
+  color: #ef4444;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  text-align: center;
+  border: 1px solid #fecaca;
+}
+
+.dark .accounts-error {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.accounts-login-footer {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.accounts-login-footer a {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.accounts-login-footer a:hover {
+  color: #f59e0b;
+}

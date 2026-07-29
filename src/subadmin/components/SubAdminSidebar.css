@@ -1,0 +1,41 @@
+
+.nav-group-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; color: var(--sidebar-text, #475569); font-size: 0.9375rem; font-weight: 500; text-transform: none; letter-spacing: 0.2px; cursor: pointer; transition: all 0.2s; margin-top: 0.25rem; }
+.nav-group-header:hover { color: var(--text-main); }
+.nav-group-items { overflow: hidden; transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; opacity: 0; }
+.nav-group-items.collapsed { max-height: 0; opacity: 0; padding: 0; margin: 0; pointer-events: none; }
+.nav-group-items.expanded { max-height: 800px; opacity: 1; padding: 0.2rem 0; pointer-events: auto; }
+.dark .nav-group-header { color: #9CA3AF; }
+
+
+
+
+.subadmin-nav-link.active {
+  background: #4F46E5;
+  color: #FFFFFF;
+  border-radius: 8px;
+  margin: 0.2rem 1rem;
+  border-left: none;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.subadmin-nav-link.active span, .subadmin-nav-link.active svg {
+  color: #FFFFFF;
+}
+
+/* Bulletproof Active State */
+.subadmin-nav-link.active,
+.subadmin-nav-link.active:hover,
+.subadmin-nav-link.active:focus {
+  background: #4F46E5;
+  color: #FFFFFF;
+}
+.subadmin-nav-link.active span, .subadmin-nav-link.active svg,
+.subadmin-nav-link.active:hover span, .subadmin-nav-link.active:hover svg {
+  color: #FFFFFF;
+}
+.dark .subadmin-nav-link.active,
+.dark .subadmin-nav-link.active:hover {
+  background: #4F46E5;
+  color: #FFFFFF;
+}

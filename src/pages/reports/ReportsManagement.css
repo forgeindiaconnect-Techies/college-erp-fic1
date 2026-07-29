@@ -1,0 +1,113 @@
+/* ── Page Shell ── */
+.reports-page { display: flex; flex-direction: column; gap: 2rem; }
+.page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.page-header h1 { font-size: 1.8rem; margin-bottom: 0.4rem; }
+.text-muted { color: var(--text-muted); }
+
+/* ── Header Actions ── */
+.header-actions { display: flex; gap: 0.65rem; flex-wrap: wrap; }
+.btn-export { display: flex; align-items: center; gap: 0.4rem; padding: 0.55rem 1.1rem; border-radius: 8px; border: 1.5px solid var(--border-color); background: var(--bg-secondary); color: var(--text-main); font-weight: 600; cursor: pointer; font-size: 0.86rem; transition: var(--transition); font-family: inherit; }
+.btn-export:hover { border-color: var(--primary); color: var(--primary); background: rgba(79,70,229,0.06); }
+.btn-export.primary { background: var(--primary); color: white; border-color: var(--primary); }
+.btn-export.primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: var(--shadow-md); color: white; }
+.btn-export.success { background: var(--success); color: white; border-color: var(--success); }
+.btn-export.success:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: var(--shadow-md); color: white; }
+
+/* ── Report Type Tabs ── */
+.report-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; background: var(--bg-secondary); padding: 0.5rem; border-radius: 12px; border: 1px solid var(--border-color); }
+.rtab { display: flex; align-items: center; gap: 0.45rem; padding: 0.55rem 1.1rem; border-radius: 8px; border: none; background: transparent; color: var(--text-muted); font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: var(--transition); font-family: inherit; white-space: nowrap; }
+.rtab:hover { background: var(--bg-primary); color: var(--text-main); }
+.rtab.active { background: var(--primary); color: white; font-weight: 600; box-shadow: 0 2px 8px rgba(79,70,229,0.25); }
+
+/* ── Summary Row ── */
+.rpt-summary-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem; }
+@media (max-width: 1024px) { .rpt-summary-row { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 580px)  { .rpt-summary-row { grid-template-columns: 1fr; } }
+.rpt-summary-card { padding: 1.2rem 1.5rem; display: flex; flex-direction: column; gap: 0.3rem; position: relative; overflow: hidden; }
+.rpt-summary-card::after { content:''; position:absolute; right:-15px; top:-15px; width:70px; height:70px; border-radius:50%; opacity:0.06; }
+.rpt-card-blue::after   { background: #3b82f6; }
+.rpt-card-green::after  { background: #10b981; }
+.rpt-card-purple::after { background: #6366F1; }
+.rpt-card-orange::after { background: #f97316; }
+.rpt-summary-label { font-size: 0.82rem; color: var(--text-muted); font-weight: 500; }
+.rpt-summary-value { font-size: 1.65rem; font-weight: 700; color: var(--text-main); line-height: 1.2; }
+.rpt-summary-sub   { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.1rem; }
+
+/* ── Charts Grid ── */
+.charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+.charts-grid .col-span-2 { grid-column: span 2; }
+@media (max-width: 960px) { .charts-grid { grid-template-columns: 1fr; } .charts-grid .col-span-2 { grid-column: span 1; } }
+.chart-card { padding: 1.5rem; }
+.chart-card h3 { font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.2rem; }
+.chart-card p  { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.8rem; }
+
+/* ── Report List Cards ── */
+.report-cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+@media (max-width: 1100px) { .report-cards-grid { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 650px)  { .report-cards-grid { grid-template-columns: 1fr; } }
+.report-card { padding: 1.4rem; display: flex; flex-direction: column; gap: 0.9rem; cursor: default; transition: var(--transition); }
+.report-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.report-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+.report-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+/* Removed pastel */
+/* Removed pastel */
+/* Removed pastel */
+/* Removed pastel */
+/* Removed pastel */
+/* Removed pastel */
+.report-icon.yellow { background: rgba(245,158,11,0.12);  color: #f59e0b; }
+.report-card-title  { font-size: 0.95rem; font-weight: 700; color: var(--text-main); }
+.report-card-desc   { font-size: 0.81rem; color: var(--text-muted); line-height: 1.5; }
+.report-card-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.rca-btn { display: flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-muted); font-size: 0.78rem; font-weight: 500; cursor: pointer; transition: var(--transition); font-family: inherit; white-space: nowrap; }
+.rca-btn:hover { border-color: var(--primary); color: var(--primary); background: rgba(79,70,229,0.06); }
+.rca-btn.pdf    { border-color: rgba(239,68,68,0.35);   color: #ef4444;  background: rgba(239,68,68,0.05); }
+.rca-btn.pdf:hover    { background: rgba(239,68,68,0.1); }
+.rca-btn.excel  { border-color: rgba(16,185,129,0.35);  color: #10b981; background: rgba(16,185,129,0.05); }
+.rca-btn.excel:hover  { background: rgba(16,185,129,0.1); }
+.rca-btn.print  { border-color: rgba(79,70,229,0.35);   color: var(--primary); background: rgba(79,70,229,0.05); }
+.rca-btn.print:hover  { background: rgba(79,70,229,0.1); }
+.report-card-meta { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 0.7rem; }
+
+/* ── Top Students Table (in report) ── */
+.rpt-table-section { padding: 0 1.5rem 1.5rem; }
+.rpt-table-section h3 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.45rem; }
+.rpt-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.rpt-table th { text-align: left; padding: 0.75rem 1rem; font-size: 0.75rem; color: var(--text-muted); border-bottom: 1px solid var(--border-color); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(0,0,0,0.01); white-space: nowrap; }
+.rpt-table td { padding: 0.8rem 1rem; font-size: 0.88rem; border-bottom: 1px solid var(--border-color); transition: background 0.15s; }
+.rpt-table tr:hover td { background: rgba(79,70,229,0.03); }
+.rpt-table tr:last-child td { border-bottom: none; }
+.roll-no   { font-weight: 600; font-family: monospace; font-size: 0.82rem; color: var(--primary); background: rgba(79,70,229,0.08); padding: 0.2rem 0.5rem; border-radius: 4px; }
+.badge-outline { padding: 0.2rem 0.65rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.78rem; font-weight: 500; background: var(--bg-primary); color: var(--text-muted); }
+.font-semibold { font-weight: 600; }
+.text-success { color: var(--success); } .text-danger { color: var(--danger); } .text-warning { color: var(--warning); }
+
+/* ── Avatar ── */
+.avatar-xs { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.74rem; color: white; flex-shrink: 0; }
+.bg-gradient-blue   { background: linear-gradient(135deg,#3b82f6,#2563eb); }
+.bg-gradient-purple { background: linear-gradient(135deg,#a855f7,#7e22ce); }
+.bg-gradient-green  { background: linear-gradient(135deg,#10b981,#059669); }
+.bg-gradient-orange { background: linear-gradient(135deg,#f97316,#ea580c); }
+.bg-gradient-pink   { background: linear-gradient(135deg,#ec4899,#be185d); }
+.bg-gradient-teal   { background: linear-gradient(135deg,#14b8a6,#0f766e); }
+
+/* ── Rank badges ── */
+.rank-1 { color: #f59e0b; font-weight: 700; font-size: 1rem; }
+.rank-2 { color: #9ca3af; font-weight: 700; font-size: 1rem; }
+.rank-3 { color: #cd7c2f; font-weight: 700; font-size: 1rem; }
+.rank-n { color: var(--text-muted); font-weight: 600; }
+
+/* ── Low Attendance Table ── */
+.att-bar-wrap { display: flex; align-items: center; gap: 0.6rem; }
+.att-bar-bg   { flex: 1; height: 6px; background: var(--border-color); border-radius: 3px; overflow: hidden; max-width: 80px; }
+.att-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+/* ── Print ── */
+@media print {
+  .header-actions, .report-tabs, .rca-btn, .report-card-actions { display: none; }
+  .reports-page { gap: 1rem; }
+}
+
+/* ── Helpers ── */
+.gradient-text { background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.flex { display: flex; } .items-center { align-items: center; } .gap-2 { gap: 0.5rem; }

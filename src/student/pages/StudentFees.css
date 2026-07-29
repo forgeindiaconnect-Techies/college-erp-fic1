@@ -1,0 +1,67 @@
+.student-fees-page { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.fees-layout-grid-s {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+@media (max-width: 820px) { .fees-layout-grid-s { grid-template-columns: 1fr; } }
+
+.billing-statement-card { padding: 1.75rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.transaction-history-card { padding: 1.75rem; display: flex; flex-direction: column; }
+
+.billing-card-header { display: flex; justify-content: space-between; align-items: center; }
+.billing-card-header h3 { font-size: 1.05rem; font-weight: 700; margin: 0; }
+
+.fee-status-badge { font-size: 0.72rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 6px; text-transform: uppercase; }
+.fee-status-badge.paid { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+.fee-status-badge.pending { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+
+.billing-invoice-box {
+  background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 12px;
+  padding: 1.5rem; text-align: center; display: flex; flex-direction: column; gap: 0.25rem;
+}
+.invoice-title { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin: 0; }
+.invoice-price { font-size: 2.2rem; font-weight: 800; color: var(--text-main); margin: 0.25rem 0 0; }
+
+.btn-pay-dues {
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  background: linear-gradient(135deg, #14b8a6, #0d9488); color: white;
+  padding: 0.75rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem;
+  border: none; cursor: pointer; transition: all 0.3s ease;
+  font-family: inherit;
+}
+.btn-pay-dues:hover { transform: translateY(-1px); }
+.shadow-glow-s { box-shadow: 0 4px 12px rgba(20, 184, 166, 0.35); }
+.shadow-glow-s:hover { box-shadow: 0 6px 16px rgba(20, 184, 166, 0.45); }
+
+.payment-cleared-banner {
+  display: flex; align-items: center; gap: 0.75rem;
+  background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 12px; padding: 1rem;
+}
+.payment-cleared-banner h4 { font-size: 0.92rem; font-weight: 700; color: #10b981; margin: 0 0 0.15rem; }
+.payment-cleared-banner p { margin: 0; }
+
+/* History lists */
+.transaction-history-list { display: flex; flex-direction: column; gap: 0.75rem; max-height: 480px; overflow-y: auto; }
+.transaction-history-item-s {
+  padding: 0.9rem; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 12px;
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+}
+.txn-left { display: flex; flex-direction: column; gap: 0.2rem; }
+.txn-ref { font-size: 0.82rem; font-weight: 700; color: var(--text-main); }
+.txn-date { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
+.txn-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; }
+.txn-amt { font-size: 0.9rem; font-weight: 700; color: var(--text-main); }
+.badge-success-inline { font-size: 0.7rem; font-weight: 700; color: #10b981; background: rgba(16, 185, 129, 0.12); padding: 0.1rem 0.4rem; border-radius: 4px; }
+
+/* Payment check methods buttons grid */
+.payment-methods-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-top: 0.25rem; }
+.pay-method-btn {
+  background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px;
+  padding: 0.65rem 0.5rem; font-size: 0.78rem; font-weight: 600; color: var(--text-main);
+  cursor: pointer; transition: all 0.2s ease; font-family: inherit;
+}
+.pay-method-btn.active { border-color: #14b8a6; background: rgba(20, 184, 166, 0.08); color: #14b8a6; }
+.pay-method-btn:hover:not(.active) { background: var(--bg-primary); }

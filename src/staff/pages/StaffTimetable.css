@@ -1,0 +1,70 @@
+.timetable-management-staff { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.timetable-card-wrapper { padding: 1.5rem; overflow: hidden; }
+
+.timetable-header-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem; flex-wrap: wrap; gap: 1rem;
+}
+.timetable-legend { display: flex; gap: 1.25rem; }
+.legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+.legend-dot.active { background: #3b82f6; }
+.legend-dot.empty { background: rgba(0,0,0,0.03); border: 1px dashed var(--border-color); }
+
+.timetable-grid-scroll { width: 100%; overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-color); }
+.timetable-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 800px; }
+
+.timetable-table th {
+  padding: 1rem; border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color); background: rgba(0,0,0,0.01);
+  text-align: center;
+}
+.timetable-table th:last-child { border-right: none; }
+.day-col-header { width: 120px; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+
+.period-header { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
+.period-number { font-size: 0.85rem; font-weight: 700; color: var(--text-main); }
+.period-time { font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.25rem; }
+
+.timetable-table td {
+  padding: 0.6rem; border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color); vertical-align: middle;
+}
+.timetable-table td:last-child { border-right: none; }
+.timetable-table tr:last-child td { border-bottom: none; }
+
+.day-name-cell {
+  font-weight: 700; font-size: 0.88rem; color: var(--text-main); text-align: center;
+  background: rgba(0,0,0,0.01); width: 120px;
+}
+
+/* Timetable slots styles */
+.timetable-slot {
+  border-radius: 8px; padding: 0.75rem; min-height: 72px;
+  display: flex; flex-direction: column; justify-content: center; gap: 0.3rem;
+  transition: all 0.25s ease;
+}
+
+.timetable-slot.active {
+  background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.05);
+}
+.timetable-slot.active:hover {
+  background: rgba(59, 130, 246, 0.12); border-color: #3b82f6;
+  transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.slot-subject { font-size: 0.82rem; font-weight: 700; color: #2563eb; margin: 0; text-align: center; }
+.slot-class { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin: 0; text-align: center; }
+.slot-classroom {
+  font-size: 0.7rem; color: var(--text-muted); margin: 0; text-align: center;
+  display: flex; align-items: center; justify-content: center; gap: 0.2rem;
+}
+
+.timetable-slot.empty {
+  border: 1px dashed var(--border-color); background: rgba(0,0,0,0.01);
+  align-items: center; justify-content: center; opacity: 0.5;
+}
+.empty-text { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }

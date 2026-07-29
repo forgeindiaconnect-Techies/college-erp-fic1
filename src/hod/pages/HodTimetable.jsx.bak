@@ -1,0 +1,408 @@
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit2, Trash2, Calendar, MapPin, User, BookOpen, Clock, X, CheckCircle } from 'lucide-react';
+import { getStaff, getTimetable, publishTimetable, getSubjects } from '../../api/index';
+import useRealtimeSync from '../../hooks/useRealtimeSync';
+import './HodTimetable.css';
+
+// Try to grab logged in HOD session
+const getHodSession = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem('hod_session')) || {
+      name: 'Prof. Rajan Iyer', dept: 'Cyber Security', deptCode: 'CS', role: 'HOD'
+    };
+  } catch (e) {
+    return { name: 'Prof. Rajan Iyer', dept: 'Cyber Security', deptCode: 'CS', role: 'HOD' };
+  }
+};
+
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const PERIODS = [
+  { id: 1, label: 'Period 1', time: '09:00 - 10:00' },
+  { id: 2, label: 'Period 2', time: '10:00 - 11:00' },
+  { id: 3, label: 'Period 3', time: '11:15 - 12:15' },
+  { id: 4, label: 'Period 4', time: '12:15 - 01:15' },
+  { id: 5, label: 'Period 5', time: '02:00 - 03:00' },
+  { id: 6, label: 'Period 6', time: '03:00 - 04:00' },
+];
+
+const MOCK_TIMETABLE_FALLBACK = [
+  // CS Timetable
+  { id: '1', dept: 'Computer Science', day: 'Monday', period: 1, subject: 'Data Structures', faculty: 'Dr. Ananya Rao', classroom: 'LH-101' },
+  { id: '2', dept: 'Computer Science', day: 'Monday', period: 3, subject: 'DBMS', faculty: 'Dr. Ananya Rao', classroom: 'LH-101' },
+  { id: '3', dept: 'Computer Science', day: 'Tuesday', period: 2, subject: 'OS', faculty: 'Prof. Karthik S.', classroom: 'LH-102' },
+  { id: '4', dept: 'Computer Science', day: 'Wednesday', period: 5, subject: 'Machine Learning', faculty: 'Prof. Karthik S.', classroom: 'Lab 2' },
+  
+  // EE Timetable
+  { id: '5', dept: 'Electrical Engg.', day: 'Monday', period: 1, subject: 'Circuits', faculty: 'Prof. Rajan Iyer', classroom: 'LH-201' },
+  { id: '6', dept: 'Electrical Engg.', day: 'Monday', period: 2, subject: 'Networks', faculty: 'Prof. Rajan Iyer', classroom: 'LH-201' },
+  { id: '7', dept: 'Electrical Engg.', day: 'Tuesday', period: 4, subject: 'Electronics', faculty: 'Dr. Meena Pillai', classroom: 'LH-202' },
+  { id: '8', dept: 'Electrical Engg.', day: 'Thursday', period: 3, subject: 'Power Systems', faculty: 'Prof. Rajan Iyer', classroom: 'EE Lab' },
+];
+
+const EMPTY_SLOT = { day: '', period: 1, subject: '', faculty: '', classroom: '' };
+
+const HodTimetable = () => {
+  const hodSession = getHodSession();
+  const HOD_DEPT = hodSession.dept;
+
+  const [loading, setLoading] = useState(true);
+  const [schedule, setSchedule] = useState([]);
+  const [facultyList, setFacultyList] = useState([]);
+  const [subjectList, setSubjectList] = useState([]);
+  const [selectedSem, setSelectedSem] = useState('Semester 3');
+
+  /* Modal state */
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState(null); // null = add
+  const [form, setForm] = useState(EMPTY_SLOT);
+  const [saved, setSaved] = useState(false);
+
+  const loadData = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await getTimetable(HOD_DEPT, selectedSem);
+      if (res.data && res.data.schedule && res.data.schedule.length > 0) {
+        let fetchedSchedule = res.data.schedule;
+        
+        // Convert Admin's 2D array format to HOD's object array format if necessary
+        if (Array.isArray(fetchedSchedule[0])) {
+          const objectSchedule = [];
+          const adminDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+          fetchedSchedule.forEach((dayRow, dayIndex) => {
+            if (Array.isArray(dayRow)) {
+              dayRow.forEach((subject, periodIndex) => {
+                if (subject && subject !== 'Lunch') {
+                  objectSchedule.push({
+                    id: `admin_${dayIndex}_${periodIndex}`,
+                    dept: HOD_DEPT,
+                    day: adminDays[dayIndex] || DAYS[dayIndex],
+                    period: periodIndex + 1,
+                    subject: subject,
+                    faculty: 'Unassigned',
+                    classroom: 'TBD'
+                  });
+                }
+              });
+            }
+          });
+          fetchedSchedule = objectSchedule;
+        }
+        
+        setSchedule(fetchedSchedule);
+      } else {
+        setSchedule([]);
+      }
+    } catch (err) {
+      console.error('Failed to load timetable', err);
+      setSchedule([]);
+    }
+
+    // Load subjects for the select dropdown
+    try {
+      const subjectRes = await getSubjects({ dept: HOD_DEPT, sem: selectedSem });
+      if (subjectRes.data && subjectRes.data.length > 0) {
+        setSubjectList([...new Set(subjectRes.data.map(s => s.subjectName))]);
+      } else {
+        setSubjectList([]);
+      }
+    } catch (err) {
+      console.warn('Failed to load subjects', err);
+      setSubjectList([]);
+    }
+
+    // Load faculty for the select dropdown from backend
+    try {
+      const res = await getStaff();
+      const filteredStaff = (res.data || []).filter(s => s.dept === HOD_DEPT);
+      
+      if (filteredStaff.length > 0) {
+        setFacultyList(filteredStaff);
+      } else {
+        setFacultyList([]);
+      }
+    } catch (err) {
+      console.warn('Failed to load faculty', err);
+      setFacultyList([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [HOD_DEPT, selectedSem]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Sync timetable and staff data
+  useRealtimeSync(loadData, ['staff', 'subjects']);
+
+  const saveTimetable = async (newSchedule) => {
+    setSchedule(newSchedule);
+    try {
+      await publishTimetable({
+        department: HOD_DEPT,
+        semester: selectedSem,
+        schedule: newSchedule
+      });
+    } catch (err) {
+      console.error('Failed to publish timetable', err);
+      alert('Failed to save timetable to database: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  /* Filter schedule to HOD's department */
+  const deptSchedule = schedule.filter(s => s.dept === HOD_DEPT);
+
+  // Helper to find slot in state
+  const findSlot = (day, periodId) => {
+    return deptSchedule.find(s => s.day === day && s.period === periodId);
+  };
+
+  const openAdd = (dayStr, periodNum) => {
+    setEditTarget(null);
+    setForm({ 
+      ...EMPTY_SLOT, 
+      day: dayStr || DAYS[0], 
+      period: periodNum || 1, 
+      faculty: facultyList.length > 0 ? facultyList[0].name : '',
+      subject: subjectList.length > 0 ? subjectList[0] : ''
+    });
+    setSaved(false);
+    setModalOpen(true);
+  };
+
+  const openEdit = (slot) => {
+    setForm({
+      day: slot.day,
+      period: slot.period,
+      subject: slot.subject,
+      faculty: slot.faculty,
+      classroom: slot.classroom
+    });
+    setEditTarget(slot.id);
+    setSaved(false);
+    setModalOpen(true);
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm('Remove this class slot from the timetable?')) {
+      const updated = schedule.filter(s => s.id !== id);
+      saveTimetable(updated);
+    }
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditTarget(null);
+    setForm({ ...EMPTY_SLOT, faculty: facultyList.length > 0 ? facultyList[0].name : '', subject: subjectList.length > 0 ? subjectList[0] : '' });
+    setSaved(false);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    let updated;
+    if (editTarget) {
+      updated = schedule.map(s => s.id === editTarget ? { ...s, ...form } : s);
+    } else {
+      // Check if slot already occupied
+      const occupied = deptSchedule.some(s => s.day === form.day && s.period === +form.period);
+      if (occupied) {
+        alert('This time slot is already occupied!');
+        return;
+      }
+      
+      const newSlot = {
+        id: String(Date.now()),
+        dept: HOD_DEPT,
+        ...form,
+        period: +form.period
+      };
+      updated = [...schedule, newSlot];
+    }
+
+    saveTimetable(updated);
+    setSaved(true);
+    setTimeout(() => { closeModal(); setSaved(false); }, 800);
+  };
+
+  return (
+    <div className="timetable-page animate-fade-in">
+      <div className="page-header">
+        <div>
+          <h1>Department Timetable</h1>
+          <p className="text-muted">Review, add, or coordinate class schedules and rooms for <strong>{HOD_DEPT}</strong>.</p>
+        </div>
+        <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
+          <select 
+            value={selectedSem} 
+            onChange={e => setSelectedSem(e.target.value)}
+            className="bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-main)] rounded px-4 py-2 outline-none focus:border-[#6366F1]"
+          >
+            <option>Semester 1</option>
+            <option>Semester 2</option>
+            <option>Semester 3</option>
+            <option>Semester 4</option>
+            <option>Semester 5</option>
+            <option>Semester 6</option>
+          </select>
+          <button id="add-slot-btn" className="btn-primary shadow-glow" onClick={() => openAdd('', 1)}>
+            <Plus size={18} /> Add Schedule Slot
+          </button>
+        </div>
+      </div>
+
+      {/* Grid Timetable Wrapper */}
+      <div className="glass-card timetable-wrapper">
+        <div className="timetable-grid-container">
+          <div className="timetable-grid">
+            {/* Header Column/Row */}
+            <div className="grid-header-corner">Day / Period</div>
+            {PERIODS.map(p => (
+              <div key={p.id} className="grid-header-col">
+                <span className="period-title">{p.label}</span>
+                <span className="period-time">{p.time}</span>
+              </div>
+            ))}
+
+            {/* Days Rows */}
+            {DAYS.map(day => (
+              <React.Fragment key={day}>
+                {/* Row Header */}
+                <div className="grid-day-row-header">{day}</div>
+                
+                {/* Columns */}
+                {PERIODS.map(p => {
+                  const slot = findSlot(day, p.id);
+                  return (
+                    <div key={`${day}-${p.id}`} className={`grid-slot-cell ${slot ? 'occupied' : 'empty'}`}>
+                      {slot ? (
+                        <div className="slot-card">
+                          <p className="slot-subject">{slot.subject}</p>
+                          <p className="slot-detail"><User size={11} /> {slot.faculty}</p>
+                          <p className="slot-detail"><MapPin size={11} /> {slot.classroom}</p>
+                          
+                          <div className="slot-actions">
+                            <button onClick={() => openEdit(slot)} title="Edit"><Edit2 size={12} /></button>
+                            <button onClick={() => handleDelete(slot.id)} title="Delete" className="delete"><Trash2 size={12} /></button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button className="add-slot-hover-btn" onClick={() => openAdd(day, p.id)} title="Schedule slot">
+                          <Plus size={15} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* EDIT MODAL */}
+      {modalOpen && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-card glass-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>{editTarget ? 'Edit Schedule Slot' : 'Add Timetable Slot'}</h2>
+                <p className="text-muted" style={{fontSize: '0.85rem', marginTop: '2px'}}>Schedule class times, rooms, and assigning professors.</p>
+              </div>
+              <button className="btn-icon" onClick={closeModal}><X size={20} /></button>
+            </div>
+
+            {saved && (
+              <div className="modal-success-flash" style={{display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.75rem 1.75rem', background: 'rgba(16,185,129,0.1)', color: '#059669', fontSize: '0.9rem', fontWeight: 600, borderBottom: '1px solid rgba(16,185,129,0.2)'}}>
+                <CheckCircle size={18} /> Timetable slot updated successfully!
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="modal-form">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label><Calendar size={13} /> Day of the Week</label>
+                  <select value={form.day} onChange={e => setForm({ ...form, day: e.target.value })}>
+                    {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label><Clock size={13} /> Time Period</label>
+                  <select value={form.period} onChange={e => setForm({ ...form, period: e.target.value })}>
+                    {PERIODS.map(p => <option key={p.id} value={p.id}>{p.label} ({p.time})</option>)}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label><User size={13} /> Assign Faculty</label>
+                  {facultyList.length > 0 ? (
+                    <select 
+                      value={form.faculty} 
+                      onChange={e => {
+                        const newFac = e.target.value;
+                        const facObj = facultyList.find(f => f.name === newFac);
+                        // Auto-select subject if they have one assigned
+                        const newSub = (facObj && facObj.subjects && facObj.subjects.length > 0) ? facObj.subjects[0] : form.subject;
+                        setForm({ ...form, faculty: newFac, subject: newSub });
+                      }}
+                    >
+                      <option value="">Select Faculty</option>
+                      {facultyList.map((f, i) => <option key={i} value={f.name}>{f.name}</option>)}
+                    </select>
+                  ) : (
+                    <input 
+                      type="text" 
+                      required 
+                      placeholder="e.g. Dr. Ananya Rao"
+                      value={form.faculty} 
+                      onChange={e => setForm({ ...form, faculty: e.target.value })} 
+                    />
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label><BookOpen size={13} /> Subject Name *</label>
+                  {subjectList.length > 0 ? (
+                    <select value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })}>
+                      <option value="">Select Subject</option>
+                      {/* Only show subjects related to the selected faculty if they have specific subjects, else show all */}
+                      {(() => {
+                        const selFac = facultyList.find(f => f.name === form.faculty);
+                        if (selFac && selFac.subjects && selFac.subjects.length > 0) {
+                          return selFac.subjects.map((s, i) => <option key={i} value={s}>{s}</option>);
+                        }
+                        return subjectList.map((s, i) => <option key={i} value={s}>{s}</option>);
+                      })()}
+                    </select>
+                  ) : (
+                    <input 
+                      type="text" 
+                      required 
+                      placeholder="e.g. Data Structures"
+                      value={form.subject} 
+                      onChange={e => setForm({ ...form, subject: e.target.value })} 
+                    />
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label><MapPin size={13} /> Classroom / Lab *</label>
+                  <input required placeholder="e.g. LH-302, Micro Lab" value={form.classroom} onChange={e => setForm({ ...form, classroom: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="modal-actions" style={{display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem'}}>
+                <button type="button" className="btn-ghost" onClick={closeModal}>Cancel</button>
+                <button type="submit" id="save-timetable-btn" className="btn-primary">Save Slot</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default HodTimetable;

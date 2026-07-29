@@ -1,0 +1,46 @@
+.parent-management {
+  padding: 1.5rem;
+}
+
+.parent-avatar-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.parent-initials {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.parent-student-link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  color: #3b82f6;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.parent-student-link:hover {
+  background: #3b82f6;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.parent-modal-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}

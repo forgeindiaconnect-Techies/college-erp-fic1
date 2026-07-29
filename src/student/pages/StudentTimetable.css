@@ -1,0 +1,74 @@
+.student-timetable-page { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.timetable-card-wrapper-s { padding: 1.5rem; overflow: hidden; }
+
+.timetable-header-row-s {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem; flex-wrap: wrap; gap: 1rem;
+}
+.timetable-legend-s { display: flex; gap: 1.25rem; }
+.legend-item-s { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
+.legend-dot-s { width: 8px; height: 8px; border-radius: 50%; }
+.legend-dot-s.active { background: #14b8a6; }
+.legend-dot-s.empty { background: rgba(0,0,0,0.03); border: 1px dashed var(--border-color); }
+.class-group-label {
+  background: rgba(20, 184, 166, 0.1); color: #14b8a6; font-size: 0.75rem;
+  font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 6px;
+}
+
+.timetable-grid-scroll-s { width: 100%; overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-color); }
+.timetable-table-s { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 800px; }
+
+.timetable-table-s th {
+  padding: 1rem; border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color); background: rgba(0,0,0,0.01);
+  text-align: center;
+}
+.timetable-table-s th:last-child { border-right: none; }
+.day-col-header-s { width: 120px; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+
+.period-header-s { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
+.period-number-s { font-size: 0.85rem; font-weight: 700; color: var(--text-main); }
+.period-time-s { font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.25rem; }
+
+.timetable-table-s td {
+  padding: 0.6rem; border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color); vertical-align: middle;
+}
+.timetable-table-s td:last-child { border-right: none; }
+.timetable-table-s tr:last-child td { border-bottom: none; }
+
+.day-name-cell-s {
+  font-weight: 700; font-size: 0.88rem; color: var(--text-main); text-align: center;
+  background: rgba(0,0,0,0.01); width: 120px;
+}
+
+/* Timetable slots styles */
+.timetable-slot-s {
+  border-radius: 8px; padding: 0.75rem; min-height: 72px;
+  display: flex; flex-direction: column; justify-content: center; gap: 0.3rem;
+  transition: all 0.25s ease;
+}
+
+.timetable-slot-s.active {
+  background: rgba(20, 184, 166, 0.08); border: 1px solid rgba(20, 184, 166, 0.25);
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.05);
+}
+.timetable-slot-s.active:hover {
+  background: rgba(20, 184, 166, 0.12); border-color: #14b8a6;
+  transform: translateY(-1px); box-shadow: 0 4px 12px rgba(20, 184, 166, 0.1);
+}
+
+.slot-subject-s { font-size: 0.82rem; font-weight: 700; color: #0d9488; margin: 0; text-align: center; }
+.slot-faculty-s { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin: 0; text-align: center; }
+.slot-classroom-s {
+  font-size: 0.7rem; color: var(--text-muted); margin: 0; text-align: center;
+  display: flex; align-items: center; justify-content: center; gap: 0.2rem;
+}
+
+.timetable-slot-s.empty {
+  border: 1px dashed var(--border-color); background: rgba(0,0,0,0.01);
+  align-items: center; justify-content: center; opacity: 0.5;
+}
+.empty-text-s { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }

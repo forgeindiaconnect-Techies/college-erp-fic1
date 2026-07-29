@@ -1,0 +1,22 @@
+.exams-management {
+  padding: 1.5rem;
+}
+
+.exam-hall-badge {
+  font-weight: 700;
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.exam-marks-badge {
+  font-weight: 700;
+  color: #ec4899;
+  background: rgba(236, 72, 153, 0.1);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}

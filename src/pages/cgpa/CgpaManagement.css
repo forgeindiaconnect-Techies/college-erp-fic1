@@ -1,0 +1,157 @@
+/* ── Page Shell ── */
+.cgpa-page { display: flex; flex-direction: column; gap: 2rem; }
+.page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.page-header h1 { font-size: 1.8rem; margin-bottom: 0.4rem; }
+.text-muted { color: var(--text-muted); }
+
+/* ── Summary Cards ── */
+.sm-summary-row { display: grid; gap: 1.2rem; }
+.four-col { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 1024px) { .four-col { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 580px)  { .four-col { grid-template-columns: 1fr; } }
+.sm-summary-card { padding: 1.2rem 1.5rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.sm-summary-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
+.sm-summary-value { font-size: 1.8rem; font-weight: 700; color: var(--text-main); }
+
+/* ── Grid Layout ── */
+.cgpa-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+.col-span-2 { grid-column: span 2; }
+.col-span-3 { grid-column: span 3; }
+@media (max-width: 1100px) { .cgpa-grid { grid-template-columns: 1fr; } .col-span-2, .col-span-3 { grid-column: span 1; } }
+
+/* ── Chart Box ── */
+.chart-box { padding: 1.5rem; }
+.chart-box h3 { font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+
+/* ── Top Performers ── */
+.top-students-list { display: flex; flex-direction: column; gap: 0.65rem; margin-top: 1rem; }
+.top-student-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border-radius: 10px; background: var(--bg-primary); border: 1px solid var(--border-color); transition: var(--transition); }
+.top-student-item:hover { border-color: var(--primary); transform: translateX(2px); }
+.rank-badge { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.78rem; color: white; flex-shrink: 0; }
+.gold   { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.silver { background: linear-gradient(135deg, #9ca3af, #6b7280); }
+.bronze { background: linear-gradient(135deg, #cd7c2f, #a0522d); }
+.top-student-info { flex: 1; }
+.top-student-name { font-weight: 600; font-size: 0.9rem; color: var(--text-main); }
+.top-student-dept { font-size: 0.75rem; color: var(--text-muted); margin-top: 1px; }
+.top-student-cgpa { font-size: 1.2rem; font-weight: 700; }
+
+/* ── Arrear Alert ── */
+.arrear-alert { margin-top: 1.2rem; padding: 1rem 1.2rem; background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.18); border-radius: 10px; display: flex; flex-direction: column; gap: 0.5rem; color: var(--danger); font-size: 0.85rem; }
+.arrear-alert-header { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; }
+.arrear-list { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.3rem; max-height: 130px; overflow-y: auto; }
+.arrear-item { display: flex; justify-content: space-between; align-items: center; padding: 0.28rem 0.4rem; border-radius: 6px; }
+.arrear-item:hover { background: rgba(239,68,68,0.06); }
+.arrear-count { font-weight: 700; background: rgba(239,68,68,0.1); padding: 0.1rem 0.55rem; border-radius: 20px; font-size: 0.8rem; }
+
+/* ── Table Section ── */
+.table-filters-row { display: flex; justify-content: space-between; align-items: center; padding: 1.4rem 1.5rem 0; flex-wrap: wrap; gap: 1rem; }
+.table-filters-row h3 { font-size: 1.1rem; font-weight: 600; }
+.filter-group { display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: center; }
+.search-box { display: flex; align-items: center; gap: 0.6rem; background: var(--bg-primary); border: 1px solid var(--border-color); padding: 0.55rem 0.9rem; border-radius: 8px; width: 220px; transition: var(--transition); }
+.search-box:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+.search-box input { border: none; background: transparent; outline: none; width: 100%; font-size: 0.88rem; color: var(--text-main); font-family: inherit; }
+.filter-select-wrapper { display: flex; align-items: center; gap: 0.45rem; background: var(--bg-primary); border: 1px solid var(--border-color); padding: 0.55rem 0.9rem; border-radius: 8px; }
+.filter-select { border: none; background: transparent; outline: none; font-size: 0.88rem; cursor: pointer; color: var(--text-main); font-family: inherit; }
+.table-container { width: 100%; overflow-x: auto; margin-top: 1rem; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; }
+th { text-align: left; padding: 0.85rem 1rem; font-size: 0.75rem; color: var(--text-muted); border-bottom: 1px solid var(--border-color); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(0,0,0,0.01); white-space: nowrap; }
+td { padding: 0.85rem 1rem; font-size: 0.88rem; border-bottom: 1px solid var(--border-color); transition: background 0.15s; }
+tr:hover td { background: rgba(79,70,229,0.03); }
+.table-footer { display: flex; justify-content: space-between; align-items: center; padding: 1.2rem 1.5rem; font-size: 0.85rem; color: var(--text-muted); border-top: 1px solid var(--border-color); }
+.clear-filters-link { border: none; background: transparent; color: var(--primary); cursor: pointer; font-weight: 500; font-size: 0.85rem; padding: 0; }
+.clear-filters-link:hover { text-decoration: underline; }
+.no-data-row { text-align: center; color: var(--text-muted); padding: 3rem; font-weight: 500; }
+
+/* ── Cell Atoms ── */
+.roll-no { font-weight: 600; font-family: monospace; font-size: 0.82rem; color: var(--primary); }
+.badge-outline { padding: 0.2rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.78rem; font-weight: 500; background: var(--bg-primary); color: var(--text-muted); }
+.font-semibold { font-weight: 600; }
+.text-success { color: var(--success); }
+.text-danger  { color: var(--danger); }
+.text-warning { color: var(--warning); }
+.text-sm { font-size: 0.82rem; }
+.flex { display: flex; } .items-center { align-items: center; } .gap-2 { gap: 0.5rem; }
+
+/* ── Avatars ── */
+.avatar-xs { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.74rem; color: white; flex-shrink: 0; }
+.avatar-sm { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; color: white; flex-shrink: 0; }
+.bg-gradient-blue   { background: linear-gradient(135deg,#3b82f6,#2563eb); }
+.bg-gradient-purple { background: linear-gradient(135deg,#a855f7,#7e22ce); }
+.bg-gradient-orange { background: linear-gradient(135deg,#f97316,#ea580c); }
+.bg-gradient-green  { background: linear-gradient(135deg,#10b981,#059669); }
+.bg-gradient-teal   { background: linear-gradient(135deg,#14b8a6,#0f766e); }
+.bg-gradient-pink   { background: linear-gradient(135deg,#ec4899,#be185d); }
+
+/* ── Mark Entry (table cells) ── */
+.marks-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.marks-val { font-weight: 700; font-size: 0.9rem; }
+.marks-max { font-size: 0.72rem; color: var(--text-muted); }
+.fail-mark { color: var(--danger); }
+.pass-mark { color: var(--text-main); }
+
+/* ── CGPA Bar ── */
+.cgpa-cell { display: flex; align-items: center; gap: 0.5rem; }
+.cgpa-bar-bg   { width: 52px; height: 5px; background: var(--border-color); border-radius: 3px; overflow: hidden; }
+.cgpa-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+/* ── Grade Badge ── */
+.grade-badge { padding: 0.22rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 700; display: inline-block; }
+
+/* ── Pass / Fail / Arrear Badges ── */
+.badge-pass   { background: rgba(16,185,129,0.1);  color: var(--success); border: 1px solid rgba(16,185,129,0.2);  padding: 0.22rem 0.65rem; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+.badge-fail   { background: rgba(239,68,68,0.08);  color: var(--danger);  border: 1px solid rgba(239,68,68,0.2);   padding: 0.22rem 0.65rem; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+.badge-clear  { background: rgba(16,185,129,0.1);  color: var(--success); border: 1px solid rgba(16,185,129,0.2);  padding: 0.22rem 0.65rem; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+.badge-arrear { background: rgba(239,68,68,0.08);  color: var(--danger);  border: 1px solid rgba(239,68,68,0.18); padding: 0.22rem 0.65rem; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+
+/* ── Action Buttons ── */
+.action-btns { display: flex; gap: 0.4rem; }
+.act-btn { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--border-color); background: var(--bg-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-muted); transition: var(--transition); }
+.act-btn:hover { border-color: var(--primary); color: var(--primary); background: rgba(79,70,229,0.07); }
+
+/* ── Skeleton ── */
+.skeleton { background: linear-gradient(90deg, var(--bg-primary) 25%, var(--border-color) 50%, var(--bg-primary) 75%); background-size: 1000px 100%; animation: shimmer 2s infinite linear; border-radius: 4px; }
+@keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+
+/* ══════════════ MODAL ══════════════ */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal-box { width: 100%; max-width: 680px; border-radius: 16px; overflow: hidden; animation: slideUp 0.25s ease; max-height: 90vh; display: flex; flex-direction: column; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+.modal-hd { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.5rem 1.75rem 1rem; border-bottom: 1px solid var(--border-color); }
+.modal-hd h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.25rem; }
+.modal-close-btn { border: none; background: transparent; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; justify-content: center; padding: 0.25rem; border-radius: 6px; transition: var(--transition); }
+.modal-close-btn:hover { background: var(--bg-primary); color: var(--text-main); }
+
+.modal-body { padding: 1.5rem 1.75rem; overflow-y: auto; flex: 1; }
+.modal-student-info { display: flex; align-items: center; gap: 0.9rem; padding: 0.9rem 1rem; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; margin-bottom: 1.5rem; }
+.modal-student-name { font-weight: 700; font-size: 0.95rem; color: var(--text-main); }
+.modal-student-meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+
+.marks-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+@media (max-width: 520px) { .marks-form-grid { grid-template-columns: 1fr; } }
+
+.fld { display: flex; flex-direction: column; gap: 0.45rem; }
+.fld label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem; }
+.fld input, .fld select { padding: 0.65rem 0.9rem; border: 1.5px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); color: var(--text-main); font-size: 0.9rem; outline: none; transition: var(--transition); font-family: inherit; width: 100%; }
+.fld input:focus, .fld select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+.fld-error input, .fld-error select { border-color: var(--danger); }
+.err-msg { font-size: 0.78rem; color: var(--danger); }
+.field-hint { font-size: 0.75rem; color: var(--text-muted); }
+
+.gpa-preview-row { grid-column: span 2; display: flex; gap: 1rem; align-items: stretch; }
+@media (max-width: 520px) { .gpa-preview-row { grid-column: span 1; flex-direction: column; } }
+.gpa-preview-card { flex: 1; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.gpa-preview-label { font-size: 0.78rem; color: var(--text-muted); font-weight: 500; }
+.gpa-preview-value { font-size: 1.5rem; font-weight: 700; }
+
+.modal-success-flash { display: flex; align-items: center; gap: 0.5rem; color: var(--success); background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); padding: 0.7rem 1rem; border-radius: 8px; font-size: 0.88rem; font-weight: 500; margin: 0 1.75rem 1rem; }
+
+.modal-ft { display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1.2rem 1.75rem; border-top: 1px solid var(--border-color); }
+.btn-ghost   { padding: 0.6rem 1.2rem; border-radius: 8px; border: 1px solid var(--border-color); background: transparent; color: var(--text-main); font-weight: 600; cursor: pointer; font-size: 0.88rem; transition: var(--transition); font-family: inherit; }
+.btn-ghost:hover { background: var(--bg-primary); }
+.btn-primary { padding: 0.6rem 1.4rem; border-radius: 8px; border: none; background: var(--primary); color: white; font-weight: 600; cursor: pointer; font-size: 0.88rem; transition: var(--transition); display: flex; align-items: center; gap: 0.4rem; font-family: inherit; }
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn-success { background: var(--success); }

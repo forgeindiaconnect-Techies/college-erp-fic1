@@ -1,0 +1,118 @@
+.notifications-management {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.notif-summary-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.notif-summary-card {
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-left: 4px solid var(--border-color);
+}
+.notif-summary-card.blue { border-left-color: #3b82f6; }
+.notif-summary-card.yellow { border-left-color: #f59e0b; }
+.notif-summary-card.red { border-left-color: #ef4444; }
+.notif-summary-card.green { border-left-color: #10b981; }
+.notif-summary-card.purple { border-left-color: #6366F1; }
+
+.notif-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.notif-value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.notif-badge {
+  padding: 0.3rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.notif-badge.emergency { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+.notif-badge.standard { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); }
+
+.delivery-methods {
+  display: flex;
+  gap: 0.5rem;
+}
+.delivery-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  border: 1px solid var(--border-color);
+}
+.delivery-icon.active-email { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-color: rgba(59, 130, 246, 0.3); }
+.delivery-icon.active-sms { background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.3); }
+.delivery-icon.active-app { background: rgba(99, 102, 241, 0.1); color: #6366F1; border-color: rgba(99, 102, 241, 0.3); }
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+.status-sent .status-dot { background: #10b981; }
+.status-scheduled .status-dot { background: #f59e0b; }
+.status-failed .status-dot { background: #ef4444; }
+
+.checkbox-group {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  cursor: pointer;
+}
+.checkbox-label input {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+.emergency-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  color: #ef4444;
+  font-weight: 600;
+  cursor: pointer;
+}
+.emergency-toggle input {
+  accent-color: #ef4444;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
