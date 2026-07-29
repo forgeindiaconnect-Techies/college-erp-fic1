@@ -153,7 +153,26 @@ io.on('connection', (socket) => {
   });
 });
 
-app.use(cors());
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow all Vercel previews, production Vercel URLs, localhost, and render
+    const allowedPatterns = [
+      /\.vercel\.app$/,
+      /\.onrender\.com$/,
+      /^http:\/\/localhost/,
+      /^http:\/\/127\.0\.0\.1/
+    ];
+    if (!origin || allowedPatterns.some(p => p.test(origin))) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all origins for now (open CORS)
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Expires']
+}));
+app.options('*', cors()); // Pre-flight for all routes
 app.use(express.json());
 
 // Context Middleware for Multi-Tenancy
