@@ -172,7 +172,6 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Expires']
 }));
-app.options(/(.*)/, cors()); // Pre-flight for all routes (Express 5 compatible)
 app.use(express.json());
 
 // Context Middleware for Multi-Tenancy

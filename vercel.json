@@ -1,12 +1,16 @@
 {
-  "buildCommand": "npm install && npm run build",
   "outputDirectory": "dist",
-  "installCommand": "npm install --ignore-scripts",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://college-erp-software.onrender.com/api/$1"
+      "source": "/api/:path*",
+      "destination": "https://college-erp-software.onrender.com/api/:path*"
+    },
+    {
+      "source": "/socket.io/:path*",
+      "destination": "https://college-erp-software.onrender.com/socket.io/:path*"
     },
     {
       "source": "/(.*)",
