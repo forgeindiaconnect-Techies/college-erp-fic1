@@ -165,11 +165,6 @@ const LibraryManagement = () => {
           <h1>Advanced Library Management 📚</h1>
           <p className="text-muted">Manage books, issues, digital resources, and auto-calculate fines.</p>
         </div>
-        <div className="header-actions">
-          <button className="btn-primary shadow-glow" onClick={() => alert('Opening barcode scanner...')}>
-            <QrCode size={16}/> Scan Barcode
-          </button>
-        </div>
       </div>
 
       <div className="lib-tabs-container">
@@ -308,32 +303,47 @@ const LibraryManagement = () => {
           </div>
 
           {showAddModal && (
-            <div className="modal-overlay" onClick={()=>setShowAddModal(false)}>
-              <div className="modal-card" onClick={e=>e.stopPropagation()}>
-                <div className="modal-header">
+            <div className="lib-modal-overlay" onClick={()=>setShowAddModal(false)}>
+              <div className="lib-modal-card" onClick={e=>e.stopPropagation()}>
+                <div className="lib-modal-header">
                   <h2>Add New Book</h2>
                   <button className="modal-close-btn" onClick={()=>setShowAddModal(false)}><X size={20}/></button>
                 </div>
-                <div className="modal-form space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1"><label className="text-sm font-bold text-muted">Title</label><input type="text" className="p-2 rounded border bg-transparent"/></div>
-                    <div className="flex flex-col gap-1"><label className="text-sm font-bold text-muted">Author</label><input type="text" className="p-2 rounded border bg-transparent"/></div>
+                <div className="lib-modal-form">
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Title</label>
+                      <input type="text" placeholder="Enter book title" />
+                    </div>
+                    <div className="form-group">
+                      <label>Author</label>
+                      <input type="text" placeholder="Enter author name" />
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1"><label className="text-sm font-bold text-muted">ISBN</label><input type="text" className="p-2 rounded border bg-transparent"/></div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-bold text-muted">Category</label>
-                      <select className="p-2 rounded border bg-transparent">
+                  <div className="form-grid" style={{ marginTop: '1rem' }}>
+                    <div className="form-group">
+                      <label>ISBN</label>
+                      <input type="text" placeholder="Enter ISBN" />
+                    </div>
+                    <div className="form-group">
+                      <label>Category</label>
+                      <select>
                         {CATEGORIES.slice(1).map(c=><option key={c}>{c}</option>)}
                       </select>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1"><label className="text-sm font-bold text-muted">Total Copies</label><input type="number" className="p-2 rounded border bg-transparent"/></div>
-                    <div className="flex flex-col gap-1"><label className="text-sm font-bold text-muted">Shelf Location</label><input type="text" className="p-2 rounded border bg-transparent"/></div>
+                  <div className="form-grid" style={{ marginTop: '1rem' }}>
+                    <div className="form-group">
+                      <label>Total Copies</label>
+                      <input type="number" placeholder="0" />
+                    </div>
+                    <div className="form-group">
+                      <label>Shelf Location</label>
+                      <input type="text" placeholder="e.g. A1-Rack2" />
+                    </div>
                   </div>
                 </div>
-                <div className="modal-actions">
+                <div className="lib-modal-actions">
                   <button className="btn-secondary" onClick={()=>setShowAddModal(false)}>Cancel</button>
                   <button className="btn-primary shadow-glow" onClick={()=>{alert('Book Added!');setShowAddModal(false)}}>Save Book</button>
                 </div>
@@ -342,13 +352,13 @@ const LibraryManagement = () => {
           )}
 
           {showIssueModal && selectedBookToIssue && (
-            <div className="modal-overlay" onClick={()=>setShowIssueModal(false)}>
-              <div className="modal-card" onClick={e=>e.stopPropagation()}>
-                <div className="modal-header">
+            <div className="lib-modal-overlay" onClick={()=>setShowIssueModal(false)}>
+              <div className="lib-modal-card" onClick={e=>e.stopPropagation()}>
+                <div className="lib-modal-header">
                   <h2>Issue Book Form</h2>
-                  <button className="modal-close-btn" onClick={()=>setShowIssueModal(false)}><X size={20}/></button>
+                  <button className="lib-modal-close-btn" onClick={()=>setShowIssueModal(false)}><X size={20}/></button>
                 </div>
-                <form className="modal-form space-y-4" onSubmit={handleIssueSubmit}>
+                <form className="lib-modal-form space-y-4" onSubmit={handleIssueSubmit}>
                   <div className="flex flex-col gap-1">
                     <label className="text-sm font-bold text-muted">Select Book</label>
                     <select 
@@ -365,15 +375,14 @@ const LibraryManagement = () => {
                       ))}
                     </select>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-bold text-muted">Select Student</label>
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Select Student</label>
                       <select 
                         required 
-                        className="p-2 rounded border bg-transparent" 
                         value={issueFormData.regNo} 
                         onChange={e => {
-                          const selected = students.find(s => s.id === e.target.value || s.referenceId === e.target.value || s._id === e.target.value);
+                          const selected = students.find(s => (s.id || s.referenceId || s.studentId || s._id) === e.target.value);
                           setIssueFormData({
                             ...issueFormData, 
                             regNo: e.target.value,
@@ -392,23 +401,23 @@ const LibraryManagement = () => {
                         })}
                       </select>
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-bold text-muted">Register Number</label>
-                      <input type="text" className="p-2 rounded border bg-[var(--bg-main)] text-[var(--text-muted)]" value={issueFormData.regNo} readOnly placeholder="Auto-filled"/>
+                    <div className="form-group">
+                      <label>Register Number</label>
+                      <input type="text" value={issueFormData.regNo} readOnly placeholder="Auto-filled" style={{ backgroundColor: 'var(--bg-primary)' }}/>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-bold text-muted">Issue Date</label>
-                      <input type="date" className="p-2 rounded border bg-[var(--bg-main)] text-[var(--text-muted)]" value={new Date().toISOString().split('T')[0]} readOnly />
+                  <div className="form-grid" style={{ marginTop: '1rem' }}>
+                    <div className="form-group">
+                      <label>Issue Date</label>
+                      <input type="date" value={new Date().toISOString().split('T')[0]} readOnly style={{ backgroundColor: 'var(--bg-primary)' }} />
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-bold text-muted">Return Date</label>
-                      <input type="date" required className="p-2 rounded border bg-transparent text-[var(--text-main)]" value={issueFormData.dueDate} onChange={e=>setIssueFormData({...issueFormData, dueDate: e.target.value})} />
+                    <div className="form-group">
+                      <label>Return Date</label>
+                      <input type="date" required value={issueFormData.dueDate} onChange={e=>setIssueFormData({...issueFormData, dueDate: e.target.value})} />
                     </div>
                   </div>
                 </form>
-                <div className="modal-actions">
+                <div className="lib-modal-actions">
                   <button type="button" className="btn-secondary" onClick={()=>setShowIssueModal(false)}>Cancel</button>
                   <button type="submit" className="btn-primary shadow-glow flex items-center gap-2" onClick={handleIssueSubmit}><CheckCircle size={16}/> Confirm Issue</button>
                 </div>
@@ -589,7 +598,8 @@ const LibraryManagement = () => {
               <p className="text-sm text-muted">Generate full library circulation history.</p>
             </div>
             <button className="btn-primary flex items-center gap-2"><Download size={16}/> Export Excel</button>
-                   <div className="grid grid-cols-3 gap-6 mb-6">
+          </div>
+          <div className="grid grid-cols-3 gap-6 mb-6">
             <div className="glass-card p-5">
               <h3 className="text-sm text-muted uppercase font-bold mb-1">Total Fine Collected</h3>
               <p className="text-2xl font-bold text-success">₹{totalFineCollected.toLocaleString()}</p>
@@ -653,7 +663,6 @@ const LibraryManagement = () => {
                 </tbody>
               </table>
             </div>
-          </div>
           </div>
         </div>
       )}

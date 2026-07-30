@@ -31,7 +31,7 @@ async function resetFresh() {
     const oneYearLater = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
 
     const mainCollege = await College.create({
-      name: 'FIC College of Engineering',
+      name: 'Marudhar Kesari Jain College',
       adminName: 'System Admin',
       email: 'admin@college.edu',
       phone: '9876543210',
@@ -42,7 +42,7 @@ async function resetFresh() {
       trialEndDate: oneYearLater,
       convertedToPaid: true
     });
-    console.log('Created Primary College: FIC College of Engineering (COL001)');
+    console.log('Created Primary College: Marudhar Kesari Jain College (COL001)');
 
     // 3. Create Default Department
     await Department.create({
@@ -156,7 +156,7 @@ async function resetFresh() {
 
     // 7. System Setting
     await SystemSetting.create({
-      institutionName: 'FIC College of Engineering',
+      institutionName: 'Marudhar Kesari Jain College',
       academicYear: '2025-2026',
       tenantId: 'COL001'
     });

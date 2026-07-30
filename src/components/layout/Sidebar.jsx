@@ -83,7 +83,6 @@ const Sidebar = ({ isOpen, onClose }) => {
       icon: <PieChart size={20} />,
       items: [
         { name: 'Reports', path: '/admin/reports', icon: <FileBarChart size={20} /> },
-        { name: 'Analytics', path: '/admin/analytics', icon: <PieChart size={20} /> },
         { name: 'Activity Logs', path: '/admin/activity-logs', icon: <Activity size={20} /> }
       ]
     },

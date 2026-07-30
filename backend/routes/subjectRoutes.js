@@ -24,7 +24,11 @@ router.get('/', protect, collegeScope, async (req, res) => {
 // Create a new subject
 router.post('/', protect, authorize('Admin', 'Super Admin', 'HOD', 'Principal', 'Sub Admin'), collegeScope, async (req, res) => {
   try {
-    const newSubject = new Subject({ ...req.body, collegeId: req.collegeId });
+    const bodyData = { ...req.body };
+    if (bodyData.regulationId === '') {
+      bodyData.regulationId = null;
+    }
+    const newSubject = new Subject({ ...bodyData, collegeId: req.collegeId });
     const savedSubject = await newSubject.save();
     res.status(201).json(savedSubject);
   } catch (error) {
@@ -38,9 +42,14 @@ router.put('/:id', protect, authorize('Admin', 'Super Admin', 'HOD', 'Principal'
     const filter = { _id: req.params.id };
     if (req.collegeId) filter.collegeId = req.collegeId;
 
+    const bodyData = { ...req.body };
+    if (bodyData.regulationId === '') {
+      bodyData.regulationId = null;
+    }
+
     const updatedSubject = await Subject.findOneAndUpdate(
       filter,
-      req.body,
+      bodyData,
       { new: true, runValidators: true }
     );
     if (!updatedSubject) return res.status(404).json({ message: 'Subject not found' });

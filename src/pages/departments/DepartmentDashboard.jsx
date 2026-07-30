@@ -272,8 +272,14 @@ const DepartmentDashboard = () => {
     <div className="dept-detail-wrapper animate-fade-in">
       {/* Header Banner */}
       <div className="dept-detail-header glass-card">
-        <div className="dd-header-top">
-          
+        <div className="dd-header-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <button 
+            className="btn-ghost" 
+            onClick={() => navigate('/admin/departments')}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.4rem 0.8rem', fontSize: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-main)', cursor: 'pointer' }}
+          >
+            <ArrowLeft size={16} /> Back to Departments
+          </button>
           <span className={`status-badge ${dept.status === 'Active' ? 'badge-active' : 'badge-inactive'}`}>
             {dept.status}
           </span>

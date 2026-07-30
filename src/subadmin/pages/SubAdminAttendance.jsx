@@ -6,7 +6,7 @@ import {
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area 
 } from 'recharts';
-import { getStudents, getAllAttendance, createAttendance } from '../../api/index';
+import { getStudents, getAllAttendance, createAttendance, getDepartments } from '../../api/index';
 import '../../pages/attendance/AttendanceManagement.css';
 
 const DEPARTMENTS = ['All', 'Computer Science', 'Electrical Engg.', 'Mechanical Engg.', 'Civil Engg.', 'Information Tech.'];
@@ -37,6 +37,7 @@ const SubAdminAttendance = () => {
   const [students, setStudents] = useState([]);
   const [dailyLogs, setDailyLogs] = useState({});
   const [stats, setStats] = useState({});
+  const [dbDepartments, setDbDepartments] = useState([]);
   
   const [deptFilter, setDeptFilter] = useState('All');
   const [semFilter, setSemFilter] = useState('All');
@@ -54,9 +55,13 @@ const SubAdminAttendance = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const studentsRes = await getStudents();
+      const [studentsRes, deptsRes] = await Promise.all([
+        getStudents().catch(() => ({ data: [] })),
+        getDepartments().catch(() => ({ data: [] }))
+      ]);
       const studentList = studentsRes.data;
       setStudents(studentList);
+      setDbDepartments(deptsRes.data || []);
 
       let dailyLogData = {};
       let statsData = {};
@@ -325,7 +330,11 @@ const SubAdminAttendance = () => {
             <div className="filter-select-wrapper">
               <Filter size={14} className="text-muted" />
               <select className="filter-select" value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
-                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                <option value="All">All Departments</option>
+                {(() => {
+                  const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS.slice(1);
+                  return activeDepts.map(d => <option key={d} value={d}>{d}</option>);
+                })()}
               </select>
             </div>
 

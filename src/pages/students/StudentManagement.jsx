@@ -4,7 +4,7 @@ import {
   User, BookOpen, Hash, Percent, DollarSign,
   Phone, Mail, ChevronUp, ChevronDown, CheckCircle, Building
 } from 'lucide-react';
-import { getStudents, createStudent, updateStudent, deleteStudent } from '../../api/index';
+import { getStudents, createStudent, updateStudent, deleteStudent, getDepartments } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import './StudentManagement.css';
 
@@ -79,6 +79,7 @@ const StudentManagement = () => {
   const [hostelFilter, setHostelFilter] = useState('All');
   const [sortKey,  setSortKey]   = useState('name');
   const [sortAsc,  setSortAsc]   = useState(true);
+  const [dbDepartments, setDbDepartments] = useState([]);
 
   /* Modal state */
   const [modalOpen,   setModalOpen]   = useState(false);
@@ -89,7 +90,17 @@ const StudentManagement = () => {
 
   useEffect(() => {
     fetchStudents();
+    fetchDepartments();
   }, []);
+
+  const fetchDepartments = async () => {
+    try {
+      const res = await getDepartments();
+      setDbDepartments(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch departments:', err);
+    }
+  };
 
   // Auto-refresh when student data changes anywhere
   useRealtimeSync(useCallback(() => { fetchStudents(); }, []), 'students');
@@ -156,7 +167,14 @@ const StudentManagement = () => {
   const handleSort = (key) => { if (sortKey === key) setSortAsc(!sortAsc); else { setSortKey(key); setSortAsc(true); } };
 
   /* ── Modal helpers ── */
-  const openAdd  = ()  => { setForm(EMPTY_FORM); setEditTarget(null); setFormErrors({}); setSaved(false); setModalOpen(true); };
+  const openAdd  = ()  => { 
+    const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
+    setForm({ ...EMPTY_FORM, dept: activeDepts[0] || '' }); 
+    setEditTarget(null); 
+    setFormErrors({}); 
+    setSaved(false); 
+    setModalOpen(true); 
+  };
   const openEdit = (s) => { setForm({ ...s });   setEditTarget(s.id); setFormErrors({}); setSaved(false); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setEditTarget(null); setForm(EMPTY_FORM); setFormErrors({}); };
 
@@ -272,7 +290,10 @@ const StudentManagement = () => {
               <Filter size={13} className="text-muted" />
               <select className="filter-select" value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
                 <option value="All">All Departments</option>
-                {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
+                {(() => {
+                  const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
+                  return activeDepts.map(d => <option key={d}>{d}</option>);
+                })()}
               </select>
             </div>
             <div className="filter-select-wrapper">
@@ -465,7 +486,10 @@ const StudentManagement = () => {
                     <label><BookOpen size={13}/> Department <span className="req">*</span></label>
                     <select {...field('dept')}>
                       <option value="">— Select Department —</option>
-                      {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
+                      {(() => {
+                        const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
+                        return activeDepts.map(d => <option key={d}>{d}</option>);
+                      })()}
                     </select>
                     {formErrors.dept && <span className="err-msg">{formErrors.dept}</span>}
                   </div>

@@ -21,6 +21,8 @@ export const protect = async (req, res, next) => {
         else if (token.includes('-staff')) role = 'Staff';
         else if (token.includes('-parent')) role = 'Parent';
         else if (token.includes('-accounts')) role = 'Accounts';
+        else if (token.includes('-driver')) role = 'Driver';
+        
         let referenceId = null;
         if (token.includes('-dynamic-')) {
           referenceId = token.split('-dynamic-')[1];
@@ -29,9 +31,14 @@ export const protect = async (req, res, next) => {
           referenceId = 'CS2022001';
         }
         
+        let tenantId = 'mock_college_id';
+        if (token.includes('-tenant-')) {
+          tenantId = token.split('-tenant-')[1];
+        }
+        
         const permissions = role === 'Sub Admin' ? ['manage_students', 'manage_staff', 'manage_attendance'] : undefined;
         
-        req.user = { role, _id: 'mock-id', department: 'Computer Science Engineering', referenceId, permissions, tenantId: 'mock_college_id', collegeId: 'mock_college_id' };
+        req.user = { role, _id: 'mock-id', department: 'Computer Science Engineering', referenceId, permissions, tenantId, collegeId: tenantId };
         return next();
       }
 

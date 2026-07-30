@@ -130,11 +130,12 @@ const UnifiedLogin = () => {
 
         const dest = applySession({
           _id: matchedDriver.driverId,
+          referenceId: matchedDriver.driverId,
           name: matchedDriver.name,
           email: matchedDriver.phone,
           role: 'Driver',
           tenantId: foundTenantId,
-          token: 'mock-driver_token_123'
+          token: 'mock-driver-tenant-' + foundTenantId
         });
         if (dest) { navigate(dest); return; }
       }

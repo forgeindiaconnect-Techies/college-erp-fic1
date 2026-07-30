@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, X, BookOpen, User, Hash, Percent, Award, Clock } from 'lucide-react';
-import { getStaff, getSubjects, createSubject, updateSubject, deleteSubject, getRegulations } from '../../api/index';
+import { getStaff, getSubjects, createSubject, updateSubject, deleteSubject, getRegulations, getDepartments } from '../../api/index';
 import './SubjectsManagement.css';
 
 const DEFAULT_SUBJECTS = [];
@@ -28,6 +28,7 @@ const SubjectsManagement = () => {
   const [subjects, setSubjects] = useState([]);
   const [staff, setStaff] = useState([]);
   const [regulations, setRegulations] = useState([]);
+  const [dbDepartments, setDbDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
@@ -49,6 +50,9 @@ const SubjectsManagement = () => {
       
       const regRes = await getRegulations().catch(() => ({ data: [] }));
       setRegulations(regRes.data || []);
+
+      const deptsRes = await getDepartments().catch(() => ({ data: [] }));
+      setDbDepartments(deptsRes.data || []);
       
       const subRes = await getSubjects().catch(() => ({ data: [] }));
       const formattedSubs = subRes.data.map(s => ({
@@ -72,7 +76,8 @@ const SubjectsManagement = () => {
   };
 
   const openAdd = () => {
-    setForm({ regulationId: regulations[0]?._id || '', code: '', name: '', dept: 'Computer Science Engineering', sem: 'Semester 1', teacher: '', credits: 4, workload: 4 });
+    const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
+    setForm({ regulationId: regulations[0]?._id || '', code: '', name: '', dept: activeDepts[0] || '', sem: 'Semester 1', teacher: '', credits: 4, workload: 4 });
     setEditTarget(null);
     setModalOpen(true);
   };
@@ -91,7 +96,7 @@ const SubjectsManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = {
-      regulationId: form.regulationId,
+      regulationId: form.regulationId || null,
       subjectCode: form.code,
       subjectName: form.name,
       department: form.dept,
@@ -180,7 +185,10 @@ const SubjectsManagement = () => {
           <div className="filter-group">
             <select className="filter-select" value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
               <option value="All">All Departments</option>
-              {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
+              {(() => {
+                const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
+                return activeDepts.map(d => <option key={d}>{d}</option>);
+              })()}
             </select>
           </div>
         </div>
@@ -284,9 +292,22 @@ const SubjectsManagement = () => {
                 </div>
 
                 <div className="form-group">
+                  <label>Regulation</label>
+                  <select value={form.regulationId} onChange={e => setForm({ ...form, regulationId: e.target.value })}>
+                    <option value="">— Select Regulation —</option>
+                    {regulations.map(r => (
+                      <option key={r._id} value={r._id}>{r.regulationName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
                   <label>Department Scope *</label>
                   <select value={form.dept} onChange={e => setForm({ ...form, dept: e.target.value })}>
-                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    {(() => {
+                      const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
+                      return activeDepts.map(d => <option key={d} value={d}>{d}</option>);
+                    })()}
                   </select>
                 </div>
 

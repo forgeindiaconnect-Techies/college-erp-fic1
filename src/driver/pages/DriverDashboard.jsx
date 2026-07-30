@@ -52,12 +52,34 @@ const DriverDashboard = () => {
       ];
 
       // Find this driver's record
-      const me = allDrivers.find(d => d.driverId === driverId || d.phone === driverId);
+      const cleanStr = (str) => (str || '').toString().trim().toLowerCase();
+      const me = allDrivers.find(d => 
+        cleanStr(d.driverId) === cleanStr(driverId) || 
+        cleanStr(d.phone).replace(/\s+/g, '') === cleanStr(driverId).replace(/\s+/g, '') || 
+        cleanStr(d.name) === cleanStr(driverId)
+      );
       if (!me) { setLoading(false); return; }
 
-      const myVehicle = { vehicleNumber: me.vehicleId || me.vehicle, vehicleId: me.vehicleId || me.vehicle };
-      const myRoute = allRoutes.find(r => r.routeId === me.routeId || r.name === me.routeId);
-      const myStudents = allStudents.filter(s => s.routeId === me.routeId);
+      // Find the route assigned to this driver by matching driver name or ID
+      const myRoute = allRoutes.find(r => {
+        const rDriver = cleanStr(r.driver);
+        const meName = cleanStr(me.name);
+        const meId = cleanStr(me.driverId);
+        return rDriver === meName || 
+               rDriver === `${meName}(${meId})` || 
+               rDriver === `${meName} (${meId})` ||
+               rDriver.includes(meName) || 
+               rDriver.includes(meId) ||
+               (me.routeId && (cleanStr(r.routeId) === cleanStr(me.routeId) || cleanStr(r.name) === cleanStr(me.routeId)));
+      });
+      
+      const myVehicle = myRoute 
+        ? { vehicleNumber: myRoute.vehicle, vehicleId: myRoute.vehicle } 
+        : { vehicleNumber: me.vehicleId || me.vehicle, vehicleId: me.vehicleId || me.vehicle };
+
+      const myStudents = myRoute 
+        ? allStudents.filter(s => s.routeId === myRoute.routeId) 
+        : [];
       
       const todayStr = new Date().toISOString().split('T')[0];
       const attendanceData = Array.isArray(attendanceRes.data) ? attendanceRes.data : [];

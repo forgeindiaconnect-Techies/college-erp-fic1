@@ -285,6 +285,28 @@ function App() {
   const [theme, setTheme] = useState('light');
   const [collegeSettings, setCollegeSettings] = useState(null);
 
+  // Derive the active token to re-trigger settings fetch on login / logout
+  const getActiveToken = () => {
+    const keys = ['superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token'];
+    for (const key of keys) {
+      const val = sessionStorage.getItem(key);
+      if (val) return val;
+    }
+    return '';
+  };
+  const [activeToken, setActiveToken] = useState(getActiveToken());
+
+  // Poll for token changes every second so we react immediately even if routing in SPA
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const current = getActiveToken();
+      if (current !== activeToken) {
+        setActiveToken(current);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [activeToken]);
+
   useEffect(() => {
     // Force reset to light theme since user dislikes dark mode
     setTheme('light');
@@ -305,17 +327,17 @@ function App() {
           if (res.data.secondaryColor) {
             document.documentElement.style.setProperty('--secondary-color', res.data.secondaryColor);
           }
-          if (res.data.collegeLogo) {
-            // Can be used via context
-          }
+        } else {
+          setCollegeSettings(null);
         }
       } catch (err) {
         console.warn('Could not fetch college settings. Either not logged in or endpoint failed.');
+        setCollegeSettings(null);
       }
     };
 
     fetchCollegeSettings();
-  }, []);
+  }, [activeToken]);
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';

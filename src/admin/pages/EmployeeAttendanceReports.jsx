@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Filter, Download, Users, Briefcase, GraduationCap } from 'lucide-react';
+import { Calendar, Filter, Download, Users, Briefcase, GraduationCap, Search, X } from 'lucide-react';
 import { getEmployeeAttendanceReports } from '../../api';
 import './EmployeeAttendanceReports.css';
 
@@ -8,6 +8,7 @@ const EmployeeAttendanceReports = () => {
   const [loading, setLoading] = useState(true);
   const [filterRole, setFilterRole] = useState('');
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchReports();
@@ -36,14 +37,20 @@ const EmployeeAttendanceReports = () => {
 
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'Present': return <span className="badge badge-success">Present</span>;
-      case 'Absent': return <span className="badge badge-danger">Absent</span>;
-      case 'LOP': return <span className="badge badge-danger">LOP</span>;
-      case 'Half Day': return <span className="badge badge-warning">Half Day</span>;
-      case 'Late': return <span className="badge badge-warning">Late</span>;
-      default: return <span className="badge badge-secondary">{status}</span>;
+      case 'Present': return <span className="emp-badge emp-badge-success">Present</span>;
+      case 'Absent': return <span className="emp-badge emp-badge-danger">Absent</span>;
+      case 'LOP': return <span className="emp-badge emp-badge-danger">LOP</span>;
+      case 'Half Day': return <span className="emp-badge emp-badge-warning">Half Day</span>;
+      case 'Late': return <span className="emp-badge emp-badge-warning">Late</span>;
+      default: return <span className="emp-badge emp-badge-secondary">{status}</span>;
     }
   };
+
+  const filteredReports = reports.filter((record) => {
+    if (!search) return true;
+    const name = record.employeeId?.name || record.employeeId || '';
+    return name.toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <div className="employee-reports-container animate-fade-in">
@@ -54,45 +61,65 @@ const EmployeeAttendanceReports = () => {
         </div>
         <div className="header-actions">
           <button className="btn btn-primary" onClick={() => window.print()}>
-            <Download size={18} /> Export PDF
+            <Download size={18} style={{ display: 'inline', marginRight: '4px' }} /> Export PDF
           </button>
         </div>
       </div>
 
-      <div className="filters-container glass-card mb-6">
-        <div className="filter-group" style={{ display: 'flex', gap: '1rem', padding: '1rem' }}>
-          <div className="filter-select-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-primary)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <Calendar size={14} className="text-muted" />
+      <div className="glass-card mb-6">
+        <div className="filters-row" style={{ borderBottom: 'none' }}>
+          <div className="search-box">
+            <Search size={17} className="text-muted" />
             <input 
-              type="date" 
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }}
+              type="text" 
+              placeholder="Search employee by name..." 
+              value={search} 
+              onChange={e => setSearch(e.target.value)} 
             />
+            {search && (
+              <button className="clear-btn" onClick={() => setSearch('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <X size={14} className="text-muted" />
+              </button>
+            )}
           </div>
-          <div className="filter-select-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-primary)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <Filter size={14} className="text-muted" />
-            <select 
-              value={filterRole} 
-              onChange={(e) => setFilterRole(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', minWidth: '150px' }}
-            >
-              <option value="">All Roles</option>
-              <option value="Staff">Teaching Staff</option>
-              <option value="HOD">HOD</option>
-              <option value="Principal">Principal</option>
-              <option value="Accounts">Accounts</option>
-              <option value="Driver">Transport Driver</option>
-            </select>
+
+          <div className="filter-group">
+            {/* Date Selector */}
+            <div className="filter-select-wrapper">
+              <Calendar size={14} className="text-muted" />
+              <input 
+                type="date" 
+                className="date-input"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+              />
+            </div>
+
+            {/* Role Filter */}
+            <div className="filter-select-wrapper">
+              <Filter size={14} className="text-muted" />
+              <select 
+                className="filter-select"
+                value={filterRole} 
+                onChange={(e) => setFilterRole(e.target.value)}
+              >
+                <option value="">All Roles</option>
+                <option value="Staff">Teaching Staff</option>
+                <option value="HOD">HOD</option>
+                <option value="Principal">Principal</option>
+                <option value="Accounts">Accounts</option>
+                <option value="Driver">Transport Driver</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="reports-table-card glass-card">
         {loading ? (
-          <div className="loading-state">Loading reports...</div>
-        ) : reports.length === 0 ? (
-          <div className="empty-state">No attendance records found for this date.</div>
+          <div className="loading-state" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading reports...</div>
+        ) : filteredReports.length === 0 ? (
+          <div className="empty-state" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No attendance records found.</div>
         ) : (
           <div className="table-responsive">
             <table className="reports-table">
@@ -107,9 +134,9 @@ const EmployeeAttendanceReports = () => {
                 </tr>
               </thead>
               <tbody>
-                {reports.map((record) => (
+                {filteredReports.map((record) => (
                   <tr key={record._id}>
-                    <td className="font-medium">
+                    <td className="font-medium" style={{ fontWeight: 600 }}>
                       {record.employeeId?.name || record.employeeId}
                     </td>
                     <td>

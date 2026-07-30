@@ -4,6 +4,27 @@ import { protect, authorize, collegeScope } from '../middleware/authMiddleware.j
 
 const router = express.Router();
 
+const parseTimeToMinutes = (timeStr) => {
+  if (!timeStr) return 0;
+  timeStr = timeStr.trim();
+  const match = timeStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+  if (match) {
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const ampm = match[3].toUpperCase();
+    if (ampm === 'PM' && hours < 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  }
+  const match24 = timeStr.match(/^(\d+):(\d+)$/);
+  if (match24) {
+    const hours = parseInt(match24[1], 10);
+    const minutes = parseInt(match24[2], 10);
+    return hours * 60 + minutes;
+  }
+  return 0;
+};
+
 router.get('/', protect, collegeScope, async (req, res) => {
   try {
     const collegeId = req.collegeId || req.user?.collegeId || 'COL002-8379189';
@@ -13,7 +34,7 @@ router.get('/', protect, collegeScope, async (req, res) => {
         { collegeId: { $exists: false } },
         { collegeId: null }
       ]
-    }).sort({ startTime: 1 });
+    });
 
     if (!periods || periods.length === 0) {
       const defaultPeriods = [
@@ -27,6 +48,8 @@ router.get('/', protect, collegeScope, async (req, res) => {
       ];
       periods = await PeriodMaster.insertMany(defaultPeriods);
     }
+
+    periods = periods.sort((a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
     res.json(periods);
   } catch (error) {
     res.status(500).json({ message: error.message });

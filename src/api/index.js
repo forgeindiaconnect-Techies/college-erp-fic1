@@ -301,6 +301,7 @@ export const getTransportTrips = () => api.get('/transport/trips');
 export const createTransportTrip = (data) => api.post('/transport/trips', data);
 export const updateTransportTrip = (id, data) => api.put(`/transport/trips/${id}`, data);
 export const getTransportMaintenance = () => api.get('/transport/maintenance');
+export const createTransportMaintenance = (data) => api.post('/transport/maintenance', data);
 export const updateTransportMaintenance = (id, data) => api.put(`/transport/maintenance/${id}`, data);
 export const getTransportNotifications = () => api.get('/transport/notifications');
 

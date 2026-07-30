@@ -263,3 +263,199 @@
     height: 280px;
   }
 }
+
+/* ==========================================================================
+   Custom Responsive Grid & Premium Cards Layout (fixes alignment issues)
+   ========================================================================== */
+
+.transport-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+@media (max-width: 1200px) {
+  .transport-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .transport-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.transport-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .transport-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.transport-routes-grid,
+.transport-drivers-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .transport-routes-grid,
+  .transport-drivers-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .transport-routes-grid,
+  .transport-drivers-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Premium Stat Cards styling */
+.transport-stat-card {
+  background: var(--bg-secondary, #FFFFFF);
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #E2E8F0);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm, 0 4px 15px rgba(15,23,42,0.03));
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+}
+
+.transport-stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 40px rgba(0,0,0,0.08);
+}
+
+.transport-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+}
+
+.transport-stat-card.blue::before {
+  background: #3b82f6;
+}
+
+.transport-stat-card.indigo::before {
+  background: #6366f1;
+}
+
+.transport-stat-card.green::before {
+  background: #10b981;
+}
+
+.transport-stat-card.red::before {
+  background: #ef4444;
+}
+
+.transport-icon-wrapper {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.transport-stat-card.blue .transport-icon-wrapper {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.transport-stat-card.indigo .transport-icon-wrapper {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+}
+
+.transport-stat-card.green .transport-icon-wrapper {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.transport-stat-card.red .transport-icon-wrapper {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.transport-stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.transport-stat-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted, #64748B);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.transport-stat-value {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--text-main, #0F172A);
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.transport-stat-value.text-danger {
+  color: var(--danger, #EF4444);
+}
+
+/* Fleet List Items styling */
+.transport-fleet-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background-color: var(--bg-primary, #F8FAFC);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color, #E2E8F0);
+  transition: background-color 0.2s;
+}
+
+.dark .transport-fleet-item {
+  background-color: var(--bg-card, #1E293B);
+}
+
+.transport-fleet-icon-wrapper {
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transport-status-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+}
+
+.transport-status-badge.success {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}

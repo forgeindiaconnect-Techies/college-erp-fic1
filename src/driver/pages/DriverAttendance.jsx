@@ -12,7 +12,7 @@ const DriverAttendance = () => {
     try {
       const data = JSON.parse(sessionStorage.getItem('driver_session') || '{}');
       setSession(data);
-      const driverId = data.referenceId;
+      const driverId = data.referenceId || data._id;
       
       if (driverId) {
         let attData = [];
@@ -45,8 +45,11 @@ const DriverAttendance = () => {
       const todayStr = new Date().toISOString().split('T')[0];
       const nowTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       
+      const driverId = session.referenceId || session._id;
+      if (!driverId) return;
+
       let payload = {
-        driverId: session.referenceId,
+        driverId: driverId,
         date: todayStr,
         status: 'Present'
       };
@@ -63,18 +66,15 @@ const DriverAttendance = () => {
         await markDriverAttendance({ records: [payload] });
       } catch (e) {
         // Fallback to local storage if API fails
-        const driverId = session.referenceId;
-        if (driverId) {
-          const allAtt = JSON.parse(localStorage.getItem(`erp_driver_attendance_${driverId}`) || '[]');
-          const todayStr = new Date().toISOString().split('T')[0];
-          const existingIdx = allAtt.findIndex(a => a.date === todayStr);
-          if (existingIdx >= 0) {
-             allAtt[existingIdx] = { ...allAtt[existingIdx], ...payload };
-          } else {
-             allAtt.push(payload);
-          }
-          localStorage.setItem(`erp_driver_attendance_${driverId}`, JSON.stringify(allAtt));
+        const allAtt = JSON.parse(localStorage.getItem(`erp_driver_attendance_${driverId}`) || '[]');
+        const todayStr = new Date().toISOString().split('T')[0];
+        const existingIdx = allAtt.findIndex(a => a.date === todayStr);
+        if (existingIdx >= 0) {
+           allAtt[existingIdx] = { ...allAtt[existingIdx], ...payload };
+        } else {
+           allAtt.push(payload);
         }
+        localStorage.setItem(`erp_driver_attendance_${driverId}`, JSON.stringify(allAtt));
       }
 
       fetchAttendance(); // Refresh

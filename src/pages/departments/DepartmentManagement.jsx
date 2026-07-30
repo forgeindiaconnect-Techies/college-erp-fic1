@@ -32,7 +32,7 @@ const STANDARD_DEPARTMENTS = [
   { name: 'Biotechnology Engineering', code: 'BIOTECH' },
 ];
 
-const EMPTY_FORM = { name: '', customName: '', code: '', hod: '', students: '', staff: '', established: '2020', status: 'Active' };
+const EMPTY_FORM = { name: '', code: '', hod: '', students: '', staff: '', established: '2020', status: 'Active' };
 
 const DepartmentManagement = () => {
   const [loading, setLoading] = useState(true);
@@ -54,12 +54,11 @@ const DepartmentManagement = () => {
     }).catch(err => console.error('Failed to load HODs:', err));
   }, []);
 
-  // Auto-generate Department Code based on Department Name
+  // Auto-generate Department Code based on Department Name input
   useEffect(() => {
-    const targetName = form.name === 'Other' ? form.customName : form.name;
-    if (!editTarget && targetName) {
+    if (!editTarget && form.name) {
       const generateCode = (name) => {
-        const std = STANDARD_DEPARTMENTS.find(d => d.name === name);
+        const std = STANDARD_DEPARTMENTS.find(d => d.name.toLowerCase() === name.toLowerCase());
         if (std) return std.code;
 
         // Fallback (just in case)
@@ -69,11 +68,11 @@ const DepartmentManagement = () => {
         }
         return name.substring(0, 3).toUpperCase();
       };
-      setForm(prev => ({ ...prev, code: generateCode(targetName) }));
-    } else if (!editTarget && !targetName) {
+      setForm(prev => ({ ...prev, code: generateCode(form.name) }));
+    } else if (!editTarget && !form.name) {
       setForm(prev => ({ ...prev, code: '' }));
     }
-  }, [form.name, form.customName, editTarget]);
+  }, [form.name, editTarget]);
 
   const fetchDepartments = async () => {
     try {
@@ -82,7 +81,6 @@ const DepartmentManagement = () => {
       setDepts(res.data);
     } catch (err) {
       console.error('Failed to fetch departments:', err);
-      // Fallback
       setDepts([]);
     } finally {
       setLoading(false);
@@ -96,11 +94,9 @@ const DepartmentManagement = () => {
 
   const openAdd = () => { setForm(EMPTY_FORM); setEditTarget(null); setModalOpen(true); };
   const openEdit = (d) => { 
-    const isStandard = STANDARD_DEPARTMENTS.some(std => std.name === d.name);
     setForm({ 
       ...d, 
-      name: isStandard ? d.name : 'Other',
-      customName: isStandard ? '' : d.name
+      name: d.name
     }); 
     setEditTarget(d.id); 
     setModalOpen(true); 
@@ -110,14 +106,12 @@ const DepartmentManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const finalName = form.name === 'Other' ? form.customName : form.name;
-      if (!finalName) {
+      if (!form.name || !form.name.trim()) {
         alert("Please provide a department name.");
         return;
       }
       
-      const payloadBase = { ...form, name: finalName, students: Number(form.students) || 0, staff: Number(form.staff) || 0 };
-      delete payloadBase.customName;
+      const payloadBase = { ...form, name: form.name.trim(), students: Number(form.students) || 0, staff: Number(form.staff) || 0 };
       
       if (editTarget) {
         await updateDepartment(editTarget, payloadBase);
@@ -263,13 +257,13 @@ const DepartmentManagement = () => {
                     <div className="dept-stat-box" style={{ background: 'var(--bg-primary)', padding: '0.8rem', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
                       <span className="stat-label" style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Students</span>
                       <span className="stat-number" style={{ display: 'block', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                        {dept.students ? Number(dept.students).toLocaleString() : (dept.name.length * 15 + 120)}
+                        {typeof dept.students === 'number' || typeof dept.students === 'string' ? Number(dept.students).toLocaleString() : (dept.name.length * 15 + 120)}
                       </span>
                     </div>
                     <div className="dept-stat-box" style={{ background: 'var(--bg-primary)', padding: '0.8rem', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
                       <span className="stat-label" style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Staff</span>
                       <span className="stat-number" style={{ display: 'block', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                        {dept.staff ? dept.staff : Math.floor((dept.name.length * 15 + 120) / 15)}
+                        {typeof dept.staff === 'number' || typeof dept.staff === 'string' ? Number(dept.staff).toLocaleString() : Math.floor((dept.name.length * 15 + 120) / 15)}
                       </span>
                     </div>
                   </div>
@@ -306,29 +300,13 @@ const DepartmentManagement = () => {
               <div className="form-grid">
                 <div className="form-group">
                   <label>Department Name</label>
-                  <CustomSelect 
-                    value={form.name}
+                  <input 
+                    required 
+                    placeholder="e.g. Computer Science Engineering" 
+                    value={form.name} 
                     onChange={e => setForm({ ...form, name: e.target.value })}
-                    options={[
-                      ...STANDARD_DEPARTMENTS.map(d => ({ value: d.name, label: d.name })),
-                      { value: 'Other', label: '+ Other (Custom Department)' }
-                    ]}
-                    placeholder="— Select Department —"
-                    required
                   />
                 </div>
-                {form.name === 'Other' && (
-                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                    <label>Enter Custom Department Name</label>
-                    <input 
-                      type="text"
-                      value={form.customName}
-                      onChange={e => setForm({ ...form, customName: e.target.value })}
-                      placeholder="e.g. History & Arts"
-                      required
-                    />
-                  </div>
-                )}
                 <div className="form-group">
                   <label>Department Code (Auto)</label>
                   <input 

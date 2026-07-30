@@ -17,25 +17,45 @@ const DriverTripManagement = () => {
       setLoading(true);
       const data = JSON.parse(sessionStorage.getItem('driver_session') || '{}');
       setSession(data);
-      const driverId = data.referenceId;
+      const driverId = data.referenceId || data._id;
       if (!driverId) return;
 
-      const driversRes = await getTransportDrivers();
-      const me = driversRes.data.find(d => d.driverId === driverId || (driverId === 'DRV001' && d.name.includes('Suresh')));
+      const tenantId = data.tenantId || 'mock_college_id';
+      const localDrivers = JSON.parse(localStorage.getItem(`erp_transport_drivers_${tenantId}`) || '[]');
+      const localRoutes  = JSON.parse(localStorage.getItem(`erp_transport_routes_${tenantId}`)  || '[]');
+      const localStudents = JSON.parse(localStorage.getItem(`erp_transport_students_${tenantId}`) || '[]');
+
+      const [driversRes, routesRes, studentsRes, tripsRes] = await Promise.all([
+        getTransportDrivers().catch(() => ({ data: [] })),
+        getTransportRoutes().catch(() => ({ data: [] })),
+        getTransportStudents().catch(() => ({ data: [] })),
+        getTransportTrips({ driverId }).catch(() => ({ data: [] }))
+      ]);
+
+      const allDrivers = [
+        ...localDrivers,
+        ...(driversRes.data || []).filter(d => !localDrivers.find(l => l.driverId === d.driverId))
+      ];
+      const allRoutes = [
+        ...localRoutes,
+        ...(routesRes.data || []).filter(r => !localRoutes.find(l => l.routeId === r.routeId))
+      ];
+      const allStudents = [
+        ...localStudents,
+        ...(studentsRes.data || []).filter(s => !localStudents.find(l => l.studentId === s.studentId))
+      ];
+
+      const me = allDrivers.find(d => d.driverId === driverId || d.phone === driverId || d.name === driverId);
       setMyDriverInfo(me);
 
       if (me) {
-        const [routesRes, studentsRes, tripsRes] = await Promise.all([
-          getTransportRoutes().catch(() => ({ data: [] })),
-          getTransportStudents().catch(() => ({ data: [] })),
-          getTransportTrips({ driverId }).catch(() => ({ data: [] }))
-        ]);
-
-        const myRoute = routesRes.data.find(r => r.name === me.routeId || r.routeId === me.routeId);
+        const myRoute = allRoutes.find(r => r.driver === me.name || r.driver === `${me.name} (${me.driverId})` || r.routeId === me.routeId || r.name === me.routeId);
         setRoute(myRoute);
         
-        const myStudents = studentsRes.data.filter(s => s.routeId === me.routeId);
-        setStudents(myStudents);
+        if (myRoute) {
+          const myStudents = allStudents.filter(s => s.routeId === myRoute.routeId);
+          setStudents(myStudents);
+        }
 
         const allTrips = tripsRes.data || [];
         setTrips(allTrips);
@@ -61,9 +81,9 @@ const DriverTripManagement = () => {
       const nowTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       
       const payload = {
-        driverId: myDriverInfo.driverId,
-        vehicleId: myDriverInfo.vehicleId,
-        routeId: myDriverInfo.routeId,
+        driverId: myDriverInfo ? myDriverInfo.driverId : (session.referenceId || session._id),
+        vehicleId: route ? route.vehicle : (myDriverInfo?.vehicleId || 'Unassigned'),
+        routeId: route ? route.routeId : (myDriverInfo?.routeId || 'Unassigned'),
         date: todayStr,
         startTime: nowTime,
         status: 'Started',

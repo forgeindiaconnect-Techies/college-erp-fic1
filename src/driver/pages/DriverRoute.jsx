@@ -15,18 +15,59 @@ const DriverRoute = () => {
         const data = JSON.parse(sessionStorage.getItem('driver_session') || '{}');
         setSession(data);
         
-        const driversRes = await getTransportDrivers();
-        const me = driversRes.data.find(d => d.driverId === data.referenceId || (data.referenceId === 'DRV001' && d.name.includes('Suresh')));
+        const driverId = data.referenceId || data._id;
+        const tenantId = data.tenantId || 'mock_college_id';
+        if (!driverId) { setLoading(false); return; }
+
+        const localDrivers = JSON.parse(localStorage.getItem(`erp_transport_drivers_${tenantId}`) || '[]');
+        const localRoutes  = JSON.parse(localStorage.getItem(`erp_transport_routes_${tenantId}`)  || '[]');
+        const localStudents = JSON.parse(localStorage.getItem(`erp_transport_students_${tenantId}`) || '[]');
+
+        const [driversRes, routesRes, studentsRes] = await Promise.all([
+          getTransportDrivers().catch(() => ({ data: [] })),
+          getTransportRoutes().catch(() => ({ data: [] })),
+          getTransportStudents().catch(() => ({ data: [] }))
+        ]);
+
+        const allDrivers = [
+          ...localDrivers,
+          ...(driversRes.data || []).filter(d => !localDrivers.find(l => l.driverId === d.driverId))
+        ];
+        const allRoutes = [
+          ...localRoutes,
+          ...(routesRes.data || []).filter(r => !localRoutes.find(l => l.routeId === r.routeId))
+        ];
+        const allStudents = [
+          ...localStudents,
+          ...(studentsRes.data || []).filter(s => !localStudents.find(l => l.studentId === s.studentId))
+        ];
+
+        const cleanStr = (str) => (str || '').toString().trim().toLowerCase();
+        const me = allDrivers.find(d => 
+          cleanStr(d.driverId) === cleanStr(driverId) || 
+          cleanStr(d.phone).replace(/\s+/g, '') === cleanStr(driverId).replace(/\s+/g, '') || 
+          cleanStr(d.name) === cleanStr(driverId)
+        );
         setDriverInfo(me);
 
-        if (me && me.routeId) {
-          const routesRes = await getTransportRoutes();
-          const myRoute = routesRes.data.find(r => r.name === me.routeId || r.routeId === me.routeId);
+        if (me) {
+          const myRoute = allRoutes.find(r => {
+            const rDriver = cleanStr(r.driver);
+            const meName = cleanStr(me.name);
+            const meId = cleanStr(me.driverId);
+            return rDriver === meName || 
+                   rDriver === `${meName}(${meId})` || 
+                   rDriver === `${meName} (${meId})` ||
+                   rDriver.includes(meName) || 
+                   rDriver.includes(meId) ||
+                   (me.routeId && (cleanStr(r.routeId) === cleanStr(me.routeId) || cleanStr(r.name) === cleanStr(me.routeId)));
+          });
           setRoute(myRoute);
 
-          const studentsRes = await getTransportStudents();
-          const myStudents = studentsRes.data.filter(s => s.routeId === me.routeId);
-          setStudents(myStudents);
+          if (myRoute) {
+            const myStudents = allStudents.filter(s => s.routeId === myRoute.routeId);
+            setStudents(myStudents);
+          }
         }
       } catch (err) {
         console.error('Failed to load route data', err);

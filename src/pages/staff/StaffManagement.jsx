@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Filter, MoreVertical, Edit2, Trash2, Mail, Phone, Clock, AlertTriangle, CheckCircle, X, BookOpen } from 'lucide-react';
-import { getStaff, createStaff, updateStaff, deleteStaff, approveStaff, getSubjects } from '../../api/index';
+import { getStaff, createStaff, updateStaff, deleteStaff, approveStaff, getSubjects, getDepartments } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import CustomSelect from '../../components/CustomSelect';
 import './StaffManagement.css';
@@ -35,10 +35,21 @@ const StaffManagement = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [dbDepartments, setDbDepartments] = useState([]);
 
   useEffect(() => {
     fetchStaff();
+    fetchDepartments();
   }, []);
+
+  const fetchDepartments = async () => {
+    try {
+      const res = await getDepartments();
+      setDbDepartments(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch departments:', err);
+    }
+  };
 
   // Auto-refresh when staff data changes on another dashboard
   useRealtimeSync(useCallback(() => { fetchStaff(false); }, []), 'staff');
@@ -73,7 +84,12 @@ const StaffManagement = () => {
     return matchSearch && matchDept;
   });
 
-  const openAdd = () => { setForm(EMPTY_FORM); setEditTarget(null); setModalOpen(true); };
+  const openAdd = () => { 
+    const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
+    setForm({ ...EMPTY_FORM, dept: activeDepts[0] || '' }); 
+    setEditTarget(null); 
+    setModalOpen(true); 
+  };
   const openEdit = (s) => { setForm({ ...s }); setEditTarget(s.id); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setEditTarget(null); setForm(EMPTY_FORM); };
 
@@ -171,10 +187,13 @@ const StaffManagement = () => {
             <CustomSelect 
               value={deptFilter} 
               onChange={e => setDeptFilter(e.target.value)}
-              options={[
-                { value: 'All', label: 'All Departments' },
-                ...DEPARTMENTS.map(d => ({ value: d, label: d }))
-              ]}
+              options={(() => {
+                const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
+                return [
+                  { value: 'All', label: 'All Departments' },
+                  ...activeDepts.map(d => ({ value: d, label: d }))
+                ];
+              })()}
             />
           </div>
         </div>
@@ -269,7 +288,10 @@ const StaffManagement = () => {
                   <CustomSelect 
                     value={form.dept}
                     onChange={e => setForm({ ...form, dept: e.target.value })}
-                    options={DEPARTMENTS.map(d => ({ value: d, label: d }))}
+                    options={(() => {
+                      const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
+                      return activeDepts.map(d => ({ value: d, label: d }));
+                    })()}
                     placeholder="Select Department"
                     required
                   />

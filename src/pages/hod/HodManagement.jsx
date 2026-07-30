@@ -45,7 +45,7 @@ const HodManagement = () => {
   const [editTarget, setEditTarget] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const [availableDepartments, setAvailableDepartments] = useState(DEPARTMENTS);
+  const [availableDepartments, setAvailableDepartments] = useState([]);
 
   useEffect(() => {
     fetchHods();
@@ -60,9 +60,12 @@ const HodManagement = () => {
       const res = await getDepartments();
       if (res.data && res.data.length > 0) {
         setAvailableDepartments(res.data.map(d => ({ name: d.name, code: d.code })));
+      } else {
+        setAvailableDepartments([]);
       }
     } catch (err) {
-      console.warn('Failed to load real departments, using defaults');
+      console.warn('Failed to load real departments');
+      setAvailableDepartments([]);
     }
   };
 
@@ -95,7 +98,12 @@ const HodManagement = () => {
     h.id.toLowerCase().includes(search.toLowerCase())
   );
 
-  const openAdd = () => { setForm(EMPTY_FORM); setEditTarget(null); setModalOpen(true); };
+  const openAdd = () => { 
+    const activeDepts = availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS;
+    setForm({ ...EMPTY_FORM, dept: activeDepts[0]?.name || '' }); 
+    setEditTarget(null); 
+    setModalOpen(true); 
+  };
   const openEdit = (h) => { setForm({ ...h }); setEditTarget(h.id); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setEditTarget(null); setForm(EMPTY_FORM); };
 
@@ -315,7 +323,10 @@ const HodManagement = () => {
                   <CustomSelect 
                     value={form.dept}
                     onChange={e => setForm({ ...form, dept: e.target.value })}
-                    options={availableDepartments.map(d => ({ value: d.name, label: d.name }))}
+                    options={(() => {
+                      const activeDepts = availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS;
+                      return activeDepts.map(d => ({ value: d.name, label: d.name }));
+                    })()}
                     placeholder="Select Department"
                   />
                 </div>

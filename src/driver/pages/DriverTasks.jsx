@@ -14,20 +14,49 @@ const DriverTasks = () => {
       const session = JSON.parse(sessionStorage.getItem('driver_session') || '{}');
       setDriverInfo(session);
 
+      const tenantId = session.tenantId || 'mock_college_id';
+      const localMaintenance = JSON.parse(localStorage.getItem(`erp_transport_maintenance_${tenantId}`) || '[]');
+      const localComplaints = JSON.parse(localStorage.getItem(`erp_transport_complaints_${tenantId}`) || '[]');
+      const localRoutes = JSON.parse(localStorage.getItem(`erp_transport_routes_${tenantId}`) || '[]');
+
       const [maintRes, compRes, routesRes] = await Promise.all([
         getTransportMaintenance().catch(() => ({ data: [] })),
         getTransportComplaints().catch(() => ({ data: [] })),
         getTransportRoutes().catch(() => ({ data: [] }))
       ]);
 
+      const allMaintenance = [
+        ...localMaintenance,
+        ...(maintRes.data || []).filter(m => !localMaintenance.find(l => l._id === m._id))
+      ];
+      const allComplaints = [
+        ...localComplaints,
+        ...(compRes.data || []).filter(c => !localComplaints.find(l => l._id === c._id))
+      ];
+      const allRoutes = [
+        ...localRoutes,
+        ...(routesRes.data || []).filter(r => !localRoutes.find(l => l.routeId === r.routeId))
+      ];
+
       // Find driver's actual vehicle via route assignment (fallback to session)
-      const myRoute = routesRes.data.find(r => r.driver === session.name || r.routeId === session.routeId || r.driver === session.referenceId);
-      const myVehicleId = myRoute ? myRoute.vehicle : session.vehicleId;
+      const cleanStr = (str) => (str || '').toString().trim().toLowerCase();
+      const myRoute = allRoutes.find(r => {
+        const rDriver = cleanStr(r.driver);
+        const meName = cleanStr(session.name);
+        const meId = cleanStr(session.referenceId);
+        return rDriver === meName || 
+               rDriver === `${meName}(${meId})` || 
+               rDriver === `${meName} (${meId})` ||
+               rDriver.includes(meName) || 
+               rDriver.includes(meId) ||
+               (session.routeId && (cleanStr(r.routeId) === cleanStr(session.routeId) || cleanStr(r.name) === cleanStr(session.routeId)));
+      });
+      const myVehicleId = myRoute ? myRoute.vehicle : (session.vehicleId || session.vehicle);
       
       const myVehicleClean = myVehicleId ? String(myVehicleId).trim().toLowerCase() : '';
       
       // Filter maintenance for my vehicle
-      const myMaintenance = maintRes.data.filter(m => 
+      const myMaintenance = allMaintenance.filter(m => 
         m.vehicleNumber && String(m.vehicleNumber).trim().toLowerCase() === myVehicleClean
       );
       
@@ -36,7 +65,7 @@ const DriverTasks = () => {
       const myIdClean = session.referenceId ? String(session.referenceId).trim().toLowerCase() : '';
       const myRouteClean = myRoute ? String(myRoute.routeId).trim().toLowerCase() : '';
       
-      const myComplaints = compRes.data.filter(c => {
+      const myComplaints = allComplaints.filter(c => {
         // Hide sensitive complaints related to driver behavior or safety
         const typeClean = (c.complaintType || c.category || '').toLowerCase();
         const descClean = (c.description || '').toLowerCase();

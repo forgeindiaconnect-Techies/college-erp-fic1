@@ -196,7 +196,7 @@ const autoSeedIfEmpty = async () => {
       await College.insertMany([
         {
           tenantId: 'COL001',
-          name: 'FIC Engineering College',
+          name: 'Marudhar Kesari Jain College',
           adminName: 'Vaideeswari Admin',
           email: 'vaidee@gmail.com',
           phone: '9876543210',
@@ -252,25 +252,43 @@ const autoSeedIfEmpty = async () => {
 
       // Ensure user's exact requested custom credentials are always present
       const customCredentials = [
-        { name: 'Global Super Admin', email: 'superadmin@erpsaas.com', password: 'superadmin123', role: 'Super Admin' },
-        { name: 'Vaideeswari (Admin)', email: 'vaidee@gmail.com', password: 'vaidee', role: 'Admin' },
-        { name: 'Vaideeswari (Admin)', email: 'vaideeswari@gmail.com', password: 'password123', role: 'Admin' },
-        { name: 'Sree (Principal)', email: 'sree@gmail.com', password: 'sree123', role: 'Principal' },
-        { name: 'Dr. Agila (HOD)', email: 'agila@gmail.com', password: 'agila', role: 'HOD', department: 'Information Technology', referenceId: 'HOD001' },
-        { name: 'Pooja (Staff)', email: 'pooja@gmail.com', password: 'pooja', role: 'Staff', department: 'Computer Science', referenceId: 'STF008', subjects: ['Data Structures'] },
+        { name: 'Global Super Admin', email: 'superadmin@erpsaas.com', password: 'superadmin123', role: 'Super Admin', tenantId: 'system', collegeId: 'system' },
+        { name: 'Vaideeswari (Admin)', email: 'vaidee@gmail.com', password: 'vaidee', role: 'Admin', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Vaideeswari (Admin)', email: 'vaideeswari@gmail.com', password: 'password123', role: 'Admin', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Sree (Principal)', email: 'sree@gmail.com', password: 'sree123', role: 'Principal', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Dr. Agila (HOD)', email: 'agila@gmail.com', password: 'agila', role: 'HOD', department: 'Information Technology', referenceId: 'HOD001', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Pooja (Staff)', email: 'pooja@gmail.com', password: 'pooja', role: 'Staff', department: 'Computer Science', referenceId: 'STF008', subjects: ['Data Structures'], tenantId: 'COL001', collegeId: 'COL001' },
       ];
 
       for (const cred of customCredentials) {
         const u = await User.findOne({ email: cred.email });
+        
+        let resolvedTenantId = cred.tenantId;
+        const matchingCollege = await College.findOne({
+          $or: [
+            { email: cred.email.trim().toLowerCase() },
+            { principalEmail: cred.email.trim().toLowerCase() }
+          ]
+        });
+        if (matchingCollege) {
+          resolvedTenantId = matchingCollege.tenantId;
+        }
+
         if (!u) {
-          await User.create(cred);
-          console.log(`✅ Created custom user: ${cred.email}`);
+          await User.create({
+            ...cred,
+            tenantId: resolvedTenantId,
+            collegeId: resolvedTenantId
+          });
+          console.log(`✅ Created custom user: ${cred.email} with resolved tenantId: ${resolvedTenantId}`);
         } else {
           u.role = cred.role;
           u.password = cred.password;
+          u.tenantId = resolvedTenantId;
+          u.collegeId = resolvedTenantId;
           u.markModified('password');
           await u.save();
-          console.log(`✅ Updated custom user password for: ${cred.email}`);
+          console.log(`✅ Restored custom user: ${cred.email} to resolved tenantId: ${resolvedTenantId}`);
         }
       }
 
@@ -855,6 +873,19 @@ const startServer = async () => {
     const uri = mongoServer.getUri();
     await mongoose.connect(uri);
     console.log('✅ Connected to In-Memory MongoDB (Zero-Config Mode)');
+  }
+
+  // Migrate existing users without tenantId to COL001
+  try {
+    const updateResult = await User.updateMany(
+      { role: { $ne: 'Super Admin' }, $or: [{ tenantId: null }, { tenantId: { $exists: false } }] },
+      { $set: { tenantId: 'COL001', collegeId: 'COL001' } }
+    );
+    if (updateResult.modifiedCount > 0) {
+      console.log(`✅ Multi-tenancy migration: updated ${updateResult.modifiedCount} users to default tenant COL001`);
+    }
+  } catch (err) {
+    console.error('Failed to run user multi-tenancy migration:', err);
   }
 
   // Auto-seed the 15 Professional Departments if missing

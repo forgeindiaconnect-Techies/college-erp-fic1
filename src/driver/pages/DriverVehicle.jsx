@@ -27,17 +27,56 @@ const DriverVehicle = () => {
       try {
         const data = JSON.parse(sessionStorage.getItem('driver_session') || '{}');
         setSession(data);
-        const driversRes = await getTransportDrivers();
-        const me = driversRes.data.find(d => d.driverId === data.referenceId || (data.referenceId === 'DRV001' && d.name.includes('Suresh')));
+        
+        const driverId = data.referenceId || data._id;
+        const tenantId = data.tenantId || 'mock_college_id';
+        if (!driverId) { setLoading(false); return; }
 
-        if (me && me.vehicleId) {
+        const localDrivers = JSON.parse(localStorage.getItem(`erp_transport_drivers_${tenantId}`) || '[]');
+        const localRoutes  = JSON.parse(localStorage.getItem(`erp_transport_routes_${tenantId}`)  || '[]');
+
+        const [driversRes, routesRes] = await Promise.all([
+          getTransportDrivers().catch(() => ({ data: [] })),
+          getTransportRoutes().catch(() => ({ data: [] }))
+        ]);
+
+        const allDrivers = [
+          ...localDrivers,
+          ...(driversRes.data || []).filter(d => !localDrivers.find(l => l.driverId === d.driverId))
+        ];
+        const allRoutes = [
+          ...localRoutes,
+          ...(routesRes.data || []).filter(r => !localRoutes.find(l => l.routeId === r.routeId))
+        ];
+
+        const cleanStr = (str) => (str || '').toString().trim().toLowerCase();
+        const me = allDrivers.find(d => 
+          cleanStr(d.driverId) === cleanStr(driverId) || 
+          cleanStr(d.phone).replace(/\s+/g, '') === cleanStr(driverId).replace(/\s+/g, '') || 
+          cleanStr(d.name) === cleanStr(driverId)
+        );
+
+        if (me) {
+          const myRoute = allRoutes.find(r => {
+            const rDriver = cleanStr(r.driver);
+            const meName = cleanStr(me.name);
+            const meId = cleanStr(me.driverId);
+            return rDriver === meName || 
+                   rDriver === `${meName}(${meId})` || 
+                   rDriver === `${meName} (${meId})` ||
+                   rDriver.includes(meName) || 
+                   rDriver.includes(meId) ||
+                   (me.routeId && (cleanStr(r.routeId) === cleanStr(me.routeId) || cleanStr(r.name) === cleanStr(me.routeId)));
+          });
+          const vehicleNumber = myRoute ? myRoute.vehicle : (me.vehicleId || me.vehicle || 'Unassigned');
+
           setVehicle({
-            vehicleId: me.vehicleId,
-            vehicleNumber: me.vehicleId, 
+            vehicleId: vehicleNumber,
+            vehicleNumber: vehicleNumber, 
             vehicleType: 'School Bus',
-            capacity: 50,
-            registrationNumber: me.vehicleId,
-            assignedRoute: me.routeId || 'Unassigned',
+            capacity: myRoute ? (myRoute.capacity || 50) : 50,
+            registrationNumber: vehicleNumber,
+            assignedRoute: myRoute ? myRoute.name : 'Unassigned',
             insuranceExpiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
             status: 'Active',
             maintenanceStatus: 'Good'
@@ -45,7 +84,7 @@ const DriverVehicle = () => {
 
           try {
             const compRes = await getTransportComplaints();
-            const driverIssues = compRes.data.filter(c => c.studentId === (data.referenceId || data._id));
+            const driverIssues = compRes.data.filter(c => c.studentId === driverId);
             setMyIssues(driverIssues);
           } catch(e) {
             console.error("Failed to fetch my complaints");

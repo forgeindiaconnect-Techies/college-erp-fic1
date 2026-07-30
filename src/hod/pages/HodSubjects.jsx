@@ -62,6 +62,7 @@ const HodSubjects = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = {
+      regulationId: form.regulationId || null,
       subjectCode: form.code,
       subjectName: form.name,
       department: DEPT,
@@ -70,9 +71,6 @@ const HodSubjects = () => {
       credits: Number(form.credits),
       workload: Number(form.hours)
     };
-    if (form.regulationId) {
-      payload.regulationId = form.regulationId;
-    }
     
     try {
       if (editId) {
@@ -163,6 +161,16 @@ const HodSubjects = () => {
 
                 <div className="form-group"><label><Hash size={12} style={{display:'inline',marginRight:4}}/>Course Code *</label><input required placeholder="e.g. CS301" value={form.code} onChange={e=>setForm({...form,code:e.target.value})}/></div>
                 <div className="form-group"><label><BookOpen size={12} style={{display:'inline',marginRight:4}}/>Subject Name *</label><input required placeholder="e.g. Data Structures" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div>
+                <div className="form-group">
+                  <label>Regulation</label>
+                  <select value={form.regulationId} onChange={e=>setForm({...form,regulationId:e.target.value})}>
+                    <option value="">— Select Regulation —</option>
+                    {regulations.map(r => (
+                      <option key={r._id} value={r._id}>{r.regulationName}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="form-group"><label>Semester</label><select value={form.sem} onChange={e=>setForm({...form,sem:e.target.value})}>{SEMESTERS.map(s=><option key={s}>{s}</option>)}</select></div>
                 <div className="form-group">
                   <label><User size={12} style={{display:'inline',marginRight:4}}/>Instructor</label>

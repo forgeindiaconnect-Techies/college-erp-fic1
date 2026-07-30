@@ -24,7 +24,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { getStudents, getAllAttendance, createAttendance } from '../../api/index';
+import { getStudents, getAllAttendance, createAttendance, getDepartments } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import './AttendanceManagement.css';
 
@@ -77,6 +77,7 @@ const AttendanceManagement = () => {
   const [students, setStudents] = useState([]);
   const [dailyLogs, setDailyLogs] = useState({});
   const [stats, setStats] = useState({});
+  const [dbDepartments, setDbDepartments] = useState([]);
   
   const [deptFilter, setDeptFilter] = useState('All');
   const [semFilter, setSemFilter] = useState('All');
@@ -98,10 +99,14 @@ const AttendanceManagement = () => {
     try {
       setLoading(true);
       
-      // 1. Fetch Students
-      const studentsRes = await getStudents();
+      // 1. Fetch Students & Departments
+      const [studentsRes, deptsRes] = await Promise.all([
+        getStudents().catch(() => ({ data: [] })),
+        getDepartments().catch(() => ({ data: [] }))
+      ]);
       const studentList = studentsRes.data;
       setStudents(studentList);
+      setDbDepartments(deptsRes.data || []);
 
       // 2. Fetch Attendance Records
       let dailyLogData = {};
@@ -386,7 +391,10 @@ const AttendanceManagement = () => {
                 onChange={e => setDeptFilter(e.target.value)}
               >
                 <option value="All">All Departments</option>
-                {DEPARTMENTS.slice(1).map(d => <option key={d} value={d}>{d}</option>)}
+                {(() => {
+                  const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS.slice(1);
+                  return activeDepts.map(d => <option key={d} value={d}>{d}</option>);
+                })()}
               </select>
             </div>
 
@@ -420,37 +428,8 @@ const AttendanceManagement = () => {
         /* ──────────────── DIRECTORY / ANALYTICS MODE ──────────────── */
         <div className="attendance-grid">
           
-          {/* Attendance Chart (Weekly Trends) */}
-          <div className="glass-card chart-section col-span-2">
-            <h3><Calendar size={18} className="text-primary" /> Daily Attendance Trend (Mon - Sat)</h3>
-            <div style={{ height: '230px', width: '100%', marginTop: '1rem' }}>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={weeklyData} barSize={32}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                  <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={12} tickLine={false} />
-                  <YAxis stroke="var(--text-muted)" domain={[0, 100]} fontSize={12} tickLine={false} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      borderRadius: '8px', 
-                      border: 'none', 
-                      background: 'var(--bg-secondary)', 
-                      color: 'var(--text-main)', 
-                      boxShadow: 'var(--shadow-md)',
-                      fontSize: '12px' 
-                    }} 
-                  />
-                  <Bar dataKey="rate" name="Attendance %" radius={[4, 4, 0, 0]}>
-                    {weeklyData.map((entry, index) => (
-                      <Cell key={index} fill={entry.rate >= 90 ? '#10b981' : entry.rate >= 75 ? '#f59e0b' : '#ef4444'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
           {/* Low Attendance Card Widget */}
-          <div className="glass-card chart-section">
+          <div className="glass-card chart-section col-span-3">
             <h3><AlertTriangle size={18} style={{ color: 'var(--danger)' }} /> Critical Standings (&lt; 75%)</h3>
             <div className="absent-list" style={{ marginTop: '1rem' }}>
               {loading ? (
@@ -484,37 +463,6 @@ const AttendanceManagement = () => {
                   </div>
                 ))
               )}
-            </div>
-          </div>
-
-          {/* Monthly Attendance Analytics Line Chart */}
-          <div className="glass-card chart-section col-span-3">
-            <h3><TrendingUp size={18} className="text-primary" /> Monthly Attendance Analytics (6-Month Trend)</h3>
-            <div style={{ height: '240px', width: '100%', marginTop: '1rem' }}>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={MONTHLY_ANALYTICS}>
-                  <defs>
-                    <linearGradient id="colorAvg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.25}/>
-                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                  <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={12} tickLine={false} />
-                  <YAxis stroke="var(--text-muted)" domain={[80, 100]} fontSize={12} tickLine={false} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      borderRadius: '8px', 
-                      border: 'none', 
-                      background: 'var(--bg-secondary)', 
-                      color: 'var(--text-main)', 
-                      boxShadow: 'var(--shadow-md)',
-                      fontSize: '12px' 
-                    }} 
-                  />
-                  <Area type="monotone" dataKey="average" stroke="var(--primary)" fillOpacity={1} fill="url(#colorAvg)" strokeWidth={2} name="Average Rate %" />
-                </AreaChart>
-              </ResponsiveContainer>
             </div>
           </div>
 

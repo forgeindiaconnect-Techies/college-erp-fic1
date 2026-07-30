@@ -30,42 +30,43 @@ const loadScholarsLS = () => {
   try { return JSON.parse(localStorage.getItem(`erp_scholarships_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]'); } catch { return []; }
 };
 
+const getRecentDate = (monthsAgo, day) => {
+  const d = new Date();
+  d.setMonth(d.getMonth() - monthsAgo);
+  d.setDate(day);
+  return d.toISOString().split('T')[0];
+};
+
 const MOCK_FEES = [
   { id:'CS2021001', name:'John Doe',       dept:'Computer Science',  sem:'Sem 6',
-    semesterFee:75000, fine:0,    paid:75000, status:'Paid',    dueDate:'2024-03-15',
+    semesterFee:75000, fine:0,    paid:75000, status:'Paid',    dueDate: getRecentDate(-1, 15),
     payments:[
-      { id: 'TXN20240110A', date:'2024-01-10', amount:40000, mode:'Online' },
-      { id: 'TXN20240205B', date:'2024-02-05', amount:35000, mode:'Online' },
+      { id: 'TXN20240110A', date: getRecentDate(1, 10), amount:40000, mode:'Online' },
+      { id: 'TXN20240205B', date: getRecentDate(0, 5), amount:35000, mode:'Online' },
     ]},
   { id:'EE2022001', name:'Alice Smith',    dept:'Electrical Engg.',  sem:'Sem 4',
-    semesterFee:70000, fine:0,    paid:70000, status:'Paid',    dueDate:'2024-03-15',
+    semesterFee:70000, fine:0,    paid:70000, status:'Paid',    dueDate: getRecentDate(-1, 15),
     payments:[
-      { id: 'DD20240108C', date:'2024-01-08', amount:70000, mode:'DD' },
+      { id: 'DD20240108C', date: getRecentDate(1, 8), amount:70000, mode:'DD' },
     ]},
   { id:'ME2023001', name:'Robert Johnson', dept:'Mechanical Engg.',  sem:'Sem 2',
-    semesterFee:65000, fine:2500, paid:0,     status:'Pending', dueDate:'2024-03-15',
+    semesterFee:65000, fine:2500, paid:0,     status:'Pending', dueDate: getRecentDate(-1, 15),
     payments:[]},
   { id:'CS2021004', name:'Emily Davis',    dept:'Computer Science',  sem:'Sem 6',
-    semesterFee:75000, fine:0,    paid:75000, status:'Paid',    dueDate:'2024-03-15',
+    semesterFee:75000, fine:0,    paid:75000, status:'Paid',    dueDate: getRecentDate(-1, 15),
     payments:[
-      { id: 'TXN20240112D', date:'2024-01-12', amount:75000, mode:'Online' },
+      { id: 'TXN20240112D', date: getRecentDate(0, 12), amount:75000, mode:'Online' },
     ]},
   { id:'CE2020001', name:'Michael Brown',  dept:'Civil Engg.',       sem:'Sem 8',
-    semesterFee:62000, fine:3000, paid:35000, status:'Partial', dueDate:'2024-03-15',
+    semesterFee:62000, fine:3000, paid:35000, status:'Partial', dueDate: getRecentDate(-1, 15),
     payments:[
-      { id: 'CASH20240105E', date:'2024-01-05', amount:35000, mode:'Cash' },
+      { id: 'CASH20240105E', date: getRecentDate(1, 5), amount:35000, mode:'Cash' },
     ]},
   { id:'CE2020002', name:'Lakshmi Rao',    dept:'Civil Engg.',       sem:'Sem 8',
-    semesterFee:62000, fine:0,    paid:62000, status:'Waived',  dueDate:'2024-03-15',
+    semesterFee:62000, fine:0,    paid:62000, status:'Waived',  dueDate: getRecentDate(-1, 15),
     payments:[
-      { id: 'WAIVER2024I', date:'2024-01-01', amount:62000, mode:'Waiver' },
+      { id: 'WAIVER2024I', date: getRecentDate(2, 1), amount:62000, mode:'Waiver' },
     ]},
-];
-
-const MONTHLY_COLLECTION = [
-  { month:'Aug', collected:420000 }, { month:'Sep', collected:380000 },
-  { month:'Oct', collected:290000 }, { month:'Nov', collected:510000 },
-  { month:'Dec', collected:180000 }, { month:'Jan', collected:350000 },
 ];
 
 /* ── Receipt generator ── */
@@ -143,13 +144,13 @@ const FeesManagement = () => {
       const [studentsRes, feesRes] = await Promise.all([ getStudents(), getAllFees() ]);
       const studentList = Array.isArray(studentsRes.data) ? studentsRes.data : (studentsRes.data?.data || []);
       const feesList = Array.isArray(feesRes.data) ? feesRes.data : (feesRes.data?.data || []);
-      const feeMap = Object.fromEntries(
-        (feesList.length > 0 ? feesList : MOCK_FEES).map(f => [f.studentId || f.id, f])
+       const feeMap = Object.fromEntries(
+        feesList.map(f => [f.studentId || f.id, f])
       );
       
       // Combine students from the DB with any students that only exist in the fee records
       const combinedStudents = [...studentList];
-      const actualFees = feesList.length > 0 ? feesList : MOCK_FEES;
+      const actualFees = feesList;
       actualFees.forEach(f => {
         if (!combinedStudents.find(s => s.id === (f.studentId || f.id))) {
           combinedStudents.push({
@@ -171,7 +172,32 @@ const FeesManagement = () => {
       const savedScholars = JSON.parse(localStorage.getItem(`erp_scholarships_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
 
       const mergedRecords = combinedStudents.map(s => {
-        const studentPayments = feeGroups[s.id] || [];
+        const studentPayments = [];
+        const rawGroups = feeGroups[s.id] || [];
+        rawGroups.forEach(g => {
+          if (Array.isArray(g.payments) && g.payments.length > 0) {
+            g.payments.forEach(p => {
+              studentPayments.push({
+                id: p.id || p.receiptNo || g.receiptNo || g._id || 'N/A',
+                date: p.date || p.paymentDate || g.paymentDate || g.createdAt || new Date().toISOString(),
+                amount: p.amount || p.paidAmount || 0,
+                mode: p.mode || p.paymentMode || g.paymentMode || 'Online',
+                feeType: p.feeType || g.feeType || 'Tuition Fee'
+              });
+            });
+          } else {
+            const amt = g.paidAmount || g.amount || g.paid || 0;
+            if (amt > 0) {
+              studentPayments.push({
+                id: g.receiptNo || g._id || g.id || 'N/A',
+                date: g.paymentDate || g.date || g.createdAt || new Date().toISOString(),
+                amount: amt,
+                mode: g.paymentMode || g.mode || 'Online',
+                feeType: g.feeType || 'Tuition Fee'
+              });
+            }
+          }
+        });
         
         // Calculate dynamic total fees
         let tuitionFee = 60000;
@@ -194,7 +220,7 @@ const FeesManagement = () => {
         let semesterFee = grossFee - discount;
         
         // Total Paid
-        let paid = studentPayments.reduce((acc, curr) => acc + (curr.paidAmount || curr.amount || 0), 0);
+        let paid = studentPayments.reduce((acc, curr) => acc + curr.amount, 0);
         
         let feeStatus = 'Pending';
         if (paid >= semesterFee && semesterFee > 0) feeStatus = 'Paid';
@@ -212,13 +238,7 @@ const FeesManagement = () => {
           fine: 0,
           paid: paid,
           status: feeStatus,
-          payments: studentPayments.map(p => ({
-            id: p.receiptNo || p._id || p.id || 'N/A',
-            date: p.paymentDate || p.date || p.createdAt || new Date().toISOString(),
-            amount: p.paidAmount || p.amount || 0,
-            mode: p.paymentMode || p.mode || 'Online',
-            feeType: p.feeType || 'Tuition Fee'
-          }))
+          payments: studentPayments
         };
       });
       setFees(mergedRecords);
@@ -234,7 +254,15 @@ const FeesManagement = () => {
   const totalPending   = fees.reduce((a,b) => a + Math.max(0,(b.semesterFee+b.fine)-b.paid), 0);
   const todayCollected = fees.reduce((a,b) => {
     const today = new Date().toISOString().split('T')[0];
-    return a + b.payments.filter(p=>p.date===today).reduce((x,y)=>x+y.amount,0);
+    return a + b.payments.filter(p => {
+      if (!p.date) return false;
+      try {
+        const pDateStr = new Date(p.date).toISOString().split('T')[0];
+        return pDateStr === today;
+      } catch (e) {
+        return false;
+      }
+    }).reduce((x,y)=>x+y.amount,0);
   }, 0);
   const totalFines = fees.reduce((a,b) => a + (b.fine || 0), 0);
   const defaultersCount = fees.filter(f => f.status === 'Pending').length;
@@ -245,6 +273,55 @@ const FeesManagement = () => {
 
   const getFeeClass = s => ({ Paid:'fee-paid', Pending:'fee-pending', Partial:'fee-partial', Waived:'fee-waived' }[s]||'');
   const getBarColor = s => ({ Paid:'var(--success)', Pending:'var(--danger)', Partial:'var(--warning)', Waived:'var(--primary)' }[s]||'var(--primary)');
+
+  const getDynamicMonthlyCollection = () => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthlySum = {};
+    
+    fees.forEach(student => {
+      if (Array.isArray(student.payments)) {
+        student.payments.forEach(p => {
+          if (p.amount && p.date) {
+            const dateObj = new Date(p.date);
+            if (!isNaN(dateObj)) {
+              const key = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+              const mName = monthNames[dateObj.getMonth()];
+              const yearShort = dateObj.getFullYear().toString().slice(-2);
+              
+              if (!monthlySum[key]) {
+                monthlySum[key] = { 
+                  month: `${mName} '${yearShort}`, 
+                  collected: 0,
+                  sortKey: key
+                };
+              }
+              monthlySum[key].collected += Number(p.amount);
+            }
+          }
+        });
+      }
+    });
+
+    const activePeriods = Object.values(monthlySum);
+    
+    if (activePeriods.length === 0) {
+      // Fallback to last 6 calendar months if no payments exist
+      const result = [];
+      const today = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const mName = monthNames[d.getMonth()];
+        const yearShort = d.getFullYear().toString().slice(-2);
+        result.push({ month: `${mName} '${yearShort}`, collected: 0 });
+      }
+      return result;
+    }
+
+    // Sort periods chronologically by their sortKey (YYYY-MM)
+    activePeriods.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+    return activePeriods.map(p => ({ month: p.month, collected: p.collected }));
+  };
 
   const TABS = ['Dashboard', 'Fee Structure', 'Student Fees', 'Pending & Fines', 'Scholarships', 'Reports'];
 
@@ -311,7 +388,7 @@ const FeesManagement = () => {
               <h3><TrendingUp size={15}/> Monthly Fee Collection</h3>
               <div style={{height:280, marginTop:'1rem'}}>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={MONTHLY_COLLECTION} barSize={40}>
+                  <BarChart data={getDynamicMonthlyCollection()} barSize={40}>
                     <defs>
                       <linearGradient id="feesBarGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="var(--primary)"/><stop offset="100%" stopColor="#4F46E5"/>
