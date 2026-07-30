@@ -13,35 +13,69 @@ const UpgradePlan = () => {
     navigate('/admin/dashboard');
   };
 
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (window.Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleSubscribe = async (planName, price) => {
     setLoadingPlan(planName);
     
-    // Simulate Razorpay Payment Gateway integration delay
-    setTimeout(() => {
-      // Create a mock Razorpay options object
+    try {
+      // 1. Load Razorpay script
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        setSuccessModal({ show: true, message: 'Failed to load Razorpay SDK. Please check your internet connection.', isError: true });
+        setLoadingPlan(null);
+        return;
+      }
+
+      // 2. Create order on backend
+      const orderRes = await api.post('/auth/create-order', { planName, amount: price });
+      const { orderId, keyId, amount, currency } = orderRes.data;
+
+      // 3. Configure Razorpay options
       const options = {
-        key: 'rzp_test_mockkey', // Mock key
-        amount: price * 100, // Amount in paise
-        currency: 'INR',
-        name: 'ERP SaaS',
+        key: keyId,
+        amount: amount,
+        currency: currency,
+        name: 'Marudhar Kesari Jain College',
         description: `${planName} Plan Subscription`,
+        order_id: orderId,
         handler: async function (response) {
           try {
-            const res = await api.post('/auth/verify-payment', {
-              paymentId: response.razorpay_payment_id,
+            // 4. Verify payment signature on backend
+            const verifyRes = await api.post('/auth/verify-payment', {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
               planName,
               amount: price
             });
             
-            setSuccessModal({ show: true, message: res.data.message });
+            setSuccessModal({ show: true, message: verifyRes.data.message });
 
             // Delay redirect so user can read the success message
             setTimeout(() => {
               navigate('/admin/subscription');
             }, 3500);
           } catch (err) {
-            console.error('Payment submission failed:', err);
-            setSuccessModal({ show: true, message: 'Payment submission failed. Please contact support.', isError: true });
+            console.error('Payment verification failed:', err);
+            setSuccessModal({ 
+              show: true, 
+              message: err.response?.data?.message || 'Payment verification failed. Please contact support.', 
+              isError: true 
+            });
             setLoadingPlan(null);
           }
         },
@@ -52,11 +86,24 @@ const UpgradePlan = () => {
         theme: {
           color: '#3b82f6',
         },
+        modal: {
+          ondismiss: function() {
+            setLoadingPlan(null);
+          }
+        }
       };
-      // Since we don't have the actual Razorpay script loaded, we mock the popup behavior
-      // Browsers often block repeated window.confirm() calls, so we simulate it automatically.
-      options.handler({ razorpay_payment_id: 'pay_mock_' + Math.random().toString(36).substring(7) });
-    }, 1000);
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      console.error('Subscription checkout failed:', err);
+      setSuccessModal({ 
+        show: true, 
+        message: err.response?.data?.message || 'Could not initiate checkout. Please try again.', 
+        isError: true 
+      });
+      setLoadingPlan(null);
+    }
   };
 
   return (
@@ -145,14 +192,14 @@ const UpgradePlan = () => {
         {/* Starter Plan */}
         <div 
           className="pricing-card" 
-          onClick={() => handleSubscribe('Starter', 599)}
+          onClick={() => handleSubscribe('Starter', 15000)}
           style={{ cursor: 'pointer' }}
         >
           <div className="plan-icon" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
             <Shield size={28} />
           </div>
           <h2>Starter</h2>
-          <div className="price">₹599<span>/month</span></div>
+          <div className="price">₹15,000<span>/month</span></div>
           <p className="plan-desc">Perfect for small institutions getting started with digital management.</p>
           <ul className="plan-features">
             <li><CheckCircle2 size={16} /> Up to 500 Students</li>
@@ -162,7 +209,7 @@ const UpgradePlan = () => {
           </ul>
           <button 
             className="btn-subscribe btn-starter" 
-            onClick={(e) => { e.stopPropagation(); handleSubscribe('Starter', 599); }}
+            onClick={(e) => { e.stopPropagation(); handleSubscribe('Starter', 15000); }}
             disabled={loadingPlan !== null}
           >
             {loadingPlan === 'Starter' ? 'Processing...' : 'Subscribe Now'} <ArrowRight size={16} />
@@ -172,7 +219,7 @@ const UpgradePlan = () => {
         {/* Premium Plan */}
         <div 
           className="pricing-card popular"
-          onClick={() => handleSubscribe('Premium', 699)}
+          onClick={() => handleSubscribe('Premium', 25000)}
           style={{ cursor: 'pointer' }}
         >
           <div className="popular-badge">Most Popular</div>
@@ -180,7 +227,7 @@ const UpgradePlan = () => {
             <Zap size={28} />
           </div>
           <h2>Premium</h2>
-          <div className="price">₹699<span>/month</span></div>
+          <div className="price">₹25,000<span>/month</span></div>
           <p className="plan-desc">Complete ERP suite for growing colleges and universities.</p>
           <ul className="plan-features">
             <li><CheckCircle2 size={16} /> Unlimited Students</li>
@@ -190,7 +237,7 @@ const UpgradePlan = () => {
           </ul>
           <button 
             className="btn-subscribe popular-btn"
-            onClick={(e) => { e.stopPropagation(); handleSubscribe('Premium', 699); }}
+            onClick={(e) => { e.stopPropagation(); handleSubscribe('Premium', 25000); }}
             disabled={loadingPlan !== null}
           >
             {loadingPlan === 'Premium' ? 'Processing...' : 'Subscribe Now'} <ArrowRight size={16} />
@@ -200,14 +247,14 @@ const UpgradePlan = () => {
         {/* Elite Plan */}
         <div 
           className="pricing-card"
-          onClick={() => handleSubscribe('Elite', 999)}
+          onClick={() => handleSubscribe('Elite', 50000)}
           style={{ cursor: 'pointer' }}
         >
           <div className="plan-icon" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>
             <Crown size={28} />
           </div>
           <h2>Elite</h2>
-          <div className="price">₹999<span>/month</span></div>
+          <div className="price">₹50,000<span>/month</span></div>
           <p className="plan-desc">Enterprise-grade AI and custom integrations for massive scale.</p>
           <ul className="plan-features">
             <li><CheckCircle2 size={16} /> Everything in Premium</li>
@@ -217,7 +264,7 @@ const UpgradePlan = () => {
           </ul>
           <button 
             className="btn-subscribe btn-elite"
-            onClick={(e) => { e.stopPropagation(); handleSubscribe('Elite', 999); }}
+            onClick={(e) => { e.stopPropagation(); handleSubscribe('Elite', 50000); }}
             disabled={loadingPlan !== null}
           >
             {loadingPlan === 'Elite' ? 'Processing...' : 'Subscribe Now'} <ArrowRight size={16} />

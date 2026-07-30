@@ -18,10 +18,17 @@ import { protect, authorize, collegeScope, checkSubscription } from '../middlewa
 import bcrypt from 'bcryptjs';
 import ActivityLog from '../models/ActivityLog.js';
 import Subscription from '../models/Subscription.js';
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
 import { calculateSubscriptionStatus } from '../utils/subscriptionHelper.js';
 import { sendNotification } from '../utils/notificationHelper.js';
 
 const router = express.Router();
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_live_SlbQBi57McKtUc',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || 'IgfxpfmQCMxSPaU0T4EyhcLU'
+});
 
 const generateToken = (id) => {
   const secret = process.env.JWT_SECRET || 'fallback_secret_key';
@@ -268,11 +275,43 @@ router.post('/register-college', async (req, res) => {
   }
 });
 
-// Submit Payment for Verification
+// Create Razorpay Order
+router.post('/create-order', protect, collegeScope, async (req, res) => {
+  const { planName, amount } = req.body;
+  try {
+    const options = {
+      amount: Math.round(Number(amount) * 100), // amount in the smallest currency unit (paise)
+      currency: 'INR',
+      receipt: `receipt_sub_${Date.now()}`
+    };
+    const order = await razorpay.orders.create(options);
+    res.json({
+      orderId: order.id,
+      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_live_SlbQBi57McKtUc',
+      amount: order.amount,
+      currency: order.currency
+    });
+  } catch (error) {
+    console.error('Razorpay Order Creation Error:', error);
+    res.status(500).json({ message: 'Failed to create payment order: ' + error.message });
+  }
+});
+
+// Verify Payment and Activate Subscription
 router.post('/verify-payment', protect, collegeScope, async (req, res) => {
-  const { paymentId, planName, amount } = req.body;
+  const { razorpay_payment_id, razorpay_order_id, razorpay_signature, planName, amount } = req.body;
   
   try {
+    // 1. Signature verification
+    const secret = process.env.RAZORPAY_KEY_SECRET || 'IgfxpfmQCMxSPaU0T4EyhcLU';
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(razorpay_order_id + '|' + razorpay_payment_id);
+    const generated_signature = hmac.digest('hex');
+    
+    if (generated_signature !== razorpay_signature) {
+      return res.status(400).json({ message: 'Invalid payment signature. Verification failed.' });
+    }
+
     const college = await College.findOne({ tenantId: req.user.tenantId });
     if (!college) {
       return res.status(404).json({ message: 'College not found.' });
@@ -283,6 +322,15 @@ router.post('/verify-payment', protect, collegeScope, async (req, res) => {
     // Subscription lasts for 30 days
     endDate.setDate(endDate.getDate() + 30);
 
+    // 2. Activate Subscription immediately in the DB on successful payment
+    college.subscriptionPlan = planName;
+    college.subscriptionStatus = 'Active';
+    college.convertedToPaid = true;
+    college.trialStartDate = now;
+    college.trialEndDate = endDate;
+    await college.save();
+
+    // 3. Save Subscription record
     const subscription = new Subscription({
       tenantId: college.tenantId,
       collegeId: college._id,
@@ -291,27 +339,29 @@ router.post('/verify-payment', protect, collegeScope, async (req, res) => {
       amount,
       startDate: now,
       endDate: endDate,
-      paymentStatus: 'Pending', // Sent to Super Admin for verification
-      transactionId: paymentId
+      status: 'Active',
+      paymentStatus: 'Success',
+      transactionId: razorpay_payment_id,
+      razorpayOrderId: razorpay_order_id
     });
 
     await subscription.save();
 
-    // Do NOT automatically set college to Active. Super Admin must verify it first.
-    // However, we send a notification to Super Admin
+    // 4. Log the upgrade activity
     await ActivityLog.create({
       userId: req.user._id,
       userName: req.user.name,
       role: req.user.role,
-      action: `Requested Upgrade to ${planName}`,
+      action: `Upgraded to ${planName} Plan successfully via Razorpay`,
       moduleName: 'Subscription',
       ip: req.ip || req.connection.remoteAddress,
-      collegeId: 'system' // So it shows on Super Admin logs potentially
+      collegeId: college.tenantId
     });
 
-    res.json({ message: 'Your subscription request has been submitted successfully and is pending verification by the Super Admin.', subscription });
+    res.json({ message: `Your college subscription has been upgraded to ${planName} successfully!`, subscription });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Payment Verification Error:', error);
+    res.status(500).json({ message: 'Failed to verify payment: ' + error.message });
   }
 });
 
