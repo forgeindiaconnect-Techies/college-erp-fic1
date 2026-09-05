@@ -172,6 +172,8 @@ export const createStudent = (studentData) => api.post('/students', studentData)
 export const updateStudent = (id, studentData) => api.put(`/students/${id}`, studentData);
 export const deleteStudent = (id) => api.delete(`/students/${id}`);
 export const promoteStudents = (payload) => api.post('/students/promote', payload);
+export const allocateStudentsToSection = (payload) =>
+  api.put('/students/allocate-section', payload);
 
 // Staff Endpoints
 export const getStaff = () => api.get('/staff');
@@ -206,6 +208,49 @@ export const getDepartments = () => api.get('/departments');
 export const createDepartment = (deptData) => api.post('/departments', deptData);
 export const updateDepartment = (id, deptData) => api.put(`/departments/${id}`, deptData);
 export const deleteDepartment = (id) => api.delete(`/departments/${id}`);
+
+// Course Endpoints
+export const getCourses = (departmentId = "") =>
+  api.get("/courses", {
+    params: departmentId ? { departmentId } : {}
+  });
+
+export const createCourse = (courseData) =>
+  api.post("/courses", courseData);
+
+export const updateCourse = (id, courseData) =>
+  api.put(`/courses/${id}`, courseData);
+
+export const deleteCourse = (id) =>
+  api.delete(`/courses/${id}`);
+
+
+// Semester Endpoints
+export const getSemesters = (params = {}) =>
+  api.get("/semesters", { params });
+
+export const createSemester = (semesterData) =>
+  api.post("/semesters", semesterData);
+
+export const updateSemester = (id, semesterData) =>
+  api.put(`/semesters/${id}`, semesterData);
+
+export const deleteSemester = (id) =>
+  api.delete(`/semesters/${id}`);
+
+
+// Section Endpoints
+export const getSections = (params = {}) =>
+  api.get("/sections", { params });
+
+export const createSection = (sectionData) =>
+  api.post("/sections", sectionData);
+
+export const updateSection = (id, sectionData) =>
+  api.put(`/sections/${id}`, sectionData);
+
+export const deleteSection = (id) =>
+  api.delete(`/sections/${id}`);
 
 // Subject Endpoints
 export const getSubjects = (params) => api.get('/subjects', { params });

@@ -61,3 +61,177 @@
 .btn-ghost:hover { background: var(--bg-primary); color: var(--text-main); }
 .skeleton { background: linear-gradient(90deg, var(--bg-primary) 25%, var(--border-color) 50%, var(--bg-primary) 75%); background-size: 1000px 100%; animation: shimmer 2s infinite linear; border-radius: 4px; }
 @keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+
+/* Professional Department Management Table */
+.department-table-section {
+  margin-top: 18px;
+}
+
+.department-table-section .filters-row {
+  margin-bottom: 12px;
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+}
+
+.department-table-section .search-box {
+  width: 100%;
+  max-width: 380px;
+  min-height: 38px;
+  padding: 0 11px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: #ffffff;
+  border: 1px solid #bfcbd4;
+  border-radius: 3px;
+}
+
+.department-table-section .search-box input {
+  width: 100%;
+  min-height: 34px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+.department-table {
+  background: #ffffff;
+  border: 1px solid #bfcbd4;
+  border-radius: 3px;
+}
+
+.department-table table {
+  min-width: 900px;
+  border-collapse: collapse;
+}
+
+.department-table th {
+  padding: 11px 13px;
+  color: #ffffff;
+  background: #416b89;
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.department-table td {
+  padding: 11px 13px;
+  color: #34495e;
+  background: #ffffff;
+  border-right: 1px solid #d9e0e5;
+  border-bottom: 1px solid #d9e0e5;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.department-table tbody tr:nth-child(even) td {
+  background: #f4f7f9;
+}
+
+.department-table tbody tr:hover td {
+  background: #e8f0f5;
+}
+
+.department-code {
+  padding: 4px 8px;
+  color: #ffffff;
+  background: #567d98;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.department-name-cell,
+.department-hod-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.department-name-cell svg,
+.department-hod-cell svg {
+  flex-shrink: 0;
+  color: #416b89;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.badge-active {
+  color: #08783e;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+}
+
+.badge-inactive {
+  color: #b42318;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+}
+
+.department-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.department-view-btn,
+.department-icon-btn {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.department-view-btn {
+  padding: 6px 10px;
+  gap: 6px;
+  color: #ffffff;
+  background: #416b89;
+  border: 1px solid #315873;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.department-view-btn:hover {
+  background: #315873;
+}
+
+.department-icon-btn {
+  width: 32px;
+  padding: 0;
+  background: #ffffff;
+  border: 1px solid #cbd5dc;
+}
+
+.department-icon-btn.edit {
+  color: #2563eb;
+}
+
+.department-icon-btn.delete {
+  color: #dc2626;
+}
+
+.department-icon-btn:hover {
+  background: #eef3f6;
+}
+
+.department-table-message {
+  height: 100px;
+  text-align: center;
+  color: #65788a;
+}
+

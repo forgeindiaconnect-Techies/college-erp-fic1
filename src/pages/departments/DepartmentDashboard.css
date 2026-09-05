@@ -465,3 +465,231 @@
     height: 220px;
   }
 }
+
+/* ==================================================
+   PROFESSIONAL DEPARTMENT CONTROL CENTER
+   ================================================== */
+
+.dept-detail-wrapper {
+  gap: 12px;
+}
+
+/* Compact department header */
+.dept-detail-header {
+  padding: 0 !important;
+  gap: 0 !important;
+  overflow: hidden;
+  background: #ffffff !important;
+  border: 1px solid #bdc9d2 !important;
+  border-left: 0 !important;
+  border-radius: 4px !important;
+}
+
+.dd-header-top {
+  min-height: 48px;
+  padding: 7px 14px;
+  background: #416b89;
+  border-bottom: 1px solid #315873;
+}
+
+.dd-header-top .btn-ghost {
+  min-height: 32px;
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  border-radius: 3px !important;
+}
+
+.dd-header-top .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.dd-header-main {
+  padding: 14px;
+  display: block;
+}
+
+.dd-title-section {
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dd-icon-box {
+  width: 46px;
+  height: 46px;
+  border-radius: 4px;
+  color: #416b89;
+  background: #e5eef4;
+  border: 1px solid #b9cbd7;
+  box-shadow: none;
+}
+
+.dd-title {
+  margin: 0 0 4px !important;
+  color: #243447;
+  font-size: 21px;
+  letter-spacing: 0;
+}
+
+.dd-meta {
+  gap: 8px;
+}
+
+.code-pill {
+  padding: 3px 8px;
+  color: #ffffff;
+  background: #567d98;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dd-hod {
+  font-size: 12px;
+}
+
+/* Compact metric row */
+.dd-quick-stats.advanced-stats {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(105px, 1fr));
+  gap: 0;
+  background: #ffffff;
+  border: 1px solid #cbd5dc;
+  border-radius: 3px;
+  overflow-x: auto;
+}
+
+.dd-stat.advanced-stat-box {
+  min-height: 76px;
+  padding: 11px 12px;
+  justify-content: center;
+  background: #f7f9fa !important;
+  border: 0 !important;
+  border-right: 1px solid #d5dde3 !important;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.dd-stat.advanced-stat-box:last-child {
+  border-right: 0 !important;
+}
+
+.dd-stat.advanced-stat-box:hover {
+  transform: none;
+  background: #eaf1f5 !important;
+}
+
+.dd-stat-label {
+  color: #65788a;
+  font-size: 10px;
+  line-height: 1.3;
+  letter-spacing: 0.03em;
+}
+
+.dd-stat-value {
+  font-size: 19px;
+}
+
+/* Professional horizontal tabs */
+.dd-tabs-container {
+  padding: 0 !important;
+  background: #ffffff;
+  border: 1px solid #bdc9d2;
+  border-radius: 3px !important;
+  box-shadow: none;
+}
+
+.dd-tabs-scroll {
+  min-height: 43px;
+}
+
+.dd-tab-btn {
+  min-height: 43px;
+  padding: 9px 14px;
+  color: #41576a;
+  background: #f5f7f9;
+  border: 0;
+  border-right: 1px solid #cbd5dc;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dd-tab-btn:hover {
+  color: #243447;
+  background: #e5edf2;
+}
+
+.dd-tab-btn.active {
+  color: #ffffff;
+  background: #416b89;
+  border-bottom-color: #274b65;
+}
+
+/* Tab content */
+.dd-tab-content {
+  min-height: 360px;
+  padding: 16px !important;
+  background: #ffffff;
+  border: 1px solid #bdc9d2 !important;
+  border-radius: 4px !important;
+  box-shadow: none;
+}
+
+.dd-tab-content table {
+  border: 1px solid #cbd5dc;
+  border-collapse: collapse !important;
+}
+
+.dd-tab-content th {
+  padding: 10px 12px !important;
+  color: #ffffff;
+  background: #416b89;
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 12px;
+}
+
+.dd-tab-content td {
+  padding: 10px 12px !important;
+  border-right: 1px solid #d9e0e5;
+  border-bottom: 1px solid #d9e0e5;
+  font-size: 13px;
+}
+
+.dd-tab-content tbody tr:nth-child(even) td {
+  background: #f4f7f9;
+}
+
+/* Overview */
+.tab-placeholder-panel {
+  min-height: 320px;
+  padding: 35px 20px;
+}
+
+.tab-placeholder-icon {
+  width: 58px;
+  height: 58px;
+  margin-bottom: 12px;
+  background: #e8f0f5;
+  border-radius: 4px;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .dd-header-main {
+    padding: 12px;
+  }
+
+  .dd-quick-stats.advanced-stats {
+    grid-template-columns: repeat(7, 125px);
+  }
+
+  .dd-title {
+    font-size: 18px;
+  }
+}
+

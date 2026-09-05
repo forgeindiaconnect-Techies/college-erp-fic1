@@ -233,3 +233,218 @@
 .mt-4 {
   margin-top: 1rem;
 }
+
+.course-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+}
+
+.course-form input,
+.course-form select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--text-primary, #1e293b);
+  background: var(--card-bg, #ffffff);
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+
+.course-form input::placeholder {
+  color: #64748b;
+}
+
+.course-form input:focus,
+.course-form select:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.course-form button[type="submit"] {
+  grid-column: 1 / -1;
+  min-height: 44px;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .course-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.academic-setup-tabs {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  margin-bottom: 18px;
+  overflow-x: auto;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  scrollbar-width: thin;
+}
+
+.academic-setup-tabs button {
+  flex: 0 0 auto;
+  min-height: 46px;
+  padding: 0 18px;
+  color: #334155;
+  background: #f8fafc;
+  border: none;
+  border-right: 1px solid #cbd5e1;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.academic-setup-tabs button:last-child {
+  border-right: none;
+}
+
+.academic-setup-tabs button:hover {
+  color: #ffffff;
+  background: #557996;
+}
+
+.academic-setup-tabs button.active {
+  color: #ffffff;
+  background: #3f617d;
+  box-shadow: inset 0 -3px 0 #7dd3fc;
+}
+
+@media (max-width: 768px) {
+  .academic-setup-tabs button {
+    min-height: 42px;
+    padding: 0 14px;
+    font-size: 12px;
+  }
+}
+
+/* Professional Academic Mapping Table */
+.academic-mapping-table {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 14px;
+}
+
+.academic-mapping-table .table-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(100vh - 220px);
+  border: 1px solid #bfcbd4;
+  border-radius: 3px;
+  background: #ffffff;
+  scrollbar-width: thin;
+  scrollbar-color: #416b89 #f1f5f9;
+}
+
+.academic-mapping-table .table-container::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.academic-mapping-table .table-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.academic-mapping-table .table-container::-webkit-scrollbar-thumb {
+  background-color: #416b89;
+  border-radius: 4px;
+}
+
+.academic-mapping-table table {
+  min-width: 1150px;
+  border-collapse: collapse;
+}
+
+.academic-mapping-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 11px 12px;
+  color: #ffffff;
+  background: #416b89;
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.academic-mapping-table td {
+  padding: 10px 12px;
+  color: #34495e;
+  background: #ffffff;
+  border-right: 1px solid #d9e0e5;
+  border-bottom: 1px solid #d9e0e5;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.academic-mapping-table tbody tr:nth-child(even) td {
+  background: #f4f7f9;
+}
+
+.academic-mapping-table tbody tr:hover td {
+  background: #e8f0f5;
+}
+
+.academic-cell-code {
+  margin-top: 3px;
+  color: #718394;
+  font-size: 11px;
+}
+
+.academic-section-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  color: #315873;
+  background: #e1ebf1;
+  border: 1px solid #b7c9d5;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.academic-teacher-select {
+  width: 180px;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid #bfcbd4;
+  border-radius: 3px;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.academic-table-message {
+  padding: 30px;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #d5dde3;
+}
+
+/* Give the mapping table more page space */
+.structure-grid {
+  grid-template-columns: minmax(0, 1fr) 300px !important;
+}
+
+@media (max-width: 1100px) {
+  .structure-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+

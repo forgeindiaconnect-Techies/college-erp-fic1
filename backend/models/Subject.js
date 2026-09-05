@@ -18,6 +18,30 @@ const subjectSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  departmentId: {
+    type: String,
+    trim: true,
+    default: ""
+  },
+  courseId: {
+    type: String,
+    trim: true,
+    default: ""
+  },
+  semesterId: {
+    type: String,
+    trim: true,
+    default: ""
+  },
+  academicYearId: {
+    type: String,
+    trim: true,
+    default: ""
+  },
+  sectionIds: {
+    type: [String],
+    default: []
+  },
   subjectCode: {
     type: String,
     required: true

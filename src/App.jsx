@@ -69,6 +69,7 @@ import SettingsSecurity from './pages/settings/SettingsSecurity';
 import LandingPage from './pages/landing/LandingPage';
 import AcademicStructure from './pages/academic/AcademicStructure';
 import AcademicMaster from './pages/academic/AcademicMaster';
+import StudentSectionAllocation from './pages/academic/StudentSectionAllocation';
 import FacultyAllocation from './pages/academic/FacultyAllocation';
 import ClassAdvisorAllocation from './pages/academic/ClassAdvisorAllocation';
 import PeriodMaster from './pages/academic/PeriodMaster';
@@ -398,6 +399,10 @@ function App() {
               <Route path="parents"       element={<ParentsManagement />} />
               <Route path="academic"      element={<AcademicStructure />} />
               <Route path="academic-master" element={<AcademicMaster />} />
+              <Route
+                path="student-section-allocation"
+                element={<StudentSectionAllocation />}
+              />
               <Route path="faculty-allocation" element={<FacultyAllocation />} />
               <Route path="class-advisor-allocation" element={<ClassAdvisorAllocation />} />
               <Route path="period-master" element={<PeriodMaster />} />

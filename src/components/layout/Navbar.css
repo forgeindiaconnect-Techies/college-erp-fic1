@@ -1,211 +1,202 @@
+/* EduSys-style global top header */
 .navbar {
-  min-height: 70px;
-  background-color: var(--bg-card);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.75rem;
   position: sticky;
   top: 0;
-  z-index: 90;
-  border-radius: 0;
-  box-shadow: var(--shadow-sm);
-  flex-wrap: nowrap;
-  gap: 1rem;
-}
-
-.hamburger-btn {
+  z-index: 150;
+  width: 100%;
+  min-height: 72px;
+  padding: 0 22px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  position: relative;
-  z-index: 9999;
-  cursor: pointer;
-  margin-right: 0.25rem;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: nowrap;
+  color: #ffffff;
+  background: #466d8b !important;
+  border: 0 !important;
+  border-bottom: 1px solid #345b78 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.16) !important;
 }
 
 .navbar-left {
-  justify-content: flex-start;
-
-  display: flex;
-  align-items: center;
   flex: 1;
   min-width: 0;
-  gap: 1rem;
-}
-
-.navbar-search {
   display: flex;
   align-items: center;
-  background-color: var(--bg-primary);
-  border-radius: 8px;
-  padding: 0.5rem 1rem;
-  width: 100%;
-  max-width: 350px;
-  min-width: 150px;
-  border: 1px solid var(--border-color);
-  transition: var(--transition);
+  gap: 14px !important;
 }
 
-.navbar-search:focus-within {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+.hamburger-btn {
+  flex-shrink: 0;
+  margin: 0;
+  cursor: pointer;
 }
 
-.search-icon {
-  color: var(--text-muted);
-  margin-right: 0.8rem;
+.navbar-logo {
+  width: auto;
+  max-width: 120px;
+  height: 34px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
 }
 
-.navbar-search input {
-  border: none;
-  background: transparent;
-  outline: none;
-  width: 100%;
-  font-family: inherit;
-  font-size: 0.9rem;
-  color: var(--text-main);
+.navbar-greeting {
+  min-width: 0;
+}
+
+.navbar-greeting h3 {
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.navbar-greeting span {
+  color: #dbe8f1 !important;
+  font-size: 12px !important;
 }
 
 .navbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
   flex-shrink: 0;
-}
-
-.dept-switch {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background-color: var(--bg-primary);
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+  gap: 10px;
 }
 
-.dept-select {
-  border: none;
-  outline: none;
-  background: transparent;
-  font-family: inherit;
-  font-weight: 500;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.icon-btn {
-  background: transparent;
-  color: var(--text-muted);
+/* Header icon buttons */
+.navbar .icon-btn {
   position: relative;
+  width: 38px;
+  height: 38px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  transition: var(--transition);
+  color: #edf6fc;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s ease;
 }
 
-.icon-btn:hover {
-  background-color: var(--bg-primary);
-  color: var(--primary);
+.navbar .icon-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
 }
 
+/* Notification counter */
 .badge {
   position: absolute;
-  top: 0px;
-  right: 0px;
-  background-color: var(--danger);
-  color: white;
-  font-size: 0.65rem;
-  font-weight: 700;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
+  top: 1px;
+  right: 0;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--bg-card);
+  color: #ffffff;
+  background: #ef4444;
+  border: 2px solid #466d8b;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 700;
 }
 
+/* User profile */
 .navbar-profile {
+  min-width: 0;
+  padding: 5px 8px;
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 9px;
+  color: #ffffff;
+  border-radius: 4px;
   cursor: pointer;
-  padding: 0.4rem;
-  border-radius: 8px;
-  transition: var(--transition);
+  transition: background 0.2s ease;
 }
 
 .navbar-profile:hover {
-  background-color: var(--bg-primary);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .profile-img {
   width: 36px;
   height: 36px;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.8);
   border-radius: 50%;
   object-fit: cover;
 }
 
 .profile-info {
+  max-width: 180px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  max-width: 280px;
 }
 
 .profile-name {
+  color: #ffffff;
+  font-size: 13px;
   font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .profile-role {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: #dbe8f1;
+  font-size: 11px;
 }
 
-.notification-wrapper {
+/* Dropdowns */
+.notification-wrapper,
+.navbar-profile-wrapper {
   position: relative;
 }
 
-.notification-dropdown {
+.notification-dropdown,
+.profile-dropdown {
   position: absolute;
-  top: 120%;
-  right: -60px;
-  width: 320px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-  z-index: 100;
+  top: calc(100% + 12px);
+  right: 0;
+  color: #172033;
+  background: #ffffff !important;
+  border: 1px solid #d8e0e7;
+  border-radius: 5px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.2);
   overflow: hidden;
 }
 
-.dropdown-header {
+.notification-dropdown {
+  width: 340px;
+}
+
+.profile-dropdown {
+  width: 205px;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+}
+
+.dropdown-header {
+  padding: 13px 15px;
+  display: flex;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-main);
+  justify-content: space-between;
+  background: #f4f6f8;
+  border-bottom: 1px solid #d8e0e7;
 }
 
 .dropdown-header h3 {
-  font-size: 14px;
-  font-weight: 700;
   margin: 0;
+  color: #172033;
+  font-size: 14px;
 }
 
 .notification-list {
@@ -214,72 +205,70 @@
 }
 
 .notification-item {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 11px 14px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e9ed;
   cursor: pointer;
-  transition: background 0.2s;
 }
 
-.notification-item:hover {
-  background: var(--bg-main);
-}
-
+.notification-item:hover,
 .notification-item.unread {
-  background: rgba(59, 130, 246, 0.05);
-}
-
-.notification-item:last-child {
-  border-bottom: none;
-}
-
-.profile-dropdown {
-  position: absolute;
-  top: 120%;
-  right: 0;
-  width: 200px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-  z-index: 100;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  background: #eef5fa;
 }
 
 .dropdown-item {
-  padding: 12px 16px;
+  padding: 12px 15px;
   display: flex;
   align-items: center;
   gap: 10px;
+  color: #273549;
+  font-size: 13px;
   cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-main);
-  transition: background 0.2s;
 }
 
 .dropdown-item:hover {
-  background: var(--bg-primary);
-}
-
-.dropdown-item.text-red-500 {
-  color: var(--danger);
+  background: #eef5fa;
 }
 
 .dropdown-divider {
   height: 1px;
-  background-color: var(--border-color);
-  margin: 4px 0;
+  background: #e2e8f0;
 }
 
-.navbar-logo {
-  height: 28px;
-  object-fit: contain;
-  display: none;
-  transition: all 0.3s ease;
-}
-/* removed problematic logo rule */
+/* Mobile */
 @media (max-width: 768px) {
-  .navbar-logo { display: block; }
+  .navbar {
+    min-height: 62px;
+    padding: 0 10px;
+  }
+
+  .navbar-logo {
+    display: none;
+  }
+
+  .navbar-greeting h3 {
+    max-width: 170px;
+    font-size: 14px !important;
+  }
+
+  .navbar-greeting span {
+    display: none;
+  }
+
+  .profile-info,
+  .navbar-profile > svg {
+    display: none;
+  }
+
+  .navbar-actions {
+    gap: 3px;
+  }
+
+  .notification-dropdown {
+    position: fixed;
+    top: 68px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
 }

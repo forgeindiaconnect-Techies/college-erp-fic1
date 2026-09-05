@@ -203,89 +203,135 @@ const DepartmentManagement = () => {
         </div>
       </div>
 
-      {/* Cards Section */}
-      <div className="dept-cards-wrapper">
-        <div className="filters-row glass-card" style={{ padding: '1rem 1.5rem', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <div className="search-box" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', maxWidth: '400px' }}>
-            <Search size={18} className="text-muted" />
-            <input 
-              type="text" 
-              placeholder="Search departments by name or code..." 
-              value={search} 
-              onChange={e => setSearch(e.target.value)} 
-              style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-main)', width: '100%', fontSize: '0.9rem' }}
+      {/* Department Table Section */}
+      <div className="department-table-section">
+        <div className="filters-row glass-card">
+          <div className="search-box">
+            <Search size={17} className="text-muted" />
+
+            <input
+              type="text"
+              placeholder="Search by department name or code..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
             />
           </div>
         </div>
 
-        {loading ? (
-          <div className="dept-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="dept-card glass-card skeleton-card" style={{ height: '220px' }}></div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="glass-card text-center text-muted" style={{ padding: '3rem' }}>
-            No departments match your query.
-          </div>
-        ) : (
-          <div className="dept-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
-            {filtered.map(dept => (
-              <div key={dept.id} className="dept-card glass-card">
-                <div className="dept-card-header">
-                  <div className="dept-title-area">
-                    <div className="dept-icon-box"><Building2 size={24} className="text-primary" /></div>
-                    <div>
-                      <h3 className="dept-name">{dept.name}</h3>
-                      <span className="dept-code">{dept.code}</span>
-                    </div>
-                  </div>
-                  <span className={`status-badge ${dept.status === 'Active' ? 'badge-active' : 'badge-inactive'}`}>
-                    {dept.status || 'Active'}
-                  </span>
-                </div>
+        <div className="table-container department-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Department</th>
+                <th>Head of Department</th>
+                <th>Students</th>
+                <th>Staff</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
 
-                <div className="dept-card-body" style={{ padding: '0 1.25rem 1.25rem 1.25rem' }}>
-                  <div className="dept-hod-info" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem', padding: '0.6rem 0.8rem', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                    <UserCircle size={18} className="text-[var(--primary)]" />
-                    <span className="hod-name" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                      {dept.headOfDepartment || dept.hod || `Dr. ${dept.name.substring(0, 3)} Sharma`}
-                    </span>
-                  </div>
-                  
-                  <div className="dept-stats-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div className="dept-stat-box" style={{ background: 'var(--bg-primary)', padding: '0.8rem', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
-                      <span className="stat-label" style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Students</span>
-                      <span className="stat-number" style={{ display: 'block', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                        {typeof dept.students === 'number' || typeof dept.students === 'string' ? Number(dept.students).toLocaleString() : (dept.name.length * 15 + 120)}
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="7" className="department-table-message">
+                    Loading departments...
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="department-table-message">
+                    No departments match your search.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((dept) => (
+                  <tr key={dept._id || dept.id}>
+                    <td>
+                      <span className="department-code">
+                        {dept.code}
                       </span>
-                    </div>
-                    <div className="dept-stat-box" style={{ background: 'var(--bg-primary)', padding: '0.8rem', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
-                      <span className="stat-label" style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Staff</span>
-                      <span className="stat-number" style={{ display: 'block', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                        {typeof dept.staff === 'number' || typeof dept.staff === 'string' ? Number(dept.staff).toLocaleString() : Math.floor((dept.name.length * 15 + 120) / 15)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                    </td>
 
-                <div className="dept-actions" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '1rem 1.25rem', borderTop: '1px solid var(--border-color)', background: 'var(--bg-primary)', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }}>
-                  <button 
-                    className="btn-ghost" 
-                    onClick={() => navigate(`/admin/departments/${dept._id || dept.id}`)}
-                    style={{ flex: 1, padding: '0.5rem', fontSize: '0.85rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', borderRadius: '8px', border: '1px solid var(--primary)', color: 'var(--primary)' }}
-                  >
-                    View Details <ArrowRight size={16} />
-                  </button>
-                  <div className="action-buttons" style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button className="btn-icon" onClick={() => openEdit(dept)} title="Edit" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', width: '34px', height: '34px', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Edit2 size={16} className="text-[#3b82f6]" /></button>
-                    <button className="btn-icon btn-icon-danger" onClick={() => handleDelete(dept.id)} title="Delete" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', width: '34px', height: '34px', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={16} className="text-[#ef4444]" /></button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                    <td>
+                      <div className="department-name-cell">
+                        <Building2 size={18} />
+                        <strong>{dept.name}</strong>
+                      </div>
+                    </td>
+
+                    <td>
+                      <div className="department-hod-cell">
+                        <UserCircle size={17} />
+                        <span>
+                          {dept.headOfDepartment ||
+                            dept.hod ||
+                            "Not assigned"}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td>
+                      {Number(dept.students || 0).toLocaleString()}
+                    </td>
+
+                    <td>
+                      {Number(dept.staff || 0).toLocaleString()}
+                    </td>
+
+                    <td>
+                      <span
+                        className={`status-badge ${
+                          dept.status === "Inactive"
+                            ? "badge-inactive"
+                            : "badge-active"
+                        }`}
+                      >
+                        {dept.status || "Active"}
+                      </span>
+                    </td>
+
+                    <td>
+                      <div className="department-action-buttons">
+                        <button
+                          className="department-view-btn"
+                          onClick={() =>
+                            navigate(
+                              `/admin/departments/${dept._id || dept.id}`
+                            )
+                          }
+                          title="View Department"
+                        >
+                          View Details
+                          <ArrowRight size={15} />
+                        </button>
+
+                        <button
+                          className="department-icon-btn edit"
+                          onClick={() => openEdit(dept)}
+                          title="Edit Department"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+
+                        <button
+                          className="department-icon-btn delete"
+                          onClick={() =>
+                            handleDelete(dept._id || dept.id)
+                          }
+                          title="Delete Department"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Modal */}

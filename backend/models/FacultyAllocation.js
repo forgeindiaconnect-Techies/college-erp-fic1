@@ -2,9 +2,16 @@ import mongoose from 'mongoose';
 
 const facultyAllocationSchema = new mongoose.Schema({
   collegeId: { type: String, required: false },
+  // Human-readable academic values
   department: { type: String, required: true },
   semester: { type: String, required: true },
   section: { type: String, required: true },
+
+  // Real academic structure IDs
+  departmentId: { type: String, default: null },
+  courseId: { type: String, default: null },
+  semesterId: { type: String, default: null },
+  sectionId: { type: String, default: null },
   subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', required: true },
   staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', required: true },
   academicYearId: { type: mongoose.Schema.Types.ObjectId, ref: 'AcademicYear' },

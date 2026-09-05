@@ -40,10 +40,15 @@ const Sidebar = ({ isOpen, onClose }) => {
       name: 'Academic',
       icon: <Layers size={20} />,
       items: [
-        { name: 'Departments', path: '/admin/departments', icon: <Building2 size={20} /> },
+        { name: 'Academic Master', path: '/admin/academic-master', icon: <Settings size={20} /> },
+        { name: 'Academic Structure', path: '/admin/academic', icon: <Layers size={20} /> },
+        {
+          name: 'Student to Section',
+          path: '/admin/student-section-allocation',
+          icon: <Users size={20} />
+        },
         { name: 'Subjects', path: '/admin/subjects', icon: <BookOpen size={20} /> },
         { name: 'Class Timetable', path: '/admin/timetable', icon: <Calendar size={20} /> },
-        { name: 'Period Master', path: '/admin/period-master', icon: <Clock size={20} /> },
         { name: 'Student Attendance', path: '/admin/attendance', icon: <CalendarCheck size={20} /> },
         { name: 'Staff Attendance', path: '/admin/employee-attendance', icon: <CalendarCheck size={20} /> },
         { name: 'Exam Timetable', path: '/admin/exams', icon: <FileSpreadsheet size={20} /> },

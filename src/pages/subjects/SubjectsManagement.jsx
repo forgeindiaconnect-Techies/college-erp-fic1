@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, X, BookOpen, User, Hash, Percent, Award, Clock } from 'lucide-react';
-import { getStaff, getSubjects, createSubject, updateSubject, deleteSubject, getRegulations, getDepartments } from '../../api/index';
+import {
+  getStaff,
+  getSubjects,
+  createSubject,
+  updateSubject,
+  deleteSubject,
+  getRegulations,
+  getDepartments,
+  getCourses,
+  getSemesters,
+  getSections
+} from '../../api/index';
 import './SubjectsManagement.css';
 
 const DEFAULT_SUBJECTS = [];
@@ -29,6 +40,9 @@ const SubjectsManagement = () => {
   const [staff, setStaff] = useState([]);
   const [regulations, setRegulations] = useState([]);
   const [dbDepartments, setDbDepartments] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [semesters, setSemesters] = useState([]);
+  const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
@@ -36,7 +50,20 @@ const SubjectsManagement = () => {
   // Modal states
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [form, setForm] = useState({ regulationId: '', code: '', name: '', dept: 'Computer Science Engineering', sem: 'Semester 1', teacher: '', credits: 4, workload: 4 });
+  const [form, setForm] = useState({
+    regulationId: "",
+    code: "",
+    name: "",
+    departmentId: "",
+    dept: "",
+    courseId: "",
+    semesterId: "",
+    sem: "",
+    sectionIds: [],
+    teacher: "",
+    credits: 4,
+    workload: 4
+  });
 
   useEffect(() => {
     fetchData();
@@ -53,11 +80,31 @@ const SubjectsManagement = () => {
 
       const deptsRes = await getDepartments().catch(() => ({ data: [] }));
       setDbDepartments(deptsRes.data || []);
+
+      const courseRes = await getCourses().catch(() => ({
+        data: { courses: [] }
+      }));
+
+      const semesterRes = await getSemesters().catch(() => ({
+        data: { semesters: [] }
+      }));
+
+      const sectionRes = await getSections().catch(() => ({
+        data: { sections: [] }
+      }));
+
+      setCourses(courseRes?.data?.courses || []);
+      setSemesters(semesterRes?.data?.semesters || []);
+      setSections(sectionRes?.data?.sections || []);
       
       const subRes = await getSubjects().catch(() => ({ data: [] }));
       const formattedSubs = subRes.data.map(s => ({
         id: s._id,
         regulationId: s.regulationId,
+        departmentId: s.departmentId || "",
+        courseId: s.courseId || "",
+        semesterId: s.semesterId || "",
+        sectionIds: s.sectionIds || [],
         code: s.subjectCode,
         name: s.subjectName,
         dept: s.department,
@@ -76,14 +123,44 @@ const SubjectsManagement = () => {
   };
 
   const openAdd = () => {
-    const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
-    setForm({ regulationId: regulations[0]?._id || '', code: '', name: '', dept: activeDepts[0] || '', sem: 'Semester 1', teacher: '', credits: 4, workload: 4 });
+    setForm({
+      regulationId: regulations[0]?._id || "",
+      code: "",
+      name: "",
+      departmentId: "",
+      dept: "",
+      courseId: "",
+      semesterId: "",
+      sem: "",
+      sectionIds: [],
+      teacher: "",
+      credits: 4,
+      workload: 4
+    });
+
     setEditTarget(null);
     setModalOpen(true);
   };
 
   const openEdit = (sub) => {
-    setForm({ regulationId: sub.regulationId?._id || sub.regulationId || '', code: sub.code, name: sub.name, dept: sub.dept, sem: sub.sem, teacher: sub.teacher, credits: sub.credits, workload: sub.workload });
+    setForm({
+      regulationId:
+        sub.regulationId?._id ||
+        sub.regulationId ||
+        "",
+      code: sub.code,
+      name: sub.name,
+      departmentId: sub.departmentId || "",
+      dept: sub.dept,
+      courseId: sub.courseId || "",
+      semesterId: sub.semesterId || "",
+      sem: sub.sem,
+      sectionIds: sub.sectionIds || [],
+      teacher: sub.teacher || "",
+      credits: sub.credits,
+      workload: sub.workload
+    });
+
     setEditTarget(sub.id);
     setModalOpen(true);
   };
@@ -97,6 +174,10 @@ const SubjectsManagement = () => {
     e.preventDefault();
     const payload = {
       regulationId: form.regulationId || null,
+      departmentId: form.departmentId,
+      courseId: form.courseId,
+      semesterId: form.semesterId,
+      sectionIds: form.sectionIds,
       subjectCode: form.code,
       subjectName: form.name,
       department: form.dept,
@@ -282,12 +363,12 @@ const SubjectsManagement = () => {
               <div className="form-grid">
 
                 <div className="form-group">
-                  <label><Hash size={13} style={{ display: 'inline', marginRight: '4px' }} /> Course Code *</label>
+                  <label><Hash size={13} style={{ display: 'inline', marginRight: '4px' }} /> Subject Code *</label>
                   <input required placeholder="e.g. CS301" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} />
                 </div>
                 
                 <div className="form-group">
-                  <label><BookOpen size={13} style={{ display: 'inline', marginRight: '4px' }} /> Course Title *</label>
+                  <label><BookOpen size={13} style={{ display: 'inline', marginRight: '4px' }} /> Subject Name *</label>
                   <input required placeholder="e.g. Data Structures" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                 </div>
 
@@ -302,20 +383,157 @@ const SubjectsManagement = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Department Scope *</label>
-                  <select value={form.dept} onChange={e => setForm({ ...form, dept: e.target.value })}>
-                    {(() => {
-                      const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
-                      return activeDepts.map(d => <option key={d} value={d}>{d}</option>);
-                    })()}
+                  <label>Department *</label>
+
+                  <select
+                    value={form.departmentId}
+                    onChange={(event) => {
+                      const selectedDepartment = dbDepartments.find(
+                        (department) =>
+                          department.id === event.target.value
+                      );
+
+                      setForm({
+                        ...form,
+                        departmentId: event.target.value,
+                        dept: selectedDepartment?.name || "",
+                        courseId: "",
+                        semesterId: "",
+                        sem: "",
+                        sectionIds: []
+                      });
+                    }}
+                    required
+                  >
+                    <option value="">Select Department</option>
+
+                    {dbDepartments.map((department) => (
+                      <option
+                        key={department.id}
+                        value={department.id}
+                      >
+                        {department.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Course *</label>
+
+                  <select
+                    value={form.courseId}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        courseId: event.target.value,
+                        semesterId: "",
+                        sem: "",
+                        sectionIds: []
+                      })
+                    }
+                    required
+                    disabled={!form.departmentId}
+                  >
+                    <option value="">Select Course</option>
+
+                    {courses
+                      .filter(
+                        (course) =>
+                          course.departmentId === form.departmentId &&
+                          course.status !== "Inactive"
+                      )
+                      .map((course) => (
+                        <option
+                          key={course.id}
+                          value={course.id}
+                        >
+                          {course.name} ({course.code})
+                        </option>
+                      ))}
                   </select>
                 </div>
 
                 <div className="form-group">
                   <label>Academic Semester *</label>
-                  <select value={form.sem} onChange={e => setForm({ ...form, sem: e.target.value })}>
-                    {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
+
+                  <select
+                    value={form.semesterId}
+                    onChange={(event) => {
+                      const selectedSemester = semesters.find(
+                        (semester) =>
+                          semester.id === event.target.value
+                      );
+
+                      setForm({
+                        ...form,
+                        semesterId: event.target.value,
+                        sem: selectedSemester?.name || "",
+                        sectionIds: []
+                      });
+                    }}
+                    required
+                    disabled={!form.courseId}
+                  >
+                    <option value="">Select Semester</option>
+
+                    {semesters
+                      .filter(
+                        (semester) =>
+                          semester.courseId === form.courseId &&
+                          semester.status !== "Inactive"
+                      )
+                      .map((semester) => (
+                        <option
+                          key={semester.id}
+                          value={semester.id}
+                        >
+                          {semester.name}
+                        </option>
+                      ))}
                   </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Applicable Sections *</label>
+
+                  <select
+                    multiple
+                    value={form.sectionIds}
+                    onChange={(event) => {
+                      const selectedSectionIds = Array.from(
+                        event.target.selectedOptions,
+                        (option) => option.value
+                      );
+
+                      setForm({
+                        ...form,
+                        sectionIds: selectedSectionIds
+                      });
+                    }}
+                    required
+                    disabled={!form.semesterId}
+                    style={{ minHeight: "90px" }}
+                  >
+                    {sections
+                      .filter(
+                        (section) =>
+                          section.semesterId === form.semesterId &&
+                          section.status !== "Inactive"
+                      )
+                      .map((section) => (
+                        <option
+                          key={section.id}
+                          value={section.id}
+                        >
+                          Section {section.name}
+                        </option>
+                      ))}
+                  </select>
+
+                  <small className="text-muted">
+                    Hold Ctrl to select multiple sections.
+                  </small>
                 </div>
 
                 <div className="form-group">

@@ -1,0 +1,128 @@
+.student-section-page {
+  width: 100%;
+}
+
+.allocation-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.allocation-filters {
+  padding: 15px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(160px, 1fr));
+  gap: 12px;
+  background: #f4f7f9;
+  border-bottom: 1px solid #cbd5dc;
+}
+
+.allocation-filters .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.allocation-filters select {
+  width: 100%;
+}
+
+.allocation-filters select:disabled {
+  color: #94a3b8;
+  background: #e8edf1;
+  cursor: not-allowed;
+}
+
+.allocation-table-header {
+  padding: 14px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  background: #ffffff;
+}
+
+.allocation-table-header h2 {
+  margin: 0 0 3px;
+  font-size: 17px;
+}
+
+.allocation-table-header p {
+  margin: 0;
+  color: #65788a;
+  font-size: 12px;
+}
+
+.allocation-table-header .btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.allocation-table {
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+
+.allocation-table table {
+  min-width: 850px;
+  border-collapse: collapse;
+}
+
+.allocation-table th {
+  padding: 10px 12px;
+  color: #ffffff;
+  background: #416b89;
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 12px;
+}
+
+.allocation-table td {
+  padding: 10px 12px;
+  border-right: 1px solid #d9e0e5;
+  border-bottom: 1px solid #d9e0e5;
+  font-size: 13px;
+}
+
+.allocation-table tbody tr:nth-child(even) td {
+  background: #f4f7f9;
+}
+
+.allocation-table tbody tr:hover td {
+  background: #e8f0f5;
+}
+
+.allocation-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  accent-color: #416b89;
+}
+
+.allocation-message {
+  height: 100px;
+  color: #65788a;
+  text-align: center;
+}
+
+@media (max-width: 1200px) {
+  .allocation-filters {
+    grid-template-columns: repeat(3, minmax(170px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .allocation-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .allocation-table-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .allocation-table-header .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+}

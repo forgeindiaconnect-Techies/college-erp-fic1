@@ -1,5 +1,7 @@
 import express from 'express';
 import Student from '../models/Student.js';
+import mongoose from 'mongoose';
+import Section from '../models/Section.js';
 import { protect, authorize, departmentScope, requirePermission, collegeScope, checkSubscription } from '../middleware/authMiddleware.js';
 import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
@@ -128,6 +130,112 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
     res.status(400).json({ message: err.message });
   }
 });
+
+// Allocate multiple students to an academic section
+router.put(
+  '/allocate-section',
+  protect,
+  authorize('Admin', 'Sub Admin', 'Principal', 'HOD'),
+  requirePermission('manage_students'),
+  collegeScope,
+  checkSubscription,
+  async (req, res) => {
+    try {
+      const {
+        studentIds,
+        departmentId,
+        departmentName,
+        courseId,
+        semesterId,
+        semesterName,
+        sectionId,
+        sectionName,
+        academicYearId
+      } = req.body;
+
+      if (!Array.isArray(studentIds) || studentIds.length === 0) {
+        return res.status(400).json({
+          message: 'Select at least one student'
+        });
+      }
+
+      if (
+        !departmentId ||
+        !courseId ||
+        !semesterId ||
+        !sectionId
+      ) {
+        return res.status(400).json({
+          message:
+            'Department, course, semester and section are required'
+        });
+      }
+
+      const collegeId =
+        req.collegeId ||
+        req.user.collegeId ||
+        req.user.tenantId;
+
+      const sectionIdentifiers = [{ id: sectionId }];
+
+      if (mongoose.Types.ObjectId.isValid(sectionId)) {
+        sectionIdentifiers.push({ _id: sectionId });
+      }
+
+      const section = await Section.findOne({
+        collegeId,
+        $or: sectionIdentifiers
+      });
+
+      if (!section) {
+        return res.status(404).json({
+          message: 'Section not found for this college'
+        });
+      }
+
+      const objectIds = studentIds.filter((id) =>
+        mongoose.Types.ObjectId.isValid(id)
+      );
+
+      const studentFilter = {
+        collegeId,
+        $or: [
+          { id: { $in: studentIds } },
+          { _id: { $in: objectIds } }
+        ]
+      };
+
+      const result = await Student.updateMany(studentFilter, {
+        $set: {
+          departmentId,
+          dept: departmentName,
+          courseId,
+          semesterId,
+          sem: semesterName,
+          sectionId,
+          section: sectionName || section.name,
+          academicYearId: academicYearId || null
+        }
+      });
+
+      req.app.get('io')?.emit('dataUpdated', {
+        module: 'students',
+        action: 'section-allocated',
+        sectionId
+      });
+
+      res.json({
+        message: `${result.modifiedCount} student(s) allocated successfully`,
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount
+      });
+    } catch (error) {
+      res.status(500).json({
+        message: error.message
+      });
+    }
+  }
+);
 
 // Update student
 router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), requirePermission('manage_students'), collegeScope, checkSubscription, async (req, res) => {

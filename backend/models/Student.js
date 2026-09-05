@@ -14,7 +14,19 @@ const studentSchema = new mongoose.Schema({
   idNumber: { type: String },
   dob: { type: String },
   academicYear: { type: String },
-  regulationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Regulation' },
+  regulationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Regulation'
+  },
+
+  // Academic structure allocation
+  departmentId: { type: String, default: null },
+  courseId: { type: String, default: null },
+  semesterId: { type: String, default: null },
+  sectionId: { type: String, default: null },
+  academicYearId: { type: String, default: null },
+
+  // Human-readable values retained for existing pages
   section: { type: String },
   batch: { type: String },
   admissionDate: { type: String },

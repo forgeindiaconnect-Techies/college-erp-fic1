@@ -4,18 +4,23 @@ import {
   ArrowLeft, Users, UserCheck, BookOpen, Clock, 
   Building2, UserCircle, ArrowRight, Scan, Camera, QrCode, Cpu, CheckCircle2, XCircle, Plus, Hash, User, Award
 } from 'lucide-react';
-import { getDepartments, getStudents, getStaff } from '../../api/index';
+import {
+  getDepartments,
+  getStudents,
+  getStaff,
+  getSubjects
+} from '../../api/index';
 import './DepartmentDashboard.css';
 import CollegeInfoCard from '../../components/common/CollegeInfoCard';
 
 const ADVANCED_METRICS = [
   { label: 'Total Students', value: (dept) => Number(dept.students).toLocaleString(), color: 'var(--text-main)' },
   { label: 'Total Staff', value: (dept) => dept.staff, color: 'var(--text-main)' },
-  { label: 'Total Subjects', value: () => '42', color: 'var(--primary)' },
-  { label: 'Today Attendance', value: () => '88%', color: 'var(--success)' },
-  { label: 'Pending Leaves', value: () => '5', color: '#f59e0b' },
-  { label: 'Upcoming Exams', value: () => '2', color: '#6366F1' },
-  { label: 'Pass Percentage', value: () => '92%', color: 'var(--success)' },
+  { label: 'Total Subjects', value: (dept) => dept.subjectCount || 0, color: 'var(--primary)' },
+  { label: 'Today Attendance', value: () => '—', color: 'var(--success)' },
+  { label: 'Pending Leaves', value: () => '—', color: '#f59e0b' },
+  { label: 'Upcoming Exams', value: () => '—', color: '#6366F1' },
+  { label: 'Pass Percentage', value: () => '—', color: 'var(--success)' },
 ];
 
 const TABS = [
@@ -197,37 +202,99 @@ const DepartmentDashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [deptRes, stuRes, staffRes] = await Promise.all([
-          getDepartments(),
-          getStudents(),
-          getStaff()
-        ]);
+        setLoading(true);
 
-        const found = deptRes.data.find(d => d._id === id || d.id === id);
-        if (found) {
-          setDept(found);
-          // Filter students and staff by department name (or code if necessary)
-          const deptStudents = stuRes.data ? stuRes.data.filter(s => s.dept === found.name || s.department === found.name) : [];
-          const deptStaff = staffRes.data ? staffRes.data.filter(s => s.dept === found.name || s.department === found.name) : [];
-          setStudents(deptStudents);
-          setStaff(deptStaff);
-        } else {
-          // Fallback if not found
-          setDept({ id: id, name: 'Unknown', code: 'N/A', hod: 'Not Assigned', students: 0, staff: 0, status: 'Unknown' });
-        }
-        const savedSubs = localStorage.getItem(`erp_subjects_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
-        if (savedSubs && found) {
-          const parsedSubs = JSON.parse(savedSubs);
-          setDeptSubjects(parsedSubs.filter(s => s.dept === found.name || s.dept.includes(found.name.split(' ')[0])));
+        const [deptRes, studentRes, staffRes, subjectRes] =
+          await Promise.all([
+            getDepartments(),
+            getStudents(),
+            getStaff(),
+            getSubjects()
+          ]);
+
+        const found = deptRes.data.find(
+          (department) =>
+            department._id === id ||
+            department.id === id
+        );
+
+        if (!found) {
+          setDept({
+            id,
+            name: "Unknown",
+            code: "N/A",
+            hod: "Not Assigned",
+            students: 0,
+            staff: 0,
+            subjectCount: 0,
+            status: "Unknown"
+          });
+
+          return;
         }
 
-      } catch (err) {
-        console.error("Error fetching department data:", err);
-        setDept({ id: id, name: 'Error', code: 'ERR', hod: 'Error', students: 0, staff: 0, status: 'Error' });
+        const departmentStudents = (studentRes.data || []).filter(
+          (student) =>
+            student.departmentId === found.id ||
+            student.dept === found.name ||
+            student.department === found.name
+        );
+
+        const departmentStaff = (staffRes.data || []).filter(
+          (staffMember) =>
+            staffMember.departmentId === found.id ||
+            staffMember.dept === found.name ||
+            staffMember.department === found.name ||
+            staffMember.deptCode === found.code
+        );
+
+        const departmentSubjects = (subjectRes.data || []).filter(
+          (subject) =>
+            subject.departmentId === found.id ||
+            subject.department === found.name
+        );
+
+        setStudents(departmentStudents);
+        setStaff(departmentStaff);
+
+        setDeptSubjects(
+          departmentSubjects.map((subject) => ({
+            id: subject._id,
+            code: subject.subjectCode,
+            name: subject.subjectName,
+            sem: subject.semester,
+            teacher: subject.teacher,
+            credits: subject.credits
+          }))
+        );
+
+        setDept({
+          ...found,
+          students: departmentStudents.length,
+          staff: departmentStaff.length,
+          subjectCount: departmentSubjects.length
+        });
+      } catch (error) {
+        console.error(
+          "Error fetching department data:",
+          error
+        );
+
+        setDept({
+          id,
+          name: "Error",
+          code: "ERR",
+          hod: "Error",
+          students: 0,
+          staff: 0,
+          subjectCount: 0,
+          status: "Error"
+        });
       } finally {
         setLoading(false);
       }
     };
+
     fetchData();
   }, [id]);
 
