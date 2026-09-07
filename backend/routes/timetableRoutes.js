@@ -111,7 +111,7 @@ router.get('/', protect, collegeScope, async (req, res) => {
   }
 });
 
-router.post('/', protect, authorize('SuperAdmin', 'CollegeAdmin', 'HOD'), collegeScope, async (req, res) => {
+router.post('/', protect, authorize('SuperAdmin', 'CollegeAdmin', 'Admin', 'Sub Admin', 'Principal', 'HOD'), collegeScope, async (req, res) => {
   try {
     const { department, semester, section, day, periodId, subjectId, facultyAllocationId, roomNo } = req.body;
 
@@ -223,7 +223,7 @@ router.post('/', protect, authorize('SuperAdmin', 'CollegeAdmin', 'HOD'), colleg
   }
 });
 
-router.delete('/:id', protect, authorize('SuperAdmin', 'CollegeAdmin', 'HOD'), collegeScope, async (req, res) => {
+router.delete('/:id', protect, authorize('SuperAdmin', 'CollegeAdmin', 'Admin', 'Sub Admin', 'Principal', 'HOD'), collegeScope, async (req, res) => {
   try {
     const timetable = await Timetable.findOneAndDelete({ _id: req.params.id, collegeId: req.collegeId });
     if (!timetable) {

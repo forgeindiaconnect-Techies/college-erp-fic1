@@ -35,6 +35,93 @@ const examSchema = new mongoose.Schema({
     required: true,
     default: 100
   },
+  examType: {
+    type: String,
+    enum: [
+      'Internal',
+      'Model',
+      'Practical',
+      'Semester',
+      'Supplementary'
+    ],
+    default: 'Internal'
+  },
+
+  academicYearId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicYear'
+  },
+
+  regulationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Regulation'
+  },
+
+  departmentId: {
+    type: String
+  },
+
+  courseId: {
+    type: String
+  },
+
+  semesterId: {
+    type: String
+  },
+
+  sectionId: {
+    type: String
+  },
+
+  section: {
+    type: String
+  },
+
+  subjectId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Subject'
+  },
+
+  startTime: {
+    type: String
+  },
+
+  endTime: {
+    type: String
+  },
+
+  hallName: {
+    type: String
+  },
+
+  hallCapacity: {
+    type: Number,
+    default: 0
+  },
+
+  invigilatorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Staff'
+  },
+
+  passMarks: {
+    type: Number,
+    default: 40
+  },
+
+  status: {
+    type: String,
+    enum: [
+      'Draft',
+      'Scheduled',
+      'Ongoing',
+      'Completed',
+      'Published',
+      'Cancelled'
+    ],
+    default: 'Draft'
+  },
+
   createdBy: {
     type: String,
     default: 'System'

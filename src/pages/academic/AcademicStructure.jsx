@@ -551,7 +551,22 @@ const AcademicStructure = () => {
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn-secondary"><Settings size={18} /> Regulations</button>
-          <button className="btn-primary shadow-glow"><Plus size={18} /> Add Department</button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => navigate('/admin/subjects')}
+          >
+            <BookOpen size={18} />
+            Add Subject
+          </button>
+          <button
+            type="button"
+            className="btn-primary shadow-glow"
+            onClick={() => navigate('/admin/departments')}
+          >
+            <Plus size={18} />
+            Add Department
+          </button>
         </div>
       </div>
 
@@ -1056,7 +1071,12 @@ const AcademicStructure = () => {
               </form>
             )}
 
-            <div style={{ marginTop: "16px" }}>
+            <div className="management-count">
+              <strong>{courses.length}</strong>
+              <span>Courses configured</span>
+            </div>
+
+            <div className="management-record-list">
               {courses.length === 0 ? (
                 <p className="text-sm text-muted">
                   No courses created yet.
@@ -1226,7 +1246,12 @@ const AcademicStructure = () => {
               </form>
             )}
 
-            <div style={{ marginTop: "16px" }}>
+            <div className="management-count">
+              <strong>{semesters.length}</strong>
+              <span>Semesters configured</span>
+            </div>
+
+            <div className="management-record-list">
               {semesters.length === 0 ? (
                 <p className="text-sm text-muted">
                   No semesters created yet.
@@ -1430,7 +1455,12 @@ const AcademicStructure = () => {
               </form>
             )}
 
-            <div style={{ marginTop: "16px" }}>
+            <div className="management-count">
+              <strong>{sections.length}</strong>
+              <span>Sections configured</span>
+            </div>
+
+            <div className="management-record-list">
               {sections.length === 0 ? (
                 <p className="text-sm text-muted">
                   No sections created yet.

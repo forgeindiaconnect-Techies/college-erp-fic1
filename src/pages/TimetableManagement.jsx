@@ -1,9 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Plus, Trash2, Clock, Users, MapPin, X, BookOpen, Layers, CheckCircle2 } from 'lucide-react';
-import { getTimetable, createTimetable, deleteTimetable, getDepartments, getPeriodMasters, getFacultyAllocations } from '../api/index';
+import {
+  getTimetable,
+  createTimetable,
+  deleteTimetable,
+  getDepartments,
+  getCourses,
+  getSemesters,
+  getSections,
+  getPeriodMasters,
+  getFacultyAllocations
+} from '../api/index';
+import './TimetableManagement.css';
 
-const SEMESTERS = ['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8'];
-const SECTIONS = ['A', 'B', 'C', 'D'];
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const SUBJECT_COLORS = [
@@ -49,9 +58,18 @@ const formatRoomNo = (room) => {
 
 export default function TimetableManagement() {
   const [departments, setDepartments] = useState([]);
-  const [dept, setDept] = useState('Computer Science Engineering');
-  const [sem, setSem] = useState('Semester 6');
-  const [section, setSection] = useState('A');
+  const [courses, setCourses] = useState([]);
+  const [semesters, setSemesters] = useState([]);
+  const [sections, setSections] = useState([]);
+
+  const [departmentId, setDepartmentId] = useState('');
+  const [courseId, setCourseId] = useState('');
+  const [semesterId, setSemesterId] = useState('');
+  const [sectionId, setSectionId] = useState('');
+
+  const [dept, setDept] = useState('');
+  const [sem, setSem] = useState('');
+  const [section, setSection] = useState('');
 
   const [periods, setPeriods] = useState([]);
   const [allocations, setAllocations] = useState([]);
@@ -69,15 +87,46 @@ export default function TimetableManagement() {
   const [formRoom, setFormRoom] = useState('Room 201');
   const [autoFaculty, setAutoFaculty] = useState('');
 
+  const safeCourses = Array.isArray(courses) ? courses : [];
+  const safeSemesters = Array.isArray(semesters) ? semesters : [];
+  const safeSections = Array.isArray(sections) ? sections : [];
+
+  const filteredCourses = safeCourses.filter(
+    (course) => course.departmentId === departmentId
+  );
+
+  const filteredSemesters = safeSemesters.filter(
+    (semesterItem) => semesterItem.courseId === courseId
+  );
+
+  const filteredSections = safeSections.filter(
+    (sectionItem) =>
+      sectionItem.semesterId === semesterId &&
+      sectionItem.status !== 'Inactive'
+  );
+
   const loadDependencies = useCallback(async () => {
     try {
-      const [deptRes, periodRes] = await Promise.all([
+      const [
+        deptRes,
+        courseRes,
+        semesterRes,
+        sectionRes,
+        periodRes
+      ] = await Promise.all([
         getDepartments().catch(() => ({ data: [] })),
+        getCourses().catch(() => ({ data: [] })),
+        getSemesters().catch(() => ({ data: [] })),
+        getSections().catch(() => ({ data: [] })),
         getPeriodMasters().catch(() => ({ data: [] }))
       ]);
-      if (deptRes.data && deptRes.data.length > 0) {
-        setDepartments(deptRes.data);
+      const deptData = Array.isArray(deptRes.data) ? deptRes.data : (deptRes.data?.departments || deptRes.data?.data || []);
+      if (deptData && deptData.length > 0) {
+        setDepartments(deptData);
       }
+      setCourses(Array.isArray(courseRes.data) ? courseRes.data : (courseRes.data?.courses || courseRes.data?.data || []));
+      setSemesters(Array.isArray(semesterRes.data) ? semesterRes.data : (semesterRes.data?.semesters || semesterRes.data?.data || []));
+      setSections(Array.isArray(sectionRes.data) ? sectionRes.data : (sectionRes.data?.sections || sectionRes.data?.data || []));
       if (periodRes.data) {
         const sortedPeriods = [...periodRes.data]
           .filter(p => p.isActive)
@@ -96,19 +145,69 @@ export default function TimetableManagement() {
   const loadFullWeeklyTimetable = useCallback(async () => {
     setLoading(true);
     setError('');
+
+    if (!dept || !sem || !section) {
+      setAllTimetables([]);
+      setAllocations([]);
+      setLoading(false);
+      return;
+    }
     try {
       const [ttRes, allocRes] = await Promise.all([
         getTimetable(dept, sem, section).catch(() => ({ data: [] })),
-        getFacultyAllocations({ department: dept, semester: sem, section }).catch(() => ({ data: [] }))
+        getFacultyAllocations({}).catch(() => ({ data: [] }))
       ]);
       setAllTimetables(ttRes.data || []);
-      setAllocations(allocRes.data || []);
+      const normalize = (value) =>
+        String(value || '').trim().toLowerCase();
+
+      const normalizeSection = (value) =>
+        normalize(value).replace(/^section\s*/, '');
+
+      const classAllocations = (allocRes.data || []).filter(
+        (allocation) => {
+          const departmentMatches =
+            normalize(allocation.departmentId) ===
+              normalize(departmentId) ||
+            normalize(allocation.department) === normalize(dept);
+
+          const courseMatches =
+            !allocation.courseId ||
+            normalize(allocation.courseId) === normalize(courseId);
+
+          const semesterMatches =
+            normalize(allocation.semesterId) === normalize(semesterId) ||
+            normalize(allocation.semester) === normalize(sem);
+
+          const sectionMatches =
+            normalize(allocation.sectionId) === normalize(sectionId) ||
+            normalizeSection(allocation.section) ===
+              normalizeSection(section);
+
+          return (
+            departmentMatches &&
+            courseMatches &&
+            semesterMatches &&
+            sectionMatches &&
+            allocation.isActive !== false
+          );
+        }
+      );
+
+      setAllocations(classAllocations);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [dept, sem, section]);
+  }, [
+    dept,
+    sem,
+    section,
+    departmentId,
+    semesterId,
+    sectionId
+  ]);
 
   useEffect(() => {
     loadDependencies();
@@ -128,9 +227,30 @@ export default function TimetableManagement() {
     }
   };
 
-  const openAddSlotModal = (targetDay = 'Monday', targetPeriodId = null) => {
+  const openAddSlotModal = (
+    targetDay = 'Monday',
+    targetPeriodId = null
+  ) => {
+    if (
+      !departmentId ||
+      !courseId ||
+      !semesterId ||
+      !sectionId
+    ) {
+      alert(
+        'Select Department, Course, Semester and Section first.'
+      );
+      return;
+    }
+
     setFormDay(targetDay);
-    if (targetPeriodId) setFormPeriod(targetPeriodId);
+
+    if (targetPeriodId) {
+      setFormPeriod(targetPeriodId);
+    }
+
+    setFormSubject('');
+    setAutoFaculty('');
     setError('');
     setModalOpen(true);
   };
@@ -182,7 +302,7 @@ export default function TimetableManagement() {
   };
 
   return (
-    <div className="animate-fade-in p-6 max-w-7xl mx-auto">
+    <div className="timetable-page animate-fade-in p-6 max-w-7xl mx-auto">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">
@@ -217,39 +337,140 @@ export default function TimetableManagement() {
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Department:</label>
-            <select 
-              value={dept} 
-              onChange={e => setDept(e.target.value)}
-              className="p-2 border border-gray-200 rounded-lg text-sm font-semibold bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500"
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Department:
+            </label>
+
+            <select
+              value={departmentId}
+              onChange={(event) => {
+                const selectedDepartment = (Array.isArray(departments) ? departments : []).find(
+                  (item) =>
+                    (item.id || item._id) === event.target.value
+                );
+
+                setDepartmentId(event.target.value);
+                setDept(selectedDepartment?.name || '');
+
+                setCourseId('');
+                setSemesterId('');
+                setSem('');
+                setSectionId('');
+                setSection('');
+              }}
+              className="p-2 border border-gray-200 rounded-lg text-sm font-semibold bg-gray-50"
             >
-              {departments.length > 0 ? (
-                departments.map(d => <option key={d._id || d.name || d} value={d.name || d}>{d.name || d}</option>)
-              ) : (
-                <option value={dept}>{dept}</option>
-              )}
+              <option value="">Select Department</option>
+
+              {(Array.isArray(departments) ? departments : []).map((department) => (
+                <option
+                  key={department.id || department._id}
+                  value={department.id || department._id}
+                >
+                  {department.name}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Semester:</label>
-            <select 
-              value={sem} 
-              onChange={e => setSem(e.target.value)}
-              className="p-2 border border-gray-200 rounded-lg text-sm font-semibold bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500"
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Course:
+            </label>
+
+            <select
+              value={courseId}
+              disabled={!departmentId}
+              onChange={(event) => {
+                setCourseId(event.target.value);
+                setSemesterId('');
+                setSem('');
+                setSectionId('');
+                setSection('');
+              }}
+              className="p-2 border border-gray-200 rounded-lg text-sm font-semibold bg-gray-50"
             >
-              {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
+              <option value="">Select Course</option>
+
+              {filteredCourses.map((course) => (
+                <option
+                  key={course.id || course._id}
+                  value={course.id || course._id}
+                >
+                  {course.name} ({course.code})
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Section:</label>
-            <select 
-              value={section} 
-              onChange={e => setSection(e.target.value)}
-              className="p-2 border border-gray-200 rounded-lg text-sm font-semibold bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500"
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Semester:
+            </label>
+
+            <select
+              value={semesterId}
+              disabled={!courseId}
+              onChange={(event) => {
+                const selectedSemester = (Array.isArray(semesters) ? semesters : []).find(
+                  (item) =>
+                    (item.id || item._id) === event.target.value
+                );
+
+                setSemesterId(event.target.value);
+                setSem(
+                  selectedSemester?.name ||
+                    `Semester ${selectedSemester?.semesterNumber || ''}`
+                );
+
+                setSectionId('');
+                setSection('');
+              }}
+              className="p-2 border border-gray-200 rounded-lg text-sm font-semibold bg-gray-50"
             >
-              {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              <option value="">Select Semester</option>
+
+              {filteredSemesters.map((semesterItem) => (
+                <option
+                  key={semesterItem.id || semesterItem._id}
+                  value={semesterItem.id || semesterItem._id}
+                >
+                  {semesterItem.name ||
+                    `Semester ${semesterItem.semesterNumber}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Section:
+            </label>
+
+            <select
+              value={sectionId}
+              disabled={!semesterId}
+              onChange={(event) => {
+                const selectedSection = (Array.isArray(sections) ? sections : []).find(
+                  (item) =>
+                    (item.id || item._id) === event.target.value
+                );
+
+                setSectionId(event.target.value);
+                setSection(selectedSection?.name || '');
+              }}
+              className="p-2 border border-gray-200 rounded-lg text-sm font-semibold bg-gray-50"
+            >
+              <option value="">Select Section</option>
+
+              {filteredSections.map((sectionItem) => (
+                <option
+                  key={sectionItem.id || sectionItem._id}
+                  value={sectionItem.id || sectionItem._id}
+                >
+                  Section {sectionItem.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -400,8 +621,7 @@ export default function TimetableManagement() {
                               onClick={() => openAddSlotModal(dayName, period._id)}
                               className="w-full h-14 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center text-xs text-gray-400 font-medium hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/30 transition-all group"
                             >
-                              <span className="group-hover:inline hidden font-semibold">+ Add</span>
-                              <span className="group-hover:hidden opacity-60">Free</span>
+                              <span className="font-semibold">+ Schedule Class</span>
                             </button>
                           </td>
                         );
@@ -428,7 +648,7 @@ export default function TimetableManagement() {
             zIndex: 9999,
             display: 'flex',
             alignItems: 'center',
-            justify: 'center',
+            justifyContent: 'center',
             padding: '1rem'
           }}
         >

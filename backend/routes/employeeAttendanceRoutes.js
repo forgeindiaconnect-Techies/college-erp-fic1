@@ -1,6 +1,7 @@
 import express from 'express';
 import EmployeeAttendance from '../models/EmployeeAttendance.js';
 import User from '../models/User.js';
+import Staff from '../models/Staff.js';
 import { protect, collegeScope, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -119,14 +120,191 @@ router.get('/history', protect, collegeScope, async (req, res) => {
   }
 });
 
+// Admin bulk staff attendance
+router.post(
+  '/admin/mark',
+  protect,
+  authorize('Admin', 'Principal', 'Sub Admin'),
+  collegeScope,
+  async (req, res) => {
+    try {
+      const { date, records } = req.body;
+
+      if (!date || !Array.isArray(records) || records.length === 0) {
+        return res.status(400).json({
+          message: 'Date and staff attendance records are required.'
+        });
+      }
+
+      const attendanceDate = new Date(date);
+      attendanceDate.setUTCHours(0, 0, 0, 0);
+
+      const allowedStatuses = [
+        'Present',
+        'Absent',
+        'Late',
+        'Leave',
+        'LOP'
+      ];
+
+      const invalidRecord = records.find(
+        record =>
+          !record.employeeId ||
+          !allowedStatuses.includes(record.status)
+      );
+
+      if (invalidRecord) {
+        return res.status(400).json({
+          message: 'Every staff member requires a valid attendance status.'
+        });
+      }
+
+      const collegeId =
+        req.collegeId ||
+        req.user.collegeId ||
+        req.user.tenantId ||
+        'unassigned_college';
+
+      const operations = records.map(record => {
+        const isWorking =
+          record.status === 'Present' ||
+          record.status === 'Late';
+
+        return {
+          updateOne: {
+            filter: {
+              collegeId,
+              employeeId: record.employeeId,
+              date: attendanceDate
+            },
+            update: {
+              $set: {
+                tenantId: collegeId,
+                collegeId,
+                employeeId: record.employeeId,
+                role: record.role || 'Staff',
+                date: attendanceDate,
+                status: record.status,
+                remarks: record.remarks || '',
+                checkIn: isWorking
+                  ? record.checkIn || new Date()
+                  : null,
+                checkOut: record.checkOut || null
+              }
+            },
+            upsert: true
+          }
+        };
+      });
+
+      await EmployeeAttendance.bulkWrite(operations);
+
+      req.app.get('io')?.emit('dataUpdated', {
+        module: 'employee-attendance',
+        action: 'bulk-marked'
+      });
+
+      res.status(200).json({
+        message: 'Staff attendance saved successfully.',
+        count: operations.length
+      });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+);
+
+// Admin checkout for a selected employee
+router.put(
+  '/admin/checkout/:employeeId',
+  protect,
+  authorize('Admin', 'Principal', 'Sub Admin'),
+  collegeScope,
+  async (req, res) => {
+    try {
+      const attendanceDate = new Date(
+        req.body.date || new Date()
+      );
+
+      attendanceDate.setUTCHours(0, 0, 0, 0);
+
+      const collegeId =
+        req.collegeId ||
+        req.user.collegeId ||
+        req.user.tenantId;
+
+      const record = await EmployeeAttendance.findOne({
+        employeeId: req.params.employeeId,
+        date: attendanceDate,
+        $or: [
+          { tenantId: collegeId },
+          { collegeId }
+        ]
+      });
+
+      if (!record) {
+        return res.status(404).json({
+          message: 'No staff check-in found for this date.'
+        });
+      }
+
+      if (!record.checkIn) {
+        return res.status(400).json({
+          message: 'The employee has not checked in.'
+        });
+      }
+
+      if (record.checkOut) {
+        return res.status(400).json({
+          message: 'The employee has already checked out.'
+        });
+      }
+
+      record.checkOut = new Date();
+      await record.save();
+
+      req.app.get('io')?.emit('dataUpdated', {
+        module: 'employee-attendance',
+        action: 'checkout'
+      });
+
+      res.status(200).json({
+        message: 'Staff checked out successfully.',
+        record
+      });
+    } catch (error) {
+      res.status(500).json({
+        message: error.message
+      });
+    }
+  }
+);
+
 // GET /api/employee-attendance/admin/reports
 // Admin & HOD report for all employees
 router.get('/admin/reports', protect, authorize('Admin', 'Principal', 'Sub Admin', 'HOD'), collegeScope, async (req, res) => {
   try {
     const { date, role, department } = req.query;
     
-    let filter = { tenantId: { $in: [req.collegeId, 'unassigned_college', 'mock_college_id'] } };
-    let userFilter = { tenantId: { $in: [req.collegeId, 'unassigned_college', 'mock_college_id'] } };
+    const tenantValues = [
+      req.collegeId,
+      'unassigned_college',
+      'mock_college_id'
+    ];
+
+    let filter = {
+      $or: [
+        { tenantId: { $in: tenantValues } },
+        { collegeId: { $in: tenantValues } }
+      ]
+    };
+
+    let userFilter = {
+      $or: [
+        { tenantId: { $in: tenantValues } },
+        { collegeId: { $in: tenantValues } }
+      ]
+    };
 
     if (date && date !== 'all') {
       const queryDate = new Date(date);
@@ -149,8 +327,41 @@ router.get('/admin/reports', protect, authorize('Admin', 'Principal', 'Sub Admin
       userFilter.department = department;
     }
 
+    // Synchronize existing Staff records with their User login accounts
+    const staffRecords = await Staff.find({
+      collegeId: req.collegeId
+    });
+
+    if (staffRecords.length > 0) {
+      await User.bulkWrite(
+        staffRecords.map(staffMember => ({
+          updateOne: {
+            filter: {
+              $or: [
+                { referenceId: staffMember.id },
+                { email: staffMember.email }
+              ]
+            },
+            update: {
+              $set: {
+                name: staffMember.name,
+                department: staffMember.dept,
+                referenceId: staffMember.id,
+                role:
+                  staffMember.designation === 'HOD'
+                    ? 'HOD'
+                    : 'Staff',
+                tenantId: req.collegeId,
+                collegeId: req.collegeId
+              }
+            }
+          }
+        }))
+      );
+    }
+
     const users = await User.find(userFilter);
-    const attendanceRecords = await EmployeeAttendance.find(filter).populate('employeeId', 'name email');
+    const attendanceRecords = await EmployeeAttendance.find(filter).populate('employeeId', 'name email department');
     
     const attendanceMap = new Map();
     attendanceRecords.forEach(record => {
@@ -164,7 +375,12 @@ router.get('/admin/reports', protect, authorize('Admin', 'Principal', 'Sub Admin
       if (record) return record;
       return {
         _id: `lop_${user._id}`,
-        employeeId: { _id: user._id, name: user.name, email: user.email },
+        employeeId: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          department: user.department || 'Not Assigned'
+        },
         role: user.role,
         date: filter.date || new Date(),
         checkIn: null,

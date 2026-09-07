@@ -1,0 +1,184 @@
+.faculty-allocation-page {
+  width: 100%;
+  color: #243447;
+}
+
+/* Page header */
+.faculty-allocation-page > .flex:first-child {
+  margin-bottom: 14px !important;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #c7d2da;
+}
+
+.faculty-allocation-page > .flex:first-child h1 {
+  margin: 0 0 4px;
+  color: #243447;
+  font-size: 24px;
+}
+
+.faculty-allocation-page > .flex:first-child p {
+  margin: 0;
+  color: #65788a;
+  font-size: 13px;
+}
+
+/* Form and table layout */
+.faculty-allocation-page > .grid {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 14px !important;
+}
+
+.faculty-allocation-page > .grid > div {
+  padding: 0 !important;
+  background: #ffffff !important;
+  border: 1px solid #c5d0d8 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08) !important;
+  overflow: hidden;
+}
+
+/* New Allocation heading */
+.faculty-allocation-page > .grid > div:first-child > h3 {
+  margin: 0 !important;
+  padding: 13px 15px;
+  color: #ffffff;
+  background: #416b89;
+  border-bottom: 1px solid #315873;
+  font-size: 15px;
+}
+
+/* Allocation form */
+.faculty-allocation-page form {
+  padding: 15px;
+}
+
+.faculty-allocation-page form > div {
+  margin-bottom: 12px !important;
+}
+
+.faculty-allocation-page form label {
+  display: block;
+  margin-bottom: 5px !important;
+  color: #526779;
+  font-size: 11px !important;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.faculty-allocation-page form select,
+.faculty-allocation-page form input {
+  width: 100%;
+  min-height: 37px;
+  padding: 7px 9px !important;
+  color: #243447;
+  background: #ffffff;
+  border: 1px solid #bfcbd4 !important;
+  border-radius: 3px !important;
+  font-size: 12px;
+  outline: none;
+}
+
+.faculty-allocation-page form select:focus,
+.faculty-allocation-page form input:focus {
+  border-color: #416b89 !important;
+  box-shadow: 0 0 0 2px rgba(65, 107, 137, 0.12);
+}
+
+.faculty-allocation-page form select:disabled {
+  color: #94a3b8;
+  background: #e9eef2;
+  cursor: not-allowed;
+}
+
+.faculty-allocation-page form button[type="submit"] {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 14px;
+  color: #ffffff;
+  background: #416b89 !important;
+  border: 1px solid #315873;
+  border-radius: 3px !important;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.faculty-allocation-page form button[type="submit"]:hover {
+  background: #315873 !important;
+}
+
+/* Current Allocations header */
+.faculty-allocation-page > .grid > div:nth-child(2) > div:first-child {
+  min-height: 52px;
+  padding: 9px 14px !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #f1f5f7 !important;
+  border-bottom: 1px solid #c5d0d8 !important;
+}
+
+.faculty-allocation-page > .grid > div:nth-child(2) h3 {
+  margin: 0;
+  color: #243447;
+  font-size: 15px;
+}
+
+.faculty-allocation-page > .grid > div:nth-child(2) select {
+  min-width: 190px;
+  min-height: 34px;
+  border: 1px solid #bfcbd4;
+  border-radius: 3px !important;
+}
+
+/* Allocation table */
+.faculty-allocation-page table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.faculty-allocation-page th {
+  padding: 10px 12px !important;
+  color: #ffffff !important;
+  background: #416b89 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 11px !important;
+  text-transform: uppercase;
+}
+
+.faculty-allocation-page td {
+  padding: 10px 12px !important;
+  color: #34495e;
+  background: #ffffff;
+  border-right: 1px solid #d9e0e5;
+  border-bottom: 1px solid #d9e0e5;
+  font-size: 12px !important;
+}
+
+.faculty-allocation-page tbody tr:nth-child(even) td {
+  background: #f4f7f9;
+}
+
+.faculty-allocation-page tbody tr:hover td {
+  background: #e8f0f5;
+}
+
+.faculty-allocation-page td button {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #dc2626;
+  background: #ffffff;
+  border: 1px solid #fecaca;
+  border-radius: 3px;
+}
+
+@media (max-width: 1000px) {
+  .faculty-allocation-page > .grid {
+    grid-template-columns: 1fr;
+  }
+}

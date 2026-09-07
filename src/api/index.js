@@ -548,6 +548,12 @@ export const employeeCheckIn = () => api.post('/employee-attendance/checkin');
 export const employeeCheckOut = () => api.put('/employee-attendance/checkout');
 export const getEmployeeAttendanceHistory = () => api.get('/employee-attendance/history');
 export const getEmployeeAttendanceReports = (params) => api.get('/employee-attendance/admin/reports', { params });
+export const markStaffAttendance = (data) =>
+  api.post('/employee-attendance/admin/mark', data);
+export const adminCheckoutStaff = (employeeId, date) =>
+  api.put(`/employee-attendance/admin/checkout/${employeeId}`, {
+    date
+  });
 export const getEmployeeAttendanceStats = () => api.get('/employee-attendance/stats');
 
 // Daily Class Execution Monitoring

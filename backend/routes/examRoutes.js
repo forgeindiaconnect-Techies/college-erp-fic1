@@ -6,13 +6,42 @@ import { sendNotification } from '../utils/notificationHelper.js';
 const router = express.Router();
 
 // GET all exams (HOD/Staff scoped by departmentScope, Admin/Principal can view all or filter)
-router.get('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff', 'Student', 'Parent'), collegeScope, departmentScope, collegeScope, async (req, res) => {
+router.get('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff', 'Student', 'Parent'), collegeScope, departmentScope, async (req, res) => {
   try {
+    const {
+      academicYearId,
+      departmentId,
+      courseId,
+      semesterId,
+      sectionId,
+      subjectId,
+      examType,
+      status
+    } = req.query;
+
     const dept = req.dept || req.query.dept;
-    const query = {};
+
+    const query = {
+      collegeId: req.collegeId
+    };
+
     if (dept) query.dept = dept;
-    if (req.collegeId) query.collegeId = req.collegeId;
-    const exams = await Exam.find(query).sort({ date: 1 });
+    if (academicYearId) query.academicYearId = academicYearId;
+    if (departmentId) query.departmentId = departmentId;
+    if (courseId) query.courseId = courseId;
+    if (semesterId) query.semesterId = semesterId;
+    if (sectionId) query.sectionId = sectionId;
+    if (subjectId) query.subjectId = subjectId;
+    if (examType) query.examType = examType;
+    if (status) query.status = status;
+
+    const exams = await Exam.find(query)
+      .populate('academicYearId', 'year')
+      .populate('regulationId', 'name code')
+      .populate('subjectId', 'subjectCode subjectName')
+      .populate('invigilatorId', 'name email department')
+      .sort({ date: 1, startTime: 1 });
+
     res.json(exams);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -35,14 +64,45 @@ router.post('/', protect, authorize('Admin', 'HOD', 'Principal'), collegeScope, 
   try {
     const collegeId = req.collegeId || req.user.tenantId || req.user.collegeId || 'unassigned_college';
     const exam = new Exam({
+      ...req.body,
+
       name: req.body.name,
+      examType: req.body.examType || 'Internal',
+
+      academicYearId: req.body.academicYearId || null,
+      regulationId: req.body.regulationId || null,
+
+      departmentId: req.body.departmentId || '',
       dept: req.body.dept,
+
+      courseId: req.body.courseId || '',
+
+      semesterId: req.body.semesterId || '',
       sem: req.body.sem,
+
+      sectionId: req.body.sectionId || '',
+      section: req.body.section || '',
+
+      subjectId: req.body.subjectId || null,
       subject: req.body.subject,
+
       date: req.body.date,
-      time: req.body.time,
-      room: req.body.room,
+
+      startTime: req.body.startTime || req.body.time,
+      endTime: req.body.endTime || '',
+      time: req.body.startTime || req.body.time,
+
+      hallName: req.body.hallName || req.body.room,
+      room: req.body.hallName || req.body.room,
+      hallCapacity: Number(req.body.hallCapacity) || 0,
+
+      invigilatorId: req.body.invigilatorId || null,
+
       maxMarks: Number(req.body.maxMarks) || 100,
+      passMarks: Number(req.body.passMarks) || 40,
+
+      status: req.body.status || 'Scheduled',
+
       createdBy: req.user.name || 'Staff HOD',
       collegeId
     });

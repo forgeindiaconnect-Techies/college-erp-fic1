@@ -24,7 +24,18 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { getStudents, getAllAttendance, createAttendance, getDepartments } from '../../api/index';
+import {
+  getStudents,
+  getAllAttendance,
+  createAttendance,
+  getDepartments,
+  getCourses,
+  getSemesters,
+  getSections,
+  getAcademicYears,
+  getPeriodMasters,
+  getFacultyAllocations
+} from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import './AttendanceManagement.css';
 
@@ -78,9 +89,22 @@ const AttendanceManagement = () => {
   const [dailyLogs, setDailyLogs] = useState({});
   const [stats, setStats] = useState({});
   const [dbDepartments, setDbDepartments] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [semesters, setSemesters] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [academicYears, setAcademicYears] = useState([]);
+  const [periods, setPeriods] = useState([]);
+  const [facultyAllocations, setFacultyAllocations] = useState([]);
   
   const [deptFilter, setDeptFilter] = useState('All');
   const [semFilter, setSemFilter] = useState('All');
+  const [departmentId, setDepartmentId] = useState('');
+  const [courseId, setCourseId] = useState('');
+  const [semesterId, setSemesterId] = useState('');
+  const [sectionId, setSectionId] = useState('');
+  const [academicYearId, setAcademicYearId] = useState('');
+  const [periodId, setPeriodId] = useState('');
+  const [subjectId, setSubjectId] = useState('');
   const [search, setSearch] = useState('');
   
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr());
@@ -100,13 +124,40 @@ const AttendanceManagement = () => {
       setLoading(true);
       
       // 1. Fetch Students & Departments
-      const [studentsRes, deptsRes] = await Promise.all([
+      const [
+        studentsRes,
+        deptsRes,
+        coursesRes,
+        semestersRes,
+        sectionsRes,
+        yearsRes,
+        periodsRes,
+        allocationsRes
+      ] = await Promise.all([
         getStudents().catch(() => ({ data: [] })),
-        getDepartments().catch(() => ({ data: [] }))
+        getDepartments().catch(() => ({ data: [] })),
+        getCourses().catch(() => ({ data: [] })),
+        getSemesters().catch(() => ({ data: [] })),
+        getSections().catch(() => ({ data: [] })),
+        getAcademicYears().catch(() => ({ data: [] })),
+        getPeriodMasters().catch(() => ({ data: [] })),
+        getFacultyAllocations({}).catch(() => ({ data: [] }))
       ]);
-      const studentList = studentsRes.data;
+      const studentList = Array.isArray(studentsRes.data) ? studentsRes.data : (studentsRes.data?.students || studentsRes.data?.data || []);
       setStudents(studentList);
-      setDbDepartments(deptsRes.data || []);
+      setDbDepartments(Array.isArray(deptsRes.data) ? deptsRes.data : (deptsRes.data?.departments || deptsRes.data?.data || []));
+
+      setCourses(Array.isArray(coursesRes.data) ? coursesRes.data : (coursesRes.data?.courses || coursesRes.data?.data || []));
+      setSemesters(Array.isArray(semestersRes.data) ? semestersRes.data : (semestersRes.data?.semesters || semestersRes.data?.data || []));
+      setSections(Array.isArray(sectionsRes.data) ? sectionsRes.data : (sectionsRes.data?.sections || sectionsRes.data?.data || []));
+      setAcademicYears(Array.isArray(yearsRes.data) ? yearsRes.data : (yearsRes.data?.academicYears || yearsRes.data?.data || []));
+
+      const rawPeriods = Array.isArray(periodsRes.data) ? periodsRes.data : (periodsRes.data?.periods || periodsRes.data?.data || []);
+      setPeriods(
+        rawPeriods.filter((period) => period.isActive && !period.isBreak)
+      );
+
+      setFacultyAllocations(Array.isArray(allocationsRes.data) ? allocationsRes.data : (allocationsRes.data?.allocations || allocationsRes.data?.data || []));
 
       // 2. Fetch Attendance Records
       let dailyLogData = {};
@@ -118,7 +169,9 @@ const AttendanceManagement = () => {
         
         // Group by date
         records.forEach(r => {
-          const dateStr = new Date(r.date).toLocaleDateString('en-CA');
+          const dateStr = new Date(
+            r.attendanceDate || r.date
+          ).toLocaleDateString('en-CA');
           if (!dailyLogData[dateStr]) dailyLogData[dateStr] = {};
           dailyLogData[dateStr][r.studentId] = r.status.toLowerCase();
         });
@@ -131,10 +184,9 @@ const AttendanceManagement = () => {
 
       // 3. Initialize baseline stats
       studentList.forEach(s => {
-        const att = s.attendance !== undefined ? Number(s.attendance) : 85;
         statsData[s.id] = {
-          basePresent: Math.round(att),
-          baseAbsent: 100 - Math.round(att)
+          basePresent: 0,
+          baseAbsent: 0
         };
       });
       setStats(statsData);
@@ -161,7 +213,7 @@ const AttendanceManagement = () => {
   // Aggregate stats dynamically
   const getStudentRecords = () => {
     return students.map(s => {
-      const studentStats = stats[s.id] || { basePresent: 85, baseAbsent: 15 };
+      const studentStats = stats[s.id] || { basePresent: 0, baseAbsent: 0 };
       let dailyPresent = 0;
       let dailyAbsent = 0;
 
@@ -186,15 +238,113 @@ const AttendanceManagement = () => {
     });
   };
 
+  const safeDbDepartments = Array.isArray(dbDepartments) ? dbDepartments : [];
+  const safeSemesters = Array.isArray(semesters) ? semesters : [];
+  const safeSections = Array.isArray(sections) ? sections : [];
+  const safeCourses = Array.isArray(courses) ? courses : [];
+  const safeFacultyAllocations = Array.isArray(facultyAllocations) ? facultyAllocations : [];
+
+  const selectedDepartment = safeDbDepartments.find(
+    (department) =>
+      (department.id || department._id) === departmentId
+  );
+
+  const selectedSemester = safeSemesters.find(
+    (semester) =>
+      (semester.id || semester._id) === semesterId
+  );
+
+  const selectedSection = safeSections.find(
+    (section) => (section.id || section._id) === sectionId
+  );
+
+  const filteredCourses = safeCourses.filter(
+    (course) => course.departmentId === departmentId
+  );
+
+  const filteredSemesters = safeSemesters.filter(
+    (semester) => semester.courseId === courseId
+  );
+
+  const filteredSections = safeSections.filter(
+    (section) =>
+      section.semesterId === semesterId &&
+      section.status !== 'Inactive'
+  );
+
+  const filteredSubjects = safeFacultyAllocations.filter(
+    (allocation) => {
+      const departmentMatches =
+        allocation.departmentId === departmentId ||
+        allocation.department === selectedDepartment?.name;
+
+      const semesterMatches =
+        allocation.semesterId === semesterId ||
+        allocation.semester === selectedSemester?.name;
+
+      const sectionMatches =
+        allocation.sectionId === sectionId ||
+        allocation.section === selectedSection?.name ||
+        allocation.section ===
+          `Section ${selectedSection?.name}`;
+
+      return (
+        departmentMatches &&
+        semesterMatches &&
+        sectionMatches &&
+        allocation.isActive !== false
+      );
+    }
+  );
+
+  useEffect(() => {
+    if (filteredSubjects.length === 1 && !subjectId) {
+      const subject = filteredSubjects[0].subjectId;
+      const selectedSubjectId = subject?._id || subject;
+
+      if (selectedSubjectId) {
+        setSubjectId(String(selectedSubjectId));
+      }
+    }
+  }, [filteredSubjects, subjectId]);
+
   const records = getStudentRecords();
 
   // Apply filters
-  const filteredRecords = records.filter(r => {
-    const matchDept = deptFilter === 'All' || r.dept === deptFilter;
-    const matchSem = semFilter === 'All' || r.sem === semFilter;
-    const matchSearch = r.name.toLowerCase().includes(search.toLowerCase()) || 
-                        r.id.toLowerCase().includes(search.toLowerCase());
-    return matchDept && matchSem && matchSearch;
+  const filteredRecords = records.filter((record) => {
+    const matchDepartment =
+      !departmentId ||
+      record.departmentId === departmentId ||
+      record.dept === selectedDepartment?.name;
+
+    const matchCourse =
+      !courseId ||
+      record.courseId === courseId;
+
+    const matchSemester =
+      !semesterId ||
+      record.semesterId === semesterId ||
+      record.sem === selectedSemester?.name;
+
+    const matchSection =
+      !sectionId ||
+      record.sectionId === sectionId ||
+      record.section === selectedSection?.name ||
+      record.section === `Section ${selectedSection?.name}`;
+
+    const searchValue = search.toLowerCase();
+
+    const matchSearch =
+      String(record.name || '').toLowerCase().includes(searchValue) ||
+      String(record.id || '').toLowerCase().includes(searchValue);
+
+    return (
+      matchDepartment &&
+      matchCourse &&
+      matchSemester &&
+      matchSection &&
+      matchSearch
+    );
   });
 
   // Calculate totals for summary cards
@@ -211,7 +361,7 @@ const AttendanceManagement = () => {
   const handleBulkMark = (status) => {
     const updated = { ...markingState };
     filteredRecords.forEach(r => {
-      updated[r.id] = status;
+      updated[r.id || r._id] = status;
     });
     setMarkingState(updated);
   };
@@ -226,18 +376,97 @@ const AttendanceManagement = () => {
   // Save the marked attendance
   const handleSaveAttendance = async () => {
     try {
-      // Build the bulk array
-      const bulkRecords = [];
-      Object.keys(markingState).forEach(studentId => {
-        const mark = markingState[studentId];
-        if (mark) {
-          bulkRecords.push({
-            studentId,
-            date: new Date(selectedDate),
-            status: mark.charAt(0).toUpperCase() + mark.slice(1) // 'Present', 'Absent'
-          });
-        }
+      const missingFields = [];
+
+      if (!academicYearId) missingFields.push('Academic Year');
+      if (!departmentId) missingFields.push('Department');
+      if (!courseId) missingFields.push('Course');
+      if (!semesterId) missingFields.push('Semester');
+      if (!sectionId) missingFields.push('Section');
+      if (!periodId) missingFields.push('Period');
+      if (!subjectId) missingFields.push('Subject');
+
+      if (missingFields.length > 0) {
+        alert(`Please select: ${missingFields.join(', ')}`);
+        return;
+      }
+
+      if (Object.keys(markingState).length === 0) {
+        alert('Please mark at least one student as Present or Absent.');
+        return;
+      }
+
+      const selectedAcademicYear = (Array.isArray(academicYears) ? academicYears : []).find(
+        year => String(year._id || year.id) === String(academicYearId)
+      );
+
+      const selectedAllocation = safeFacultyAllocations.find(allocation => {
+        const allocationId = allocation._id || allocation.id;
+        const allocatedSubjectId =
+          allocation.subjectId?._id || allocation.subjectId;
+
+        return (
+          String(allocationId) === String(subjectId) ||
+          String(allocatedSubjectId) === String(subjectId)
+        );
       });
+
+      const allocatedSubject = selectedAllocation?.subjectId;
+
+      const actualSubjectId =
+        allocatedSubject?._id ||
+        allocatedSubject ||
+        subjectId;
+
+      const subjectName =
+        allocatedSubject?.subjectName ||
+        allocatedSubject?.name ||
+        selectedAllocation?.subjectName ||
+        'Subject';
+
+      const bulkRecords = filteredRecords
+        .filter(student => markingState[student.id || student._id])
+        .map(student => {
+          const studentKey = student.id || student._id;
+          const mark = markingState[studentKey];
+
+          return {
+            studentId: student.id,
+            studentName: student.name,
+            registerNo: student.idNumber || student.id,
+
+            academicYearId,
+            academicYear: selectedAcademicYear?.year || '',
+
+            departmentId,
+            department: selectedDepartment?.name || student.dept,
+
+            courseId,
+
+            semesterId,
+            semester:
+              selectedSemester?.name ||
+              `Semester ${selectedSemester?.semesterNumber || ''}`,
+
+            sectionId,
+            section:
+              selectedSection?.name ||
+              student.section ||
+              '',
+
+            periodId,
+
+            subjectId: actualSubjectId,
+            subjectName,
+            subject: subjectName,
+
+            attendanceDate: new Date(selectedDate),
+            date: new Date(selectedDate),
+
+            status:
+              mark.charAt(0).toUpperCase() + mark.slice(1)
+          };
+        });
 
       if (bulkRecords.length > 0) {
         await createAttendance(bulkRecords);
@@ -382,31 +611,165 @@ const AttendanceManagement = () => {
           </div>
 
           <div className="filter-group">
-            {/* Department Filter */}
             <div className="filter-select-wrapper">
-              <Filter size={14} className="text-muted" />
-              <select 
-                className="filter-select" 
-                value={deptFilter} 
-                onChange={e => setDeptFilter(e.target.value)}
+              <select
+                className="filter-select"
+                value={academicYearId}
+                onChange={(e) => setAcademicYearId(e.target.value)}
               >
-                <option value="All">All Departments</option>
-                {(() => {
-                  const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS.slice(1);
-                  return activeDepts.map(d => <option key={d} value={d}>{d}</option>);
-                })()}
+                <option value="">Academic Year</option>
+                {(Array.isArray(academicYears) ? academicYears : []).map((year) => (
+                  <option key={year._id} value={year._id}>
+                    {year.year}
+                  </option>
+                ))}
               </select>
             </div>
 
-            {/* Semester Filter */}
             <div className="filter-select-wrapper">
-              <select 
-                className="filter-select" 
-                value={semFilter} 
-                onChange={e => setSemFilter(e.target.value)}
+              <select
+                className="filter-select"
+                value={departmentId}
+                onChange={(e) => {
+                  const selected = (Array.isArray(dbDepartments) ? dbDepartments : []).find(
+                    (d) => (d.id || d._id) === e.target.value
+                  );
+
+                  setDepartmentId(e.target.value);
+                  setDeptFilter(selected?.name || 'All');
+                  setCourseId('');
+                  setSemesterId('');
+                  setSemFilter('All');
+                  setSectionId('');
+                  setPeriodId('');
+                  setSubjectId('');
+                }}
               >
-                <option value="All">All Semesters</option>
-                {SEMESTERS.slice(1).map(s => <option key={s} value={s}>{s}</option>)}
+                <option value="">Department</option>
+                {(Array.isArray(dbDepartments) ? dbDepartments : []).map((department) => (
+                  <option
+                    key={department.id || department._id}
+                    value={department.id || department._id}
+                  >
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-select-wrapper">
+              <select
+                className="filter-select"
+                value={courseId}
+                disabled={!departmentId}
+                onChange={(e) => {
+                  setCourseId(e.target.value);
+                  setSemesterId('');
+                  setSectionId('');
+                  setSubjectId('');
+                }}
+              >
+                <option value="">Course</option>
+                {filteredCourses.map((course) => (
+                  <option
+                    key={course.id || course._id}
+                    value={course.id || course._id}
+                  >
+                    {course.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-select-wrapper">
+              <select
+                className="filter-select"
+                value={semesterId}
+                disabled={!courseId}
+                onChange={(e) => {
+                  const selected = (Array.isArray(semesters) ? semesters : []).find(
+                    (semester) =>
+                      (semester.id || semester._id) === e.target.value
+                  );
+
+                  setSemesterId(e.target.value);
+                  setSemFilter(
+                    selected?.name ||
+                      `Semester ${selected?.semesterNumber || ''}`
+                  );
+                  setSectionId('');
+                  setSubjectId('');
+                }}
+              >
+                <option value="">Semester</option>
+                {filteredSemesters.map((semester) => (
+                  <option
+                    key={semester.id || semester._id}
+                    value={semester.id || semester._id}
+                  >
+                    {semester.name ||
+                      `Semester ${semester.semesterNumber}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-select-wrapper">
+              <select
+                className="filter-select"
+                value={sectionId}
+                disabled={!semesterId}
+                onChange={(e) => {
+                  setSectionId(e.target.value);
+                  setSubjectId('');
+                }}
+              >
+                <option value="">Section</option>
+                {filteredSections.map((section) => (
+                  <option
+                    key={section.id || section._id}
+                    value={section.id || section._id}
+                  >
+                    Section {section.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-select-wrapper">
+              <select
+                className="filter-select"
+                value={periodId}
+                onChange={(e) => setPeriodId(e.target.value)}
+              >
+                <option value="">Period</option>
+                {(Array.isArray(periods) ? periods : []).map((period) => (
+                  <option key={period._id} value={period._id}>
+                    {period.periodName} ({period.startTime} - {period.endTime})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-select-wrapper">
+              <select
+                className="filter-select"
+                value={subjectId}
+                disabled={!sectionId}
+                onChange={(e) => setSubjectId(e.target.value)}
+              >
+                <option value="">Subject</option>
+                {filteredSubjects.map((allocation) => {
+                  const subject = allocation.subjectId;
+                  const value = subject?._id || subject;
+
+                  return (
+                    <option key={allocation._id} value={value}>
+                      {subject?.subjectCode || ''} -{' '}
+                      {subject?.subjectName || 'Subject'}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -641,9 +1004,10 @@ const AttendanceManagement = () => {
                   </tr>
                 ) : (
                   filteredRecords.map((r, idx) => {
-                    const status = markingState[r.id];
+                    const studentKey = r.id || r._id;
+                    const status = markingState[studentKey];
                     return (
-                      <tr key={r.id}>
+                      <tr key={studentKey}>
                         <td className="text-muted">{idx + 1}</td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -679,14 +1043,14 @@ const AttendanceManagement = () => {
                             <button
                               type="button"
                               className={`mark-btn btn-present ${status === 'present' ? 'active' : ''}`}
-                              onClick={() => handleMarkStudent(r.id, 'present')}
+                              onClick={() => handleMarkStudent(studentKey, 'present')}
                             >
                               <Check size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} /> Present
                             </button>
                             <button
                               type="button"
                               className={`mark-btn btn-absent ${status === 'absent' ? 'active' : ''}`}
-                              onClick={() => handleMarkStudent(r.id, 'absent')}
+                              onClick={() => handleMarkStudent(studentKey, 'absent')}
                             >
                               <X size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} /> Absent
                             </button>

@@ -435,14 +435,150 @@
   border: 1px solid #d5dde3;
 }
 
-/* Give the mapping table more page space */
-.structure-grid {
-  grid-template-columns: minmax(0, 1fr) 300px !important;
+/* ===== Academic Setup Top Control Panel ===== */
+
+.academic-structure .structure-grid {
+  display: flex !important;
+  flex-direction: column;
+  gap: 14px;
 }
 
-@media (max-width: 1100px) {
-  .structure-grid {
+.academic-structure .structure-sidebar {
+  order: -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.academic-structure .structure-sidebar > .glass-card {
+  margin: 0 !important;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 4px;
+  box-shadow: none;
+  border: 1px solid #cbd8e2;
+  border-top: 4px solid #3c6f90;
+}
+
+.academic-structure .structure-sidebar > .glass-card:hover {
+  transform: none;
+}
+
+.academic-structure .structure-sidebar > .glass-card:has(form) {
+  grid-column: 1 / -1;
+}
+
+.academic-structure .structure-tree {
+  width: 100%;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.academic-structure .quick-actions button {
+  width: 100%;
+  justify-content: center;
+}
+
+@media (max-width: 1200px) {
+  .academic-structure .structure-sidebar {
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .academic-structure .structure-sidebar {
+    grid-template-columns: 1fr;
+  }
+}
+
+.academic-structure .management-record-list {
+  display: none;
+}
+
+.academic-structure .management-count {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #eef4f8;
+  border-left: 3px solid #3c6f90;
+  border-radius: 3px;
+}
+
+.academic-structure .management-count strong {
+  color: #315f7d;
+  font-size: 22px;
+}
+
+.academic-structure .management-count span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+/* ===== Academic Management Modal Forms ===== */
+
+.academic-structure .course-form {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  z-index: 1200 !important;
+  transform: translate(-50%, -50%) !important;
+
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(220px, 1fr)) !important;
+  gap: 16px !important;
+
+  width: min(720px, calc(100vw - 32px)) !important;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+
+  margin: 0 !important;
+  padding: 24px !important;
+  background: #ffffff !important;
+  border: 1px solid #b8c8d4 !important;
+  border-top: 5px solid #3c6f90 !important;
+  border-radius: 6px !important;
+
+  box-shadow:
+    0 20px 50px rgba(15, 23, 42, 0.3),
+    0 0 0 100vmax rgba(15, 23, 42, 0.55) !important;
+}
+
+.academic-structure .course-form label {
+  display: block;
+  margin-bottom: 6px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.academic-structure .course-form input,
+.academic-structure .course-form select {
+  width: 100% !important;
+  min-height: 42px;
+  padding: 9px 11px;
+  background: #f8fafc;
+  border: 1px solid #bdcad5;
+  border-radius: 4px;
+}
+
+.academic-structure .course-form button[type="submit"] {
+  grid-column: 1 / -1;
+  justify-content: center;
+  min-height: 42px;
+  border-radius: 4px;
+}
+
+@media (max-width: 650px) {
+  .academic-structure .course-form {
     grid-template-columns: 1fr !important;
+  }
+
+  .academic-structure .course-form button[type="submit"] {
+    grid-column: 1;
   }
 }
 

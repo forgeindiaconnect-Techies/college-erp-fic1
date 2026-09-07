@@ -1,0 +1,153 @@
+/* Professional ERP Class Timetable */
+.timetable-page {
+  width: 100%;
+  color: #243447;
+}
+
+.timetable-page h1 {
+  margin: 0 0 4px;
+  color: #243447;
+  font-size: 24px;
+}
+
+.timetable-page h2,
+.timetable-page h3 {
+  color: #243447;
+}
+
+/* Remove oversized rounded dashboard appearance */
+.timetable-page .rounded-xl {
+  border-radius: 4px !important;
+}
+
+.timetable-page .rounded-lg {
+  border-radius: 3px !important;
+}
+
+.timetable-page .shadow-sm {
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Class selection toolbar */
+.timetable-page select {
+  min-height: 36px;
+  padding: 7px 9px !important;
+  color: #243447;
+  background: #ffffff !important;
+  border: 1px solid #bfcbd4 !important;
+  border-radius: 3px !important;
+  font-size: 12px !important;
+}
+
+.timetable-page select:disabled {
+  color: #94a3b8;
+  background: #e8edf1 !important;
+  cursor: not-allowed;
+}
+
+.timetable-page label {
+  color: #526779 !important;
+  font-size: 10px !important;
+  font-weight: 700;
+}
+
+/* Main timetable */
+.timetable-page table {
+  width: 100%;
+  min-width: 1050px;
+  border-collapse: collapse !important;
+  background: #ffffff;
+  border: 1px solid #bfcbd4;
+}
+
+.timetable-page thead th {
+  padding: 10px 8px !important;
+  color: #ffffff !important;
+  background: #416b89 !important;
+  border: 1px solid #365d79 !important;
+  font-size: 11px !important;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.timetable-page tbody td {
+  min-width: 135px;
+  height: 76px;
+  padding: 6px !important;
+  color: #34495e;
+  background: #ffffff;
+  border: 1px solid #cfd8df !important;
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+.timetable-page tbody tr:nth-child(even) td {
+  background: #f5f7f9;
+}
+
+/* Period column */
+.timetable-page tbody td:first-child {
+  min-width: 115px;
+  color: #315873;
+  background: #e5edf2 !important;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Empty timetable slot */
+.timetable-page button[class*="border-dashed"] {
+  width: 100%;
+  min-height: 58px;
+  color: #65788a !important;
+  background: #f8fafb !important;
+  border: 1px dashed #9eb2c1 !important;
+  border-radius: 3px !important;
+  font-size: 11px !important;
+}
+
+.timetable-page button[class*="border-dashed"]:hover {
+  color: #ffffff !important;
+  background: #567d98 !important;
+  border-color: #416b89 !important;
+}
+
+/* Scheduled subject cell */
+.timetable-page td .group {
+  border-radius: 3px !important;
+  box-shadow: none !important;
+}
+
+.timetable-page td h4 {
+  font-size: 12px !important;
+}
+
+/* Add Class Slot button */
+.timetable-page button {
+  border-radius: 3px !important;
+}
+
+/* Popup inputs */
+.timetable-page input {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid #bfcbd4;
+  border-radius: 3px;
+}
+
+/* Horizontal scroll on smaller screens */
+.timetable-page .overflow-x-auto {
+  border: 1px solid #bfcbd4;
+  border-radius: 3px;
+}
+
+@media (max-width: 900px) {
+  .timetable-page {
+    overflow-x: hidden;
+  }
+
+  .timetable-page table {
+    min-width: 950px;
+  }
+}

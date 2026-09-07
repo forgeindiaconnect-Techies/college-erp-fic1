@@ -12,7 +12,7 @@ import '../../components/layout/Sidebar.css';
 const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const [expandedGroups, setExpandedGroups] = useState({});
-  const { collegeSettings } = useContext(SettingsContext);
+  const { collegeSettings } = useContext(SettingsContext) || {};
 
   const toggleGroup = (groupName) => {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
@@ -46,6 +46,11 @@ const Sidebar = ({ isOpen, onClose }) => {
           name: 'Student to Section',
           path: '/admin/student-section-allocation',
           icon: <Users size={20} />
+        },
+        {
+          name: 'Faculty to Subject',
+          path: '/admin/faculty-allocation',
+          icon: <GraduationCap size={20} />
         },
         { name: 'Subjects', path: '/admin/subjects', icon: <BookOpen size={20} /> },
         { name: 'Class Timetable', path: '/admin/timetable', icon: <Calendar size={20} /> },

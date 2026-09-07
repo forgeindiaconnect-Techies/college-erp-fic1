@@ -7,6 +7,15 @@ const attendanceSchema = new mongoose.Schema({
   registerNo: { type: String },
   department: { type: String },
   semester: { type: String },
+
+  // Real academic structure mapping
+  departmentId: { type: String, default: null },
+  courseId: { type: String, default: null },
+  semesterId: { type: String, default: null },
+  sectionId: { type: String, default: null },
+  section: { type: String, default: null },
+  academicYearId: { type: String, default: null },
+  timetableId: { type: String, default: null },
   attendanceDate: { type: Date, required: true },
   periodId: { type: String },
   status: { type: String, enum: ['Present', 'Absent', 'On Leave', 'Medical Leave', 'Leave'], required: true },

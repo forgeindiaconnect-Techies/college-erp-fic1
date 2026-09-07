@@ -70,6 +70,15 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), r
         });
         await staffUser.save();
       } else {
+        existingUser.name = newStaff.name;
+        existingUser.role =
+          newStaff.designation === 'HOD' ? 'HOD' : 'Staff';
+        existingUser.department = newStaff.dept;
+        existingUser.referenceId = newStaff.id;
+        existingUser.tenantId = collegeId;
+        existingUser.collegeId = collegeId;
+
+        await existingUser.save();
         staffUser = existingUser;
       }
     } catch (userErr) {

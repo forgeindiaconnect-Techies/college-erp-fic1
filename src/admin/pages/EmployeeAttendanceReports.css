@@ -146,3 +146,236 @@
 .emp-badge-danger { background: #fee2e2; color: #dc2626; }
 .emp-badge-warning { background: #fef9c3; color: #ca8a04; }
 .emp-badge-secondary { background: #f3f4f6; color: #4b5563; }
+
+.staff-rollcall-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: #eef4f8;
+  border: 1px solid #cbd9e3;
+  border-left: 4px solid #386f91;
+  border-radius: 4px;
+}
+
+.staff-rollcall-toolbar span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.staff-rollcall-actions,
+.staff-mark-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.staff-mark-actions {
+  flex-wrap: wrap;
+}
+
+.staff-status-btn {
+  padding: 6px 9px;
+  background: #fff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.staff-status-btn.status-present.active {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.staff-status-btn.status-absent.active,
+.staff-status-btn.status-lop.active {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+.staff-status-btn.status-late.active {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #fff;
+}
+
+.staff-status-btn.status-leave.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.staff-attendance-success {
+  padding: 11px 14px;
+  margin-bottom: 12px;
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .staff-rollcall-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .staff-rollcall-actions {
+    flex-wrap: wrap;
+  }
+}
+
+/* ===== Professional ERP Staff Attendance ===== */
+
+.employee-reports-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 24px;
+}
+
+.employee-reports-container .reports-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(90deg, #315f7d, #477c9d);
+  border-radius: 4px;
+  color: #fff;
+}
+
+.employee-reports-container .reports-header h1 {
+  margin: 0;
+  color: #fff;
+  font-size: 22px;
+}
+
+.employee-reports-container .reports-header p {
+  margin: 4px 0 0;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.employee-reports-container .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.employee-reports-container .header-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 7px 12px;
+  border-radius: 3px;
+}
+
+.employee-reports-container .filters-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 12px;
+  padding: 14px;
+  background: #eef3f7;
+  border: 1px solid #cad7e1;
+  border-radius: 4px;
+}
+
+.employee-reports-container .filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.employee-reports-container .search-box,
+.employee-reports-container .filter-select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 10px;
+  background: #fff;
+  border: 1px solid #b9c8d4;
+  border-radius: 3px;
+}
+
+.employee-reports-container input,
+.employee-reports-container select {
+  min-height: 36px;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 13px;
+}
+
+.employee-reports-container .reports-table-card {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #cad7e1;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.employee-reports-container .reports-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.employee-reports-container .reports-table th {
+  padding: 10px 12px;
+  background: #3c6f90;
+  color: #fff;
+  border: 1px solid #527f9c;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.employee-reports-container .reports-table td {
+  padding: 10px 12px;
+  border: 1px solid #d7e0e7;
+  font-size: 13px;
+}
+
+.employee-reports-container .reports-table tbody tr:nth-child(even) td {
+  background: #f5f8fa;
+}
+
+.employee-reports-container .reports-table tbody tr:hover td {
+  background: #eaf2f7;
+}
+
+.employee-reports-container .role-tag,
+.employee-reports-container .emp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.employee-reports-container .glass-card:hover {
+  transform: none;
+}
+
+@media (max-width: 1000px) {
+  .employee-reports-container .reports-header,
+  .employee-reports-container .filters-row {
+    align-items: flex-start;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .employee-reports-container .filter-group,
+  .employee-reports-container .header-actions {
+    flex-wrap: wrap;
+  }
+}

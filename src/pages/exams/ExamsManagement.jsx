@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, X, Calendar, Clock, MapPin, ClipboardList, BookOpen, AlertTriangle } from 'lucide-react';
-import { getDepartments, getExams, createExam, updateExam, deleteExam } from '../../api/index';
+import {
+  getDepartments,
+  getCourses,
+  getSemesters,
+  getSections,
+  getAcademicYears,
+  getRegulations,
+  getSubjects,
+  getStaff,
+  getExams,
+  createExam,
+  updateExam,
+  deleteExam
+} from '../../api/index';
 import './ExamsManagement.css';
 
 const DEPARTMENTS = [
@@ -55,6 +68,13 @@ const EXAM_TYPES = [
 const ExamsManagement = () => {
   const [exams, setExams] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [semesters, setSemesters] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [academicYears, setAcademicYears] = useState([]);
+  const [regulations, setRegulations] = useState([]);
+  const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
@@ -62,7 +82,30 @@ const ExamsManagement = () => {
   // Modal states
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [form, setForm] = useState({ name: 'Internal Assessment 1 (IA-1)', dept: 'Computer Science Engineering', sem: 'Sem 3', subject: '', date: '', time: '10:00 AM - 12:00 PM', room: '', maxMarks: 100 });
+  const [form, setForm] = useState({
+    name: '',
+    examType: 'Internal',
+    academicYearId: '',
+    regulationId: '',
+    departmentId: '',
+    dept: '',
+    courseId: '',
+    semesterId: '',
+    sem: '',
+    sectionId: '',
+    section: '',
+    subjectId: '',
+    subject: '',
+    date: '',
+    startTime: '10:00',
+    endTime: '12:00',
+    hallName: '',
+    hallCapacity: 60,
+    invigilatorId: '',
+    maxMarks: 100,
+    passMarks: 40,
+    status: 'Scheduled'
+  });
 
   useEffect(() => {
     fetchData();
@@ -88,24 +131,106 @@ const ExamsManagement = () => {
   };
 
   const openAdd = () => {
-    const deptSubs = subjects.filter(s => s.dept === form.dept);
-    setForm({ 
-      name: 'Internal Assessment 1 (IA-1)', 
-      dept: 'Computer Science Engineering', 
-      sem: 'Sem 3',
-      subject: deptSubs[0]?.name || 'Core Curriculum', 
-      date: new Date(Date.now() + 5*24*60*60*1000).toISOString().split('T')[0], 
-      time: '10:00 AM - 12:00 PM', 
-      room: 'Main Seminar Hall', 
-      maxMarks: 100 
+    const activeYear =
+      academicYears.find(year => year.isActive) ||
+      academicYears[0];
+
+    setForm({
+      name: '',
+      examType: 'Internal',
+
+      academicYearId:
+        activeYear?._id || activeYear?.id || '',
+
+      regulationId:
+        regulations[0]?._id || regulations[0]?.id || '',
+
+      departmentId: '',
+      dept: '',
+
+      courseId: '',
+
+      semesterId: '',
+      sem: '',
+
+      sectionId: '',
+      section: '',
+
+      subjectId: '',
+      subject: '',
+
+      date: '',
+      startTime: '10:00',
+      endTime: '12:00',
+
+      hallName: '',
+      hallCapacity: 60,
+
+      invigilatorId: '',
+
+      maxMarks: 100,
+      passMarks: 40,
+      status: 'Scheduled'
     });
+
     setEditTarget(null);
     setModalOpen(true);
   };
 
-  const openEdit = (ex) => {
-    setForm({ name: ex.name, dept: ex.dept, sem: ex.sem || 'Sem 3', subject: ex.subject, date: ex.date, time: ex.time, room: ex.room, maxMarks: ex.maxMarks });
-    setEditTarget(ex._id || ex.id);
+  const openEdit = exam => {
+    setForm({
+      name: exam.name || '',
+      examType: exam.examType || 'Internal',
+
+      academicYearId:
+        exam.academicYearId?._id ||
+        exam.academicYearId ||
+        '',
+
+      regulationId:
+        exam.regulationId?._id ||
+        exam.regulationId ||
+        '',
+
+      departmentId: exam.departmentId || '',
+      dept: exam.dept || '',
+
+      courseId: exam.courseId || '',
+
+      semesterId: exam.semesterId || '',
+      sem: exam.sem || '',
+
+      sectionId: exam.sectionId || '',
+      section: exam.section || '',
+
+      subjectId:
+        exam.subjectId?._id ||
+        exam.subjectId ||
+        '',
+
+      subject:
+        exam.subjectId?.subjectName ||
+        exam.subject ||
+        '',
+
+      date: exam.date || '',
+      startTime: exam.startTime || exam.time || '',
+      endTime: exam.endTime || '',
+
+      hallName: exam.hallName || exam.room || '',
+      hallCapacity: exam.hallCapacity || 60,
+
+      invigilatorId:
+        exam.invigilatorId?._id ||
+        exam.invigilatorId ||
+        '',
+
+      maxMarks: exam.maxMarks || 100,
+      passMarks: exam.passMarks || 40,
+      status: exam.status || 'Scheduled'
+    });
+
+    setEditTarget(exam._id || exam.id);
     setModalOpen(true);
   };
 
@@ -114,23 +239,91 @@ const ExamsManagement = () => {
     setEditTarget(null);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async event => {
+    event.preventDefault();
+
+    const selectedCourse = courses.find(
+      course =>
+        String(course.id || course._id) ===
+        String(form.courseId)
+    );
+
+    const selectedSection = sections.find(
+      section =>
+        String(section.id || section._id) ===
+        String(form.sectionId)
+    );
+
+    const selectedSubject = subjects.find(
+      subject =>
+        String(subject._id || subject.id) ===
+        String(form.subjectId)
+    );
+
+    if (
+      !form.name ||
+      !form.academicYearId ||
+      !form.departmentId ||
+      !form.courseId ||
+      !form.semesterId ||
+      !form.sectionId ||
+      !form.subjectId ||
+      !form.date ||
+      !form.startTime ||
+      !form.endTime ||
+      !form.hallName ||
+      !form.invigilatorId
+    ) {
+      alert('Please complete all required exam schedule fields.');
+      return;
+    }
+
     const payload = {
       ...form,
-      maxMarks: Number(form.maxMarks)
+
+      dept: selectedDepartment?.name || form.dept,
+      courseName: selectedCourse?.name || '',
+
+      sem:
+        selectedSemester?.name ||
+        `Semester ${selectedSemester?.semesterNumber || ''}`,
+
+      section:
+        selectedSection?.name || form.section,
+
+      subject:
+        selectedSubject?.subjectName ||
+        selectedSubject?.name ||
+        form.subject,
+
+      time: form.startTime,
+      room: form.hallName,
+
+      maxMarks: Number(form.maxMarks),
+      passMarks: Number(form.passMarks),
+      hallCapacity: Number(form.hallCapacity)
     };
+
     try {
       if (editTarget) {
         await updateExam(editTarget, payload);
       } else {
         await createExam(payload);
       }
-      fetchData();
-    } catch (err) {
-      console.error('Error saving exam schedule in Admin console:', err);
+
+      await fetchData();
+      closeModal();
+      alert(
+        editTarget
+          ? 'Exam schedule updated successfully.'
+          : 'Exam scheduled successfully.'
+      );
+    } catch (error) {
+      alert(
+        error?.response?.data?.message ||
+        'Unable to save the exam schedule.'
+      );
     }
-    closeModal();
   };
 
   const handleDelete = async (id) => {
@@ -173,6 +366,75 @@ const ExamsManagement = () => {
     const matchesDept = deptFilter === 'All' || exDept === deptFilter;
     return matchesSearch && matchesDept;
   });
+
+  const selectedDepartment = departments.find(
+    department =>
+      String(department.id || department._id) ===
+      String(form.departmentId)
+  );
+
+  const selectedSemester = semesters.find(
+    semester =>
+      String(semester.id || semester._id) ===
+      String(form.semesterId)
+  );
+
+  const examCourses = courses.filter(
+    course =>
+      String(course.departmentId) ===
+      String(form.departmentId)
+  );
+
+  const examSemesters = semesters.filter(
+    semester =>
+      String(semester.courseId) ===
+      String(form.courseId)
+  );
+
+  const examSections = sections.filter(
+    section =>
+      String(section.semesterId) ===
+        String(form.semesterId) &&
+      section.status !== 'Inactive'
+  );
+
+  const examSubjects = subjects.filter(subject => {
+    const departmentMatches =
+      String(subject.departmentId) ===
+        String(form.departmentId) ||
+      subject.department === selectedDepartment?.name;
+
+    const semesterMatches =
+      String(subject.semesterId) ===
+        String(form.semesterId) ||
+      subject.semester === selectedSemester?.name ||
+      subject.semester ===
+        `Semester ${selectedSemester?.semesterNumber}`;
+
+    const sectionMatches =
+      !Array.isArray(subject.sectionIds) ||
+      subject.sectionIds.length === 0 ||
+      subject.sectionIds.some(
+        sectionId =>
+          String(sectionId) === String(form.sectionId)
+      );
+
+    return (
+      departmentMatches &&
+      semesterMatches &&
+      sectionMatches
+    );
+  });
+
+  const examInvigilators = staff.filter(
+    member =>
+      member.status !== 'Inactive' &&
+      (
+        member.dept === selectedDepartment?.name ||
+        member.department === selectedDepartment?.name ||
+        member.deptCode === selectedDepartment?.code
+      )
+  );
 
   return (
     <div className="exams-management animate-fade-in">

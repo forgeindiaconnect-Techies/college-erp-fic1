@@ -7,6 +7,7 @@ import {
   updateSubject,
   deleteSubject,
   getRegulations,
+  getAcademicYears,
   getDepartments,
   getCourses,
   getSemesters,
@@ -39,6 +40,7 @@ const SubjectsManagement = () => {
   const [subjects, setSubjects] = useState([]);
   const [staff, setStaff] = useState([]);
   const [regulations, setRegulations] = useState([]);
+  const [academicYears, setAcademicYears] = useState([]);
   const [dbDepartments, setDbDepartments] = useState([]);
   const [courses, setCourses] = useState([]);
   const [semesters, setSemesters] = useState([]);
@@ -78,6 +80,12 @@ const SubjectsManagement = () => {
       const regRes = await getRegulations().catch(() => ({ data: [] }));
       setRegulations(regRes.data || []);
 
+      const yearRes = await getAcademicYears().catch(() => ({
+        data: []
+      }));
+
+      setAcademicYears(yearRes.data || []);
+
       const deptsRes = await getDepartments().catch(() => ({ data: [] }));
       setDbDepartments(deptsRes.data || []);
 
@@ -100,6 +108,7 @@ const SubjectsManagement = () => {
       const subRes = await getSubjects().catch(() => ({ data: [] }));
       const formattedSubs = subRes.data.map(s => ({
         id: s._id,
+        academicYearId: s.academicYearId,
         regulationId: s.regulationId,
         departmentId: s.departmentId || "",
         courseId: s.courseId || "",
@@ -124,6 +133,7 @@ const SubjectsManagement = () => {
 
   const openAdd = () => {
     setForm({
+      academicYearId: academicYears[0]?._id || "",
       regulationId: regulations[0]?._id || "",
       code: "",
       name: "",
@@ -144,6 +154,10 @@ const SubjectsManagement = () => {
 
   const openEdit = (sub) => {
     setForm({
+      academicYearId:
+        sub.academicYearId?._id ||
+        sub.academicYearId ||
+        '',
       regulationId:
         sub.regulationId?._id ||
         sub.regulationId ||
@@ -173,6 +187,7 @@ const SubjectsManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = {
+      academicYearId: form.academicYearId || null,
       regulationId: form.regulationId || null,
       departmentId: form.departmentId,
       courseId: form.courseId,
@@ -370,6 +385,33 @@ const SubjectsManagement = () => {
                 <div className="form-group">
                   <label><BookOpen size={13} style={{ display: 'inline', marginRight: '4px' }} /> Subject Name *</label>
                   <input required placeholder="e.g. Data Structures" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                </div>
+
+                <div className="form-group">
+                  <label>Academic Year *</label>
+
+                  <select
+                    value={form.academicYearId || ''}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        academicYearId: event.target.value
+                      })
+                    }
+                    required
+                  >
+                    <option value="">— Select Academic Year —</option>
+
+                    {(Array.isArray(academicYears) ? academicYears : []).map((year) => (
+                      <option
+                        key={year._id || year.id}
+                        value={year._id || year.id}
+                      >
+                        {year.year}
+                        {year.isActive ? ' (Active)' : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="form-group">

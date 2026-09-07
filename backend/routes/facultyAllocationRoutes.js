@@ -66,7 +66,7 @@ router.get('/my-allocations', protect, async (req, res) => {
 // Create an allocation
 router.post('/', protect, authorize('SuperAdmin', 'CollegeAdmin', 'Admin', 'HOD'), collegeScope, async (req, res) => {
   try {
-    const { department, semester, section, subjectId, staffId, academicYearId, regulationId, isActive } = req.body;
+    const { department, semester, section, subjectId, staffId, academicYearId, regulationId, isActive, departmentId, courseId, semesterId, sectionId } = req.body;
     
     // Check if subject/section is already assigned
     const existing = await FacultyAllocation.findOne({
@@ -86,12 +86,16 @@ router.post('/', protect, authorize('SuperAdmin', 'CollegeAdmin', 'Admin', 'HOD'
       department,
       semester,
       section,
+      departmentId: departmentId || null,
+      courseId: courseId || null,
+      semesterId: semesterId || null,
+      sectionId: sectionId || null,
       subjectId,
       staffId,
-      academicYearId,
-      regulationId,
+      academicYearId: academicYearId || null,
+      regulationId: regulationId || null,
       isActive,
-      assignedBy: req.user.name
+      assignedBy: req.user?.name || 'Admin'
     });
 
     const populated = await FacultyAllocation.findById(allocation._id)
