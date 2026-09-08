@@ -554,7 +554,8 @@ export const adminCheckoutStaff = (employeeId, date) =>
   api.put(`/employee-attendance/admin/checkout/${employeeId}`, {
     date
   });
-export const getEmployeeAttendanceStats = () => api.get('/employee-attendance/stats');
+export const getEmployeeAttendanceStats = (params = {}) =>
+  api.get('/employee-attendance/stats', { params });
 
 // Daily Class Execution Monitoring
 export const getClassMonitoringDailyStatus = (department) => api.get('/class-monitoring/daily-status', { params: { department } });

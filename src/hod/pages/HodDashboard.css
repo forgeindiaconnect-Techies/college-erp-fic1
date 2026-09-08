@@ -153,3 +153,60 @@
 .font-semibold { font-weight: 600; }
 .no-data { text-align: center; color: var(--text-muted); padding: 1.25rem 1.5rem; font-size: 0.85rem; }
 .timetable-min-list { max-height: 250px; overflow-y: auto; }
+
+/* Real-time HOD ERP summary */
+.hod-realtime-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.hod-summary-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 5px 10px;
+  padding: 14px 16px;
+  text-align: left;
+  background: #fff;
+  color: #315f7d;
+  border: 1px solid #cbd8e2;
+  border-top: 4px solid #3c6f90;
+  border-radius: 5px;
+  box-shadow: 0 2px 6px rgba(30, 64, 90, 0.06);
+  transition: 0.2s ease;
+}
+
+.hod-summary-card:hover {
+  transform: translateY(-2px);
+  border-color: #3c6f90;
+  box-shadow: 0 6px 14px rgba(30, 64, 90, 0.13);
+}
+
+.hod-summary-card svg {
+  grid-row: 1 / 3;
+}
+
+.hod-summary-card span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hod-summary-card strong {
+  color: #0f2940;
+  font-size: 22px;
+}
+
+@media (max-width: 1100px) {
+  .hod-realtime-summary {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .hod-realtime-summary {
+    grid-template-columns: 1fr;
+  }
+}

@@ -87,8 +87,8 @@ tr:hover td { background: rgba(79,70,229,0.035); }
 
 /* ── Status Badges ── */
 .status-badge   { padding: 0.2rem 0.65rem; border-radius: 20px; font-size: 0.73rem; font-weight: 600; }
-.status-active  { background: rgba(16,185,129,0.1);  color: var(--success); }
-.status-inactive{ background: rgba(239,68,68,0.1);   color: var(--danger);  }
+.status-active  { background: rgba(16,185,129,0.15);  color: #059669; border: 1px solid rgba(16,185,129,0.3); }
+.status-inactive{ background: rgba(239,68,68,0.15);   color: #dc2626; border: 1px solid rgba(239,68,68,0.3); }
 
 /* ── Avatar ── */
 .av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem; color: white; flex-shrink: 0; }

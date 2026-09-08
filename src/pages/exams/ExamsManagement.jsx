@@ -112,19 +112,66 @@ const ExamsManagement = () => {
   }, []);
 
   const fetchData = async () => {
-    setLoading(true);
-    // Fetch subjects from localStorage
-    const savedSubs = localStorage.getItem(`erp_subjects_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
-    const subsList = savedSubs ? JSON.parse(savedSubs) : [];
-    setSubjects(subsList);
-
     try {
-      const res = await getExams();
-      if (res?.data) {
-        setExams(res.data);
-      }
-    } catch (err) {
-      console.warn('API error fetching exams in ExamsManagement:', err);
+      setLoading(true);
+
+      const safeRequest = request =>
+        request.catch(() => ({ data: [] }));
+
+      const [
+        examResponse,
+        departmentResponse,
+        courseResponse,
+        semesterResponse,
+        sectionResponse,
+        yearResponse,
+        regulationResponse,
+        subjectResponse,
+        staffResponse
+      ] = await Promise.all([
+        safeRequest(getExams()),
+        safeRequest(getDepartments()),
+        safeRequest(getCourses()),
+        safeRequest(getSemesters()),
+        safeRequest(getSections()),
+        safeRequest(getAcademicYears()),
+        safeRequest(getRegulations()),
+        safeRequest(getSubjects()),
+        safeRequest(getStaff())
+      ]);
+
+      const getArray = (response, key) => {
+        const data = response?.data;
+
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.[key])) return data[key];
+        if (Array.isArray(data?.data)) return data.data;
+
+        return [];
+      };
+
+      setExams(getArray(examResponse, 'exams'));
+      setDepartments(
+        getArray(departmentResponse, 'departments')
+      );
+      setCourses(getArray(courseResponse, 'courses'));
+      setSemesters(
+        getArray(semesterResponse, 'semesters')
+      );
+      setSections(getArray(sectionResponse, 'sections'));
+      setAcademicYears(
+        getArray(yearResponse, 'academicYears')
+      );
+      setRegulations(
+        getArray(regulationResponse, 'regulations')
+      );
+      setSubjects(getArray(subjectResponse, 'subjects'));
+      setStaff(getArray(staffResponse, 'staff'));
+    } catch (error) {
+      console.error(
+        'Unable to load exam management data:',
+        error
+      );
     } finally {
       setLoading(false);
     }
@@ -579,44 +626,273 @@ const ExamsManagement = () => {
             <form onSubmit={handleSubmit} className="modal-form">
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Exam Category *</label>
-                  <select value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}>
-                    {EXAM_TYPES.map(group => (
-                      <optgroup key={group.category} label={group.category}>
-                        {group.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </optgroup>
+                  <label>Exam Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Internal Assessment 1"
+                    value={form.name}
+                    onChange={event =>
+                      setForm({ ...form, name: event.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Exam Type *</label>
+                  <select
+                    value={form.examType}
+                    onChange={event =>
+                      setForm({ ...form, examType: event.target.value })
+                    }
+                  >
+                    <option value="Internal">Internal</option>
+                    <option value="Model">Model</option>
+                    <option value="Practical">Practical</option>
+                    <option value="Semester">Semester</option>
+                    <option value="Supplementary">Supplementary</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Academic Year *</label>
+                  <select
+                    required
+                    value={form.academicYearId}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        academicYearId: event.target.value
+                      })
+                    }
+                  >
+                    <option value="">Select Academic Year</option>
+
+                    {academicYears.map(year => (
+                      <option
+                        key={year._id || year.id}
+                        value={year._id || year.id}
+                      >
+                        {year.year}
+                        {year.isActive ? ' (Active)' : ''}
+                      </option>
                     ))}
                   </select>
                 </div>
-                
+
                 <div className="form-group">
-                  <label>Department Scope *</label>
-                  <select value={form.dept} onChange={e => {
-                    const nextDept = e.target.value;
-                    const nextSubs = getDeptSubjects(nextDept);
-                    setForm({ ...form, dept: nextDept, subject: nextSubs[0]?.name || 'Core Curriculum' });
-                  }}>
-                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                  <label>Regulation</label>
+                  <select
+                    value={form.regulationId}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        regulationId: event.target.value
+                      })
+                    }
+                  >
+                    <option value="">Default Regulation</option>
+
+                    {regulations.map(regulation => (
+                      <option
+                        key={regulation._id || regulation.id}
+                        value={regulation._id || regulation.id}
+                      >
+                        {regulation.regulationName || regulation.code || regulation.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Department *</label>
+                  <select
+                    required
+                    value={form.departmentId}
+                    onChange={event => {
+                      const departmentId = event.target.value;
+
+                      const department = departments.find(
+                        item =>
+                          String(item.id || item._id) ===
+                          String(departmentId)
+                      );
+
+                      setForm({
+                        ...form,
+                        departmentId,
+                        dept: department?.name || '',
+                        courseId: '',
+                        semesterId: '',
+                        sem: '',
+                        sectionId: '',
+                        section: '',
+                        subjectId: '',
+                        subject: '',
+                        invigilatorId: ''
+                      });
+                    }}
+                  >
+                    <option value="">Select Department</option>
+
+                    {departments.map(department => (
+                      <option
+                        key={department.id || department._id}
+                        value={department.id || department._id}
+                      >
+                        {department.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Course *</label>
+                  <select
+                    required
+                    disabled={!form.departmentId}
+                    value={form.courseId}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        courseId: event.target.value,
+                        semesterId: '',
+                        sem: '',
+                        sectionId: '',
+                        section: '',
+                        subjectId: '',
+                        subject: ''
+                      })
+                    }
+                  >
+                    <option value="">Select Course</option>
+
+                    {examCourses.map(course => (
+                      <option
+                        key={course.id || course._id}
+                        value={course.id || course._id}
+                      >
+                        {course.name} ({course.code})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <div className="form-group">
                   <label>Semester *</label>
-                  <select value={form.sem} onChange={e => setForm({ ...form, sem: e.target.value })}>
-                    {SEMS.map(s => <option key={s} value={s}>{s}</option>)}
+                  <select
+                    required
+                    disabled={!form.courseId}
+                    value={form.semesterId}
+                    onChange={event => {
+                      const semesterId = event.target.value;
+
+                      const semester = semesters.find(
+                        item =>
+                          String(item.id || item._id) ===
+                          String(semesterId)
+                      );
+
+                      setForm({
+                        ...form,
+                        semesterId,
+                        sem:
+                          semester?.name ||
+                          `Semester ${semester?.semesterNumber || ''}`,
+                        sectionId: '',
+                        section: '',
+                        subjectId: '',
+                        subject: ''
+                      });
+                    }}
+                  >
+                    <option value="">Select Semester</option>
+
+                    {examSemesters.map(semester => (
+                      <option
+                        key={semester.id || semester._id}
+                        value={semester.id || semester._id}
+                      >
+                        {semester.name ||
+                          `Semester ${semester.semesterNumber}`}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label>Mapped Subject *</label>
-                  <select value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })}>
-                    {getDeptSubjects(form.dept).length === 0 ? (
-                      <option value="Core Curriculum">Core Curriculum (No subjects mapped)</option>
-                    ) : (
-                      getDeptSubjects(form.dept).map(s => (
-                        <option key={s.id} value={s.name}>{s.name} ({s.code})</option>
-                      ))
-                    )}
+                  <label>Section *</label>
+                  <select
+                    required
+                    disabled={!form.semesterId}
+                    value={form.sectionId}
+                    onChange={event => {
+                      const sectionId = event.target.value;
+
+                      const section = sections.find(
+                        item =>
+                          String(item.id || item._id) ===
+                          String(sectionId)
+                      );
+
+                      setForm({
+                        ...form,
+                        sectionId,
+                        section: section?.name || '',
+                        subjectId: '',
+                        subject: ''
+                      });
+                    }}
+                  >
+                    <option value="">Select Section</option>
+
+                    {examSections.map(section => (
+                      <option
+                        key={section.id || section._id}
+                        value={section.id || section._id}
+                      >
+                        Section {section.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Subject *</label>
+                  <select
+                    required
+                    disabled={!form.sectionId}
+                    value={form.subjectId}
+                    onChange={event => {
+                      const subjectId = event.target.value;
+
+                      const subject = subjects.find(
+                        item =>
+                          String(item._id || item.id) ===
+                          String(subjectId)
+                      );
+
+                      setForm({
+                        ...form,
+                        subjectId,
+                        subject:
+                          subject?.subjectName ||
+                          subject?.name ||
+                          ''
+                      });
+                    }}
+                  >
+                    <option value="">Select Subject</option>
+
+                    {examSubjects.map(subject => (
+                      <option
+                        key={subject._id || subject.id}
+                        value={subject._id || subject.id}
+                      >
+                        {subject.subjectCode || subject.code} —{' '}
+                        {subject.subjectName || subject.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -626,24 +902,139 @@ const ExamsManagement = () => {
                 </div>
 
                 <div className="form-group">
-                  <label><Clock size={13} style={{ display: 'inline', marginRight: '4px' }} /> Time Window *</label>
-                  <input required placeholder="e.g. 10:00 AM - 01:00 PM" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} />
+                  <label>Start Time *</label>
+                  <input
+                    type="time"
+                    required
+                    value={form.startTime}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        startTime: event.target.value
+                      })
+                    }
+                  />
                 </div>
 
                 <div className="form-group">
-                  <label><MapPin size={13} style={{ display: 'inline', marginRight: '4px' }} /> Venue Hall *</label>
-                  <input required placeholder="e.g. Exam Hall B" value={form.room} onChange={e => setForm({ ...form, room: e.target.value })} />
+                  <label>End Time *</label>
+                  <input
+                    type="time"
+                    required
+                    value={form.endTime}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        endTime: event.target.value
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Exam Hall *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Main Exam Hall"
+                    value={form.hallName}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        hallName: event.target.value
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Hall Capacity *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={form.hallCapacity}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        hallCapacity: event.target.value
+                      })
+                    }
+                  />
                 </div>
 
                 <div className="form-group">
                   <label><ClipboardList size={13} style={{ display: 'inline', marginRight: '4px' }} /> Maximum Marks</label>
                   <input type="number" min="10" max="100" value={form.maxMarks} onChange={e => setForm({ ...form, maxMarks: e.target.value })} />
                 </div>
+
+                <div className="form-group">
+                  <label>Invigilator *</label>
+                  <select
+                    required
+                    disabled={!form.departmentId}
+                    value={form.invigilatorId}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        invigilatorId: event.target.value
+                      })
+                    }
+                  >
+                    <option value="">Select Invigilator</option>
+
+                    {examInvigilators.map(member => (
+                      <option
+                        key={member._id}
+                        value={member._id}
+                      >
+                        {member.name} — {member.designation || 'Faculty'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Pass Marks *</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    max={form.maxMarks}
+                    value={form.passMarks}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        passMarks: event.target.value
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Schedule Status *</label>
+                  <select
+                    value={form.status}
+                    onChange={event =>
+                      setForm({
+                        ...form,
+                        status: event.target.value
+                      })
+                    }
+                  >
+                    <option value="Draft">Draft</option>
+                    <option value="Scheduled">Scheduled</option>
+                    <option value="Ongoing">Ongoing</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Published">Published</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                </div>
               </div>
               
               <div className="modal-actions">
                 <button type="button" className="btn-ghost" onClick={closeModal}>Cancel</button>
-                <button type="submit" className="btn-primary">{editTarget ? 'Save Changes' : 'Publish Slot'}</button>
+                <button type="submit" className="btn-primary">{editTarget ? 'Update Exam' : 'Schedule Exam'}</button>
               </div>
             </form>
           </div>

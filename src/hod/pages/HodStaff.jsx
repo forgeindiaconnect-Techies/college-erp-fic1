@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Edit2, Mail, Phone, X, BookOpen, Clock, CheckCircle, Plus } from 'lucide-react';
-import { getStaff, updateStaff, createStaff, getEmployeeAttendanceStats } from '../../api/index';
+import {
+  getStaff,
+  updateStaff,
+  createStaff,
+  getEmployeeAttendanceStats,
+  getFacultyAllocations
+} from '../../api/index';
 import { io } from 'socket.io-client';
 import { getBackendURL } from '../../utils/backendUrl';
 import './HodStaff.css';
@@ -42,7 +48,10 @@ const HodStaff = () => {
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState([]);
   const [search, setSearch] = useState('');
-  
+  const [selectedMonth, setSelectedMonth] = useState(
+    new Date().toISOString().slice(0, 7)
+  );
+
   /* Edit Modal state */
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -51,20 +60,21 @@ const HodStaff = () => {
 
   useEffect(() => {
     fetchStaff();
-    
+
     const socket = io(getBackendURL());
     socket.on('staffUpdated', () => {
       fetchStaff();
     });
-    
+
     return () => socket.disconnect();
-  }, []);
+  }, [selectedMonth]);
 
   const fetchStaff = async () => {
     try {
       const [resStaff, resAttStats] = await Promise.all([
         getStaff().catch(() => ({ data: [] })),
-        getEmployeeAttendanceStats().catch(() => ({ data: {} }))
+        getEmployeeAttendanceStats({ month: selectedMonth })
+          .catch(() => ({ data: {} }))
       ]);
 
       const backendData = resStaff.data || [];
@@ -73,7 +83,12 @@ const HodStaff = () => {
       const processed = backendData
         .filter(s => s.dept === HOD_DEPT || s.department === HOD_DEPT)
         .map(s => {
-          const matchedKey = Object.keys(attStats).find(k => k === s._id || k === s.id);
+          const matchedKey = Object.keys(attStats).find(
+            k =>
+              k === s._id ||
+              k === s.id ||
+              k.toLowerCase() === s.email?.toLowerCase()
+          );
           const stat = matchedKey ? attStats[matchedKey] : null;
           let calculatedAtt = 0;
           if (stat && stat.total > 0) {
@@ -81,7 +96,13 @@ const HodStaff = () => {
           }
           return {
             ...s,
-            attendance: calculatedAtt
+            attendance: calculatedAtt,
+            totalDays: stat?.total || 0,
+            presentDays: stat?.present || 0,
+            absentDays: stat?.absent || 0,
+            lateDays: stat?.late || 0,
+            leaveDays: stat?.leave || 0,
+            lopDays: stat?.lop || 0
           };
         });
 
@@ -177,9 +198,25 @@ const HodStaff = () => {
           <h1>Department Faculty</h1>
           <p className="text-muted">Manage subjects assignment and workloads for faculty in <strong>{HOD_DEPT}</strong>.</p>
         </div>
-        <button className="btn-primary shadow-glow flex items-center gap-2" onClick={openAdd}>
-          <Plus size={18} /> Add Faculty
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="filter-select-wrapper">
+            <label htmlFor="attendance-month">Attendance Month</label>
+            <input
+              id="attendance-month"
+              type="month"
+              className="date-input"
+              value={selectedMonth}
+              onChange={e => setSelectedMonth(e.target.value)}
+            />
+          </div>
+
+          <button
+            className="btn-primary shadow-glow flex items-center gap-2"
+            onClick={openAdd}
+          >
+            <Plus size={18} /> Add Faculty
+          </button>
+        </div>
       </div>
 
       {/* Summary Row */}
@@ -220,14 +257,14 @@ const HodStaff = () => {
             <thead>
               <tr>
                 <th>#</th><th>Staff ID</th><th>Name</th><th>Designation</th>
-                <th>Assigned Subjects</th><th>Weekly Workload</th><th>Attendance</th><th>Status</th><th>Actions</th>
+                <th>Assigned Subjects</th><th>Weekly Workload</th><th>Attendance</th><th>Status</th>
               </tr>
             </thead>
             <tbody>
               {loading ? Array.from({ length: 3 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: 9 }).map((_, j) => <td key={j}><div className="skeleton" style={{ height: '16px', borderRadius: '4px', width: j === 2 ? '150px' : '60px' }}></div></td>)}</tr>
+                <tr key={i}>{Array.from({ length: 8 }).map((_, j) => <td key={j}><div className="skeleton" style={{ height: '16px', borderRadius: '4px', width: j === 2 ? '150px' : '60px' }}></div></td>)}</tr>
               )) : filtered.length === 0 ? (
-                <tr><td colSpan={9} className="no-data">No faculty registered in this department.</td></tr>
+                <tr><td colSpan={8} className="no-data">No faculty registered in this department.</td></tr>
               ) : filtered.map((s, idx) => (
                 <tr key={s.id}>
                   <td className="text-muted">{idx + 1}</td>
@@ -253,11 +290,27 @@ const HodStaff = () => {
                   </td>
                   <td><span className={`font-semibold ${getWorkloadColor(s.workload)}`}>{s.workload}h</span></td>
                   <td>
-                    <div className="att-cell">
-                      <span style={{ color: s.attendance >= 90 ? 'var(--success)' : 'var(--warning)', fontWeight: 600 }}>{s.attendance}%</span>
-                      <div className="mini-progress-bar">
-                        <div className="mini-progress-fill" style={{ width: `${s.attendance}%`, background: s.attendance >= 90 ? 'var(--success)' : 'var(--warning)' }}></div>
-                      </div>
+                    <div
+                      className="att-cell"
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: '5px',
+                        minWidth: '190px'
+                      }}
+                    >
+                      <strong style={{ color: s.attendance >= 75 ? '#059669' : '#dc2626' }}>
+                        {s.attendance}%
+                      </strong>
+
+                      <span style={{ fontSize: '12px', color: 'var(--text-main)' }}>
+                        {s.presentDays} Present · {s.absentDays} Absent
+                      </span>
+
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        {s.lateDays} Late · {s.leaveDays} Leave · {s.lopDays} LOP
+                      </span>
                     </div>
                   </td>
                   <td>
@@ -269,11 +322,6 @@ const HodStaff = () => {
                     }}>
                       {s.status || 'Active'}
                     </span>
-                  </td>
-                  <td>
-                    <div className="action-buttons">
-                      <button className="btn-icon" title="Edit workload / subjects" onClick={() => openEdit(s)}><Edit2 size={15} /></button>
-                    </div>
                   </td>
                 </tr>
               ))}

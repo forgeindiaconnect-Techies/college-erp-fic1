@@ -66,7 +66,7 @@ const HodSidebar = ({ isOpen, onClose }) => {
         { name: 'Subjects', path: '/hod/subjects', icon: <BookOpen size={20} /> },
         { name: 'Faculty Allocation', path: '/hod/faculty-allocation', icon: <Users size={20} /> },
         { name: 'Assignments', path: '/hod/assignments', icon: <FileText size={20} /> },
-        { name: 'Attendance', path: '/hod/attendance', icon: <CalendarCheck size={20} /> },
+        { name: 'Student Attendance', path: '/hod/attendance', icon: <CalendarCheck size={20} /> },
         { name: 'Class Timetable', path: '/hod/timetable', icon: <Calendar size={20} /> },
         { name: 'Faculty Substitution', path: '/hod/substitution', icon: <Users size={20} /> },
         { name: 'Exam Timetable', path: '/hod/exams', icon: <FileText size={20} /> },

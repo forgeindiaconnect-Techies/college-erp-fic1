@@ -463,7 +463,7 @@ function App() {
               <Route index element={<HodDashboard />} />
               <Route path="students"      element={<HodStudents />} />
               <Route path="staff"         element={<HodStaff />} />
-              <Route path="attendance"    element={<HodAttendance />} />
+              <Route path="attendance"    element={<AttendanceManagement />} />
               <Route path="marks"         element={<HodMarks />} />
               <Route path="timetable"     element={<HodTimetable />} />
               <Route path="substitution"  element={<HodSubstitution />} />

@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Plus, Search, Edit2, Trash2, X, MapPin, Clock, BookOpen } from 'lucide-react';
-import { getExams, createExam, updateExam, deleteExam } from '../../api/index';
+import {
+  getExams,
+  getSubjects,
+  getSections,
+  getAcademicYears,
+  createExam,
+  updateExam,
+  deleteExam
+} from '../../api/index';
 
 const getHodSession = () => {
   try { return JSON.parse(sessionStorage.getItem('hod_session')) || { dept: 'Computer Science' }; }
@@ -41,20 +49,80 @@ const HodExams = () => {
   const hod = getHodSession();
   const [exams, setExams] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [academicYears, setAcademicYears] = useState([]);
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({ name:'Internal Assessment 1 (IA-1)', subject:'', sem:'Sem 3', date:'', time:'10:00 AM – 12:00 PM', room:'', maxMarks:100 });
+  const [form, setForm] = useState({ name:'Internal Assessment 1 (IA-1)', academicYearId:'', subject:'', sem:'Sem 3', section:'A', date:'', time:'10:00 AM – 12:00 PM', room:'', maxMarks:100 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchExams();
 
-    const savedSubs = localStorage.getItem(`erp_subjects_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
-    if (savedSubs) {
-      const deptSubs = JSON.parse(savedSubs).filter(s => s.dept === hod.dept);
-      setSubjects(deptSubs);
-    }
+    const fetchLiveSubjects = async () => {
+      try {
+        const response = await getSubjects({
+          dept: hod.dept,
+          department: hod.dept
+        });
+
+        const data = response.data;
+        const list = Array.isArray(data)
+          ? data
+          : data.subjects || data.data || [];
+
+        setSubjects(
+          list.map(subject => ({
+            ...subject,
+            id: subject._id || subject.id,
+            name: subject.subjectName || subject.name,
+            code: subject.subjectCode || subject.code
+          }))
+        );
+      } catch (error) {
+        console.error('Failed to load subjects:', error);
+        setSubjects([]);
+      }
+    };
+
+    const fetchLiveSections = async () => {
+      try {
+        const response = await getSections();
+        const data = response.data;
+
+        const list = Array.isArray(data)
+          ? data
+          : data.sections || data.data || [];
+
+        setSections(
+          list.filter(section => section.status !== 'Inactive')
+        );
+      } catch (error) {
+        console.error('Failed to load sections:', error);
+        setSections([]);
+      }
+    };
+
+    const loadAcademicYears = async () => {
+      try {
+        const response = await getAcademicYears();
+        const data = response.data;
+
+        const yearList = Array.isArray(data)
+          ? data
+          : (data.academicYears || data.data || []);
+
+        setAcademicYears(yearList);
+      } catch (error) {
+        console.error('Failed to load academic years:', error);
+        setAcademicYears([]);
+      }
+    };
+
+    fetchLiveSubjects();
+    fetchLiveSections();
+    loadAcademicYears();
   }, [hod.dept]);
 
   const fetchExams = async () => {
@@ -73,8 +141,8 @@ const HodExams = () => {
     }
   };
 
-  const openAdd = () => { setForm({ name:'Internal Assessment 1 (IA-1)', subject:subjects[0]?.name||'', sem:'Sem 3', date:new Date().toISOString().split('T')[0], time:'10:00 AM – 12:00 PM', room:'', maxMarks:100 }); setEditId(null); setModal(true); };
-  const openEdit = (ex) => { setForm({ name:ex.name, subject:ex.subject, sem:ex.sem || 'Sem 3', date:ex.date, time:ex.time, room:ex.room, maxMarks:ex.maxMarks }); setEditId(ex._id || ex.id); setModal(true); };
+  const openAdd = () => { setForm({ name:'Internal Assessment 1 (IA-1)', academicYearId:'', subject:subjects[0]?.name||'', sem:'Sem 3', section:'A', date:new Date().toISOString().split('T')[0], time:'10:00 AM – 12:00 PM', room:'', maxMarks:100 }); setEditId(null); setModal(true); };
+  const openEdit = (ex) => { setForm({ name:ex.name, academicYearId: ex.academicYearId?._id || ex.academicYearId || '', subject:ex.subject, sem:ex.sem || 'Sem 3', section:ex.section || 'A', date:ex.date, time:ex.time, room:ex.room, maxMarks:ex.maxMarks }); setEditId(ex._id || ex.id); setModal(true); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -108,6 +176,7 @@ const HodExams = () => {
   };
 
   const filtered = exams.filter(ex => {
+    if (ex.subject?.toLowerCase() === 'general course 1') return false;
     const q = search.toLowerCase();
     return ex.name.toLowerCase().includes(q) || ex.subject.toLowerCase().includes(q) || ex.room.toLowerCase().includes(q);
   });
@@ -154,10 +223,32 @@ const HodExams = () => {
 
       {modal && (
         <div className="modal-overlay" onClick={()=>setModal(false)}>
-          <div className="modal-card glass-card" onClick={e=>e.stopPropagation()}>
+          <div
+            className="modal-card glass-card"
+            style={{ maxHeight: '90vh', overflowY: 'auto' }}
+            onClick={e => e.stopPropagation()}
+          >
             <div className="modal-header"><h2>{editId?'Edit Exam':'Schedule Exam'}</h2><button className="btn-icon" onClick={()=>setModal(false)}><X size={18}/></button></div>
             <form onSubmit={handleSubmit} className="modal-form">
               <div className="form-grid">
+                <div className="form-group">
+                  <label>Academic Year *</label>
+                  <select
+                    required
+                    value={form.academicYearId}
+                    onChange={e =>
+                      setForm({ ...form, academicYearId: e.target.value })
+                    }
+                  >
+                    <option value="">Select Academic Year</option>
+
+                    {academicYears.map(year => (
+                      <option key={year._id || year.id} value={year._id || year.id}>
+                        {year.year || year.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="form-group"><label>Exam Type</label><select value={form.name} onChange={e=>setForm({...form,name:e.target.value})}>
                   {EXAM_TYPES.map(group => (
                     <optgroup key={group.category} label={group.category}>
@@ -173,6 +264,23 @@ const HodExams = () => {
                   )}
                 </div>
                 <div className="form-group"><label>Semester</label><select value={form.sem} onChange={e=>setForm({...form,sem:e.target.value})}>{SEMS.map(s=><option key={s}>{s}</option>)}</select></div>
+                <div className="form-group">
+                  <label>Section *</label>
+                  <select
+                    required
+                    value={form.section}
+                    onChange={e => setForm({ ...form, section: e.target.value })}
+                  >
+                    <option value="">Select Section</option>
+
+                    {[...new Set(['A', 'B', 'C', ...sections.map(section => section.name || section.sectionName).filter(Boolean)])]
+                      .map(sectionName => (
+                        <option key={sectionName} value={sectionName}>
+                          Section {sectionName}
+                        </option>
+                      ))}
+                  </select>
+                </div>
                 <div className="form-group"><label>Date *</label><input type="date" required value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/></div>
                 <div className="form-group"><label>Time Window *</label><input required placeholder="10:00 AM – 01:00 PM" value={form.time} onChange={e=>setForm({...form,time:e.target.value})}/></div>
                 <div className="form-group"><label>Venue / Hall *</label><input required placeholder="e.g. Block A – 301" value={form.room} onChange={e=>setForm({...form,room:e.target.value})}/></div>

@@ -399,9 +399,26 @@ router.get('/admin/reports', protect, authorize('Admin', 'Principal', 'Sub Admin
 // Return aggregated attendance statistics per employee
 router.get('/stats', protect, authorize('Admin', 'Principal', 'Sub Admin', 'HOD'), collegeScope, async (req, res) => {
   try {
-    const records = await EmployeeAttendance.find({
-      tenantId: { $in: [req.collegeId, 'unassigned_college', 'mock_college_id'] }
-    });
+    const query = {
+      tenantId: {
+        $in: [req.collegeId, 'unassigned_college', 'mock_college_id']
+      }
+    };
+
+    const { month } = req.query;
+
+    if (month && /^\d{4}-\d{2}$/.test(month)) {
+      const [year, monthNumber] = month.split('-').map(Number);
+      const startDate = new Date(Date.UTC(year, monthNumber - 1, 1));
+      const endDate = new Date(Date.UTC(year, monthNumber, 1));
+
+      query.date = {
+        $gte: startDate,
+        $lt: endDate
+      };
+    }
+
+    const records = await EmployeeAttendance.find(query);
 
     const statsByEmployee = {};
     records.forEach(r => {
@@ -409,11 +426,44 @@ router.get('/stats', protect, authorize('Admin', 'Principal', 'Sub Admin', 'HOD'
       if (!empId) return;
 
       if (!statsByEmployee[empId]) {
-        statsByEmployee[empId] = { total: 0, present: 0 };
+        statsByEmployee[empId] = {
+          total: 0,
+          present: 0,
+          absent: 0,
+          late: 0,
+          leave: 0,
+          lop: 0
+        };
       }
-      statsByEmployee[empId].total += 1;
-      if (r.status === 'Present' || r.checkIn) {
-        statsByEmployee[empId].present += 1;
+
+      const status = String(r.status || '').toLowerCase();
+      const stat = statsByEmployee[empId];
+
+      stat.total += 1;
+
+      if (status === 'present' || status === 'late' || r.checkIn) {
+        stat.present += 1;
+      }
+      if (status === 'absent') stat.absent += 1;
+      if (status === 'late') stat.late += 1;
+      if (status === 'leave') stat.leave += 1;
+      if (status === 'lop') stat.lop += 1;
+    });
+
+    const employeeIds = Object.keys(statsByEmployee);
+
+    const users = await User.find({
+      _id: { $in: employeeIds }
+    }).select('_id referenceId email');
+
+    users.forEach(user => {
+      if (user.referenceId) {
+        statsByEmployee[user.referenceId] =
+          statsByEmployee[user._id.toString()];
+      }
+      if (user.email) {
+        statsByEmployee[user.email.toLowerCase()] =
+          statsByEmployee[user._id.toString()];
       }
     });
 

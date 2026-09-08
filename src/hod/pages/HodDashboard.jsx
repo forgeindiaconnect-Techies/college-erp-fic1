@@ -9,17 +9,30 @@ import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { getStudents, getStaff, getClassMonitoringDailyStatus, getHodClassMonitoring, getAllAttendance } from '../../api/index';
+import {
+  getStudents,
+  getStaff,
+  getSubjects,
+  getExams,
+  getHodClassMonitoring,
+  getAllAttendance
+} from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
 import './HodDashboard.css';
 import CollegeInfoCard from '../../components/common/CollegeInfoCard';
 
-const DEFAULT_SESSION = {
-  name: 'Prof. Rajan Iyer',
-  dept: 'Computer Science Engineering',
-  deptCode: 'CSE',
-  role: 'HOD'
+const getStoredHodSession = () => {
+  try {
+    const storedSession =
+      sessionStorage.getItem('hod_session');
+
+    return storedSession
+      ? JSON.parse(storedSession)
+      : null;
+  } catch {
+    return null;
+  }
 };
 
 const AVATAR_COLORS = ['bg-gradient-blue', 'bg-gradient-purple', 'bg-gradient-orange', 'bg-gradient-green', 'bg-gradient-teal', 'bg-gradient-pink'];
@@ -27,48 +40,136 @@ const AVATAR_COLORS = ['bg-gradient-blue', 'bg-gradient-purple', 'bg-gradient-or
 const HodDashboard = () => {
   const navigate = useNavigate();
   const [animate, setAnimate] = useState(false);
-  const [hodSession, setHodSession] = useState(DEFAULT_SESSION);
+  const [hodSession] = useState(getStoredHodSession);
   const [students, setStudents] = useState([]);
   const [staff, setStaff] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [exams, setExams] = useState([]);
+  const [attendance, setAttendance] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [liveMonitoring, setLiveMonitoring] = useState([]);
   const [loadingMonitoring, setLoadingMonitoring] = useState(true);
 
   const fetchLiveData = useCallback(async () => {
+    if (!hodSession?.dept && !hodSession?.department) {
+      return;
+    }
+
     try {
-      const deptName = hodSession.dept || hodSession.department || 'Computer Science Engineering';
-      const [studRes, staffRes, monRes] = await Promise.all([
+      const deptName =
+        hodSession.dept || hodSession.department;
+
+      const [
+        studentResponse,
+        staffResponse,
+        subjectResponse,
+        examResponse,
+        attendanceResponse,
+        monitoringResponse
+      ] = await Promise.all([
         getStudents().catch(() => ({ data: [] })),
         getStaff().catch(() => ({ data: [] })),
-        getHodClassMonitoring(deptName).catch(() => ({ data: [] }))
+        getSubjects().catch(() => ({ data: [] })),
+        getExams().catch(() => ({ data: [] })),
+        getAllAttendance().catch(() => ({ data: [] })),
+        getHodClassMonitoring(deptName).catch(() => ({
+          data: []
+        }))
       ]);
 
-      if (studRes?.data) setStudents(studRes.data);
-      if (staffRes?.data) setStaff(staffRes.data);
-      if (monRes?.data) setLiveMonitoring(monRes.data);
+      const readArray = (response, key) => {
+        const data = response?.data;
+
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.[key])) return data[key];
+        if (Array.isArray(data?.data)) return data.data;
+
+        return [];
+      };
+
+      setStudents(readArray(studentResponse, 'students'));
+      setStaff(readArray(staffResponse, 'staff'));
+      setSubjects(readArray(subjectResponse, 'subjects'));
+      setExams(readArray(examResponse, 'exams'));
+      setAttendance(
+        readArray(attendanceResponse, 'attendance')
+      );
+      setLiveMonitoring(
+        readArray(monitoringResponse, 'monitoring')
+      );
+
       setLoadingMonitoring(false);
     } catch (err) {
       console.warn('Dashboard API load failed:', err.message);
       setLoadingMonitoring(false);
     }
-  }, [hodSession.dept, hodSession.department]);
+  }, [hodSession?.dept, hodSession?.department]);
 
   useEffect(() => {
-    const session = sessionStorage.getItem('hod_session');
-    if (session) {
-      setHodSession(JSON.parse(session));
-    } else {
+    if (!hodSession) {
       navigate('/login');
       return;
     }
+
     fetchLiveData();
-    const t = setTimeout(() => setAnimate(true), 100);
-    return () => clearTimeout(t);
-  }, [navigate, fetchLiveData]);
+
+    const timer = setTimeout(
+      () => setAnimate(true),
+      100
+    );
+
+    return () => clearTimeout(timer);
+  }, [navigate, fetchLiveData, hodSession]);
 
   useRealtimeSync(fetchLiveData, ['students', 'staff', 'substitutions', 'timetable', 'class_started']);
 
-  const deptName = hodSession.dept || 'Computer Science Engineering';
+  const deptName =
+    hodSession?.dept ||
+    hodSession?.department ||
+    'Department';
+
+  const matchesDepartment = value =>
+    String(value || '').trim().toLowerCase() ===
+    String(deptName || '').trim().toLowerCase();
+
+  const departmentStudents = students.filter(student =>
+    matchesDepartment(student.dept || student.department)
+  );
+
+  const departmentStaff = staff.filter(member =>
+    matchesDepartment(member.dept || member.department)
+  );
+
+  const departmentSubjects = subjects.filter(subject =>
+    matchesDepartment(subject.department || subject.dept)
+  );
+
+  const departmentExams = exams.filter(exam =>
+    matchesDepartment(exam.dept || exam.department)
+  );
+
+  const departmentAttendance = attendance.filter(record =>
+    matchesDepartment(record.department || record.dept)
+  );
+
+  const attendedRecords = departmentAttendance.filter(record =>
+    ['Present', 'Late'].includes(record.status)
+  ).length;
+
+  const attendancePercentage =
+    departmentAttendance.length > 0
+      ? Math.round(
+          (attendedRecords / departmentAttendance.length) * 100
+        )
+      : 0;
+
+  const today = new Date().toISOString().split('T')[0];
+
+  const upcomingExams = departmentExams.filter(
+    exam =>
+      exam.date >= today &&
+      exam.status !== 'Cancelled'
+  ).length;
 
   return (
     <div className={`hod-dashboard ${animate ? 'animate-fade-in' : ''}`}>
@@ -95,6 +196,58 @@ const HodDashboard = () => {
             HOD Dashboard • Department of <strong>{deptName}</strong>
           </p>
         </div>
+      </div>
+
+      <div className="hod-realtime-summary">
+        <button
+          type="button"
+          onClick={() => navigate('/hod/students')}
+          className="hod-summary-card"
+        >
+          <Users size={22} />
+          <span>Total Students</span>
+          <strong>{departmentStudents.length}</strong>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/hod/staff')}
+          className="hod-summary-card"
+        >
+          <GraduationCap size={22} />
+          <span>Department Staff</span>
+          <strong>{departmentStaff.length}</strong>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/hod/subjects')}
+          className="hod-summary-card"
+        >
+          <BookOpen size={22} />
+          <span>Total Subjects</span>
+          <strong>{departmentSubjects.length}</strong>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/hod/attendance')}
+          className="hod-summary-card"
+        >
+          <CalendarCheck size={22} />
+          <span>Attendance</span>
+          <strong>{attendancePercentage}%</strong>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/hod/exams')}
+          className="hod-summary-card"
+        >
+          <ClipboardList size={22} />
+          <span>Upcoming Exams</span>
+          <strong>{upcomingExams}</strong>
+        </button>
       </div>
 
       {/* TODAY'S LIVE CLASS EXECUTION MONITORING TABLE (Step 8) */}

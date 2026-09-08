@@ -303,8 +303,8 @@ const HodStudents = () => {
       {/* Summary Row */}
       <div className="sm-summary-row">
         {[
-          { label: 'Total Scoped Students', value: myStudents.length, cls: '' },
-          { label: 'Active Status', value: myStudents.filter(s => !s.status || s.status.toLowerCase() === 'active').length, cls: 'text-success' },
+          { label: 'Total Students', value: myStudents.length, cls: '' },
+          { label: 'Active Students', value: myStudents.filter(s => !s.status || s.status.toLowerCase() === 'active').length, cls: 'text-success' },
           { label: 'High Attendance (≥90%)', value: myStudents.filter(s => parseFloat(s.attendance) >= 90).length, cls: 'gradient-text' },
           { label: 'Low Attendance (<75%)', value: myStudents.filter(s => parseFloat(s.attendance) < 75).length, cls: 'text-danger' },
         ].map((c, i) => (
@@ -370,21 +370,20 @@ const HodStudents = () => {
                 <th className="sortable-th" onClick={() => handleSort('status')}>
                   Status {makeSortIcon('status', sortKey, sortAsc)}
                 </th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 8 }).map((_, j) => (
+                    {Array.from({ length: 7 }).map((_, j) => (
                       <td key={j}><div className="skeleton" style={{ height: 15, borderRadius: 4, width: j === 1 ? 140 : 65 }}></div></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="no-data">No students found matching filters in {deptCode} department.</td>
+                  <td colSpan={7} className="no-data">No students found matching filters in {deptCode} department.</td>
                 </tr>
               ) : (
                 filtered.map((s, idx) => (
@@ -411,15 +410,9 @@ const HodStudents = () => {
                       </div>
                     </td>
                     <td>
-                      <span className={`status-badge ${s.status === 'Active' ? 'status-active' : 'status-inactive'}`}>
-                        {s.status}
+                      <span className={`status-badge ${String(s.status || 'Active').toLowerCase() === 'active' ? 'status-active' : 'status-inactive'}`}>
+                        {s.status || 'Active'}
                       </span>
-                    </td>
-                    <td>
-                      <div className="action-btns">
-                        <button className="act-btn" title="Edit" onClick={() => openEdit(s)}><Edit2 size={15} /></button>
-                        <button className="act-btn act-delete" title="Delete" onClick={() => handleDelete(s.rollNo)}><Trash2 size={15} /></button>
-                      </div>
                     </td>
                   </tr>
                 ))

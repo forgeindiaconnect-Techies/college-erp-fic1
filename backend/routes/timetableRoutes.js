@@ -44,7 +44,10 @@ router.get('/my-schedule', protect, collegeScope, async (req, res) => {
     .populate('subjectId')
     .populate({
       path: 'facultyAllocationId',
-      populate: { path: 'staffId' }
+      populate: [
+        { path: 'staffId' },
+        { path: 'subjectId' }
+      ]
     })
     .sort({ day: 1 });
 
@@ -101,7 +104,10 @@ router.get('/', protect, collegeScope, async (req, res) => {
       .populate('subjectId')
       .populate({
         path: 'facultyAllocationId',
-        populate: { path: 'staffId' }
+        populate: [
+          { path: 'staffId' },
+          { path: 'subjectId' }
+        ]
       })
       .sort({ day: 1 });
       
@@ -206,7 +212,10 @@ router.post('/', protect, authorize('SuperAdmin', 'CollegeAdmin', 'Admin', 'Sub 
       .populate('subjectId')
       .populate({
         path: 'facultyAllocationId',
-        populate: { path: 'staffId' }
+        populate: [
+          { path: 'staffId' },
+          { path: 'subjectId' }
+        ]
       });
 
     res.status(201).json(populated);

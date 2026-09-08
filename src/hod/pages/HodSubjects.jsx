@@ -114,7 +114,7 @@ const HodSubjects = () => {
       </div>
 
       <div className="sm-summary-row" style={{ marginTop:'1.5rem' }}>
-        <div className="sm-summary-card glass-card"><span className="sm-summary-label">Total Courses</span><span className="sm-summary-value">{subjects.length}</span></div>
+        <div className="sm-summary-card glass-card"><span className="sm-summary-label">Total Subjects</span><span className="sm-summary-value">{subjects.length}</span></div>
         <div className="sm-summary-card glass-card"><span className="sm-summary-label">Total Credits</span><span className="sm-summary-value text-success">{subjects.reduce((a,s)=>a+s.credits,0)}</span></div>
         <div className="sm-summary-card glass-card"><span className="sm-summary-label">Weekly Hours</span><span className="sm-summary-value gradient-text">{subjects.reduce((a,s)=>a+s.hours,0)}h</span></div>
       </div>

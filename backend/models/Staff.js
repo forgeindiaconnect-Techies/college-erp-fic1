@@ -12,6 +12,7 @@ const staffSchema = new mongoose.Schema({
   subjects: { type: [String], default: [] },
   workload: { type: Number, default: 0 },
   attendance: { type: Number, default: 0 },
+  qualification: { type: String, default: '' },
   experience: { type: String, default: '' },
   passRate: { type: Number, default: 0 },
   publications: { type: Number, default: 0 },

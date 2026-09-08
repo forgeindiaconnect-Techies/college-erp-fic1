@@ -386,7 +386,11 @@ const HodTimetable = () => {
                         );
 
                         if (slot) {
-                          const subjectName = slot.subjectId?.subjectName || slot.subject || 'Subject';
+                          const subjectName =
+                            slot.subjectId?.subjectName ||
+                            slot.facultyAllocationId?.subjectId?.subjectName ||
+                            slot.subject ||
+                            'Subject';
                           const facultyName = slot.facultyAllocationId?.staffId?.name || slot.staffName || 'Allocated Faculty';
                           const room = formatRoomNo(slot.roomNo);
                           

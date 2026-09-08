@@ -64,26 +64,17 @@ const getTodayDateStr = () => {
   return `${y}-${m}-${r}`;
 };
 
-const initDailyLogs = (students) => {
-  const logs = {};
-  const today = new Date();
-  for (let i = 1; i <= 6; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    if (d.getDay() === 0) continue; // skip Sunday
-    const dateStr = d.toLocaleDateString('en-CA');
-    logs[dateStr] = {};
-    students.forEach(s => {
-      // mark present or absent based on historical student attendance percentage
-      const isPresent = Math.random() * 100 < s.attendance;
-      logs[dateStr][s.id] = isPresent ? 'present' : 'absent';
-    });
-  }
-  localStorage.setItem('erp_attendance_daily', JSON.stringify(logs));
-  return logs;
-};
+
 
 const AttendanceManagement = () => {
+  const isHodPortal = window.location.pathname.startsWith('/hod');
+
+  const hodSession = isHodPortal
+    ? JSON.parse(sessionStorage.getItem('hod_session') || '{}')
+    : {};
+
+  const hodDepartmentName = hodSession.dept || hodSession.department || '';
+
   const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState([]);
   const [dailyLogs, setDailyLogs] = useState({});
@@ -145,7 +136,19 @@ const AttendanceManagement = () => {
       ]);
       const studentList = Array.isArray(studentsRes.data) ? studentsRes.data : (studentsRes.data?.students || studentsRes.data?.data || []);
       setStudents(studentList);
-      setDbDepartments(Array.isArray(deptsRes.data) ? deptsRes.data : (deptsRes.data?.departments || deptsRes.data?.data || []));
+      const departmentList = Array.isArray(deptsRes.data)
+        ? deptsRes.data
+        : deptsRes.data?.departments || deptsRes.data?.data || [];
+
+      setDbDepartments(departmentList);
+
+      const hodDepartment = departmentList.find(
+        department => department.name === hodDepartmentName
+      );
+
+      if (hodDepartment) {
+        setDepartmentId(hodDepartment.id || hodDepartment._id);
+      }
 
       setCourses(Array.isArray(coursesRes.data) ? coursesRes.data : (coursesRes.data?.courses || coursesRes.data?.data || []));
       setSemesters(Array.isArray(semestersRes.data) ? semestersRes.data : (semestersRes.data?.semesters || semestersRes.data?.data || []));
@@ -176,8 +179,8 @@ const AttendanceManagement = () => {
           dailyLogData[dateStr][r.studentId] = r.status.toLowerCase();
         });
       } catch (attErr) {
-        console.warn('Failed to fetch live attendance, falling back to local init', attErr);
-        dailyLogData = initDailyLogs(studentList);
+        console.warn('Failed to fetch live attendance:', attErr);
+        dailyLogData = {};
       }
       
       setDailyLogs(dailyLogData);
@@ -630,6 +633,7 @@ const AttendanceManagement = () => {
               <select
                 className="filter-select"
                 value={departmentId}
+                disabled={isHodPortal}
                 onChange={(e) => {
                   const selected = (Array.isArray(dbDepartments) ? dbDepartments : []).find(
                     (d) => (d.id || d._id) === e.target.value

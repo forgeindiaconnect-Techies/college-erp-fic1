@@ -121,12 +121,47 @@ export default function TimetableManagement() {
         getPeriodMasters().catch(() => ({ data: [] }))
       ]);
       const deptData = Array.isArray(deptRes.data) ? deptRes.data : (deptRes.data?.departments || deptRes.data?.data || []);
+      const coursesData = Array.isArray(courseRes.data) ? courseRes.data : (courseRes.data?.courses || courseRes.data?.data || []);
+      const semestersData = Array.isArray(semesterRes.data) ? semesterRes.data : (semesterRes.data?.semesters || semesterRes.data?.data || []);
+      const sectionsData = Array.isArray(sectionRes.data) ? sectionRes.data : (sectionRes.data?.sections || sectionRes.data?.data || []);
+
       if (deptData && deptData.length > 0) {
         setDepartments(deptData);
       }
-      setCourses(Array.isArray(courseRes.data) ? courseRes.data : (courseRes.data?.courses || courseRes.data?.data || []));
-      setSemesters(Array.isArray(semesterRes.data) ? semesterRes.data : (semesterRes.data?.semesters || semesterRes.data?.data || []));
-      setSections(Array.isArray(sectionRes.data) ? sectionRes.data : (sectionRes.data?.sections || sectionRes.data?.data || []));
+      setCourses(coursesData);
+      setSemesters(semestersData);
+      setSections(sectionsData);
+
+      // Auto select first department -> course -> semester -> section if not selected
+      if (deptData.length > 0 && !departmentId) {
+        const firstDept = deptData[0];
+        const dId = firstDept.id || firstDept._id;
+        setDepartmentId(dId);
+        setDept(firstDept.name);
+
+        const deptCourses = coursesData.filter(c => c.departmentId === dId);
+        if (deptCourses.length > 0) {
+          const firstCourse = deptCourses[0];
+          const cId = firstCourse.id || firstCourse._id;
+          setCourseId(cId);
+
+          const courseSems = semestersData.filter(s => s.courseId === cId);
+          if (courseSems.length > 0) {
+            const firstSem = courseSems[0];
+            const sId = firstSem.id || firstSem._id;
+            setSemesterId(sId);
+            setSem(firstSem.name || `Semester ${firstSem.semesterNumber}`);
+
+            const semSecs = sectionsData.filter(s => s.semesterId === sId && s.status !== 'Inactive');
+            if (semSecs.length > 0) {
+              const firstSec = semSecs[0];
+              setSectionId(firstSec.id || firstSec._id);
+              setSection(firstSec.name);
+            }
+          }
+        }
+      }
+
       if (periodRes.data) {
         const sortedPeriods = [...periodRes.data]
           .filter(p => p.isActive)
@@ -140,7 +175,7 @@ export default function TimetableManagement() {
     } catch (err) {
       console.error(err);
     }
-  }, [formPeriod]);
+  }, [formPeriod, departmentId]);
 
   const loadFullWeeklyTimetable = useCallback(async () => {
     setLoading(true);

@@ -21,7 +21,10 @@ export default function HodFacultyAllocation() {
       try {
         setLoading(true);
         const res = await getFacultyAllocations({ department: DEPT });
-        setAllocations(res.data || []);
+        const allocationList = Array.isArray(res.data) ? res.data : [];
+        setAllocations(
+          allocationList.filter(item => item.staffId && item.subjectId)
+        );
       } catch (err) {
         console.error(err);
       } finally {

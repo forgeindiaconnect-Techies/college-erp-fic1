@@ -32,9 +32,17 @@ const DEPARTMENTS = [
   { name: 'Biotechnology Engineering', code: 'BIOTECH' },
 ];
 
-const EMPTY_FORM = { 
-  name: '', email: '', phone: '', dept: 'Computer Science Engineering', status: 'Active',
-  experience: '10 yrs', passRate: 88, attendance: 95, publications: 5, faculty: 5, students: 100, rating: 4.5
+const EMPTY_FORM = {
+  id: '',
+  name: '',
+  email: '',
+  password: '',
+  phone: '',
+  dept: '',
+  qualification: '',
+  experience: '',
+  joinDate: '',
+  status: 'Active'
 };
 
 const HodManagement = () => {
@@ -109,17 +117,42 @@ const HodManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
+    if (!form.id?.trim()) {
+      alert("Please provide the HOD Employee ID.");
+      return;
+    }
+
     if (!form.name || !form.name.trim()) {
       alert("Please provide the HOD's Name before saving.");
       return;
     }
+
     if (!form.email || !form.email.trim()) {
       alert("Please provide the HOD's Email Address before saving.");
       return;
     }
 
-    const deptInfo = DEPARTMENTS.find(d => d.name === form.dept) || { code: 'HOD' };
+    if (!editTarget && !form.password?.trim()) {
+      alert("Please provide a Login Password.");
+      return;
+    }
+
+    if (!form.dept) {
+      alert("Please select a Department.");
+      return;
+    }
+
+    if (!form.qualification?.trim()) {
+      alert("Please provide the HOD Qualification.");
+      return;
+    }
+
+    const allDepartments =
+      availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS;
+
+    const deptInfo =
+      allDepartments.find(d => d.name === form.dept) || { code: 'HOD' };
     
     try {
       if (editTarget) {
@@ -138,7 +171,12 @@ const HodManagement = () => {
         const nextNum = Math.max(maxSuffix + 1, hods.length + 1);
         const newId = `HOD${String(nextNum).padStart(3, '0')}`;
         
-        const newHod = { id: newId, ...form, deptCode: deptInfo.code, designation: 'HOD', workload: 12, attendance: 100 };
+        const newHod = {
+          ...form,
+          id: form.id || newId,
+          deptCode: deptInfo.code,
+          designation: 'HOD'
+        };
         const res = await createStaff(newHod);
         
         // The backend automatically creates a User account during createStaff()
@@ -282,6 +320,16 @@ const HodManagement = () => {
             <form onSubmit={handleSubmit} className="modal-form">
               <div className="form-grid">
                 <div className="form-group">
+                  <label>Employee ID *</label>
+                  <input
+                    required
+                    placeholder="e.g. HOD001"
+                    value={form.id}
+                    onChange={e => setForm({ ...form, id: e.target.value.toUpperCase() })}
+                    disabled={Boolean(editTarget)}
+                  />
+                </div>
+                <div className="form-group">
                   <label>Full Name</label>
                   <input 
                     required 
@@ -303,7 +351,7 @@ const HodManagement = () => {
                 <div className="form-group">
                   <label>Login Password</label>
                   <input 
-                    type="text"
+                    type="password"
                     required={!editTarget}
                     placeholder={editTarget ? "Leave blank to keep current" : "e.g. password123"}
                     value={form.password || ''} 
@@ -342,36 +390,36 @@ const HodManagement = () => {
                   />
                 </div>
                 
-                {/* Advanced Metrics */}
-                <div className="sm-form-section-title" style={{ gridColumn: '1 / -1', marginTop: '1rem', fontWeight: 600, color: 'var(--text-main)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>Advanced Analytics Metrics</div>
+                {/* Professional Details */}
+                <div className="sm-form-section-title" style={{ gridColumn: '1 / -1', marginTop: '1rem', fontWeight: 600, color: 'var(--text-main)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                  Professional Details
+                </div>
                 
                 <div className="form-group">
                   <label>Experience (e.g. '10 yrs')</label>
                   <input placeholder="10 yrs" value={form.experience} onChange={e => setForm({ ...form, experience: e.target.value })} />
                 </div>
                 <div className="form-group">
-                  <label>Pass Rate (%)</label>
-                  <input type="number" min="0" max="100" value={form.passRate} onChange={e => setForm({ ...form, passRate: e.target.value })} />
+                  <label>Qualification *</label>
+                  <input
+                    required
+                    placeholder="e.g. M.E., Ph.D."
+                    value={form.qualification}
+                    onChange={e =>
+                      setForm({ ...form, qualification: e.target.value })
+                    }
+                  />
                 </div>
                 <div className="form-group">
-                  <label>Attendance (%)</label>
-                  <input type="number" min="0" max="100" value={form.attendance} onChange={e => setForm({ ...form, attendance: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Total Publications</label>
-                  <input type="number" min="0" value={form.publications} onChange={e => setForm({ ...form, publications: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Faculty Managed</label>
-                  <input type="number" min="0" value={form.faculty} onChange={e => setForm({ ...form, faculty: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Students in Dept</label>
-                  <input type="number" min="0" value={form.students} onChange={e => setForm({ ...form, students: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Overall Rating (1-5)</label>
-                  <input type="number" step="0.1" min="1" max="5" value={form.rating} onChange={e => setForm({ ...form, rating: e.target.value })} />
+                  <label>Joining Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={form.joinDate ? String(form.joinDate).split('T')[0] : ''}
+                    onChange={e =>
+                      setForm({ ...form, joinDate: e.target.value })
+                    }
+                  />
                 </div>
               </div>
               <div className="modal-actions">
