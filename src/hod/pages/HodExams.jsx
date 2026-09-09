@@ -5,6 +5,8 @@ import {
   getSubjects,
   getSections,
   getAcademicYears,
+  getCourses,
+  getSemesters,
   createExam,
   updateExam,
   deleteExam
@@ -50,11 +52,13 @@ const HodExams = () => {
   const [exams, setExams] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [sections, setSections] = useState([]);
+  const [semesters, setSemesters] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({ name:'Internal Assessment 1 (IA-1)', academicYearId:'', subject:'', sem:'Sem 3', section:'A', date:'', time:'10:00 AM – 12:00 PM', room:'', maxMarks:100 });
+  const [form, setForm] = useState({ name:'Internal Assessment 1 (IA-1)', academicYearId:'', courseId:'', subjectId:'', subject:'', sem:'Sem 3', section:'A', date:'', time:'10:00 AM – 12:00 PM', room:'', maxMarks:100 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -120,9 +124,43 @@ const HodExams = () => {
       }
     };
 
+    const loadSemesters = async () => {
+      try {
+        const response = await getSemesters();
+        const data = response.data;
+
+        const semList = Array.isArray(data)
+          ? data
+          : (data.semesters || data.data || []);
+
+        setSemesters(semList);
+      } catch (error) {
+        console.error('Failed to load semesters:', error);
+        setSemesters([]);
+      }
+    };
+
+    const loadCourses = async () => {
+      try {
+        const response = await getCourses();
+        const data = response.data;
+
+        const courseList = Array.isArray(data)
+          ? data
+          : (data.courses || data.data || []);
+
+        setCourses(courseList);
+      } catch (error) {
+        console.error('Failed to load courses:', error);
+        setCourses([]);
+      }
+    };
+
     fetchLiveSubjects();
     fetchLiveSections();
     loadAcademicYears();
+    loadSemesters();
+    loadCourses();
   }, [hod.dept]);
 
   const fetchExams = async () => {
@@ -141,8 +179,8 @@ const HodExams = () => {
     }
   };
 
-  const openAdd = () => { setForm({ name:'Internal Assessment 1 (IA-1)', academicYearId:'', subject:subjects[0]?.name||'', sem:'Sem 3', section:'A', date:new Date().toISOString().split('T')[0], time:'10:00 AM – 12:00 PM', room:'', maxMarks:100 }); setEditId(null); setModal(true); };
-  const openEdit = (ex) => { setForm({ name:ex.name, academicYearId: ex.academicYearId?._id || ex.academicYearId || '', subject:ex.subject, sem:ex.sem || 'Sem 3', section:ex.section || 'A', date:ex.date, time:ex.time, room:ex.room, maxMarks:ex.maxMarks }); setEditId(ex._id || ex.id); setModal(true); };
+  const openAdd = () => { setForm({ name:'Internal Assessment 1 (IA-1)', academicYearId:'', courseId: '', subjectId: '', subject:subjects[0]?.name||'', sem:'Sem 3', section:'A', date:new Date().toISOString().split('T')[0], time:'10:00 AM – 12:00 PM', room:'', maxMarks:100 }); setEditId(null); setModal(true); };
+  const openEdit = (ex) => { setForm({ name:ex.name, academicYearId: ex.academicYearId?._id || ex.academicYearId || '', courseId: ex.courseId?._id || ex.courseId || '', subjectId: ex.subjectId?._id || ex.subjectId || '', subject:ex.subject, sem:ex.sem || 'Sem 3', section:ex.section || 'A', date:ex.date, time:ex.time, room:ex.room, maxMarks:ex.maxMarks }); setEditId(ex._id || ex.id); setModal(true); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -181,6 +219,85 @@ const HodExams = () => {
     return ex.name.toLowerCase().includes(q) || ex.subject.toLowerCase().includes(q) || ex.room.toLowerCase().includes(q);
   });
 
+  const departmentCourses = courses.filter(course => {
+    const currentCourseId = String(course.id || course._id);
+
+    return subjects.some(subject => {
+      const subjectCourse = subject.courseId;
+      const subjectCourseId =
+        typeof subjectCourse === 'object' && subjectCourse !== null
+          ? subjectCourse.id || subjectCourse._id
+          : subjectCourse;
+
+      return [course.id, course._id]
+        .filter(Boolean)
+        .some(id => String(id) === String(subjectCourseId));
+    });
+  });
+
+  const courseSemesters = semesters.filter(semester => {
+    const semesterCourseId =
+      semester.courseId?._id || semester.courseId;
+
+    return (
+      form.courseId &&
+      String(semesterCourseId) === String(form.courseId)
+    );
+  });
+
+  const selectedSemNum = (form.sem || '').replace(/\D/g, '');
+  const semObj = courseSemesters.find(
+    s => s.name === form.sem || String(s.semesterNumber) === selectedSemNum || s.id === form.sem || s._id === form.sem
+  );
+  const semId = semObj?._id || semObj?.id;
+  const semesterIds = [
+    semObj?._id,
+    semObj?.id
+  ]
+    .filter(Boolean)
+    .map(String);
+
+  const filteredSubjects = subjects.filter(s => {
+    const subjectCourseId =
+      s.courseId?._id || s.courseId;
+
+    if (
+      form.courseId &&
+      String(subjectCourseId) !== String(form.courseId)
+    ) {
+      return false;
+    }
+
+    if (!form.sem) return true;
+    if (s.semester === form.sem) return true;
+    if (s.semester && String(s.semester).toLowerCase() === form.sem.toLowerCase()) return true;
+    if (s.semester && String(s.semester).replace(/\D/g, '') === selectedSemNum) return true;
+    if (semId && (s.semesterId === semId || String(s.semesterId) === String(semId))) return true;
+    return false;
+  });
+
+  const availableSubjects = filteredSubjects;
+
+  const filteredSections = sections.filter(section => {
+    const sectionSemesterId =
+      section.semesterId?._id ||
+      section.semesterId?.id ||
+      section.semesterId;
+
+    if (semesterIds.includes(String(sectionSemesterId))) {
+      return true;
+    }
+    return false;
+  });
+
+  const sectionOptions = [
+    ...new Set(
+      filteredSections
+        .map(section => section.name || section.sectionName)
+        .filter(Boolean)
+    )
+  ];
+
   return (
     <div className="animate-fade-in" style={{ padding:'1.5rem' }}>
       <div className="page-header">
@@ -198,6 +315,7 @@ const HodExams = () => {
         <div className="filters-row">
           <div className="search-box"><Search size={16} className="text-muted"/><input placeholder="Search by exam, subject or room..." value={search} onChange={e=>setSearch(e.target.value)}/></div>
         </div>
+
         <div className="table-container">
           <table>
             <thead><tr><th>Exam Type</th><th>Subject</th><th>Semester</th><th>Date</th><th>Time</th><th>Venue</th><th>Marks</th><th>Actions</th></tr></thead>
@@ -256,14 +374,98 @@ const HodExams = () => {
                     </optgroup>
                   ))}
                 </select></div>
-                <div className="form-group"><label>Subject *</label>
-                  {subjects.length>0 ? (
-                    <select value={form.subject} onChange={e=>setForm({...form,subject:e.target.value})}><option value="">– Select –</option>{subjects.map(s=><option key={s.id} value={s.name}>{s.name} ({s.code})</option>)}</select>
-                  ) : (
-                    <input required placeholder="e.g. Data Structures" value={form.subject} onChange={e=>setForm({...form,subject:e.target.value})}/>
-                  )}
+                <div className="form-group">
+                  <label>Course *</label>
+                  <select
+                    required
+                    value={form.courseId}
+                    onChange={e =>
+                      setForm({
+                        ...form,
+                        courseId: e.target.value,
+                        sem: '',
+                        section: '',
+                        subject: ''
+                      })
+                    }
+                  >
+                    <option value="">Select Course</option>
+
+                    {departmentCourses.map(course => (
+                      <option
+                        key={course.id || course._id}
+                        value={course.id || course._id}
+                      >
+                        {course.name} ({course.code})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div className="form-group"><label>Semester</label><select value={form.sem} onChange={e=>setForm({...form,sem:e.target.value})}>{SEMS.map(s=><option key={s}>{s}</option>)}</select></div>
+                <div className="form-group">
+                  <label>Semester</label>
+                  <select
+                    required
+                    value={form.sem}
+                    disabled={!form.courseId}
+                    onChange={e =>
+                      setForm({
+                        ...form,
+                        sem: e.target.value,
+                        section: '',
+                        subject: ''
+                      })
+                    }
+                  >
+                    <option value="">Select Semester</option>
+
+                    {courseSemesters.map(semester => {
+                      const semesterName =
+                        semester.name || `Semester ${semester.semesterNumber}`;
+
+                      return (
+                        <option
+                          key={semester._id || semester.id}
+                          value={semesterName}
+                        >
+                          {semesterName}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Subject *</label>
+                  <select
+                    required
+                    value={form.subjectId}
+                    disabled={!form.sem}
+                    onChange={e => {
+                      const selectedId = e.target.value;
+
+                      const selectedSubject = availableSubjects.find(
+                        subject =>
+                          String(subject._id || subject.id) === String(selectedId)
+                      );
+
+                      setForm({
+                        ...form,
+                        subjectId: selectedId,
+                        subject: selectedSubject?.name || ''
+                      });
+                    }}
+                  >
+                    <option value="">Select Subject</option>
+
+                    {availableSubjects.map(subject => (
+                      <option
+                        key={subject._id || subject.id}
+                        value={subject._id || subject.id}
+                      >
+                        {subject.name} ({subject.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="form-group">
                   <label>Section *</label>
                   <select
@@ -272,13 +474,11 @@ const HodExams = () => {
                     onChange={e => setForm({ ...form, section: e.target.value })}
                   >
                     <option value="">Select Section</option>
-
-                    {[...new Set(['A', 'B', 'C', ...sections.map(section => section.name || section.sectionName).filter(Boolean)])]
-                      .map(sectionName => (
-                        <option key={sectionName} value={sectionName}>
-                          Section {sectionName}
-                        </option>
-                      ))}
+                    {sectionOptions.map(sectionName => (
+                      <option key={sectionName} value={sectionName}>
+                        Section {sectionName}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="form-group"><label>Date *</label><input type="date" required value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/></div>

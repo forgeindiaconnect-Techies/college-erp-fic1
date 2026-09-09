@@ -1,7 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Trophy, AlertTriangle, TrendingUp, Edit2, X, CheckCircle, Percent, Hash } from 'lucide-react';
+import {
+  Search,
+  Filter,
+  Trophy,
+  AlertTriangle,
+  TrendingUp,
+  Edit2,
+  X,
+  CheckCircle,
+  Percent,
+  Hash,
+  Plus
+} from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getStudents, updateStudent, getAllMarks } from '../../api/index';
+import {
+  getAllMarks,
+  createMark,
+  getExams,
+  getStudents
+} from '../../api/index';
 import './HodMarks.css';
 
 // Try to grab logged in HOD session
@@ -14,22 +31,6 @@ const getHodSession = () => {
     return { name: 'Prof. Rajan Iyer', dept: 'Electrical Engg.', deptCode: 'EE', role: 'HOD' };
   }
 };
-
-const MOCK_MARKS_FALLBACK = [
-  { id: 'CS2021001', name: 'John Doe', dept: 'Computer Science', sem: 'Sem 6', internal: 42, external: 71, gpa: 8.5, cgpa: 8.3, arrears: 0, trend: [7.2, 7.5, 7.9, 8.1, 8.3, 8.5] },
-  { id: 'EE2022001', name: 'Alice Smith', dept: 'Electrical Engg.', sem: 'Sem 4', internal: 48, external: 88, gpa: 9.1, cgpa: 9.0, arrears: 0, trend: [8.5, 8.8, 9.0, 9.1] },
-  { id: 'ME2023001', name: 'Robert Johnson', dept: 'Mechanical Engg.', sem: 'Sem 2', internal: 35, external: 55, gpa: 6.8, cgpa: 7.1, arrears: 2, trend: [7.4, 6.8] },
-  { id: 'CS2021004', name: 'Emily Davis', dept: 'Computer Science', sem: 'Sem 6', internal: 47, external: 85, gpa: 8.9, cgpa: 8.7, arrears: 0, trend: [7.9, 8.2, 8.4, 8.5, 8.6, 8.9] },
-  { id: 'CE2020001', name: 'Michael Brown', dept: 'Civil Engg.', sem: 'Sem 8', internal: 30, external: 48, gpa: 6.1, cgpa: 6.9, arrears: 3, trend: [7.5, 7.2, 6.9, 6.5, 6.2, 6.3, 6.0, 6.1] },
-  { id: 'EE2022002', name: 'Sarah Wilson', dept: 'Electrical Engg.', sem: 'Sem 4', internal: 49, external: 91, gpa: 9.5, cgpa: 9.3, arrears: 0, trend: [8.9, 9.1, 9.2, 9.5] },
-  { id: 'CS2022001', name: 'David Lee', dept: 'Computer Science', sem: 'Sem 3', internal: 43, external: 76, gpa: 8.2, cgpa: 8.0, arrears: 0, trend: [7.6, 7.9, 8.2] },
-  { id: 'EE2022003', name: 'Raj Kumar', dept: 'Electrical Engg.', sem: 'Sem 2', internal: 38, external: 64, gpa: 7.0, cgpa: 7.2, arrears: 1, trend: [7.4, 7.0] },
-];
-
-const CGPA_TREND_DATA_FALLBACK = [
-  { sem: 'Sem 1', avg: 7.7 }, { sem: 'Sem 2', avg: 7.9 }, { sem: 'Sem 3', avg: 8.1 },
-  { sem: 'Sem 4', avg: 8.4 }, { sem: 'Sem 5', avg: 8.5 }, { sem: 'Sem 6', avg: 8.7 },
-];
 
 const SEMESTERS = ['Sem 1','Sem 2','Sem 3','Sem 4','Sem 5','Sem 6','Sem 7','Sem 8'];
 const AVATAR_COLORS = ['bg-gradient-blue','bg-gradient-purple','bg-gradient-orange','bg-gradient-green','bg-gradient-teal','bg-gradient-pink'];
@@ -46,8 +47,21 @@ const HodMarks = () => {
   /* Edit Modal states */
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [form, setForm] = useState({ id:'', name:'', internal: 0, external: 0, cgpa: 0, arrears: 0 });
+  const [form, setForm] = useState({
+    id: '',
+    name: '',
+    semester: '',
+    subject: '',
+    marksObtained: 0,
+    maxMarks: 100
+  });
   const [saved, setSaved] = useState(false);
+  const [entryModalOpen, setEntryModalOpen] = useState(false);
+  const [exams, setExams] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [selectedExamId, setSelectedExamId] = useState('');
+  const [bulkMarks, setBulkMarks] = useState({});
+  const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
     fetchMarksData();
@@ -55,61 +69,86 @@ const HodMarks = () => {
 
   const fetchMarksData = async () => {
     try {
-      const [studRes, marksRes] = await Promise.all([
-        getStudents().catch(() => ({ data: [] })),
-        getAllMarks().catch(() => ({ data: [] }))
+      setLoading(true);
+
+      const [marksRes, examsRes, studentsRes] = await Promise.all([
+        getAllMarks(),
+        getExams(),
+        getStudents()
       ]);
-      
-      let backendMarks = marksRes?.data || [];
-      const localMarks = JSON.parse(localStorage.getItem(`erp_marks_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
-      const allMarks = [...backendMarks];
-      localMarks.forEach(lm => {
-        const idx = allMarks.findIndex(m => m.studentId === lm.studentId && m.subject === lm.subject);
-        if (idx >= 0) allMarks[idx] = lm;
-        else allMarks.push(lm);
-      });
 
-      // Backend auto-scopes to HOD's dept. Map Student model data to marks display format.
-      const mapped = studRes.data.map(s => {
-        const sId = s.id || s._id;
-        const studentMarks = allMarks.filter(m => 
-          m.studentId === sId || m.studentId === s.id || m.studentId === s._id || 
-          (m.studentName && s.name && m.studentName.toLowerCase().trim() === s.name.toLowerCase().trim())
-        );
-        
-        let avgInternal = 0;
-        let avgExternal = 0;
-        if (studentMarks.length > 0) {
-          const totalInternal = studentMarks.reduce((sum, m) => sum + (m.internalMarks != null ? m.internalMarks : (m.internal || 0)), 0);
-          const totalExternal = studentMarks.reduce((sum, m) => sum + (m.semesterMarks != null ? m.semesterMarks : (m.external || 0)), 0);
-          avgInternal = Math.round(totalInternal / studentMarks.length);
-          avgExternal = Math.round(totalExternal / studentMarks.length);
-        }
+      const backendMarks = Array.isArray(marksRes?.data)
+        ? marksRes.data
+        : [];
 
-        const totalScore = avgInternal + avgExternal;
-        const computedGpa = totalScore > 0 ? Number((totalScore / 10).toFixed(1)) : (s.cgpa != null ? s.cgpa : 0);
-        const lastMarkSem = studentMarks.length > 0 ? studentMarks[studentMarks.length - 1].semester : null;
+      const examData = Array.isArray(examsRes?.data)
+        ? examsRes.data
+        : examsRes?.data?.exams || examsRes?.data?.data || [];
 
-        return {
-          id: s.id || s._id,
-          name: s.name,
-          dept: s.dept || HOD_DEPT,
-          sem: lastMarkSem || s.sem || 'Semester 3',
-          internal: avgInternal,
-          external: avgExternal,
-          gpa: computedGpa,
-          cgpa: computedGpa,
-          arrears: (avgInternal < 20 || avgExternal < 30) ? 1 : (s.arrears || 0),
-          trend: [computedGpa]
-        };
-      });
-      setMarks(mapped.length > 0 ? mapped : MOCK_MARKS_FALLBACK.filter(m => m.dept === HOD_DEPT));
-      setLoading(false);
+      const studentData = Array.isArray(studentsRes?.data)
+        ? studentsRes.data
+        : studentsRes?.data?.students || studentsRes?.data?.data || [];
+
+      const isSameDepartment = value =>
+        String(value || '').trim().toLowerCase() ===
+        String(HOD_DEPT || '').trim().toLowerCase();
+
+      setExams(
+        examData.filter(exam => isSameDepartment(exam.dept))
+      );
+
+      setStudents(
+        studentData.filter(student =>
+          isSameDepartment(student.dept || student.department)
+        )
+      );
+
+      const mapped = backendMarks.map(mark => ({
+        markId: mark._id,
+        examId: mark.examId?._id || mark.examId || '',
+        examName:
+          mark.examId?.name ||
+          examData.find(
+            exam =>
+              String(exam._id || exam.id) ===
+              String(mark.examId?._id || mark.examId)
+          )?.name ||
+          'Unlinked Exam',
+        id: mark.registerNo || mark.studentId,
+        studentId: mark.studentId,
+        name: mark.studentName || 'Unknown Student',
+        dept: mark.department || HOD_DEPT,
+        sem: mark.semester,
+        subject: mark.subject,
+        internal: Number(mark.internalMarks || 0),
+        external: Number(mark.semesterMarks || 0),
+        marksObtained: Number(mark.marksObtained ?? mark.totalMarks ?? 0),
+        maxMarks: Number(mark.maxMarks || 100),
+        passMarks: Number(mark.passMarks || 40),
+        percentage: Number(mark.maxMarks || 100) > 0
+          ? Number(
+              (
+                (Number(mark.marksObtained ?? mark.totalMarks ?? 0) /
+                  Number(mark.maxMarks || 100)) *
+                100
+              ).toFixed(2)
+            )
+          : 0,
+        gpa: Number(mark.gpa || 0),
+        grade: mark.grade || 'U',
+        cgpa: Number(mark.cgpa || 0),
+        arrears: mark.arrearStatus === 'Arrear' ? 1 : 0,
+        resultStatus: mark.resultStatus || 'Draft',
+        trend: [Number(mark.cgpa || 0)]
+      }));
+
+      setMarks(mapped);
     } catch (err) {
-      console.warn('Backend unavailable, using fallback data:', err.message);
-      const savedData = localStorage.getItem('erp_marks');
-      const base = savedData ? JSON.parse(savedData) : MOCK_MARKS_FALLBACK;
-      setMarks(base.filter(m => m.dept === HOD_DEPT));
+      console.error('Failed to load real marks data:', err);
+      setMarks([]);
+      setExams([]);
+      setStudents([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -119,27 +158,207 @@ const HodMarks = () => {
   
   const filtered = deptMarks.filter(m => {
     const matchSearch = m.name.toLowerCase().includes(search.toLowerCase()) || m.id.toLowerCase().includes(search.toLowerCase());
-    const matchSem = semFilter === 'All' || m.sem === semFilter;
+    const matchSem =
+      semFilter === 'All' ||
+      String(m.sem || '').replace(/\D/g, '') ===
+        String(semFilter).replace(/\D/g, '');
     return matchSearch && matchSem;
   });
 
-  const topStudents = [...deptMarks].sort((a, b) => b.cgpa - a.cgpa).slice(0, 3);
+  const normalizeSemester = value =>
+    String(value || '').replace(/\D/g, '');
+
+  const normalizeSection = value =>
+    String(value || '')
+      .replace(/^section\s*/i, '')
+      .trim()
+      .toLowerCase();
+
+  const selectedExam = exams.find(
+    exam => exam._id === selectedExamId || exam.id === selectedExamId
+  );
+
+  const examStudents = selectedExam
+    ? students.filter(student => {
+        const sameSemester =
+          normalizeSemester(student.sem || student.semester) ===
+          normalizeSemester(selectedExam.sem);
+
+        const sameSection =
+          normalizeSection(student.section || student.sectionName) ===
+          normalizeSection(selectedExam.section);
+
+        return sameSemester && sameSection;
+      })
+    : [];
+
+  const getFinalGradeAndGpa = (percentage, passed) => {
+    if (!passed) return { grade: 'U', gpa: 0 };
+    if (percentage >= 90) return { grade: 'O', gpa: 10 };
+    if (percentage >= 80) return { grade: 'A+', gpa: 9 };
+    if (percentage >= 70) return { grade: 'A', gpa: 8 };
+    if (percentage >= 60) return { grade: 'B+', gpa: 7 };
+    if (percentage >= 50) return { grade: 'B', gpa: 6 };
+    return { grade: 'U', gpa: 0 };
+  };
+
+  const consolidatedGroups = {};
+
+  filtered.forEach(record => {
+    const key = [
+      record.studentId,
+      record.sem,
+      record.subject
+    ].join('::');
+
+    if (!consolidatedGroups[key]) {
+      consolidatedGroups[key] = {
+        studentId: record.studentId,
+        studentRegNo: record.studentRegNo || record.id,
+        name: record.name,
+        dept: record.dept,
+        sem: record.sem,
+        subject: record.subject,
+        internalPercentages: [],
+        externalPercentages: []
+      };
+    }
+
+    const examName = String(record.examName || '').toLowerCase();
+    const percentage = Number(record.percentage || 0);
+
+    const isExternal =
+      examName.includes('end semester') ||
+      examName.includes('university semester') ||
+      examName.includes('external');
+
+    if (isExternal) {
+      consolidatedGroups[key].externalPercentages.push(percentage);
+    } else {
+      consolidatedGroups[key].internalPercentages.push(percentage);
+    }
+  });
+
+  const consolidatedResults = Object.values(consolidatedGroups)
+    .filter(group =>
+      group.internalPercentages.length > 0 &&
+      group.externalPercentages.length > 0
+    )
+    .map(group => {
+      const internalAverage =
+        group.internalPercentages.reduce(
+          (sum, value) => sum + value,
+          0
+        ) / group.internalPercentages.length;
+
+      const externalAverage =
+        group.externalPercentages.reduce(
+          (sum, value) => sum + value,
+          0
+        ) / group.externalPercentages.length;
+
+      const internalMark = Number(
+        ((internalAverage / 100) * 40).toFixed(2)
+      );
+
+      const externalMark = Number(
+        ((externalAverage / 100) * 60).toFixed(2)
+      );
+
+      const total = Number(
+        (internalMark + externalMark).toFixed(2)
+      );
+
+      const passed =
+        internalAverage >= 40 &&
+        externalAverage >= 40 &&
+        total >= 50;
+
+      const finalResult = getFinalGradeAndGpa(total, passed);
+
+      return {
+        ...group,
+        internalMark,
+        externalMark,
+        total,
+        gpa: finalResult.gpa,
+        grade: finalResult.grade,
+        status: passed ? 'Pass' : 'Arrear'
+      };
+    });
+
+  const uniqueStudents = Array.from(
+    deptMarks.reduce((map, record) => {
+      const studentKey = record.studentId || record.id;
+      const existing = map.get(studentKey);
+
+      if (!existing || record.cgpa > existing.cgpa) {
+        map.set(studentKey, record);
+      }
+
+      return map;
+    }, new Map()).values()
+  );
+
+  const topStudents = [...uniqueStudents]
+    .sort((a, b) => b.cgpa - a.cgpa)
+    .slice(0, 3);
   const withArrears = deptMarks.filter(m => m.arrears > 0);
   const avgCgpa = deptMarks.length ? (deptMarks.reduce((a, b) => a + b.cgpa, 0) / deptMarks.length).toFixed(2) : 0;
+
+  const cgpaTrendData = SEMESTERS
+    .map(sem => {
+      const semNumber = sem.replace(/\D/g, '');
+
+      const semMarks = deptMarks.filter(mark =>
+        String(mark.sem || '').replace(/\D/g, '') === semNumber &&
+        Number(mark.cgpa) > 0
+      );
+
+      if (semMarks.length === 0) {
+        return null;
+      }
+
+      const uniqueSemesterStudents = [
+        ...new Map(
+          semMarks.map(mark => [
+            mark.studentId || mark.id,
+            mark
+          ])
+        ).values()
+      ];
+
+      const average =
+        uniqueSemesterStudents.reduce(
+          (sum, mark) => sum + Number(mark.cgpa),
+          0
+        ) / uniqueSemesterStudents.length;
+
+      return {
+        sem,
+        avg: Number(average.toFixed(2))
+      };
+    })
+    .filter(Boolean);
 
   const getCgpaColor = (c) => c >= 9 ? 'var(--success)' : c < 7 ? 'var(--danger)' : 'var(--warning)';
   const getGrade = (c) => c >= 9 ? 'O' : c >= 8 ? 'A+' : c >= 7 ? 'A' : c >= 6 ? 'B+' : 'B';
 
-  const openEdit = (m) => {
+  const openEdit = (mark) => {
+    const relatedExam = exams.find(
+      exam => (exam._id || exam.id) === mark.examId
+    );
+
     setForm({
-      id: m.id,
-      name: m.name,
-      internal: m.internal,
-      external: m.external,
-      cgpa: m.cgpa,
-      arrears: m.arrears
+      id: mark.id,
+      name: mark.name,
+      semester: mark.sem,
+      subject: mark.subject,
+      marksObtained: mark.marksObtained,
+      maxMarks: Number(relatedExam?.maxMarks || mark.maxMarks || 100)
     });
-    setEditTarget(m.id);
+
+    setEditTarget(mark.markId);
     setSaved(false);
     setModalOpen(true);
   };
@@ -155,47 +374,134 @@ const HodMarks = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!editTarget) return;
 
-    // Calculate GPA from marks
-    const newGpa = Math.min(10, +((+form.internal * 0.1) + (+form.external * 0.05)).toFixed(2));
+    const selectedMark = marks.find(
+      mark => mark.markId === editTarget
+    );
 
-    // Optimistically update UI
-    const updated = marks.map(m => {
-      if (m.id === editTarget) {
-        const updatedTrend = [...m.trend];
-        updatedTrend[updatedTrend.length - 1] = +form.cgpa;
-        return { ...m, internal: +form.internal, external: +form.external, gpa: newGpa, cgpa: +form.cgpa, arrears: +form.arrears, trend: updatedTrend };
-      }
-      return m;
-    });
-    setMarks(updated);
+    if (!selectedMark) return;
 
-    try {
-      // Save CGPA update to Student record via API
-      await updateStudent(editTarget, { cgpa: +form.cgpa });
-    } catch (err) {
-      console.warn('API save failed, persisting locally:', err.message);
-      // Also sync with erp_marks localStorage for fallback
-      const studentsSaved = localStorage.getItem(`erp_students_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
-      if (studentsSaved) {
-        const parsedStud = JSON.parse(studentsSaved);
-        const updatedStud = parsedStud.map(s => s.id === editTarget ? { ...s, cgpa: +form.cgpa } : s);
-        localStorage.setItem(`erp_students_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(updatedStud));
-      }
+    const maximum = Number(form.maxMarks || 100);
+    const obtained = Number(form.marksObtained);
+
+    if (obtained < 0 || obtained > maximum) {
+      alert(`Marks must be between 0 and ${maximum}.`);
+      return;
     }
 
-    setSaved(true);
-    setTimeout(() => { closeModal(); setSaved(false); }, 800);
+    try {
+      await createMark([{
+        examId: selectedMark.examId,
+        studentId: selectedMark.studentId || selectedMark.id,
+        studentName: selectedMark.name,
+        registerNo: selectedMark.id,
+        department: HOD_DEPT,
+        semester: selectedMark.sem,
+        section: selectedMark.section,
+        subject: selectedMark.subject,
+        marksObtained: obtained,
+        maxMarks: maximum,
+        passMarks: Math.ceil(maximum * 0.4),
+        resultStatus: 'Published'
+      }]);
+
+      await fetchMarksData();
+
+      setSaved(true);
+      setTimeout(() => {
+        closeModal();
+        setSaved(false);
+      }, 800);
+    } catch (err) {
+      console.error('Failed to update exam marks:', err);
+      alert(err.response?.data?.message || 'Failed to update exam marks.');
+    }
+  };
+
+  const handlePublishExamMarks = async (e) => {
+    e.preventDefault();
+
+    if (!selectedExam) {
+      alert('Please select a scheduled exam.');
+      return;
+    }
+
+    if (examStudents.length === 0) {
+      alert('No students found for this exam semester and section.');
+      return;
+    }
+
+    const hasMissingMarks = examStudents.some(student => {
+      const studentId = student.id || student._id;
+      return (
+        bulkMarks[studentId] === undefined ||
+        bulkMarks[studentId] === ''
+      );
+    });
+
+    if (hasMissingMarks) {
+      alert('Please enter marks for every student.');
+      return;
+    }
+
+    const maximum = Number(selectedExam.maxMarks || 100);
+
+    const payload = examStudents.map(student => {
+      const studentId = student.id || student._id;
+
+      return {
+        examId: selectedExam._id,
+        studentId,
+        studentName: student.name,
+        registerNo: student.id || student.registerNo,
+        department: HOD_DEPT,
+        semester: selectedExam.sem,
+        section: selectedExam.section,
+        subject: selectedExam.subject,
+        marksObtained: Number(bulkMarks[studentId]),
+        maxMarks: maximum,
+        passMarks: Number(
+          selectedExam.passMarks || Math.ceil(maximum * 0.4)
+        ),
+        resultStatus: 'Published'
+      };
+    });
+
+    try {
+      setPublishing(true);
+      await createMark(payload);
+      await fetchMarksData();
+      setEntryModalOpen(false);
+      setSelectedExamId('');
+      setBulkMarks({});
+      alert('Exam marks published successfully.');
+    } catch (err) {
+      console.error('Failed to publish exam marks:', err);
+      alert(err.response?.data?.message || 'Failed to publish exam marks.');
+    } finally {
+      setPublishing(false);
+    }
   };
 
   return (
     <div className="cgpa-page animate-fade-in">
-      <div className="page-header">
+      <div className="page-header flex justify-between items-center">
         <div>
           <h1>Marks & CGPA</h1>
           <p className="text-muted">Manage academic grades, GPAs, and arrears for students in <strong>{HOD_DEPT}</strong>.</p>
         </div>
+        <button
+          type="button"
+          className="btn-primary flex items-center gap-2"
+          onClick={() => {
+            setSelectedExamId('');
+            setBulkMarks({});
+            setEntryModalOpen(true);
+          }}
+        >
+          <Plus size={18} />
+          Enter Exam Marks
+        </button>
       </div>
 
       {/* Summary Row */}
@@ -226,7 +532,7 @@ const HodMarks = () => {
           <h3>Semester Performance Trend</h3>
           <div style={{ height: '230px', marginTop: '1.25rem' }}>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={CGPA_TREND_DATA_FALLBACK}>
+              <LineChart data={cgpaTrendData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
                 <XAxis dataKey="sem" stroke="var(--text-muted)" />
                 <YAxis domain={[6, 10]} stroke="var(--text-muted)" />
@@ -288,21 +594,21 @@ const HodMarks = () => {
             </div>
           </div>
           <div className="table-container">
-            <table>
+            <table style={{ minWidth: '1500px' }}>
               <thead>
                 <tr>
                   <th>#</th><th>Register No</th><th>Name</th><th>Sem</th>
-                  <th>Internal (40)</th><th>External (60)</th><th>GPA</th><th>CGPA</th>
+                  <th>Subject</th><th>Exam Type</th><th>Marks Obtained</th><th>Maximum Marks</th><th>Percentage</th><th>GPA</th><th>CGPA</th>
                   <th>Grade</th><th>Arrears</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? Array.from({ length: 4 }).map((_, i) => (
-                  <tr key={i}>{Array.from({ length: 11 }).map((_, j) => <td key={j}><div className="skeleton" style={{ height: '16px', borderRadius: '4px' }}></div></td>)}</tr>
+                  <tr key={i}>{Array.from({ length: 14 }).map((_, j) => <td key={j}><div className="skeleton" style={{ height: '16px', borderRadius: '4px' }}></div></td>)}</tr>
                 )) : filtered.length === 0 ? (
-                  <tr><td colSpan={11} className="no-data">No students matching query.</td></tr>
+                  <tr><td colSpan={14} className="no-data">No students matching query.</td></tr>
                 ) : filtered.map((m, idx) => (
-                  <tr key={m.id}>
+                  <tr key={m.markId}>
                     <td className="text-muted">{idx + 1}</td>
                     <td><span className="roll-no">{m.id}</span></td>
                     <td>
@@ -312,8 +618,11 @@ const HodMarks = () => {
                       </div>
                     </td>
                     <td><span className="badge-outline">{m.sem}</span></td>
-                    <td><span className={m.internal < 20 ? 'text-danger font-semibold' : 'font-semibold'}>{m.internal}</span></td>
-                    <td><span className={m.external < 30 ? 'text-danger font-semibold' : 'font-semibold'}>{m.external}</span></td>
+                    <td><span className="font-semibold">{m.subject}</span></td>
+                    <td>{m.examName}</td>
+                    <td className="font-semibold">{m.marksObtained}</td>
+                    <td>{m.maxMarks}</td>
+                    <td className="font-semibold">{m.percentage}%</td>
                     <td><span style={{ color: getCgpaColor(m.gpa), fontWeight: 600 }}>{m.gpa}</span></td>
                     <td>
                       <div className="cgpa-cell">
@@ -325,7 +634,7 @@ const HodMarks = () => {
                     </td>
                     <td>
                       <span className="grade-badge" style={{ background: getCgpaColor(m.cgpa) + '20', color: getCgpaColor(m.cgpa), border: `1px solid ${getCgpaColor(m.cgpa)}40` }}>
-                        {getGrade(m.cgpa)}
+                        {m.grade}
                       </span>
                     </td>
                     <td>
@@ -345,7 +654,233 @@ const HodMarks = () => {
             </table>
           </div>
         </div>
+
+        {/* Consolidated Semester Results Table */}
+        <div className="glass-card col-span-3" style={{ marginTop: '1.5rem' }}>
+          <div className="table-header" style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Consolidated Semester Results</h3>
+              <p className="text-muted" style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem' }}>
+                Internal 40% + End Semester 60%
+              </p>
+            </div>
+          </div>
+
+          <div className="table-container" style={{ overflowX: 'auto', width: '100%' }}>
+            <table style={{ minWidth: '1300px' }}>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Student Name</th>
+                  <th>Register No</th>
+                  <th>Department</th>
+                  <th>Semester</th>
+                  <th>Subject</th>
+                  <th>Internal (40)</th>
+                  <th>External (60)</th>
+                  <th>Final Total</th>
+                  <th>GPA</th>
+                  <th>Grade</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {consolidatedResults.length === 0 ? (
+                  <tr>
+                    <td colSpan={12} className="no-data-row">
+                      Consolidated results require both internal and end-semester marks.
+                    </td>
+                  </tr>
+                ) : (
+                  consolidatedResults.map((result, index) => (
+                    <tr
+                      key={`${result.studentId}-${result.sem}-${result.subject}`}
+                    >
+                      <td>{index + 1}</td>
+                      <td className="font-semibold">{result.name}</td>
+                      <td>{result.studentRegNo}</td>
+                      <td>{result.dept}</td>
+                      <td>{result.sem}</td>
+                      <td className="font-semibold">{result.subject}</td>
+                      <td>{result.internalMark} / 40</td>
+                      <td>{result.externalMark} / 60</td>
+                      <td className="font-semibold" style={{ color: 'var(--primary)' }}>
+                        {result.total} / 100
+                      </td>
+                      <td>
+                        <span style={{ color: getCgpaColor(result.gpa), fontWeight: 700 }}>
+                          {result.gpa}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className="grade-badge"
+                          style={{
+                            background: getCgpaColor(result.gpa) + '18',
+                            color: getCgpaColor(result.gpa),
+                            border: `1px solid ${getCgpaColor(result.gpa)}35`
+                          }}
+                        >
+                          {result.grade}
+                        </span>
+                      </td>
+                      <td>
+                        {result.status === 'Pass' ? (
+                          <span className="badge-pass">✓ Pass</span>
+                        ) : (
+                          <span className="badge-fail">✗ Fail</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
+
+      {entryModalOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => setEntryModalOpen(false)}
+        >
+          <div
+            className="modal-card glass-card"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <h2>Enter Exam Marks</h2>
+                <p className="text-muted">
+                  Select a scheduled exam and publish student marks.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() => setEntryModalOpen(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form
+              className="modal-form"
+              onSubmit={handlePublishExamMarks}
+            >
+              <div className="form-group">
+                <label>Scheduled Exam *</label>
+                <select
+                  required
+                  value={selectedExamId}
+                  onChange={e => {
+                    setSelectedExamId(e.target.value);
+                    setBulkMarks({});
+                  }}
+                >
+                  <option value="">Select Exam</option>
+
+                  {exams.map(exam => (
+                    <option
+                      key={exam._id || exam.id}
+                      value={exam._id || exam.id}
+                    >
+                      {exam.name} — {exam.subject} — {exam.sem} —
+                      Section {exam.section}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedExam && (
+                <>
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Subject</label>
+                      <input disabled value={selectedExam.subject || ''} />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Maximum Marks</label>
+                      <input disabled value={selectedExam.maxMarks || 100} />
+                    </div>
+                  </div>
+
+                  <div className="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Register No</th>
+                          <th>Student Name</th>
+                          <th>Marks Obtained</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {examStudents.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="no-data">
+                              No students found for {selectedExam.sem},
+                              Section {selectedExam.section}.
+                            </td>
+                          </tr>
+                        ) : (
+                          examStudents.map(student => {
+                            const studentId = student.id || student._id;
+
+                            return (
+                              <tr key={studentId}>
+                                <td>{student.id || student.registerNo}</td>
+                                <td>{student.name}</td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={selectedExam.maxMarks || 100}
+                                    required
+                                    value={bulkMarks[studentId] ?? ''}
+                                    onChange={e =>
+                                      setBulkMarks(previous => ({
+                                        ...previous,
+                                        [studentId]: e.target.value
+                                      }))
+                                    }
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setEntryModalOpen(false)}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={publishing || !selectedExam}
+                >
+                  {publishing ? 'Publishing...' : 'Publish Marks'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* EDIT MARKS MODAL */}
       {modalOpen && (
@@ -376,21 +911,30 @@ const HodMarks = () => {
                   <input disabled value={form.id} style={{ opacity: 0.6, cursor: 'not-allowed' }} />
                 </div>
                 <div className="form-group">
-                  <label><Percent size={13} /> Internal Marks (Max 50)</label>
-                  <input type="number" min="0" max="50" required value={form.internal} onChange={e => handleFormChange('internal', e.target.value)} />
+                  <label>
+                    <Percent size={13} /> Marks Obtained
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max={form.maxMarks}
+                    required
+                    value={form.marksObtained}
+                    onChange={e =>
+                      handleFormChange('marksObtained', e.target.value)
+                    }
+                  />
                 </div>
+
                 <div className="form-group">
-                  <label><Percent size={13} /> External Marks (Max 100)</label>
-                  <input type="number" min="0" max="100" required value={form.external} onChange={e => handleFormChange('external', e.target.value)} />
+                  <label>Maximum Marks</label>
+                  <input
+                    disabled
+                    value={form.maxMarks}
+                    style={{ opacity: 0.7, cursor: 'not-allowed' }}
+                  />
                 </div>
-                <div className="form-group">
-                  <label><Hash size={13} /> Cumulative CGPA (0.0 - 10.0)</label>
-                  <input type="number" step="0.01" min="0" max="10" required value={form.cgpa} onChange={e => handleFormChange('cgpa', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label><AlertTriangle size={13} /> Active Arrears</label>
-                  <input type="number" min="0" max="10" required value={form.arrears} onChange={e => handleFormChange('arrears', e.target.value)} />
-                </div>
+
               </div>
 
               <div className="modal-actions" style={{display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem'}}>
@@ -406,3 +950,4 @@ const HodMarks = () => {
 };
 
 export default HodMarks;
+
