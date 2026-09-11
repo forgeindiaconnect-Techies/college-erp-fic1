@@ -1,22 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAssignments, submitAssignment as apiSubmitAssignment, getStudentSubmissions } from '../../api/index';
+import useRealtimeSync from '../../hooks/useRealtimeSync';
 import { ClipboardList, Calendar, Users, X, CheckCircle, FileText, ArrowLeft, UploadCloud } from 'lucide-react';
 import './StudentAssignments.css';
-
-// Fallbacks
-const DEFAULT_STUDENT = {
-  id: 'CS2022001',
-  name: 'John Doe',
-  dept: 'Computer Science',
-  sem: 'Sem 6',
-  email: 'john@college.edu'
-};
 
 const StudentAssignments = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [studentSession, setStudentSession] = useState(DEFAULT_STUDENT);
+  const [studentSession, setStudentSession] = useState(null);
   const [assignments, setAssignments] = useState([]);
 
   // Submission popup state
@@ -26,64 +22,77 @@ const StudentAssignments = () => {
   const [submittedTasks, setSubmittedTasks] = useState({});
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    const init = async () => {
-      const session = sessionStorage.getItem('student_session');
-      let activeStud = DEFAULT_STUDENT;
-      if (session) {
-        activeStud = JSON.parse(session);
-        setStudentSession(activeStud);
-      } else {
-        navigate('/student/login');
-        return;
-      }
+  const loadAssignments = useCallback(async () => {
+    const session =
+      sessionStorage.getItem('student_session');
 
-      let studentSem = activeStud.sem;
-      let studentDept = activeStud.dept;
-      const erpStudents = JSON.parse(localStorage.getItem(`erp_students_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
-      const localMatch = erpStudents.find(s => s.id === activeStud.id || s.rollNo === activeStud.id);
-      
-      if (localMatch) {
-        if (!studentSem && (localMatch.sem || localMatch.semester)) {
-          studentSem = localMatch.sem || localMatch.semester;
-        }
-        if (localMatch.dept || localMatch.department) {
-          studentDept = localMatch.dept || localMatch.department;
-        }
-      }
+    if (!session) {
+      navigate('/student/login');
+      return;
+    }
 
-      studentSem = studentSem || 'Sem 1';
-      console.log('Fetching assignments for:', studentDept, studentSem);
+    const activeStudent = JSON.parse(session);
+    const studentId =
+      activeStudent.id ||
+      activeStudent.referenceId;
 
-      try {
-        const res = await getAssignments();
-        console.log('All Assignments:', res.data);
-        
-        // Filter locally to allow demo testing across departments
-        const filtered = (res.data || []).filter(a => {
-          // Relaxed for demo: allow them to see it regardless of department so they can test the flow
-          return true;
-        });
-        
-        console.log('Filtered Assignments for student:', filtered);
-        setAssignments(filtered);
-        
-        const subRes = await getStudentSubmissions(activeStud.id);
-        const subDict = {};
-        if (subRes.data) {
-          subRes.data.forEach(s => {
-            subDict[s.assignmentId] = s;
-          });
-        }
-        setSubmittedTasks(subDict);
-      } catch (err) {
-        console.warn('Failed to load DB assignments');
-      } finally {
-        setLoading(false);
-      }
-    };
-    init();
+    setStudentSession(activeStudent);
+
+    if (!studentId) {
+      setAssignments([]);
+      setSubmittedTasks({});
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const [assignmentResponse, submissionResponse] =
+        await Promise.all([
+          getAssignments(),
+          getStudentSubmissions(studentId)
+        ]);
+
+      const assignmentData =
+        Array.isArray(assignmentResponse?.data)
+          ? assignmentResponse.data
+          : [];
+
+      const submissionData =
+        Array.isArray(submissionResponse?.data)
+          ? submissionResponse.data
+          : [];
+
+      const submissionMap = {};
+
+      submissionData.forEach(submission => {
+        submissionMap[submission.assignmentId] =
+          submission;
+      });
+
+      setAssignments(assignmentData);
+      setSubmittedTasks(submissionMap);
+    } catch (error) {
+      console.error(
+        'Failed to load student assignments:',
+        error
+      );
+      setAssignments([]);
+      setSubmittedTasks({});
+    } finally {
+      setLoading(false);
+    }
   }, [navigate]);
+
+  useEffect(() => {
+    loadAssignments();
+  }, [loadAssignments]);
+
+  useRealtimeSync(
+    loadAssignments,
+    'assignments'
+  );
 
   const openSubmit = (task) => {
     setActiveTask(task);
@@ -97,16 +106,39 @@ const StudentAssignments = () => {
     setActiveTask(null);
   };
 
-  const handleMockSubmit = async (e) => {
+  const handleFileSelect = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setFileName(e.target.files[0].name);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!activeTask) return;
 
     try {
+      const studentId =
+        studentSession?.id ||
+        studentSession?.referenceId;
+
+      if (!studentId || !studentSession?.name) {
+        alert('Student session is incomplete.');
+        return;
+      }
+
+      if (!fileName) {
+        alert('Please select a submission file.');
+        return;
+      }
+
       const payload = {
-        studentId: studentSession.id,
+        studentId,
         studentName: studentSession.name,
-        department: studentSession.dept,
-        fileName: fileName || 'assignment_submission.pdf'
+        department:
+          studentSession.dept ||
+          studentSession.department ||
+          '',
+        fileName
       };
       
       const res = await apiSubmitAssignment(activeTask._id || activeTask.id, payload);
@@ -122,7 +154,8 @@ const StudentAssignments = () => {
         setSuccess(false);
       }, 800);
     } catch (err) {
-      alert('Error submitting assignment');
+      console.error('Submission error:', err);
+      alert(err.response?.data?.message || 'Error submitting assignment');
     }
   };
 
@@ -222,20 +255,31 @@ const StudentAssignments = () => {
               </div>
             )}
 
-            <form onSubmit={handleMockSubmit} className="modal-form">
+            <form onSubmit={handleSubmit} className="modal-form">
               <div className="form-group">
-                <label>File Upload (Simulated)</label>
-                <div className="mock-upload-zone">
-                  <UploadCloud size={32} className="text-primary-s" />
-                  <p className="text-sm text-muted">Click or drag a file to this zone to upload</p>
+                <label>File Upload</label>
+                <div
+                  className="mock-upload-zone"
+                  style={{ position: 'relative', cursor: 'pointer', padding: '1.5rem', border: '2px dashed var(--border-color)', borderRadius: '10px', textAlign: 'center' }}
+                  onClick={() => document.getElementById('file-upload-input')?.click()}
+                >
                   <input
-                    type="text"
-                    required
-                    placeholder="e.g. dbms_assignment_john.pdf"
-                    value={fileName}
-                    onChange={e => setFileName(e.target.value)}
-                    style={{ background: 'var(--bg-secondary)', marginTop: '0.5rem', textAlign: 'center' }}
+                    id="file-upload-input"
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={handleFileSelect}
                   />
+                  <UploadCloud size={36} className="text-primary-s" style={{ margin: '0 auto 0.5rem' }} />
+                  <p className="text-sm text-muted">Click to select a file or type a filename below</p>
+                  <div style={{ marginTop: '0.8rem' }} onClick={e => e.stopPropagation()}>
+                    <input
+                      type="text"
+                      placeholder="e.g. dbms_assignment_john.pdf"
+                      value={fileName}
+                      onChange={e => setFileName(e.target.value)}
+                      style={{ background: 'var(--bg-secondary)', width: '100%', textAlign: 'center', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}
+                    />
+                  </div>
                 </div>
               </div>
 

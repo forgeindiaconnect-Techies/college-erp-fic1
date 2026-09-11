@@ -28,11 +28,35 @@ const assignmentSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  departmentId: {
+    type: String,
+    default: null
+  },
+  courseId: {
+    type: String,
+    default: null
+  },
+  semesterId: {
+    type: String,
+    default: null
+  },
+  section: {
+    type: String,
+    required: true
+  },
+  sectionId: {
+    type: String,
+    required: true
+  },
   submissionsCount: {
     type: Number,
     default: 0
+  },
+  collegeId: {
+    type: String,
+    required: true
   }
-, collegeId: { type: String } }, { timestamps: true });
+}, { timestamps: true });
 
 const Assignment = mongoose.model('Assignment', assignmentSchema);
 export default Assignment;

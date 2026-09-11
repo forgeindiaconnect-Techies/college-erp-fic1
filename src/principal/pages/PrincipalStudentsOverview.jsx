@@ -1,105 +1,119 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { GraduationCap, TrendingUp, AlertCircle, Star, Search, Users } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { getStudents, getDepartments, getAllMarks } from '../../api/index';
+import {
+  getStudents,
+  getDepartments,
+  getAllMarks,
+  getAllAttendance
+} from '../../api/index';
 import '../../pages/Dashboard.css';
-
-const students = [
-  { id: 'CS2022001', name: 'John Doe',       dept: 'Computer Science',          sem: 'Sem 6', cgpa: 8.6, attendance: 85, status: 'Active', feeStatus: 'Paid',    email: 'john@college.edu' },
-  { id: 'CS2021004', name: 'Emily Davis',    dept: 'Computer Science',          sem: 'Sem 6', cgpa: 8.9, attendance: 98, arrears: 0, status: 'Active', feeStatus: 'Paid',    email: 'emily@college.edu' },
-  { id: 'CS2022002', name: 'David Lee',      dept: 'Computer Science',          sem: 'Sem 3', cgpa: 8.2, attendance: 88, arrears: 1, status: 'Active', feeStatus: 'Partial', email: 'david@college.edu' },
-  { id: 'EE2022001', name: 'Alice Smith',    dept: 'Electrical & Electronics',  sem: 'Sem 4', cgpa: 9.1, attendance: 95, arrears: 0, status: 'Active', feeStatus: 'Paid',    email: 'alice@college.edu' },
-  { id: 'EE2022002', name: 'Sarah Wilson',   dept: 'Electrical & Electronics',  sem: 'Sem 4', cgpa: 9.5, attendance: 91, arrears: 0, status: 'Active', feeStatus: 'Paid',    email: 'sarah@college.edu' },
-  { id: 'EC2022001', name: 'Vikram Seth',    dept: 'Electronics & Comm.',       sem: 'Sem 6', cgpa: 8.8, attendance: 90, arrears: 0, status: 'Active', feeStatus: 'Paid',    email: 'vikram@college.edu' },
-  { id: 'EC2022002', name: 'Neha Gupta',     dept: 'Electronics & Comm.',       sem: 'Sem 6', cgpa: 8.5, attendance: 75, arrears: 2, status: 'Active', feeStatus: 'Pending', email: 'neha@college.edu' },
-  { id: 'ME2023001', name: 'Robert Johnson', dept: 'Mechanical Engg.',          sem: 'Sem 2', cgpa: 7.8, attendance: 68, arrears: 3, status: 'Active', feeStatus: 'Partial', email: 'robert@college.edu' },
-  { id: 'BC2022001', name: 'Karan Malhotra', dept: 'BCA',                       sem: 'Sem 5', cgpa: 8.7, attendance: 94, arrears: 0, status: 'Active', feeStatus: 'Paid',    email: 'karan@college.edu' },
-  { id: 'MB2022001', name: 'Ritu Sen',       dept: 'MBA',                       sem: 'Sem 4', cgpa: 9.2, attendance: 96, arrears: 0, status: 'Active', feeStatus: 'Paid',    email: 'ritu@college.edu' },
-];
-
-const deptData = [
-  { dept: 'CSE', students: 3, avgCGPA: 8.57, avgAtt: 90 },
-  { dept: 'EEE', students: 2, avgCGPA: 9.30, avgAtt: 93 },
-  { dept: 'ECE', students: 2, avgCGPA: 8.65, avgAtt: 82 },
-  { dept: 'MECH', students: 1, avgCGPA: 7.80, avgAtt: 68 },
-  { dept: 'BCA', students: 1, avgCGPA: 8.70, avgAtt: 94 },
-  { dept: 'MBA', students: 1, avgCGPA: 9.20, avgAtt: 96 },
-];
-
-const trendData = [
-  { sem: 'Sem 1', avgCGPA: 7.9, avgAtt: 85 },
-  { sem: 'Sem 2', avgCGPA: 8.1, avgAtt: 87 },
-  { sem: 'Sem 3', avgCGPA: 8.3, avgAtt: 88 },
-  { sem: 'Sem 4', avgCGPA: 8.5, avgAtt: 89 },
-  { sem: 'Sem 5', avgCGPA: 8.7, avgAtt: 88 },
-  { sem: 'Sem 6', avgCGPA: 8.8, avgAtt: 90 },
-];
-
-const feeStatusData = [
-  { name: 'Paid', value: 7, color: '#10b981' },
-  { name: 'Partial', value: 2, color: '#f59e0b' },
-  { name: 'Pending', value: 1, color: '#ef4444' },
-];
+import useRealtimeSync from '../../hooks/useRealtimeSync';
 
 export default function PrincipalStudentsOverview() {
   const [search, setSearch] = useState('');
   const [filterDept, setFilterDept] = useState('All');
   const [tab, setTab] = useState('all');
   const [studentList, setStudentList] = useState([]);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
 
   const [deptsList, setDeptsList] = useState(['All']);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [studentsRes, deptsRes, marksRes] = await Promise.all([
-          getStudents(),
-          getDepartments(),
-          getAllMarks().catch(() => ({ data: [] }))
-        ]);
+  const fetchData = useCallback(async () => {
+    try {
+      const [
+        studentsRes,
+        deptsRes,
+        marksRes,
+        attendanceRes
+      ] = await Promise.all([
+        getStudents(),
+        getDepartments(),
+        getAllMarks().catch(() => ({ data: [] })),
+        getAllAttendance().catch(() => ({ data: [] }))
+      ]);
+      
+      const marksData = marksRes?.data || [];
+      const attendanceData = Array.isArray(attendanceRes?.data)
+        ? attendanceRes.data
+        : attendanceRes?.data?.records ||
+          attendanceRes?.data?.data ||
+          [];
+
+      setAttendanceRecords(attendanceData);
+      // Map student IDs to their total active arrears
+      const arrearsMap = {};
+      marksData.forEach(m => {
+        let arr = 0;
+        if (m.arrearStatus === 'Arrear') arr = 1;
+        else if (m.arrearStatus === 'Pass') arr = 0;
+        else if (!isNaN(m.arrearStatus)) arr = Number(m.arrearStatus);
         
-        const marksData = marksRes?.data || [];
-        // Map student IDs to their total active arrears
-        const arrearsMap = {};
-        marksData.forEach(m => {
-          let arr = 0;
-          if (m.arrearStatus === 'Arrear') arr = 1;
-          else if (m.arrearStatus === 'Pass') arr = 0;
-          else if (!isNaN(m.arrearStatus)) arr = Number(m.arrearStatus);
-          
-          if (!arrearsMap[m.studentId]) arrearsMap[m.studentId] = 0;
-          arrearsMap[m.studentId] += arr;
+        if (!arrearsMap[m.studentId]) arrearsMap[m.studentId] = 0;
+        arrearsMap[m.studentId] += arr;
+      });
+
+      const data = studentsRes.data;
+      if (Array.isArray(data)) {
+        const formatted = data.map(s => {
+          const sid = s.id || s.studentId || 'N/A';
+
+          const studentAttendance = attendanceData.filter(record =>
+            String(record.studentId || '') === String(sid) ||
+            String(record.studentId || '') === String(s._id || '') ||
+            (
+              record.studentName &&
+              s.name &&
+              String(record.studentName).trim().toLowerCase() ===
+                String(s.name).trim().toLowerCase()
+            )
+          );
+
+          const presentCount = studentAttendance.filter(record =>
+            String(record.status).toLowerCase() === 'present'
+          ).length;
+
+          const attendancePercentage =
+            studentAttendance.length > 0
+              ? Number(
+                  (
+                    (presentCount / studentAttendance.length) *
+                    100
+                  ).toFixed(1)
+                )
+              : 0;
+
+          return {
+            id: sid,
+            name: s.name,
+            dept: s.dept || s.department || 'N/A',
+            sem: s.sem || s.semester || 'N/A',
+            cgpa: s.cgpa != null ? s.cgpa : 0,
+            attendance: attendancePercentage,
+            arrears: arrearsMap[sid] || 0,
+            status: s.status || 'Active',
+            feeStatus: s.feeStatus || 'Not Available',
+            email: s.email
+          };
         });
-
-        const data = studentsRes.data;
-        if (Array.isArray(data)) {
-          const formatted = data.map(s => {
-            const sid = s.id || s.studentId || 'N/A';
-            return {
-              id: sid,
-              name: s.name,
-              dept: s.dept || s.department || 'N/A',
-              sem: s.sem || s.semester || 'N/A',
-              cgpa: s.cgpa != null ? s.cgpa : 0,
-              attendance: s.attendance != null ? s.attendance : 0,
-              arrears: arrearsMap[sid] || 0,
-              status: s.status || 'Active',
-              feeStatus: s.feeStatus || 'Paid',
-              email: s.email
-            };
-          });
-          setStudentList(formatted);
-        }
-
-        const deptsData = deptsRes.data || [];
-        setDeptsList(['All', ...deptsData.map(d => d.name)]);
-      } catch (err) {
-        console.warn('API /api/students offline. Fallback to static data.', err);
+        setStudentList(formatted);
       }
-    };
-    
-    fetchData();
+
+      const deptsData = deptsRes.data || [];
+      setDeptsList(['All', ...deptsData.map(d => d.name)]);
+    } catch (err) {
+      console.warn('API /api/students offline. Fallback to static data.', err);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useRealtimeSync(
+    fetchData,
+    ['students', 'marks', 'attendance', 'fees']
+  );
 
   const base = studentList.filter(s =>
     (filterDept === 'All' || s.dept === filterDept) &&
@@ -110,10 +124,152 @@ export default function PrincipalStudentsOverview() {
     : tab === 'lowatt' ? base.filter(s => s.attendance < 80)
     : base;
 
-  const avgCGPA = (studentList.reduce((a, s) => a + s.cgpa, 0) / studentList.length).toFixed(2);
-  const avgAtt = Math.round(studentList.reduce((a, s) => a + s.attendance, 0) / studentList.length);
-  const lowAttCount = studentList.filter(s => s.attendance < 80).length;
-  const topCount = studentList.filter(s => s.cgpa >= 9.0).length;
+  const departmentMap = {};
+
+  studentList.forEach(student => {
+    const department = student.dept || 'Unknown Department';
+
+    if (!departmentMap[department]) {
+      departmentMap[department] = {
+        dept: department,
+        students: 0,
+        totalCGPA: 0,
+        totalAttendance: 0
+      };
+    }
+
+    departmentMap[department].students += 1;
+    departmentMap[department].totalCGPA += Number(
+      student.cgpa || 0
+    );
+    departmentMap[department].totalAttendance += Number(
+      student.attendance || 0
+    );
+  });
+
+  const deptData = Object.values(departmentMap).map(
+    department => ({
+      dept: department.dept,
+      students: department.students,
+      avgCGPA: Number(
+        (
+          department.totalCGPA /
+          department.students
+        ).toFixed(2)
+      ),
+      avgAtt: Number(
+        (
+          department.totalAttendance /
+          department.students
+        ).toFixed(1)
+      )
+    })
+  );
+
+  const semesterMap = {};
+
+  studentList.forEach(student => {
+    const semester = student.sem || 'Unknown Semester';
+
+    if (!semesterMap[semester]) {
+      semesterMap[semester] = {
+        sem: semester,
+        students: 0,
+        totalCGPA: 0,
+        totalAttendance: 0
+      };
+    }
+
+    semesterMap[semester].students += 1;
+    semesterMap[semester].totalCGPA += Number(
+      student.cgpa || 0
+    );
+    semesterMap[semester].totalAttendance += Number(
+      student.attendance || 0
+    );
+  });
+
+  const trendData = Object.values(semesterMap)
+    .map(semester => ({
+      sem: semester.sem,
+      avgCGPA: Number(
+        (
+          semester.totalCGPA /
+          semester.students
+        ).toFixed(2)
+      ),
+      avgAtt: Number(
+        (
+          semester.totalAttendance /
+          semester.students
+        ).toFixed(1)
+      )
+    }))
+    .sort((a, b) =>
+      Number(a.sem.replace(/\D/g, '')) -
+      Number(b.sem.replace(/\D/g, ''))
+    );
+
+  const feeColours = {
+    Paid: '#10b981',
+    Partial: '#f59e0b',
+    Pending: '#ef4444',
+    'Not Available': '#94a3b8'
+  };
+
+  const feeStatusCounts = {};
+
+  studentList.forEach(student => {
+    const status = student.feeStatus || 'Not Available';
+
+    feeStatusCounts[status] =
+      (feeStatusCounts[status] || 0) + 1;
+  });
+
+  const feeStatusData = Object.entries(feeStatusCounts).map(
+    ([name, value]) => ({
+      name,
+      value,
+      color: feeColours[name] || '#94a3b8'
+    })
+  );
+
+  const avgCGPA =
+    studentList.length > 0
+      ? (
+          studentList.reduce(
+            (sum, student) =>
+              sum + Number(student.cgpa || 0),
+            0
+          ) / studentList.length
+        ).toFixed(2)
+      : '0.00';
+
+  const avgAtt =
+    studentList.length > 0
+      ? Number(
+          (
+            studentList.reduce(
+              (sum, student) =>
+                sum + Number(student.attendance || 0),
+              0
+            ) / studentList.length
+          ).toFixed(1)
+        )
+      : 0;
+
+  const lowAttCount = studentList.filter(
+    student => student.attendance < 80
+  ).length;
+
+  const topCount = studentList.filter(
+    student => student.cgpa >= 9
+  ).length;
+
+  const activeCount = studentList.filter(
+    student =>
+      String(student.status).toLowerCase() === 'active'
+  ).length;
 
   return (
     <div className="main-content" style={{ padding: '2rem', background: 'var(--bg-primary)', minHeight: 'calc(100vh - 70px)' }}>
@@ -127,12 +283,22 @@ export default function PrincipalStudentsOverview() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         {[
-          { label: 'Total Students', value: studentList.length, icon: <Users size={18} />, bgTint: '#EEEDFE', iconColor: '#3C3489', sub: '6 departments' },
+          { label: 'Total Students', value: studentList.length, icon: <Users size={18} />, bgTint: '#EEEDFE', iconColor: '#3C3489', sub: `${deptData.length} departments` },
           { label: 'Avg CGPA', value: avgCGPA, icon: <Star size={18} />, bgTint: '#EEEDFE', iconColor: '#3C3489', sub: 'All students' },
-          { label: 'Avg Attendance', value: `${avgAtt}%`, icon: <TrendingUp size={18} />, bgTint: '#FAEEDA', iconColor: '#B45309', sub: 'Below 75% target', subColor: '#B45309' },
+          {
+            label: 'Avg Attendance',
+            value: `${avgAtt}%`,
+            icon: <TrendingUp size={18} />,
+            bgTint: avgAtt >= 75 ? '#E1F5EE' : '#FAEEDA',
+            iconColor: avgAtt >= 75 ? '#047857' : '#B45309',
+            sub: avgAtt >= 75
+              ? 'Meets 75% target'
+              : 'Below 75% target',
+            subColor: avgAtt >= 75 ? '#047857' : '#B45309'
+          },
           { label: 'Top Performers', value: topCount, icon: <Star size={18} />, bgTint: '#EEEDFE', iconColor: '#3C3489', sub: 'CGPA ≥ 9.0' },
           { label: 'Low Attendance', value: lowAttCount, icon: <AlertCircle size={18} />, bgTint: '#FCEBEB', iconColor: '#DC2626', sub: 'Below 80%', subColor: '#DC2626' },
-          { label: 'Active Students', value: studentList.length, icon: <GraduationCap size={18} />, bgTint: '#E1F5EE', iconColor: '#047857', sub: 'All enrolled', subColor: '#047857' },
+          { label: 'Active Students', value: activeCount, icon: <GraduationCap size={18} />, bgTint: '#E1F5EE', iconColor: '#047857', sub: 'All enrolled', subColor: '#047857' },
         ].map((s, i) => (
                     <div key={i} className="stat-card" style={{ padding: '1.25rem', background: '#FFFFFF', border: '1px solid #E3E5EC', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.75rem', boxShadow: 'none' }}>
             <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: s.bgTint, color: s.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

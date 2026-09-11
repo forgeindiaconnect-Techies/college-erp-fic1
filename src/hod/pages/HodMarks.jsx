@@ -67,6 +67,30 @@ const HodMarks = () => {
     fetchMarksData();
   }, []);
 
+  const isSameDepartment = value => {
+    if (!value || !HOD_DEPT) return false;
+    const val = String(value).trim().toLowerCase();
+    const target = String(HOD_DEPT).trim().toLowerCase();
+    if (val === target || val.includes(target) || target.includes(val)) return true;
+
+    const cse = ['computer science', 'cse', 'cs'];
+    if (cse.some(k => val.includes(k)) && cse.some(k => target.includes(k))) return true;
+
+    const ece = ['electronics', 'ece', 'ec'];
+    if (ece.some(k => val.includes(k)) && ece.some(k => target.includes(k))) return true;
+
+    const eee = ['electrical', 'eee', 'ee'];
+    if (eee.some(k => val.includes(k)) && eee.some(k => target.includes(k))) return true;
+
+    const mech = ['mechanical', 'mech', 'me'];
+    if (mech.some(k => val.includes(k)) && mech.some(k => target.includes(k))) return true;
+
+    const it = ['information technology', 'it'];
+    if (it.some(k => val.includes(k)) && it.some(k => target.includes(k))) return true;
+
+    return false;
+  };
+
   const fetchMarksData = async () => {
     try {
       setLoading(true);
@@ -89,12 +113,8 @@ const HodMarks = () => {
         ? studentsRes.data
         : studentsRes?.data?.students || studentsRes?.data?.data || [];
 
-      const isSameDepartment = value =>
-        String(value || '').trim().toLowerCase() ===
-        String(HOD_DEPT || '').trim().toLowerCase();
-
       setExams(
-        examData.filter(exam => isSameDepartment(exam.dept))
+        examData.filter(exam => isSameDepartment(exam.dept || exam.department))
       );
 
       setStudents(
@@ -154,7 +174,7 @@ const HodMarks = () => {
   };
 
   /* Scoped to department */
-  const deptMarks = marks.filter(m => m.dept === HOD_DEPT);
+  const deptMarks = marks.filter(m => isSameDepartment(m.dept));
   
   const filtered = deptMarks.filter(m => {
     const matchSearch = m.name.toLowerCase().includes(search.toLowerCase()) || m.id.toLowerCase().includes(search.toLowerCase());

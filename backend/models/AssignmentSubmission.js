@@ -1,6 +1,10 @@
 import mongoose from 'mongoose';
 
 const assignmentSubmissionSchema = new mongoose.Schema({
+  collegeId: {
+    type: String,
+    required: true
+  },
   assignmentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Assignment',
@@ -26,7 +30,18 @@ const assignmentSubmissionSchema = new mongoose.Schema({
     type: String,
     default: 'Submitted'
   }
-, collegeId: { type: String } }, { timestamps: true });
+}, { timestamps: true });
+
+assignmentSubmissionSchema.index(
+  {
+    collegeId: 1,
+    assignmentId: 1,
+    studentId: 1
+  },
+  {
+    unique: true
+  }
+);
 
 const AssignmentSubmission = mongoose.model('AssignmentSubmission', assignmentSubmissionSchema);
 export default AssignmentSubmission;

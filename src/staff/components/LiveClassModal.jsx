@@ -157,12 +157,14 @@ const LiveClassModal = ({ slot, onClose, onSessionUpdated }) => {
   const handleEndClass = async () => {
     if (!window.confirm('Are you sure you want to end this live class session?')) return;
     try {
-      if (slot.session?._id) {
-        await endClassSession(slot.session._id);
+      const sessionId = slot.session?._id || slot.session?.id || slot.sessionId || slot._id || slot.id;
+      if (sessionId) {
+        await endClassSession(sessionId);
       }
       if (onSessionUpdated) onSessionUpdated();
       onClose();
     } catch (err) {
+      console.error(err);
       alert(err.response?.data?.message || 'Error ending class session.');
     }
   };

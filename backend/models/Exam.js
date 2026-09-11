@@ -39,12 +39,16 @@ const examSchema = new mongoose.Schema({
     type: String,
     enum: [
       'Internal',
+      'CIA 1',
+      'CIA 2',
+      'CIA 3',
       'Model',
+      'Assignment',
       'Practical',
       'Semester',
       'Supplementary'
     ],
-    default: 'Internal'
+    default: 'CIA 1'
   },
 
   academicYearId: {

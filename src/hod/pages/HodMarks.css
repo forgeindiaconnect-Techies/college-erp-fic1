@@ -94,3 +94,102 @@ tr:hover td { background: rgba(79,70,229,0.04); }
 
 .skeleton { background: linear-gradient(90deg, var(--bg-primary) 25%, var(--border-color) 50%, var(--bg-primary) 75%); background-size: 1000px 100%; animation: shimmer 2s infinite linear; border-radius: 4px; }
 @keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+
+/* Professional ERP Marks Page */
+.cgpa-page {
+  gap: 1.5rem;
+  padding-bottom: 2rem;
+}
+
+.cgpa-page .page-header {
+  padding: 1.4rem 1.6rem;
+  background: linear-gradient(135deg, #ffffff, #f8fafc);
+  border: 1px solid #dbe3ec;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.cgpa-page .page-header h1 {
+  color: #1e293b;
+  font-size: 1.75rem;
+  font-weight: 750;
+}
+
+.cgpa-page .sm-summary-card {
+  min-height: 115px;
+  background: #ffffff;
+  border: 1px solid #dbe3ec;
+  border-left: 4px solid var(--primary);
+  border-radius: 12px;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
+}
+
+.cgpa-page .chart-box,
+.cgpa-page .col-span-3 {
+  background: #ffffff;
+  border: 1px solid #dbe3ec;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.cgpa-page .table-container {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.cgpa-page table {
+  min-width: 1450px;
+}
+
+.cgpa-page th {
+  background: #eff6ff;
+  color: #334155;
+  padding: 0.9rem 1rem;
+  border-bottom: 2px solid #bfdbfe;
+}
+
+.cgpa-page td {
+  color: #334155;
+  background: #ffffff;
+}
+
+.cgpa-page tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.cgpa-page tbody tr:hover td {
+  background: #eff6ff;
+}
+
+.cgpa-page .btn-primary {
+  border-radius: 8px;
+  font-weight: 700;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.2);
+}
+
+@media (max-width: 1100px) {
+  .four-col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cgpa-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .col-span-2,
+  .col-span-3 {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .four-col {
+    grid-template-columns: 1fr;
+  }
+
+  .cgpa-page .page-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+}

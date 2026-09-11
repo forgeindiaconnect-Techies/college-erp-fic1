@@ -1,29 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Mail, Phone, ArrowLeft, Users, ShieldAlert, GraduationCap } from 'lucide-react';
-import { getStudents } from '../../api/index';
+import { getMyClass } from '../../api/index';
+import useRealtimeSync from '../../hooks/useRealtimeSync';
 import './StaffStudents.css';
-
-// Fallback session
-const DEFAULT_SESSION = {
-  name: 'Dr. Ananya Rao',
-  dept: 'Computer Science',
-  deptCode: 'CS',
-  role: 'Staff',
-  subjects: ['Data Structures', 'DBMS']
-};
-
-const SUBJECT_TO_CLASS = {
-  'Data Structures': 'Sem 3',
-  'DBMS': 'Sem 6',
-  'OS': 'Sem 4',
-  'Machine Learning': 'Sem 6',
-  'Circuits': 'Sem 4',
-  'Networks': 'Sem 4',
-  'Thermodynamics': 'Sem 2',
-  'Fluid Mechanics': 'Sem 2',
-  'Structural Analysis': 'Sem 8'
-};
 
 const AVATAR_COLORS = ['var(--primary)', '#10b981', '#f59e0b', '#ec4899', '#6366F1'];
 const getInitials = (name) => name.replace('Dr. ', '').replace('Prof. ', '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
@@ -31,86 +11,69 @@ const getInitials = (name) => name.replace('Dr. ', '').replace('Prof. ', '').spl
 const StaffStudents = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [staffSession, setStaffSession] = useState(DEFAULT_SESSION);
+  const [sections, setSections] = useState([]);
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState('');
-  const [mySubjects, setMySubjects] = useState([]);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    // 1. Session check
+  const loadMyClass = useCallback(async () => {
     const session = sessionStorage.getItem('staff_session');
-    let activeStaff = DEFAULT_SESSION;
-    if (session) {
-      activeStaff = JSON.parse(session);
-      setStaffSession(activeStaff);
-    } else {
+
+    if (!session) {
       navigate('/staff/login');
       return;
     }
 
-    // 2. Load student database
-    const loadStudents = async () => {
-      try {
-        const res = await getStudents();
-        if (res?.data && res.data.length > 0) {
-          setStudents(res.data);
-        } else {
-          // Fallback to local storage if API is restricted or empty
-          const localStudents = JSON.parse(localStorage.getItem(`erp_students_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
-          setStudents(localStudents);
-        }
-      } catch (err) {
-        console.error('Failed to load students:', err);
-        const localStudents = JSON.parse(localStorage.getItem(`erp_students_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
-        setStudents(localStudents);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadStudents();
+    try {
+      setLoading(true);
+      setError('');
 
-    // 3. Load dynamically assigned subjects
-    let dynSubjects = [];
-    let deptInitialized = false;
-    const savedSubjects = localStorage.getItem(`erp_subjects_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
-    if (savedSubjects) {
-      const allSubs = JSON.parse(savedSubjects);
-      const deptSubs = allSubs.filter(s => s.dept === activeStaff.dept);
-      
-      if (deptSubs.length > 0) {
-        deptInitialized = true;
-        const assignedSubs = deptSubs.filter(s => {
-          if (!s.teacher) return false;
-          const t = s.teacher.toLowerCase().trim();
-          const n = activeStaff.name.toLowerCase().trim();
-          return t.includes(n) || n.includes(t);
-        });
-        dynSubjects = [...new Set(assignedSubs.map(s => `${s.name} (${s.sem})`))];
-      }
-    }
-    
-    if (!deptInitialized && dynSubjects.length === 0) {
-      dynSubjects = activeStaff.subjects && activeStaff.subjects.length > 0 ? activeStaff.subjects : ['General Course'];
-    }
+      const response = await getMyClass();
+      const data = response?.data || {};
 
-    if (dynSubjects.length === 0) {
-      dynSubjects = ['No Subjects Assigned by HOD'];
+      setSections(
+        Array.isArray(data.sections) ? data.sections : []
+      );
+
+      setStudents(
+        Array.isArray(data.students) ? data.students : []
+      );
+    } catch (err) {
+      console.error('Failed to load assigned class:', err);
+      setSections([]);
+      setStudents([]);
+      setError(
+        err.response?.data?.message ||
+        'Unable to load your assigned class.'
+      );
+    } finally {
+      setLoading(false);
     }
-    
-    setMySubjects(dynSubjects);
   }, [navigate]);
 
-  const staffDept = staffSession.dept;
-  
-  // Filter students: For demo purposes, just show all students in the staff's department
-  // instead of strictly filtering by targetSems which may hide students if subjects are unmapped.
-  const myClassStudents = students.filter(s => s.dept === staffDept || s.department === staffDept || !s.dept);
+  useEffect(() => {
+    loadMyClass();
+  }, [loadMyClass]);
 
-  const filteredStudents = myClassStudents.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.id.toLowerCase().includes(search.toLowerCase()) ||
-    s.email.toLowerCase().includes(search.toLowerCase())
+  useRealtimeSync(
+    loadMyClass,
+    ['students', 'sections']
   );
+
+  const filteredStudents = students.filter(student => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) return true;
+
+    return [
+      student.name,
+      student.id,
+      student.studentId,
+      student.email
+    ].some(value =>
+      String(value || '').toLowerCase().includes(query)
+    );
+  });
 
   const getAttColor = (p) => p >= 90 ? '#10b981' : p >= 75 ? '#f59e0b' : '#ef4444';
   const getCgpaColor = (c) => c >= 8.5 ? '#10b981' : c >= 7.0 ? '#f59e0b' : '#ef4444';
@@ -121,8 +84,10 @@ const StaffStudents = () => {
         <div className="header-left">
           
           <div>
-            <h1>Student List</h1>
-            <p className="text-muted">Directory of students currently enrolled in subjects you instruct.</p>
+            <h1>My Class</h1>
+            <p className="text-muted">
+              Students assigned through your Class Teacher allocation.
+            </p>
           </div>
         </div>
       </div>
@@ -131,14 +96,47 @@ const StaffStudents = () => {
       <div className="glass-card search-card-students">
         <div className="table-filters-bar" style={{ borderBottom: 'none', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           
-          {/* Active Subjects Banner */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>Assigned Subjects:</span>
-            {mySubjects.map((sub, idx) => (
-              <span key={idx} style={{ background: 'rgba(55, 48, 165, 0.12)', color: 'var(--primary)', padding: '4px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600 }}>
-                {sub}
+          {/* Assigned Class Banner */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              flexWrap: 'wrap'
+            }}
+          >
+            <span
+              style={{
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                color: 'var(--text-muted)'
+              }}
+            >
+              Assigned Class:
+            </span>
+
+            {sections.length > 0 ? (
+              sections.map(section => (
+                <span
+                  key={section.id || section._id}
+                  style={{
+                    background: 'rgba(55, 48, 165, 0.12)',
+                    color: 'var(--primary)',
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600
+                  }}
+                >
+                  Section {section.name} • Room{' '}
+                  {section.roomNumber || 'Not assigned'}
+                </span>
+              ))
+            ) : (
+              <span className="text-muted">
+                No class assigned
               </span>
-            ))}
+            )}
           </div>
 
           <div className="search-box-attendance" style={{ width: '100%' }}>
@@ -164,11 +162,39 @@ const StaffStudents = () => {
               <div className="skeleton" style={{ height: '32px', width: '100%' }}></div>
             </div>
           ))
+        ) : error ? (
+          <div className="glass-card no-students-banner col-span-full">
+            <ShieldAlert
+              size={40}
+              className="text-danger"
+              style={{ marginBottom: '1rem' }}
+            />
+            <h3>Unable to Load My Class</h3>
+            <p className="text-muted">{error}</p>
+          </div>
+        ) : sections.length === 0 ? (
+          <div className="glass-card no-students-banner col-span-full">
+            <GraduationCap
+              size={40}
+              className="text-muted"
+              style={{ marginBottom: '1rem' }}
+            />
+            <h3>No Class Assigned</h3>
+            <p className="text-muted">
+              You are not assigned as a Class Teacher for any active section.
+            </p>
+          </div>
         ) : filteredStudents.length === 0 ? (
           <div className="glass-card no-students-banner col-span-full">
-            <Users size={40} className="text-muted" style={{ marginBottom: '1rem' }} />
-            <h3>No Enrolled Students</h3>
-            <p className="text-muted">No students currently match your filters or class lists.</p>
+            <Users
+              size={40}
+              className="text-muted"
+              style={{ marginBottom: '1rem' }}
+            />
+            <h3>No Students Found</h3>
+            <p className="text-muted">
+              No students are allocated to your class or match your search.
+            </p>
           </div>
         ) : (
           filteredStudents.map((s, idx) => (
@@ -209,7 +235,7 @@ const StaffStudents = () => {
                   </div>
                   <div className="contact-item">
                     <Phone size={13} />
-                    <span>+91 98451 000{idx}</span>
+                    <span>{s.phone || 'Phone not available'}</span>
                   </div>
                 </div>
               </div>

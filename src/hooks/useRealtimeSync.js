@@ -25,24 +25,30 @@ const getSocket = () => {
  */
 const useRealtimeSync = (onUpdate, watchModules = null) => {
   const callbackRef = useRef(onUpdate);
+  const watchModulesRef = useRef(watchModules);
 
-  // Always keep the ref up-to-date so we never capture stale closures
+  // Always keep refs up-to-date so we never capture stale closures
   useEffect(() => {
     callbackRef.current = onUpdate;
   }, [onUpdate]);
+
+  useEffect(() => {
+    watchModulesRef.current = watchModules;
+  }, [watchModules]);
 
   useEffect(() => {
     const socket = getSocket();
     subscriberCount++;
 
     const handler = (payload) => {
+      const currentModules = watchModulesRef.current;
       // If no filter specified, fire for all modules
-      if (!watchModules) {
+      if (!currentModules) {
         callbackRef.current(payload);
         return;
       }
 
-      const modules = Array.isArray(watchModules) ? watchModules : [watchModules];
+      const modules = Array.isArray(currentModules) ? currentModules : [currentModules];
       if (modules.includes(payload.module)) {
         callbackRef.current(payload);
       }
@@ -60,8 +66,7 @@ const useRealtimeSync = (onUpdate, watchModules = null) => {
         subscriberCount = 0;
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // watchModules intentionally excluded — changes to filter should not re-subscribe
+  }, []);
 };
 
 export default useRealtimeSync;

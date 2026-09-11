@@ -1,33 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FileBarChart, Calendar, TrendingUp, AlertCircle, CheckCircle, Star } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import '../../pages/Dashboard.css';
 
 import { getExams, getAllMarks } from '../../api/index';
-
-const upcomingExams = [
-  { code: 'EX2026-01', subject: 'Data Structures', dept: 'CSE', sem: 'Sem 4', date: '2026-06-10', time: '10:00 AM', hall: 'Block A - Hall 1', type: 'Internal', status: 'Scheduled' },
-  { code: 'EX2026-02', subject: 'Signals & Systems', dept: 'ECE', sem: 'Sem 4', date: '2026-06-11', time: '10:00 AM', hall: 'Block B - Hall 2', type: 'Semester', status: 'Scheduled' },
-  { code: 'EX2026-03', subject: 'Thermodynamics', dept: 'MECH', sem: 'Sem 2', date: '2026-06-12', time: '02:00 PM', hall: 'Block C - Hall 1', type: 'Internal', status: 'Scheduled' },
-  { code: 'EX2026-04', subject: 'Compiler Design', dept: 'CSE', sem: 'Sem 6', date: '2026-06-14', time: '10:00 AM', hall: 'Block A - Hall 2', type: 'Semester', status: 'Scheduled' },
-  { code: 'EX2026-05', subject: 'Strategic Management', dept: 'MBA', sem: 'Sem 4', date: '2026-06-15', time: '10:00 AM', hall: 'MBA Block - Hall 1', type: 'Semester', status: 'Scheduled' },
-];
-
-const resultData = [];
-
-const trendData = [];
-
-const gradeData = [];
+import useRealtimeSync from '../../hooks/useRealtimeSync';
 
 
+
+const calculateFinalResult = (total, passed) => {
+  if (!passed) return { gpa: 0, grade: 'U' };
+  if (total >= 90) return { gpa: 10, grade: 'O' };
+  if (total >= 80) return { gpa: 9, grade: 'A+' };
+  if (total >= 70) return { gpa: 8, grade: 'A' };
+  if (total >= 60) return { gpa: 7, grade: 'B+' };
+  if (total >= 50) return { gpa: 6, grade: 'B' };
+  return { gpa: 0, grade: 'U' };
+};
 
 export default function PrincipalExamsResults() {
   const [tab, setTab] = useState('schedule');
   const [exams, setExams] = useState([]);
+  const [marks, setMarks] = useState([]);
   const [arrearList, setArrearList] = useState([]);
   const [loadingArrears, setLoadingArrears] = useState(true);
 
-  useEffect(() => {
+  const loadPrincipalResults = useCallback(() => {
     // 1. Fetch dynamic exams
     getExams()
       .then(res => {
@@ -47,12 +45,16 @@ export default function PrincipalExamsResults() {
       .then(res => res.data)
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
+          const publishedMarks = data.filter(
+            record => record.resultStatus === 'Published'
+          );
+
+          setMarks(publishedMarks);
           // Filter records where student has arrear (grade=U or arrearStatus=Arrear or totalMarks below passing threshold)
-          const arrearRecords = data.filter(r =>
-            r.arrearStatus === 'Arrear' ||
-            r.grade === 'U' ||
-            r.grade === 'F' ||
-            (typeof r.totalMarks === 'number' && r.totalMarks < 75)
+          const arrearRecords = publishedMarks.filter(record =>
+            record.arrearStatus === 'Arrear' ||
+            record.grade === 'U' ||
+            record.grade === 'F'
           );
 
           // Group by student so we can count how many arrears each student has
@@ -64,8 +66,12 @@ export default function PrincipalExamsResults() {
                 name: r.studentName || 'Unknown Student',
                 dept: r.department || r.dept || 'N/A',
                 subject: r.subject || 'N/A',
-                marks: typeof r.totalMarks === 'number' ? r.totalMarks : (r.internalMarks || 0) + (r.semesterMarks || 0),
-                maxMarks: 150,
+                marks: Number(
+                  r.marksObtained ??
+                  r.totalMarks ??
+                  ((r.internalMarks || 0) + (r.semesterMarks || 0))
+                ),
+                maxMarks: Number(r.maxMarks || 100),
                 sem: r.semester || 'N/A',
                 arrears: 1,
                 studentId: r.studentId
@@ -80,11 +86,13 @@ export default function PrincipalExamsResults() {
           setArrearList(grouped);
         } else {
           // No marks data at all — show empty
+          setMarks([]);
           setArrearList([]);
         }
       })
       .catch(err => {
         console.warn('Could not fetch marks from backend:', err);
+        setMarks([]);
         setArrearList([]);
       })
       .finally(() => {
@@ -92,10 +100,338 @@ export default function PrincipalExamsResults() {
       });
   }, []);
 
+  useEffect(() => {
+    loadPrincipalResults();
+  }, [loadPrincipalResults]);
+
+  useRealtimeSync(
+    loadPrincipalResults,
+    ['marks', 'exams']
+  );
+
+  const departmentGroups = {};
+
+  marks.forEach(mark => {
+    const department =
+      mark.department ||
+      mark.dept ||
+      'Unknown Department';
+
+    if (!departmentGroups[department]) {
+      departmentGroups[department] = {
+        dept: department,
+        records: [],
+        students: new Set()
+      };
+    }
+
+    departmentGroups[department].records.push(mark);
+
+    departmentGroups[department].students.add(
+      mark.studentId || mark.studentName
+    );
+  });
+
+  const resultData = Object.values(departmentGroups).map(group => {
+    const total = group.records.length;
+
+    const passed = group.records.filter(mark =>
+      mark.arrearStatus !== 'Arrear' &&
+      mark.grade !== 'U' &&
+      mark.grade !== 'F'
+    ).length;
+
+    const average =
+      total > 0
+        ? group.records.reduce((sum, mark) => {
+            const obtained = Number(
+              mark.marksObtained ?? mark.totalMarks ?? 0
+            );
+
+            const maximum = Number(mark.maxMarks || 100);
+
+            return sum + (
+              maximum > 0
+                ? (obtained / maximum) * 100
+                : 0
+            );
+          }, 0) / total
+        : 0;
+
+    return {
+      dept: group.dept,
+      passRate: total > 0
+        ? Number(((passed / total) * 100).toFixed(1))
+        : 0,
+      failRate: total > 0
+        ? Number((((total - passed) / total) * 100).toFixed(1))
+        : 0,
+      avgScore: Number(average.toFixed(1)),
+      students: group.students.size
+    };
+  });
+
+  const semesterGroups = {};
+
+  marks.forEach(mark => {
+    const semester = mark.semester || 'Unknown Semester';
+
+    if (!semesterGroups[semester]) {
+      semesterGroups[semester] = [];
+    }
+
+    semesterGroups[semester].push(mark);
+  });
+
+  const trendData = Object.entries(semesterGroups)
+    .map(([sem, semesterMarks]) => {
+      const passed = semesterMarks.filter(mark =>
+        mark.arrearStatus !== 'Arrear' &&
+        mark.grade !== 'U' &&
+        mark.grade !== 'F'
+      ).length;
+
+      const average =
+        semesterMarks.reduce((sum, mark) => {
+          const obtained = Number(
+            mark.marksObtained ?? mark.totalMarks ?? 0
+          );
+
+          const maximum = Number(mark.maxMarks || 100);
+
+          return sum + (
+            maximum > 0
+              ? (obtained / maximum) * 100
+              : 0
+          );
+        }, 0) / semesterMarks.length;
+
+      return {
+        sem,
+        passRate: Number(
+          ((passed / semesterMarks.length) * 100).toFixed(1)
+        ),
+        avgScore: Number(average.toFixed(1))
+      };
+    })
+    .sort((a, b) =>
+      Number(a.sem.replace(/\D/g, '')) -
+      Number(b.sem.replace(/\D/g, ''))
+    );
+
+  const gradeColours = {
+    O: '#10b981',
+    'A+': '#22c55e',
+    A: '#3b82f6',
+    'B+': '#6366f1',
+    B: '#f59e0b',
+    U: '#ef4444',
+    F: '#ef4444'
+  };
+
+  const gradeCounts = {};
+
+  marks.forEach(mark => {
+    const grade = mark.grade || 'U';
+    gradeCounts[grade] = (gradeCounts[grade] || 0) + 1;
+  });
+
+  const gradeData = Object.entries(gradeCounts).map(
+    ([name, count]) => ({
+      name,
+      value: marks.length > 0
+        ? Number(((count / marks.length) * 100).toFixed(1))
+        : 0,
+      color: gradeColours[name] || '#94a3b8'
+    })
+  );
+
+  const performerMap = {};
+
+  marks.forEach(mark => {
+    const studentKey =
+      mark.studentId ||
+      mark.studentName ||
+      mark._id;
+
+    const cgpa = Number(mark.cgpa || mark.gpa || 0);
+
+    if (
+      !performerMap[studentKey] ||
+      cgpa > performerMap[studentKey].cgpa
+    ) {
+      performerMap[studentKey] = {
+        id: studentKey,
+        name: mark.studentName || 'Unknown Student',
+        department:
+          mark.department ||
+          mark.dept ||
+          'Unknown Department',
+        semester: mark.semester || '',
+        cgpa
+      };
+    }
+  });
+
+  const topPerformers = Object.values(performerMap)
+    .filter(student => student.cgpa > 0)
+    .sort((a, b) => b.cgpa - a.cgpa)
+    .slice(0, 3);
+
+  const consolidatedGroups = {};
+
+  marks.forEach(mark => {
+    const key = [
+      mark.studentId,
+      mark.semester,
+      mark.subject
+    ].join('::');
+
+    if (!consolidatedGroups[key]) {
+      consolidatedGroups[key] = {
+        studentId: mark.studentId,
+        studentName: mark.studentName || 'Unknown Student',
+        department:
+          mark.department ||
+          mark.dept ||
+          'Unknown Department',
+        semester: mark.semester || '',
+        subject: mark.subject || '',
+        internalPercentages: [],
+        externalPercentages: []
+      };
+    }
+
+    const examName = String(
+      mark.examId?.name ||
+      mark.examName ||
+      ''
+    ).toLowerCase();
+
+    const obtained = Number(
+      mark.marksObtained ??
+      mark.totalMarks ??
+      0
+    );
+
+    const maximum = Number(mark.maxMarks || 100);
+
+    const percentage =
+      maximum > 0
+        ? (obtained / maximum) * 100
+        : 0;
+
+    const isExternal =
+      examName.includes('end semester') ||
+      examName.includes('university semester') ||
+      examName.includes('external');
+
+    if (isExternal) {
+      consolidatedGroups[key].externalPercentages.push(percentage);
+    } else {
+      consolidatedGroups[key].internalPercentages.push(percentage);
+    }
+  });
+
+  const consolidatedResults = Object.values(consolidatedGroups)
+    .filter(group =>
+      group.internalPercentages.length > 0 &&
+      group.externalPercentages.length > 0
+    )
+    .map(group => {
+      const internalAverage =
+        group.internalPercentages.reduce(
+          (sum, value) => sum + value,
+          0
+        ) / group.internalPercentages.length;
+
+      const externalAverage =
+        group.externalPercentages.reduce(
+          (sum, value) => sum + value,
+          0
+        ) / group.externalPercentages.length;
+
+      const internalMark = Number(
+        ((internalAverage / 100) * 40).toFixed(2)
+      );
+
+      const externalMark = Number(
+        ((externalAverage / 100) * 60).toFixed(2)
+      );
+
+      const total = Number(
+        (internalMark + externalMark).toFixed(2)
+      );
+
+      const passed =
+        internalAverage >= 40 &&
+        externalAverage >= 40 &&
+        total >= 50;
+
+      const finalResult = calculateFinalResult(total, passed);
+
+      return {
+        ...group,
+        internalMark,
+        externalMark,
+        total,
+        gpa: finalResult.gpa,
+        grade: finalResult.grade,
+        status: passed ? 'Pass' : 'Arrear'
+      };
+    });
+
   const overall = resultData.length > 0 ? Math.round(resultData.reduce((a, d) => a + d.passRate, 0) / resultData.length) : 0;
   const topDept = resultData.length > 0 ? resultData.reduce((a, d) => d.passRate > a.passRate ? d : a) : { dept: 'N/A', passRate: 0 };
   const avgScore = resultData.length > 0 ? Math.round(resultData.reduce((a, d) => a + d.avgScore, 0) / resultData.length) : 0;
   const totalStudents = resultData.length > 0 ? resultData.reduce((a, d) => a + d.students, 0) : 0;
+  const getExamStatus = exam => {
+    if (
+      exam.status === 'Cancelled' ||
+      exam.status === 'Postponed'
+    ) {
+      return exam.status;
+    }
+
+    const examDate = new Date(`${exam.date}T00:00:00`);
+    const today = new Date();
+
+    examDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    if (examDate < today) return 'Completed';
+    if (examDate.getTime() === today.getTime()) return 'Today';
+
+    return 'Scheduled';
+  };
+
+  const getExamStatusStyle = status => {
+    if (status === 'Completed') {
+      return {
+        background: '#e2e8f0',
+        color: '#475569'
+      };
+    }
+
+    if (status === 'Today') {
+      return {
+        background: '#fef3c7',
+        color: '#b45309'
+      };
+    }
+
+    if (status === 'Cancelled') {
+      return {
+        background: '#fee2e2',
+        color: '#b91c1c'
+      };
+    }
+
+    return {
+      background: '#d1fae5',
+      color: '#047857'
+    };
+  };
 
   return (
     <div className="main-content" style={{ padding: '2rem', background: 'var(--bg-primary)', minHeight: 'calc(100vh - 70px)' }}>
@@ -103,13 +439,13 @@ export default function PrincipalExamsResults() {
         <h1 style={{ color: 'var(--text-main)', fontSize: '1.6rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
           <FileBarChart style={{ color: '#3730A5' }} size={28} /> Exam & Results
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Upcoming exam schedule, pass/fail analytics, grade distribution, and top performers.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>College-wide exam schedule, result analytics, grade distribution, and student performance.</p>
       </div>
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         {[
-          { label: 'Upcoming Exams', value: exams.length, icon: <Calendar size={18} />, color: 'var(--primary)', bg: '#EEEDFE', sub: 'This month' },
+          { label: 'Scheduled Exams', value: exams.length, icon: <Calendar size={18} />, color: 'var(--primary)', bg: '#EEEDFE', sub: 'All exam records' },
           { label: 'Overall Pass %', value: `${overall}%`, icon: <CheckCircle size={18} />, color: 'var(--success)', bg: '#E1F5EE', sub: 'All departments' },
           { label: 'Failed Students', value: arrearList.length, icon: <AlertCircle size={18} />, color: 'var(--danger)', bg: '#FCEBEB', sub: 'Active arrears' },
           { label: 'Top Department', value: topDept.dept, icon: <Star size={18} />, color: 'var(--success)', bg: '#E1F5EE', sub: `${topDept.passRate}% pass rate` },
@@ -129,7 +465,7 @@ export default function PrincipalExamsResults() {
 
       {/* Tabs */}
       <div className="glass-card" style={{ padding: '0.4rem', borderRadius: 12, display: 'inline-flex', gap: '0.4rem', marginBottom: '1.5rem' }}>
-        {[['schedule', '📅 Exam Schedule'], ['results', '📊 Result Analytics'], ['grades', '🏆 Grade Distribution'], ['failed', '⚠️ Failed Students']].map(([key, label]) => (
+        {[['schedule', '📅 Exam Schedule'], ['results', '📊 Result Analytics'], ['grades', '🏆 Grade Distribution'], ['consolidated', '🎓 Consolidated Results'], ['failed', '⚠️ Failed Students']].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} style={{ padding: '0.55rem 1rem', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, background: tab === key ? '#3730A5' : 'transparent', color: tab === key ? 'white' : 'var(--text-muted)', border: 'none', cursor: 'pointer', transition: 'all 0.2s' }}>{label}</button>
         ))}
       </div>
@@ -137,7 +473,7 @@ export default function PrincipalExamsResults() {
       {/* Exam Schedule */}
       {tab === 'schedule' && (
         <div className="glass-card animate-fade-in" style={{ padding: '1.5rem', borderRadius: 16 }}>
-          <h4 style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '1rem', marginBottom: '1rem' }}>Upcoming Examinations</h4>
+          <h4 style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '1rem', marginBottom: '1rem' }}>Examination Schedule</h4>
           <div className="table-container">
             <table>
               <thead>
@@ -162,7 +498,24 @@ export default function PrincipalExamsResults() {
                         <span style={{ background: examType.includes('Sem') || examType.includes('Theory') ? 'rgba(99,102,241,0.1)' : 'rgba(245,158,11,0.1)', color: examType.includes('Sem') || examType.includes('Theory') ? '#6366f1' : '#f59e0b', padding: '2px 7px', borderRadius: 5, fontSize: '0.72rem', fontWeight: 700 }}>{examType}</span>
                       </td>
                       <td>
-                        <span style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', padding: '2px 8px', borderRadius: 6, fontSize: '0.72rem', fontWeight: 700 }}>{e.status || 'Scheduled'}</span>
+                        {(() => {
+                           const status = getExamStatus(e);
+                          const statusStyle = getExamStatusStyle(status);
+
+                          return (
+                            <span
+                              style={{
+                                ...statusStyle,
+                                padding: '3px 9px',
+                                borderRadius: 20,
+                                fontSize: '0.72rem',
+                                fontWeight: 700
+                              }}
+                            >
+                              {status}
+                            </span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );
@@ -243,15 +596,208 @@ export default function PrincipalExamsResults() {
             </div>
             <div style={{ marginTop: '1.5rem', background: 'rgba(16,185,129,0.06)', borderRadius: 10, padding: '1rem', borderLeft: '3px solid #10b981' }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>HIGHEST PERFORMERS</div>
-              {gradeData.length > 0 ? [{ name: 'Sarah Wilson', cgpa: 9.5, dept: 'EEE' }, { name: 'Alice Smith', cgpa: 9.1, dept: 'EEE' }, { name: 'Ritu Sen', cgpa: 9.2, dept: 'MBA' }].map((s, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: '0.82rem' }}>
-                  <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>#{i + 1} {s.name}</span>
-                  <span style={{ color: '#10b981', fontWeight: 800 }}>{s.cgpa} CGPA</span>
+              {topPerformers.length > 0 ? (
+                topPerformers.map((student, index) => (
+                  <div
+                    key={student.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginTop: 8,
+                      padding: '0.55rem 0.7rem',
+                      background: 'var(--bg-primary)',
+                      borderRadius: 8,
+                      fontSize: '0.82rem'
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          color: 'var(--text-main)',
+                          fontWeight: 700
+                        }}
+                      >
+                        #{index + 1} {student.name}
+                      </div>
+
+                      <div
+                        style={{
+                          color: 'var(--text-muted)',
+                          fontSize: '0.72rem',
+                          marginTop: 2
+                        }}
+                      >
+                        {student.department} • {student.semester}
+                      </div>
+                    </div>
+
+                    <span
+                      style={{
+                        color: '#10b981',
+                        fontWeight: 800
+                      }}
+                    >
+                      {student.cgpa} CGPA
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div
+                  style={{
+                    marginTop: '1rem',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-muted)'
+                  }}
+                >
+                  No published result data available.
                 </div>
-              )) : (
-                <div style={{ marginTop: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>No data available yet.</div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Consolidated Semester Results */}
+      {tab === 'consolidated' && (
+        <div
+          className="glass-card animate-fade-in"
+          style={{ padding: '1.5rem', borderRadius: 16 }}
+        >
+          <div style={{ marginBottom: '1rem' }}>
+            <h4
+              style={{
+                fontWeight: 700,
+                color: 'var(--text-main)',
+                fontSize: '1rem',
+                marginBottom: '0.25rem'
+              }}
+            >
+              Consolidated Semester Results
+            </h4>
+
+            <p
+              style={{
+                margin: 0,
+                color: 'var(--text-muted)',
+                fontSize: '0.82rem'
+              }}
+            >
+              Internal Assessment 40% + End Semester Examination 60%
+            </p>
+          </div>
+
+          <div className="table-container">
+            <table style={{ minWidth: 1100 }}>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Student Name</th>
+                  <th>Register No</th>
+                  <th>Department</th>
+                  <th>Semester</th>
+                  <th>Subject</th>
+                  <th>Internal</th>
+                  <th>External</th>
+                  <th>Final Total</th>
+                  <th>GPA</th>
+                  <th>Grade</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {consolidatedResults.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={12}
+                      style={{
+                        textAlign: 'center',
+                        padding: '2.5rem',
+                        color: 'var(--text-muted)'
+                      }}
+                    >
+                      Consolidated results require both internal and end-semester marks to be published for a subject.
+                    </td>
+                  </tr>
+                ) : (
+                  consolidatedResults.map((result, index) => (
+                    <tr
+                      key={`${result.studentId}-${result.semester}-${result.subject}`}
+                    >
+                      <td>{index + 1}</td>
+
+                      <td style={{ fontWeight: 700 }}>
+                        {result.studentName}
+                      </td>
+
+                      <td>{result.studentId}</td>
+
+                      <td>{result.department}</td>
+
+                      <td>{result.semester}</td>
+
+                      <td style={{ fontWeight: 700 }}>
+                        {result.subject}
+                      </td>
+
+                      <td>{result.internalMark} / 40</td>
+
+                      <td>{result.externalMark} / 60</td>
+
+                      <td
+                        style={{
+                          fontWeight: 800,
+                          color: 'var(--primary)'
+                        }}
+                      >
+                        {result.total} / 100
+                      </td>
+
+                      <td style={{ fontWeight: 700 }}>
+                        {result.gpa}
+                      </td>
+
+                      <td>
+                        <span
+                          style={{
+                            padding: '3px 9px',
+                            borderRadius: 6,
+                            fontWeight: 700,
+                            color: result.status === 'Pass'
+                              ? '#047857'
+                              : '#b91c1c',
+                            background: result.status === 'Pass'
+                              ? '#d1fae5'
+                              : '#fee2e2'
+                          }}
+                        >
+                          {result.grade}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span
+                          style={{
+                            padding: '3px 9px',
+                            borderRadius: 6,
+                            fontWeight: 700,
+                            color: result.status === 'Pass'
+                              ? '#047857'
+                              : '#b91c1c',
+                            background: result.status === 'Pass'
+                              ? '#d1fae5'
+                              : '#fee2e2'
+                          }}
+                        >
+                          {result.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

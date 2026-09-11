@@ -128,9 +128,30 @@ const HodDashboard = () => {
     hodSession?.department ||
     'Department';
 
-  const matchesDepartment = value =>
-    String(value || '').trim().toLowerCase() ===
-    String(deptName || '').trim().toLowerCase();
+  const matchesDepartment = value => {
+    if (!value || !deptName) return false;
+    const val = String(value).trim().toLowerCase();
+    const target = String(deptName).trim().toLowerCase();
+    if (val === target || val.includes(target) || target.includes(val)) return true;
+
+    // Fuzzy alias match (e.g. "Computer Science Engineering" vs "Computer Science")
+    const cse = ['computer science', 'cse', 'cs'];
+    if (cse.some(k => val.includes(k)) && cse.some(k => target.includes(k))) return true;
+
+    const ece = ['electronics', 'ece', 'ec'];
+    if (ece.some(k => val.includes(k)) && ece.some(k => target.includes(k))) return true;
+
+    const eee = ['electrical', 'eee', 'ee'];
+    if (eee.some(k => val.includes(k)) && eee.some(k => target.includes(k))) return true;
+
+    const mech = ['mechanical', 'mech', 'me'];
+    if (mech.some(k => val.includes(k)) && mech.some(k => target.includes(k))) return true;
+
+    const it = ['information technology', 'it'];
+    if (it.some(k => val.includes(k)) && it.some(k => target.includes(k))) return true;
+
+    return false;
+  };
 
   const departmentStudents = students.filter(student =>
     matchesDepartment(student.dept || student.department)

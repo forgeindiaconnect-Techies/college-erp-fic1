@@ -217,7 +217,24 @@ router.post('/start', protect, collegeScope, async (req, res) => {
 // POST /api/class-sessions/end/:id - End Live Class Session
 router.post('/end/:id', protect, collegeScope, async (req, res) => {
   try {
-    const session = await ClassSession.findById(req.params.id);
+    let session = await ClassSession.findById(req.params.id);
+    if (!session) {
+      session = await ClassSession.findOne({
+        collegeId: req.collegeId,
+        $or: [
+          { timetableId: req.params.id },
+          { _id: req.params.id }
+        ],
+        status: 'Live'
+      });
+    }
+    if (!session) {
+      session = await ClassSession.findOne({
+        collegeId: req.collegeId,
+        timetableId: req.params.id
+      }).sort({ createdAt: -1 });
+    }
+
     if (!session) {
       return res.status(404).json({ message: 'Class session not found.' });
     }
@@ -227,6 +244,13 @@ router.post('/end/:id', protect, collegeScope, async (req, res) => {
     session.endTime = endTime;
     session.durationMinutes = 50; // Standard period duration
     await session.save();
+
+    // Broadcast socket event
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('dataUpdated', { module: 'timetable', action: 'completed' });
+      io.emit('class_ended', { sessionId: session._id, timetableId: session.timetableId });
+    }
 
     res.json({ message: 'Class session completed successfully.', session });
   } catch (error) {

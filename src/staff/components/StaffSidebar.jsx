@@ -44,7 +44,7 @@ const StaffSidebar = ({ isOpen, onClose }) => {
       name: 'Class & Students',
       icon: <Users size={20} />,
       items: [
-        { name: 'Student List', path: '/staff/students', icon: <Users size={20} /> }
+        { name: 'My Class', path: '/staff/students', icon: <Users size={20} /> }
       ]
     },
     {

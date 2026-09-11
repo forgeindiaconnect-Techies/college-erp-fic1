@@ -134,6 +134,7 @@ router.put('/:id', protect, authorize('Admin', 'HOD', 'Principal'), collegeScope
       req.params.id,
       {
         name: req.body.name,
+        examType: req.body.examType || 'Internal',
         dept: req.body.dept,
         sem: req.body.sem,
         subject: req.body.subject,

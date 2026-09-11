@@ -47,6 +47,35 @@ const EXAM_TYPES = [
   }
 ];
 
+const getExamType = examName => {
+  const name = String(examName || '').toLowerCase();
+
+  if (name.includes('ia-1')) return 'CIA 1';
+  if (name.includes('ia-2')) return 'CIA 2';
+  if (name.includes('ia-3')) return 'CIA 3';
+
+  if (name.includes('mid-semester')) {
+    return 'Model';
+  }
+
+  if (
+    name.includes('end semester') ||
+    name.includes('university semester')
+  ) {
+    return 'Semester';
+  }
+
+  if (
+    name.includes('lab') ||
+    name.includes('practical') ||
+    name.includes('viva')
+  ) {
+    return 'Practical';
+  }
+
+  return 'Internal';
+};
+
 const HodExams = () => {
   const hod = getHodSession();
   const [exams, setExams] = useState([]);
@@ -186,6 +215,7 @@ const HodExams = () => {
     e.preventDefault();
     const payload = {
       ...form,
+      examType: getExamType(form.name),
       dept: hod.dept,
       maxMarks: Number(form.maxMarks)
     };

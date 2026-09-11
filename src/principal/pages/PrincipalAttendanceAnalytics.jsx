@@ -1,76 +1,470 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CalendarCheck, AlertCircle, TrendingUp, Users, CheckCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
-import { getStudents } from '../../api/index';
+import {
+  getStudents,
+  getAllAttendance
+} from '../../api/index';
 import '../../pages/Dashboard.css';
-
-const deptAttendance = [
-  { dept: 'CSE', present: 90, absent: 10, avg: 90 },
-  { dept: 'ECE', dept2: 'Electronics', present: 83, absent: 17, avg: 83 },
-  { dept: 'EEE', present: 93, absent: 7, avg: 93 },
-  { dept: 'MECH', present: 68, absent: 32, avg: 68 },
-  { dept: 'BCA', present: 94, absent: 6, avg: 94 },
-  { dept: 'MBA', present: 96, absent: 4, avg: 96 },
-];
-
-const monthlyData = [
-  { month: 'Jan', CSE: 88, ECE: 82, EEE: 90, MECH: 72, overall: 85 },
-  { month: 'Feb', CSE: 90, ECE: 80, EEE: 91, MECH: 70, overall: 86 },
-  { month: 'Mar', CSE: 89, ECE: 83, EEE: 92, MECH: 68, overall: 87 },
-  { month: 'Apr', CSE: 91, ECE: 84, EEE: 93, MECH: 69, overall: 88 },
-  { month: 'May', CSE: 90, ECE: 83, EEE: 93, MECH: 68, overall: 87 },
-];
-
-const statusPie = [
-  { name: 'Excellent (≥90%)', value: 5, color: '#10b981' },
-  { name: 'Average (75-89%)', value: 3, color: '#f59e0b' },
-  { name: 'Low (<75%)', value: 2, color: '#ef4444' },
-];
-
-const lowAttStudents = [
-  { name: 'Robert Johnson', dept: 'MECH', attendance: 68, sem: 'Sem 2', alert: 'Critical' },
-  { name: 'Neha Gupta', dept: 'ECE', attendance: 75, sem: 'Sem 6', alert: 'Warning' },
-  { name: 'David Lee', dept: 'CSE', attendance: 88, sem: 'Sem 3', alert: 'Monitor' },
-];
-
-const weekData = [
-  { day: 'Mon', present: 92, absent: 8 },
-  { day: 'Tue', present: 88, absent: 12 },
-  { day: 'Wed', present: 91, absent: 9 },
-  { day: 'Thu', present: 85, absent: 15 },
-  { day: 'Fri', present: 79, absent: 21 },
-];
+import useRealtimeSync from '../../hooks/useRealtimeSync';
 
 export default function PrincipalAttendanceAnalytics() {
   const [view, setView] = useState('overview');
-  const [alertList, setAlertList] = useState(lowAttStudents);
+  const [students, setStudents] = useState([]);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [deptAttendance, setDeptAttendance] = useState([]);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [statusPie, setStatusPie] = useState([]);
+  const [weekData, setWeekData] = useState([]);
+  const [alertList, setAlertList] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    getStudents()
-      .then(res => res.data)
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          // Normalize and filter for low attendance students (< 80%)
-          const lowAtt = data
-            .filter(s => s.attendance < 80)
-            .map(s => ({
-              name: s.name,
-              dept: s.department || 'CSE',
-              attendance: s.attendance || 70,
-              sem: s.semester || 'Sem 4',
-              alert: s.attendance < 70 ? 'Critical' : 'Warning'
-            }));
-          if (lowAtt.length > 0) {
-            setAlertList(lowAtt);
-          }
-        }
-      })
-      .catch(err => {
-        console.warn('API /api/students offline. Loading security alert logs.', err);
-      });
+  const loadAttendanceData = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const [studentsResponse, attendanceResponse] =
+        await Promise.all([
+          getStudents(),
+          getAllAttendance()
+        ]);
+
+      const studentData = Array.isArray(studentsResponse.data)
+        ? studentsResponse.data
+        : studentsResponse.data?.students ||
+          studentsResponse.data?.data ||
+          [];
+
+      const attendanceData = Array.isArray(attendanceResponse.data)
+        ? attendanceResponse.data
+        : attendanceResponse.data?.records ||
+          attendanceResponse.data?.data ||
+          [];
+
+      setStudents(studentData);
+      setAttendanceRecords(attendanceData);
+    } catch (error) {
+      console.error(
+        'Failed to load Principal attendance data:',
+        error
+      );
+
+      setStudents([]);
+      setAttendanceRecords([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const overall = Math.round(deptAttendance.reduce((a, d) => a + d.avg, 0) / deptAttendance.length);
+  useEffect(() => {
+    loadAttendanceData();
+  }, [loadAttendanceData]);
+
+  useRealtimeSync(
+    loadAttendanceData,
+    ['attendance', 'students']
+  );
+
+  useEffect(() => {
+    const studentAttendanceMap = {};
+
+    attendanceRecords.forEach(record => {
+      const rawStudentId = record.studentId;
+
+      const student = students.find(item =>
+        String(item.id || '') === String(rawStudentId) ||
+        String(item._id || '') === String(rawStudentId) ||
+        (
+          record.studentName &&
+          item.name &&
+          String(item.name).trim().toLowerCase() ===
+            String(record.studentName).trim().toLowerCase()
+        )
+      );
+
+      const studentId =
+        student?.id ||
+        student?._id ||
+        rawStudentId ||
+        String(record.studentName || '')
+          .trim()
+          .toLowerCase();
+
+      if (!studentAttendanceMap[studentId]) {
+
+        studentAttendanceMap[studentId] = {
+          studentId,
+          name:
+            record.studentName ||
+            student?.name ||
+            'Unknown Student',
+          dept:
+            record.department ||
+            student?.department ||
+            student?.dept ||
+            'Unknown Department',
+          sem:
+            record.semester ||
+            student?.semester ||
+            student?.sem ||
+            '',
+          present: 0,
+          total: 0
+        };
+      }
+
+      studentAttendanceMap[studentId].total += 1;
+
+      if (
+        String(record.status).toLowerCase() === 'present'
+      ) {
+        studentAttendanceMap[studentId].present += 1;
+      }
+    });
+
+    const calculatedStudents = Object.values(
+      studentAttendanceMap
+    ).map(student => ({
+      ...student,
+      attendance:
+        student.total > 0
+          ? Number(
+              (
+                (student.present / student.total) *
+                100
+              ).toFixed(1)
+            )
+          : 0
+    }));
+
+    const lowAttendance = calculatedStudents
+      .filter(student => student.attendance < 80)
+      .map(student => ({
+        ...student,
+        alert:
+          student.attendance < 75
+            ? 'Critical'
+            : 'Warning'
+      }))
+      .sort((a, b) => a.attendance - b.attendance);
+
+    setAlertList(lowAttendance);
+
+    setStatusPie([
+      {
+        name: 'Excellent (≥90%)',
+        value: calculatedStudents.filter(
+          student => student.attendance >= 90
+        ).length,
+        color: '#10b981'
+      },
+      {
+        name: 'Average (75–89%)',
+        value: calculatedStudents.filter(
+          student =>
+            student.attendance >= 75 &&
+            student.attendance < 90
+        ).length,
+        color: '#f59e0b'
+      },
+      {
+        name: 'Low (<75%)',
+        value: calculatedStudents.filter(
+          student => student.attendance < 75
+        ).length,
+        color: '#ef4444'
+      }
+    ]);
+  }, [students, attendanceRecords]);
+
+  useEffect(() => {
+    const departmentMap = {};
+
+    attendanceRecords.forEach(record => {
+      const department =
+        record.department ||
+        'Unknown Department';
+
+      if (!departmentMap[department]) {
+        departmentMap[department] = {
+          dept: department,
+          presentCount: 0,
+          totalCount: 0
+        };
+      }
+
+      departmentMap[department].totalCount += 1;
+
+      if (
+        String(record.status).toLowerCase() === 'present'
+      ) {
+        departmentMap[department].presentCount += 1;
+      }
+    });
+
+    const departmentResults = Object.values(
+      departmentMap
+    ).map(department => {
+      const present =
+        department.totalCount > 0
+          ? Number(
+              (
+                (department.presentCount /
+                  department.totalCount) *
+                100
+              ).toFixed(1)
+            )
+          : 0;
+
+      return {
+        dept: department.dept,
+        present,
+        absent: Number((100 - present).toFixed(1)),
+        avg: present
+      };
+    });
+
+    setDeptAttendance(departmentResults);
+  }, [attendanceRecords]);
+
+  useEffect(() => {
+    const today = new Date();
+    const currentDay = today.getDay();
+
+    const monday = new Date(today);
+    monday.setDate(
+      today.getDate() -
+      (currentDay === 0 ? 6 : currentDay - 1)
+    );
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    const dayNames = [
+      'Sun',
+      'Mon',
+      'Tue',
+      'Wed',
+      'Thu',
+      'Fri',
+      'Sat'
+    ];
+
+    const weeklyMap = {};
+
+    attendanceRecords.forEach(record => {
+      const recordDate = new Date(record.attendanceDate);
+
+      if (recordDate < monday || recordDate > sunday) {
+        return;
+      }
+
+      const day = dayNames[recordDate.getDay()];
+
+      if (!weeklyMap[day]) {
+        weeklyMap[day] = {
+          day,
+          presentCount: 0,
+          totalCount: 0,
+          order: recordDate.getDay()
+        };
+      }
+
+      weeklyMap[day].totalCount += 1;
+
+      if (
+        String(record.status).toLowerCase() === 'present'
+      ) {
+        weeklyMap[day].presentCount += 1;
+      }
+    });
+
+    const weeklyResults = Object.values(weeklyMap)
+      .map(item => {
+        const present =
+          item.totalCount > 0
+            ? Number(
+                (
+                  (item.presentCount / item.totalCount) *
+                  100
+                ).toFixed(1)
+              )
+            : 0;
+
+        return {
+          day: item.day,
+          present,
+          absent: Number((100 - present).toFixed(1)),
+          order: item.order
+        };
+      })
+      .sort((a, b) => a.order - b.order);
+
+    setWeekData(weeklyResults);
+  }, [attendanceRecords]);
+
+  useEffect(() => {
+    const monthlyMap = {};
+
+    attendanceRecords.forEach(record => {
+      const recordDate = new Date(record.attendanceDate);
+
+      if (Number.isNaN(recordDate.getTime())) {
+        return;
+      }
+
+      const monthKey = `${recordDate.getFullYear()}-${String(
+        recordDate.getMonth() + 1
+      ).padStart(2, '0')}`;
+
+      const monthLabel = recordDate.toLocaleDateString(
+        'en-US',
+        {
+          month: 'short',
+          year: 'numeric'
+        }
+      );
+
+      const department =
+        record.department ||
+        'Unknown Department';
+
+      if (!monthlyMap[monthKey]) {
+        monthlyMap[monthKey] = {
+          monthKey,
+          month: monthLabel,
+          presentCount: 0,
+          totalCount: 0,
+          departments: {}
+        };
+      }
+
+      const month = monthlyMap[monthKey];
+
+      month.totalCount += 1;
+
+      if (!month.departments[department]) {
+        month.departments[department] = {
+          presentCount: 0,
+          totalCount: 0
+        };
+      }
+
+      month.departments[department].totalCount += 1;
+
+      if (
+        String(record.status).toLowerCase() === 'present'
+      ) {
+        month.presentCount += 1;
+        month.departments[department].presentCount += 1;
+      }
+    });
+
+    const monthlyResults = Object.values(monthlyMap)
+      .sort((a, b) =>
+        a.monthKey.localeCompare(b.monthKey)
+      )
+      .map(month => {
+        const result = {
+          month: month.month,
+          overall:
+            month.totalCount > 0
+              ? Number(
+                  (
+                    (month.presentCount /
+                      month.totalCount) *
+                    100
+                  ).toFixed(1)
+                )
+              : 0
+        };
+
+        Object.entries(month.departments).forEach(
+          ([department, values]) => {
+            result[department] =
+              values.totalCount > 0
+                ? Number(
+                    (
+                      (values.presentCount /
+                        values.totalCount) *
+                      100
+                    ).toFixed(1)
+                  )
+                : 0;
+          }
+        );
+
+        return result;
+      });
+
+    setMonthlyData(monthlyResults);
+  }, [attendanceRecords]);
+
+  const overall =
+    deptAttendance.length > 0
+      ? Number(
+          (
+            deptAttendance.reduce(
+              (sum, department) =>
+                sum + department.avg,
+              0
+            ) / deptAttendance.length
+          ).toFixed(1)
+        )
+      : 0;
+
+  const chartColours = [
+    '#6366f1',
+    '#f59e0b',
+    '#10b981',
+    '#ef4444',
+    '#3b82f6',
+    '#8b5cf6',
+    '#14b8a6',
+    '#ec4899'
+  ];
+
+  const todayDate = new Date().toLocaleDateString('en-CA');
+
+  const todayRecords = attendanceRecords.filter(record =>
+    new Date(record.attendanceDate)
+      .toLocaleDateString('en-CA') === todayDate
+  );
+
+  const todayPresentCount = todayRecords.filter(record =>
+    String(record.status).toLowerCase() === 'present'
+  ).length;
+
+  const presentToday =
+    todayRecords.length > 0
+      ? Number(
+          (
+            (todayPresentCount / todayRecords.length) *
+            100
+          ).toFixed(1)
+        )
+      : 0;
+
+  const absentToday =
+    todayRecords.length > 0
+      ? Number((100 - presentToday).toFixed(1))
+      : 0;
+
+  const highestDepartment =
+    deptAttendance.length > 0
+      ? [...deptAttendance].sort(
+          (a, b) => b.avg - a.avg
+        )[0]
+      : null;
+
+  const lowestDepartment =
+    deptAttendance.length > 0
+      ? [...deptAttendance].sort(
+          (a, b) => a.avg - b.avg
+        )[0]
+      : null;
 
   return (
     <div className="main-content" style={{ padding: '2rem', background: 'var(--bg-primary)', minHeight: 'calc(100vh - 70px)' }}>
@@ -85,11 +479,11 @@ export default function PrincipalAttendanceAnalytics() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         {[
           { label: 'Overall Attendance', value: `${overall}%`, icon: <CheckCircle size={18} />, color: 'var(--primary)', bg: '#EEEDFE', sub: 'All departments' },
-          { label: 'Present Today', value: '87%', icon: <Users size={18} />, color: 'var(--primary)', bg: '#EEEDFE', sub: 'Estimated' },
-          { label: 'Absent Today', value: '13%', icon: <AlertCircle size={18} />, color: 'var(--danger)', bg: '#FCEBEB', sub: 'Estimated' },
+          { label: 'Present Today', value: `${presentToday}%`, icon: <Users size={18} />, color: 'var(--primary)', bg: '#EEEDFE', sub: `${todayPresentCount} attendance entries` },
+          { label: 'Absent Today', value: `${absentToday}%`, icon: <AlertCircle size={18} />, color: 'var(--danger)', bg: '#FCEBEB', sub: `${todayRecords.length - todayPresentCount} attendance entries` },
           { label: 'Low Attendance', value: alertList.length, icon: <AlertCircle size={18} />, color: 'var(--warning)', bg: '#FAEEDA', sub: 'Below 80%' },
-          { label: 'Dept with Highest', value: 'MBA', icon: <TrendingUp size={18} />, color: 'var(--success)', bg: '#E1F5EE', sub: '96% attendance' },
-          { label: 'Dept with Lowest', value: 'MECH', icon: <AlertCircle size={18} />, color: 'var(--danger)', bg: '#FCEBEB', sub: '68% attendance' },
+          { label: 'Dept with Highest', value: highestDepartment?.dept || '—', icon: <TrendingUp size={18} />, color: 'var(--success)', bg: '#E1F5EE', sub: highestDepartment ? `${highestDepartment.avg}% attendance` : 'No records' },
+          { label: 'Dept with Lowest', value: lowestDepartment?.dept || '—', icon: <AlertCircle size={18} />, color: 'var(--danger)', bg: '#FCEBEB', sub: lowestDepartment ? `${lowestDepartment.avg}% attendance` : 'No records' },
         ].map((s, i) => (
           <div key={i} className="stat-card" style={{ border: '1px solid #E3E5EC' }}>
             <div className="stat-icon-wrapper" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
@@ -189,10 +583,20 @@ export default function PrincipalAttendanceAnalytics() {
                 <YAxis domain={[60, 100]} tick={{ fontSize: 10 }} />
                 <Tooltip formatter={(v) => `${v}%`} />
                 <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="CSE" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="ECE" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="EEE" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="MECH" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+                {deptAttendance.map((department, index) => (
+                  <Line
+                    key={department.dept}
+                    type="monotone"
+                    dataKey={department.dept}
+                    name={department.dept}
+                    stroke={
+                      chartColours[index % chartColours.length]
+                    }
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    connectNulls
+                  />
+                ))}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -228,7 +632,20 @@ export default function PrincipalAttendanceAnalytics() {
                   <tr><th>Student Name</th><th>Department</th><th>Semester</th><th>Attendance %</th><th>Alert Level</th><th>Action</th></tr>
                 </thead>
                 <tbody>
-                  {alertList.map((s, i) => (
+                  {alertList.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        style={{
+                          textAlign: 'center',
+                          padding: '2.5rem',
+                          color: 'var(--text-muted)'
+                        }}
+                      >
+                        No students with low attendance.
+                      </td>
+                    </tr>
+                  ) : alertList.map((s, i) => (
                     <tr key={i}>
                       <td style={{ fontWeight: 700, color: 'var(--text-main)' }}>{s.name}</td>
                       <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{s.dept}</td>

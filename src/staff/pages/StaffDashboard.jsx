@@ -6,7 +6,18 @@ import {
   ArrowRight, Activity, Plus, AlertCircle, GraduationCap, Play, Square, CheckCircle2, UserCheck
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getStudents, getAllMarks, getAllAttendance, getExams, getNotifications, getMyAdvisingClass, getStaffTodaySchedule, startClassSession } from '../../api/index';
+import {
+  getStudents,
+  getAllMarks,
+  getAllAttendance,
+  getExams,
+  getNotifications,
+  getMyAdvisingClass,
+  getStaffTodaySchedule,
+  startClassSession,
+  getAssignments,
+  getMyFacultyAllocations
+} from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import LiveClassModal from '../components/LiveClassModal';
 import './StaffDashboard.css';
@@ -24,7 +35,6 @@ const DEFAULT_SESSION = {
 };
 
 const MOCK_LEAVES = [];
-const MOCK_ASSIGNMENTS = [];
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const formatPeriodName = (period) => {
@@ -48,6 +58,7 @@ const StaffDashboard = () => {
   const [marks, setMarks] = useState([]);
   const [attendanceLogs, setAttendanceLogs] = useState({});
   const [assignments, setAssignments] = useState([]);
+  const [mySubjects, setMySubjects] = useState([]);
   const [leaves, setLeaves] = useState([]);
   const [exams, setExams] = useState([]);
 
@@ -65,14 +76,28 @@ const StaffDashboard = () => {
 
   const loadDashboardData = useCallback(async () => {
     try {
-      const [studRes, marksRes, attRes, examsRes, notifRes, advisorRes, scheduleRes] = await Promise.all([
+      const [
+        studRes,
+        marksRes,
+        attRes,
+        examsRes,
+        notifRes,
+        advisorRes,
+        scheduleRes,
+        assignmentRes,
+        allocationRes
+      ] = await Promise.all([
         getStudents(),
         getAllMarks(),
         getAllAttendance(),
         getExams().catch(() => ({ data: [] })),
         getNotifications().catch(() => ({ data: [] })),
-        getMyAdvisingClass().catch(() => ({ data: { isAdvisor: false } })),
-        getStaffTodaySchedule().catch(() => ({ data: [] }))
+        getMyAdvisingClass().catch(() => ({
+          data: { isAdvisor: false }
+        })),
+        getStaffTodaySchedule().catch(() => ({ data: [] })),
+        getAssignments().catch(() => ({ data: [] })),
+        getMyFacultyAllocations().catch(() => ({ data: [] }))
       ]);
 
       if (notifRes?.data && Array.isArray(notifRes.data)) setNotifications(notifRes.data);
@@ -84,6 +109,25 @@ const StaffDashboard = () => {
       if (studRes?.data) setStudents(studRes.data);
       if (examsRes?.data) setExams(examsRes.data);
       if (scheduleRes?.data) setTodaySchedule(scheduleRes.data);
+
+      const realAssignments = Array.isArray(assignmentRes?.data)
+        ? assignmentRes.data
+        : [];
+
+      setAssignments(realAssignments);
+
+      const allocations = Array.isArray(allocationRes?.data)
+        ? allocationRes.data
+        : [];
+
+      const subjectNames = allocations
+        .map(allocation =>
+          allocation.subjectId?.subjectName ||
+          allocation.subjectId?.name
+        )
+        .filter(Boolean);
+
+      setMySubjects([...new Set(subjectNames)]);
       setLoadingSchedule(false);
 
       if (marksRes?.data) {
@@ -128,15 +172,6 @@ const StaffDashboard = () => {
 
     loadDashboardData();
 
-    // Assignments Setup
-    const assignRaw = localStorage.getItem(`erp_assignments_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
-    if (assignRaw) {
-      setAssignments(JSON.parse(assignRaw));
-    } else {
-      localStorage.setItem(`erp_assignments_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(MOCK_ASSIGNMENTS));
-      setAssignments([]);
-    }
-
     // Leaves Setup
     const leaveRaw = localStorage.getItem(`erp_leave_requests_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
     if (leaveRaw) {
@@ -156,7 +191,7 @@ const StaffDashboard = () => {
   const staffDept = staffSession.dept || staffSession.department || 'Computer Science Engineering';
 
   // Derived Stats
-  const mySubjects = staffSession.subjects || ['Programming in C', 'DBMS'];
+  const effectiveSubjects = mySubjects.length > 0 ? mySubjects : (staffSession.subjects || []);
   const myClasses = todaySchedule.length > 0 ? todaySchedule : [
     { department: staffDept, semester: 'Semester 1', section: 'A', subject: 'Programming in C', periodId: { startTime: '09:00 AM', endTime: '09:50 AM' }, roomNo: 'C101' }
   ];

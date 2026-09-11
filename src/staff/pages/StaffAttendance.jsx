@@ -9,6 +9,8 @@ import { getStudents, getAllAttendance, createAttendance, getMyTimetable } from 
 import CustomSelect from '../../components/CustomSelect';
 import './StaffAttendance.css';
 
+const AVATAR_COLORS = ['#3b82f6', '#6366F1', '#10b981', '#f59e0b', '#ec4899', '#14b8a6'];
+
 const DEFAULT_SESSION = {
   name: 'Faculty',
   dept: '',

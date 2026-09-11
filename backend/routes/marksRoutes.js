@@ -2,6 +2,8 @@ import express from 'express';
 import Mark from '../models/Mark.js';
 import Student from '../models/Student.js';
 import Exam from '../models/Exam.js';
+import FacultyAllocation from '../models/FacultyAllocation.js';
+import Staff from '../models/Staff.js';
 import { protect, authorize, departmentScope, collegeScope } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -245,7 +247,13 @@ router.get('/student/:studentId', protect, collegeScope, async (req, res) => {
 router.post('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff'), collegeScope, async (req, res) => {
   try {
     if (Array.isArray(req.body)) {
-      const processed = req.body.map(processMarkPayload);
+      const processed = req.body.map(record =>
+        processMarkPayload({
+          ...record,
+          resultStatus: 'Draft',
+          enteredBy: req.user._id
+        })
+      );
       
       const bulkOps = processed.map(record => {
         const collegeIdToSave = req.collegeId || 'unassigned_college';
@@ -279,7 +287,14 @@ router.post('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff'), colle
       req.app.get('io').emit('dataUpdated', { module: 'marks', action: 'created' });
       return res.status(201).json({ message: 'Bulk marks saved' });
     } else {
-      const mark = new Mark(processMarkPayload(req.body));
+      const mark = new Mark(
+        processMarkPayload({
+          ...req.body,
+          collegeId: req.collegeId,
+          resultStatus: 'Draft',
+          enteredBy: req.user._id
+        })
+      );
       const newRecord = await mark.save();
       await updateStudentCGPA(newRecord.studentId, req.collegeId);
       req.app.get('io').emit('dataUpdated', { module: 'marks', action: 'created' });
@@ -289,6 +304,110 @@ router.post('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff'), colle
     res.status(400).json({ message: err.message });
   }
 });
+
+// Submit one exam's draft marks to HOD
+router.post(
+  '/submit/:examId',
+  protect,
+  authorize('Staff'),
+  collegeScope,
+  async (req, res) => {
+    try {
+      const exam = await Exam.findOne({
+        _id: req.params.examId,
+        collegeId: req.collegeId
+      });
+
+      if (!exam) {
+        return res.status(404).json({
+          message: 'Exam not found'
+        });
+      }
+
+      const identityFilters = [];
+
+      if (req.user.email) {
+        identityFilters.push({ email: req.user.email });
+      }
+
+      if (req.user.referenceId) {
+        identityFilters.push({ id: req.user.referenceId });
+      }
+
+      const staff = await Staff.findOne({
+        collegeId: req.collegeId,
+        $or: identityFilters
+      });
+
+      if (!staff) {
+        return res.status(404).json({
+          message: 'Staff record not found'
+        });
+      }
+
+      const allocationFilter = {
+        collegeId: req.collegeId,
+        staffId: staff._id,
+        subjectId: exam.subjectId,
+        isActive: true
+      };
+
+      if (exam.sectionId) {
+        allocationFilter.sectionId = exam.sectionId;
+      }
+
+      const allocation = await FacultyAllocation.findOne(
+        allocationFilter
+      );
+
+      if (!allocation) {
+        return res.status(403).json({
+          message:
+            'You are not allocated to this exam subject and section'
+        });
+      }
+
+      const result = await Mark.updateMany(
+        {
+          collegeId: req.collegeId,
+          examId: exam._id,
+          resultStatus: {
+            $in: ['Draft', 'Returned']
+          }
+        },
+        {
+          $set: {
+            resultStatus: 'Submitted',
+            submittedAt: new Date(),
+            submittedBy: req.user._id,
+            returnReason: ''
+          }
+        }
+      );
+
+      if (result.matchedCount === 0) {
+        return res.status(400).json({
+          message: 'No draft marks are available to submit'
+        });
+      }
+
+      req.app.get('io').emit('dataUpdated', {
+        module: 'marks',
+        action: 'submitted',
+        examId: exam._id
+      });
+
+      res.json({
+        message: 'Marks submitted to HOD successfully',
+        count: result.modifiedCount
+      });
+    } catch (error) {
+      res.status(500).json({
+        message: error.message
+      });
+    }
+  }
+);
 
 // Update mark
 router.put('/:id', protect, authorize('Admin', 'Principal', 'HOD', 'Staff'), collegeScope, async (req, res) => {

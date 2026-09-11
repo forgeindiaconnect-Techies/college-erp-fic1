@@ -31,35 +31,60 @@ router.get('/', protect, collegeScope, async (req, res) => {
 });
 
 // Get staff's own allocations
-router.get('/my-allocations', protect, async (req, res) => {
-  try {
-    const collegeId = req.collegeId || req.user?.tenantId;
-    
-    // Find the Staff document by email (most reliable method)
-    let staffDoc = await Staff.findOne({ email: req.user.email });
-    
-    // Fallback: find by staffId field (string like STF002)
-    if (!staffDoc && req.user.referenceId) {
-      staffDoc = await Staff.findOne({ staffId: req.user.referenceId });
+router.get(
+  '/my-allocations',
+  protect,
+  authorize('Staff', 'HOD'),
+  collegeScope,
+  async (req, res) => {
+    try {
+      const collegeId = req.collegeId;
+      const identityFilters = [];
+
+      if (req.user?.email) {
+        identityFilters.push({
+          email: req.user.email
+        });
+      }
+
+      if (req.user?.referenceId) {
+        identityFilters.push({
+          id: req.user.referenceId
+        });
+      }
+
+      if (identityFilters.length === 0) {
+        return res.status(400).json({
+          message: 'Staff identity is not available'
+        });
+      }
+
+      const staffDoc = await Staff.findOne({
+        collegeId,
+        $or: identityFilters
+      });
+
+      if (!staffDoc) {
+        return res.status(404).json({
+          message: 'Staff record not found'
+        });
+      }
+
+      const allocations = await FacultyAllocation.find({
+        collegeId,
+        staffId: staffDoc._id,
+        isActive: true
+      })
+        .populate('subjectId')
+        .populate('academicYearId')
+        .populate('regulationId');
+
+      res.json(allocations);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
     }
-
-    if (!staffDoc) {
-      return res.status(404).json({ message: 'Staff record not found' });
-    }
-
-    const filter = { staffId: staffDoc._id, isActive: true };
-    if (collegeId) filter.collegeId = collegeId;
-
-    const allocations = await FacultyAllocation.find(filter)
-      .populate('subjectId')
-      .populate('academicYearId')
-      .populate('regulationId');
-
-    res.json(allocations);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
   }
-});
+);
 
 
 

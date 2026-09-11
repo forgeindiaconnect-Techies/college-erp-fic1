@@ -158,7 +158,7 @@ const StudentAttendance = () => {
     } finally {
       setLoading(false);
     }
-  }, [studentSession]);
+  }, []);
 
   useEffect(() => {
     // Session check

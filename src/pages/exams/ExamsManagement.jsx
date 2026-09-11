@@ -84,7 +84,7 @@ const ExamsManagement = () => {
   const [editTarget, setEditTarget] = useState(null);
   const [form, setForm] = useState({
     name: '',
-    examType: 'Internal',
+    examType: 'CIA 1',
     academicYearId: '',
     regulationId: '',
     departmentId: '',
@@ -184,7 +184,7 @@ const ExamsManagement = () => {
 
     setForm({
       name: '',
-      examType: 'Internal',
+      examType: 'CIA 1',
 
       academicYearId:
         activeYear?._id || activeYear?.id || '',
@@ -227,7 +227,7 @@ const ExamsManagement = () => {
   const openEdit = exam => {
     setForm({
       name: exam.name || '',
-      examType: exam.examType || 'Internal',
+      examType: exam.examType || 'CIA 1',
 
       academicYearId:
         exam.academicYearId?._id ||
@@ -646,11 +646,13 @@ const ExamsManagement = () => {
                       setForm({ ...form, examType: event.target.value })
                     }
                   >
-                    <option value="Internal">Internal</option>
-                    <option value="Model">Model</option>
-                    <option value="Practical">Practical</option>
-                    <option value="Semester">Semester</option>
-                    <option value="Supplementary">Supplementary</option>
+                    <option value="CIA 1">CIA 1</option>
+                    <option value="CIA 2">CIA 2</option>
+                    <option value="CIA 3">CIA 3</option>
+                    <option value="Model">Model Exam</option>
+                    <option value="Practical">Practical Exam</option>
+                    <option value="Semester">Semester Exam</option>
+                    <option value="Supplementary">Supplementary Exam</option>
                   </select>
                 </div>
 

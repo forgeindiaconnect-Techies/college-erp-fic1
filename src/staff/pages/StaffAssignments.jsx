@@ -1,31 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAssignments, createAssignment, getAssignmentSubmissions, getStudents, getSubjects } from '../../api/index';
+import useRealtimeSync from '../../hooks/useRealtimeSync';
 import {
   ClipboardList, Plus, Search, Calendar, Users, FileText,
   Trash2, X, CheckCircle, ArrowLeft, AlertCircle, BookOpen
 } from 'lucide-react';
 import './StaffAssignments.css';
 
-// Fallback session
-const DEFAULT_SESSION = {
-  name: 'Dr. Ananya Rao',
-  dept: 'Computer Science',
-  deptCode: 'CS',
-  role: 'Staff',
-  subjects: ['Data Structures', 'DBMS']
-};
-
-// DEPT_SUBJECTS removed as it is fetched from MongoDB
-const MOCK_ASSIGNMENTS = [
-  { id: '1', subject: 'Data Structures', class: 'Sem 3', title: 'Implement Binary Search Tree', description: 'Write a Java program to implement a BST with insert, delete, and search operations.', dueDate: '2026-05-28', submissionsCount: 12, faculty: 'Dr. Ananya Rao' },
-  { id: '2', subject: 'DBMS', class: 'Sem 6', title: 'SQL Join Queries Practice', description: 'Complete the SQL exercises sheet on nested queries and multi-table joins.', dueDate: '2026-05-25', submissionsCount: 8, faculty: 'Dr. Ananya Rao' }
-];
-
 const StaffAssignments = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [staffSession, setStaffSession] = useState(DEFAULT_SESSION);
+  const [staffSession, setStaffSession] = useState(null);
 
   // Assignments state
   const [assignments, setAssignments] = useState([]);
@@ -33,7 +19,7 @@ const StaffAssignments = () => {
 
   // Modal create states
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ title: '', subject: '', targetClass: 'Sem 1', description: '', dueDate: '' });
+  const [form, setForm] = useState({ title: '', subject: '', targetClass: '', description: '', dueDate: '' });
   const [saved, setSaved] = useState(false);
 
   const [viewingAssignment, setViewingAssignment] = useState(null);
@@ -47,41 +33,57 @@ const StaffAssignments = () => {
   useEffect(() => {
     const init = async () => {
       // 1. Session check
-    const session = sessionStorage.getItem('staff_session');
-    let activeStaff = DEFAULT_SESSION;
-    if (session) {
-      activeStaff = JSON.parse(session);
+      const session = sessionStorage.getItem('staff_session');
+      if (!session) {
+        navigate('/staff/login');
+        return;
+      }
+
+      const activeStaff = JSON.parse(session);
       setStaffSession(activeStaff);
-    } else {
-      navigate('/staff/login');
-      return;
-    }
 
-    // Fetch allocated subjects or subjects for activeStaff
     try {
-      const { getMyFacultyAllocations, getSubjects } = await import('../../api/index');
-      const [allocRes, subRes] = await Promise.all([
-        getMyFacultyAllocations().catch(() => ({ data: [] })),
-        getSubjects().catch(() => ({ data: [] }))
-      ]);
-      const allocs = allocRes?.data || [];
-      const subs = subRes?.data || [];
-      setDbSubjects(subs);
-      
-      let mySubs = allocs.map(a => a.subjectId?.subjectName).filter(Boolean);
-      if (mySubs.length === 0) {
-        mySubs = subs.map(s => s.subjectName);
-      }
+      const { getMyFacultyAllocations } =
+        await import('../../api/index');
 
-      if (mySubs.length === 0) {
-        mySubs = ['Java Programming', 'DBMS', 'Operating Systems'];
-      }
+      const allocationResponse =
+        await getMyFacultyAllocations();
 
-      const uniqueSubs = [...new Set(mySubs)];
-      setAvailableSubjects(uniqueSubs);
-      setForm(f => ({ ...f, subject: uniqueSubs[0] || '', targetClass: 'Semester 3' }));
-    } catch (e) {
-      setAvailableSubjects(['Java Programming', 'DBMS']);
+      const allocations = Array.isArray(allocationResponse?.data)
+        ? allocationResponse.data
+        : [];
+
+      const allocatedSubjects = allocations
+        .map(allocation => allocation.subjectId)
+        .filter(Boolean);
+
+      const subjectNames = allocatedSubjects
+        .map(subject =>
+          subject.subjectName ||
+          subject.name
+        )
+        .filter(Boolean);
+
+      const uniqueSubjects = [...new Set(subjectNames)];
+
+      setDbSubjects(allocations);
+      setAvailableSubjects(uniqueSubjects);
+
+      const firstAllocation = allocations[0];
+
+      setForm(current => ({
+        ...current,
+        subject: uniqueSubjects[0] || '',
+        targetClass:
+          firstAllocation?.semester || ''
+      }));
+    } catch (error) {
+      console.error(
+        'Failed to load assigned subjects:',
+        error
+      );
+      setDbSubjects([]);
+      setAvailableSubjects([]);
     }
 
     fetchAssignments(activeStaff.name);
@@ -101,8 +103,14 @@ const StaffAssignments = () => {
     }
   };
 
-  const staffName = staffSession.name;
-  const staffDept = staffSession.dept;
+  useRealtimeSync(() => {
+    if (staffSession?.name) {
+      fetchAssignments(staffSession.name);
+    }
+  }, 'assignments');
+
+  const staffName = staffSession?.name || '';
+  const staffDept = staffSession?.dept || staffSession?.department || '';
 
   // Filter assignments created by this staff member
   const myAssignments = assignments.filter(a => a.faculty === staffName);
@@ -113,42 +121,53 @@ const StaffAssignments = () => {
     a.description.toLowerCase().includes(search.toLowerCase())
   );
 
+  const allocatedSemesters = [
+    ...new Set(
+      dbSubjects
+        .map(allocation => allocation.semester)
+        .filter(Boolean)
+    )
+  ];
 
-const SEMESTER_SUBJECT_MAP = {
-  'Semester 1': ['Programming in C', 'Engineering Mathematics I', 'Engineering Physics', 'Technical English'],
-  'Semester 2': ['Data Structures', 'Engineering Mathematics II', 'Digital Electronics', 'Python Programming'],
-  'Semester 3': ['Java Programming', 'Database Management Systems', 'Operating Systems', 'Computer Networks'],
-  'Semester 4': ['Design & Analysis of Algorithms', 'Software Engineering', 'Theory of Computation', 'Object Oriented Analysis'],
-  'Semester 5': ['Web Technology', 'Compiler Design', 'Computer Architecture', 'Artificial Intelligence'],
-  'Semester 6': ['Machine Learning', 'Cloud Computing', 'Cyber Security', 'Mobile Application Development'],
-  'Semester 7': ['Big Data Analytics', 'Internet of Things (IoT)', 'Blockchain Technology', 'Elective I'],
-  'Semester 8': ['Deep Learning', 'Project Work & Viva', 'Elective II', 'Industrial Internship']
-};
+  const getAllocatedSubjects = semester => [
+    ...new Set(
+      dbSubjects
+        .filter(allocation =>
+          allocation.semester === semester
+        )
+        .map(allocation =>
+          allocation.subjectId?.subjectName ||
+          allocation.subjectId?.name
+        )
+        .filter(Boolean)
+    )
+  ];
 
-  const getSubjectsForSemester = (sem) => {
-    const normSem = sem ? (sem.includes('Semester') ? sem : `Semester ${sem.replace(/[^0-9]/g, '')}`) : 'Semester 3';
-    const fallback = SEMESTER_SUBJECT_MAP[normSem] || ['General Subject'];
-    if (dbSubjects && dbSubjects.length > 0) {
-      const dbMatch = dbSubjects.filter(s => {
-        const sSem = s.sem || s.semester || '';
-        return sSem === normSem || sSem === sem || sSem.includes(normSem.replace('Semester ', ''));
-      }).map(s => s.subjectName || s.name);
-      if (dbMatch.length > 0) return [...new Set(dbMatch)];
-    }
-    return fallback;
+  const handleSemesterChange = semester => {
+    const semesterSubjects =
+      getAllocatedSubjects(semester);
+
+    setAvailableSubjects(semesterSubjects);
+
+    setForm(current => ({
+      ...current,
+      targetClass: semester,
+      subject: semesterSubjects[0] || ''
+    }));
   };
 
   const openAdd = () => {
-    const defaultSem = 'Semester 3';
-    const subs = getSubjectsForSemester(defaultSem);
-    setAvailableSubjects(subs);
-    setForm({
+    setForm(current => ({
       title: '',
-      subject: subs[0] || '',
-      targetClass: defaultSem,
+      subject:
+        current.subject ||
+        availableSubjects[0] ||
+        '',
+      targetClass: current.targetClass || '',
       description: '',
       dueDate: ''
-    });
+    }));
+
     setSaved(false);
     setModalOpen(true);
   };
@@ -158,21 +177,31 @@ const SEMESTER_SUBJECT_MAP = {
   };
 
   const handleInputChange = (key, val) => {
-    if (key === 'targetClass') {
-      const subs = getSubjectsForSemester(val);
-      setAvailableSubjects(subs);
-      setForm(f => ({
-        ...f,
-        targetClass: val,
-        subject: subs[0] || ''
-      }));
-    } else {
-      setForm(f => ({ ...f, [key]: val }));
-    }
+    setForm(f => ({ ...f, [key]: val }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const selectedAllocation = dbSubjects.find(allocation => {
+      const subjectName =
+        allocation.subjectId?.subjectName ||
+        allocation.subjectId?.name ||
+        '';
+
+      return (
+        allocation.semester === form.targetClass &&
+        subjectName === form.subject
+      );
+    });
+
+    if (!selectedAllocation) {
+      alert(
+        'No faculty allocation found for this subject and semester.'
+      );
+      return;
+    }
+
     const newAssignment = {
       subject: form.subject,
       class: form.targetClass,
@@ -180,7 +209,9 @@ const SEMESTER_SUBJECT_MAP = {
       description: form.description,
       dueDate: form.dueDate,
       department: staffDept,
-      faculty: staffName
+      faculty: staffName,
+      section: selectedAllocation.section,
+      sectionId: selectedAllocation.sectionId,
     };
 
     try {
@@ -228,7 +259,6 @@ const SEMESTER_SUBJECT_MAP = {
     if (window.confirm('Delete this assignment posting?')) {
       const updated = assignments.filter(a => a.id !== id);
       setAssignments(updated);
-      localStorage.setItem(`erp_assignments_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(updated));
     }
   };
 
@@ -363,12 +393,15 @@ const SEMESTER_SUBJECT_MAP = {
                   <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Target Class / Semester</label>
                   <select
                     value={form.targetClass}
-                    onChange={e => handleInputChange('targetClass', e.target.value)}
+                    onChange={e => handleSemesterChange(e.target.value)}
                     required
                     style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-main)', fontSize: '0.9rem', outline: 'none' }}
                   >
-                    {['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8'].map(sem => (
-                      <option key={sem} value={sem}>{sem}</option>
+                    <option value="">Select assigned semester</option>
+                    {allocatedSemesters.map(semester => (
+                      <option key={semester} value={semester}>
+                        {semester}
+                      </option>
                     ))}
                   </select>
                 </div>

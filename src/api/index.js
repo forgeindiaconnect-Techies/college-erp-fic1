@@ -243,6 +243,9 @@ export const deleteSemester = (id) =>
 export const getSections = (params = {}) =>
   api.get("/sections", { params });
 
+export const getMyClass = () =>
+  api.get("/sections/my-class");
+
 export const createSection = (sectionData) =>
   api.post("/sections", sectionData);
 
@@ -287,6 +290,7 @@ export const deleteAttendance = (id) => api.delete(`/attendance/${id}`);
 export const getAllMarks = () => api.get('/marks');
 export const getMarksByStudent = (studentId) => api.get(`/marks/student/${studentId}`);
 export const createMark = (markData) => api.post('/marks', markData);
+export const submitMarksToHod = (examId) => api.post(`/marks/submit/${examId}`);
 export const updateMark = (id, markData) => api.put(`/marks/${id}`, markData);
 export const deleteMark = (id) => api.delete(`/marks/${id}`);
 

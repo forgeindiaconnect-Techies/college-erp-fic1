@@ -196,12 +196,12 @@ router.post('/', protect, authorize('SuperAdmin', 'CollegeAdmin', 'Admin', 'Sub 
 
     const timetable = await Timetable.create({
       collegeId: req.collegeId,
-      department,
-      semester,
-      section,
+      department: allocation.department,
+      semester: allocation.semester,
+      section: allocation.section,
       day,
       periodId,
-      subjectId,
+      subjectId: allocation.subjectId,
       facultyAllocationId: allocation._id,
       roomNo,
       createdBy: req.user.name

@@ -37,8 +37,37 @@ const markSchema = new mongoose.Schema({
 
   resultStatus: {
     type: String,
-    enum: ['Draft', 'Published'],
+    enum: [
+      'Draft',
+      'Submitted',
+      'Approved',
+      'Returned',
+      'Published'
+    ],
     default: 'Draft'
+  },
+  submittedAt: {
+    type: Date,
+    default: null
+  },
+  submittedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  reviewedAt: {
+    type: Date,
+    default: null
+  },
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  reviewRemarks: {
+    type: String,
+    trim: true,
+    default: ''
   },
   publishedAt: { type: Date },
   enteredBy: {
@@ -48,5 +77,19 @@ const markSchema = new mongoose.Schema({
 
   collegeId: { type: String, index: true }
 }, { timestamps: true });
+
+markSchema.index(
+  {
+    collegeId: 1,
+    examId: 1,
+    studentId: 1
+  },
+  {
+    unique: true,
+    partialFilterExpression: {
+      examId: { $type: 'objectId' }
+    }
+  }
+);
 
 export default mongoose.model('Mark', markSchema);

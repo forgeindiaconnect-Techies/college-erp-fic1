@@ -4,48 +4,42 @@ import {
   Search, Edit2, X, CheckCircle, Percent,
   AlertTriangle, ArrowLeft, GraduationCap, Save
 } from 'lucide-react';
-import { getStudents, getAllMarks, createMark, getMyFacultyAllocations } from '../../api/index';
+import {
+  getStudents,
+  getAllMarks,
+  createMark,
+  getMyFacultyAllocations,
+  getExams,
+  submitMarksToHod
+} from '../../api/index';
 import CustomSelect from '../../components/CustomSelect';
 import './StaffMarks.css';
 
-// Fallback session
-const DEFAULT_SESSION = {
-  name: 'Dr. Ananya Rao',
-  dept: 'Computer Science',
-  deptCode: 'CS',
-  role: 'Staff'
-};
-
 const AVATAR_COLORS = ['bg-gradient-blue', 'bg-gradient-purple', 'bg-gradient-orange', 'bg-gradient-green', 'bg-gradient-teal'];
 
-const SEMESTER_SUBJECT_MAP = {
-  'Semester 1': ['Programming in C', 'Engineering Mathematics I', 'Engineering Physics', 'Technical English'],
-  'Semester 2': ['Data Structures', 'Engineering Mathematics II', 'Digital Electronics', 'Python Programming'],
-  'Semester 3': ['Java Programming', 'Database Management Systems', 'Operating Systems', 'Computer Networks'],
-  'Semester 4': ['Design & Analysis of Algorithms', 'Software Engineering', 'Theory of Computation', 'Object Oriented Analysis'],
-  'Semester 5': ['Web Technology', 'Compiler Design', 'Computer Architecture', 'Artificial Intelligence'],
-  'Semester 6': ['Machine Learning', 'Cloud Computing', 'Cyber Security', 'Mobile Application Development'],
-  'Semester 7': ['Big Data Analytics', 'Internet of Things (IoT)', 'Blockchain Technology', 'Elective I'],
-  'Semester 8': ['Deep Learning', 'Project Work & Viva', 'Elective II', 'Industrial Internship']
-};
+
 
 // DEPT_SUBJECTS removed as it is fetched from MongoDB
 const StaffMarks = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [staffSession, setStaffSession] = useState(DEFAULT_SESSION);
+  const [staffSession, setStaffSession] = useState(null);
 
   // Database states
   const [rawMarksList, setRawMarksList] = useState([]);
   const [students, setStudents] = useState([]);
 
-  const [targetSem, setTargetSem] = useState('Semester 3');
-  const [targetSection, setTargetSection] = useState('A');
+  const [targetSem, setTargetSem] = useState('');
+  const [targetSection, setTargetSection] = useState('');
   const [search, setSearch] = useState('');
   
   const [subjectsList, setSubjectsList] = useState([]);
   const [sectionsList, setSectionsList] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedExamId, setSelectedExamId] = useState('');
+  const [examsList, setExamsList] = useState([]);
+  const [ciaMarks, setCiaMarks] = useState({});
+  const [marksView, setMarksView] = useState('cia');
 
   // Modal edit states
   const [modalOpen, setModalOpen] = useState(false);
@@ -54,63 +48,82 @@ const StaffMarks = () => {
   const [saved, setSaved] = useState(false);
 
   const normalizeSem = (semStr) => {
-    if (!semStr) return 'Semester 3';
+    if (!semStr) return '';
     const num = semStr.replace(/[^0-9]/g, '');
     return num ? `Semester ${num}` : semStr;
   };
 
   const loadData = async (activeSem = targetSem) => {
     try {
-      const [studRes, marksRes, allocRes] = await Promise.all([
+      const [studRes, marksRes, allocRes, examsRes] = await Promise.all([
         getStudents().catch(() => ({ data: [] })),
         getAllMarks().catch(() => ({ data: [] })),
-        getMyFacultyAllocations().catch(() => ({ data: [] }))
+        getMyFacultyAllocations().catch(() => ({ data: [] })),
+        getExams().catch(() => ({ data: [] }))
       ]);
 
-      let backendStudents = studRes?.data || [];
-      const erpStudents = JSON.parse(localStorage.getItem(`erp_students_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
-      const combinedStudents = [...backendStudents];
-      erpStudents.forEach(ls => {
-        if (!combinedStudents.find(cs => cs.id === ls.id || cs.rollNo === ls.rollNo)) {
-          combinedStudents.push(ls);
-        }
-      });
+      const backendStudents = Array.isArray(studRes?.data)
+        ? studRes.data
+        : studRes?.data?.students || [];
 
-      setStudents(combinedStudents);
+      const backendMarks = Array.isArray(marksRes?.data)
+        ? marksRes.data
+        : marksRes?.data?.marks || [];
 
-      let backendMarks = marksRes?.data || [];
-      const localMarks = JSON.parse(localStorage.getItem(`erp_marks_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
-      const combinedMarks = [...backendMarks];
-      localMarks.forEach(lm => {
-        const existingIdx = combinedMarks.findIndex(cm => cm.studentId === lm.studentId && cm.subject === lm.subject);
-        if (existingIdx >= 0) {
-          combinedMarks[existingIdx] = lm;
-        } else {
-          combinedMarks.push(lm);
-        }
-      });
-      setRawMarksList(combinedMarks);
+      setRawMarksList(backendMarks);
 
       const allocations = allocRes?.data || [];
-      let currentSem = activeSem || targetSem || 'Semester 3';
+
+      const allExams = Array.isArray(examsRes?.data) ? examsRes.data : [];
+      setExamsList(allExams);
+
+      const assignedStudents = backendStudents.filter(student =>
+        allocations.some(allocation => {
+          const sameSection =
+            allocation.sectionId && student.sectionId
+              ? String(allocation.sectionId) ===
+                String(student.sectionId)
+              : String(allocation.section || '')
+                  .trim()
+                  .toLowerCase() ===
+                String(student.section || '')
+                  .trim()
+                  .toLowerCase();
+
+          const sameSemester =
+            normalizeSem(allocation.semester) ===
+            normalizeSem(
+              student.semester || student.sem
+            );
+
+          return sameSection && sameSemester;
+        })
+      );
+
+      setStudents(assignedStudents);
+      const currentSem = normalizeSem(
+        activeSem ||
+        targetSem ||
+        allocations[0]?.semester ||
+        ''
+      );
+
+      if (!targetSem && currentSem) {
+        setTargetSem(currentSem);
+      }
 
       const dynSubjects = [];
       const dynSections = [];
       allocations.forEach(alloc => {
         const normAllocSem = normalizeSem(alloc.semester);
         if ((normAllocSem === currentSem || normAllocSem === normalizeSem(currentSem)) && alloc.subjectId) {
-          if (!dynSubjects.includes(alloc.subjectId.subjectName)) dynSubjects.push(alloc.subjectId.subjectName);
-          if (!dynSections.includes(alloc.section)) dynSections.push(alloc.section);
+          const subName = alloc.subjectId.subjectName || alloc.subjectId.name;
+          if (subName && !dynSubjects.includes(subName)) dynSubjects.push(subName);
+          if (alloc.section && !dynSections.includes(alloc.section)) dynSections.push(alloc.section);
         }
       });
 
-      // Fallback subjects for current semester if no specific DB allocation record found
-      if (dynSubjects.length === 0) {
-        const normSemKey = normalizeSem(currentSem);
-        const mapSubs = SEMESTER_SUBJECT_MAP[normSemKey] || ['Java Programming', 'Database Management Systems'];
-        dynSubjects.push(...mapSubs);
-      }
-      if (dynSections.length === 0) dynSections.push('A');
+
       
       setSubjectsList(dynSubjects);
       setSectionsList(dynSections);
@@ -126,39 +139,56 @@ const StaffMarks = () => {
   useEffect(() => {
     // 1. Session check
     const session = sessionStorage.getItem('staff_session');
-    let activeStaff = DEFAULT_SESSION;
-    if (session) {
-      activeStaff = JSON.parse(session);
-      setStaffSession(activeStaff);
-    } else {
+    if (!session) {
       navigate('/staff/login');
       return;
     }
+
+    const activeStaff = JSON.parse(session);
+    setStaffSession(activeStaff);
     loadData();
   }, [navigate]);
 
-  const staffDept = staffSession?.dept || 'Computer Science Engineering';
+  const staffDept = staffSession?.dept || staffSession?.department || '';
   const [inlineMarks, setInlineMarks] = useState({});
   const [inlineSaving, setInlineSaving] = useState({});
 
   useEffect(() => {
-    // Populate inlineMarks map for current selectedSubject
     const map = {};
-    students.forEach(s => {
-      const sId = s.id || s._id;
-      const existing = rawMarksList.find(m => 
-        (m.studentId === sId || m.studentId === s.id || m.studentId === s._id || m.studentName === s.name) &&
-        (m.subject === selectedSubject || 
-         (m.subject && selectedSubject && m.subject.toLowerCase().trim() === selectedSubject.toLowerCase().trim()) ||
-         (m.subject && selectedSubject && (m.subject.toLowerCase().includes(selectedSubject.toLowerCase()) || selectedSubject.toLowerCase().includes(m.subject.toLowerCase()))))
-      );
-      map[sId] = {
-        internal: existing ? (existing.internalMarks != null ? existing.internalMarks : '') : '',
-        external: existing ? (existing.semesterMarks != null ? existing.semesterMarks : '') : ''
+
+    students.forEach(student => {
+      const studentId = student.id || student._id;
+
+      const existing = rawMarksList.find(mark => {
+        const markExamId =
+          mark.examId?._id ||
+          mark.examId ||
+          '';
+
+        const sameStudent =
+          mark.studentId === studentId ||
+          mark.studentName === student.name;
+
+        return (
+          sameStudent &&
+          String(markExamId) === String(selectedExamId)
+        );
+      });
+
+      map[studentId] = {
+        obtained:
+          existing?.marksObtained !== undefined
+            ? existing.marksObtained
+            : ''
       };
     });
+
     setInlineMarks(map);
-  }, [students, rawMarksList, selectedSubject, targetSem]);
+  }, [
+    students,
+    rawMarksList,
+    selectedExamId
+  ]);
 
   const handleInlineChange = (studentId, field, val) => {
     setInlineMarks(prev => ({
@@ -170,74 +200,304 @@ const StaffMarks = () => {
     }));
   };
 
-  const saveToLocalStorageMarks = (newMarks) => {
-    try {
-      const tenantKey = `erp_marks_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`;
-      const existing = JSON.parse(localStorage.getItem(tenantKey) || '[]');
-      const updated = [...existing];
-      newMarks.forEach(nm => {
-        const idx = updated.findIndex(m => m.studentId === nm.studentId && m.subject === nm.subject);
-        if (idx >= 0) {
-          updated[idx] = { ...updated[idx], ...nm };
-        } else {
-          updated.push({ _id: 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4), ...nm });
-        }
+
+
+  const selectedExam = examsList.find(
+    exam => String(exam._id) === String(selectedExamId)
+  );
+
+  const matchesCurrentClass = exam =>
+    normalizeSem(exam.sem) === normalizeSem(targetSem) &&
+    (!exam.section || exam.section === targetSection) &&
+    (
+      exam.subject === selectedSubject ||
+      exam.subjectId?.subjectName === selectedSubject
+    );
+
+  const ciaExams = examsList.filter(
+    exam =>
+      ['CIA 1', 'CIA 2', 'CIA 3'].includes(
+        exam.examType
+      ) &&
+      exam.status !== 'Cancelled' &&
+      matchesCurrentClass(exam)
+  );
+
+  const semesterExams = examsList.filter(
+    exam =>
+      ['Semester', 'Supplementary'].includes(
+        exam.examType
+      ) &&
+      exam.status !== 'Cancelled' &&
+      matchesCurrentClass(exam)
+  );
+
+  useEffect(() => {
+    const nextMarks = {};
+
+    students.forEach(student => {
+      const studentId = student.id || student._id;
+      nextMarks[studentId] = {};
+
+      ciaExams.forEach(exam => {
+        const savedMark = rawMarksList.find(mark => {
+          const examId = mark.examId?._id || mark.examId;
+
+          return (
+            String(mark.studentId) === String(studentId) &&
+            String(examId) === String(exam._id)
+          );
+        });
+
+        nextMarks[studentId][exam._id] =
+          savedMark?.marksObtained ?? '';
       });
-      localStorage.setItem(tenantKey, JSON.stringify(updated));
-    } catch (e) {
-      console.error('Failed to sync marks to localStorage:', e);
+    });
+
+    setCiaMarks(nextMarks);
+  }, [
+    students,
+    rawMarksList,
+    examsList,
+    selectedSubject,
+    targetSem,
+    targetSection
+  ]);
+
+  const handleCiaMarkChange = (
+    studentId,
+    examId,
+    value
+  ) => {
+    setCiaMarks(previous => ({
+      ...previous,
+      [studentId]: {
+        ...previous[studentId],
+        [examId]: value
+      }
+    }));
+  };
+
+  const handleSaveCiaDraft = async () => {
+    if (ciaExams.length === 0) {
+      alert('No CIA exams are scheduled.');
+      return;
+    }
+
+    const payload = [];
+
+    for (const student of filteredStudents) {
+      const studentId = student.id || student._id;
+
+      for (const exam of ciaExams) {
+        const value = ciaMarks[studentId]?.[exam._id];
+
+        if (value === '' || value === undefined) {
+          continue;
+        }
+
+        const obtained = Number(value);
+        const maximum = Number(exam.maxMarks || 20);
+
+        if (obtained < 0 || obtained > maximum) {
+          alert(
+            `Enter marks between 0 and ${maximum} for ${student.name}.`
+          );
+          return;
+        }
+
+        payload.push({
+          examId: exam._id,
+          subjectId: exam.subjectId?._id || exam.subjectId,
+          academicYearId:
+            exam.academicYearId?._id || exam.academicYearId,
+          courseId: exam.courseId,
+          semesterId: exam.semesterId,
+          sectionId: exam.sectionId,
+          section: exam.section,
+          studentId,
+          studentName: student.name,
+          registerNo: student.id || student.registerNo,
+          department: exam.dept || staffDept,
+          semester: exam.sem || targetSem,
+          subject:
+            exam.subject ||
+            exam.subjectId?.subjectName ||
+            selectedSubject,
+          marksObtained: obtained,
+          maxMarks: maximum,
+          passMarks: Number(
+            exam.passMarks || Math.ceil(maximum * 0.4)
+          ),
+          resultStatus: 'Draft'
+        });
+      }
+    }
+
+    if (payload.length === 0) {
+      alert('Enter at least one CIA mark.');
+      return;
+    }
+
+    try {
+      setInlineSaving({ all: true });
+      await createMark(payload);
+      await loadData();
+      alert('CIA marks saved as draft.');
+    } catch (error) {
+      alert(
+        'Failed to save CIA marks: ' +
+        (error.response?.data?.message || error.message)
+      );
+    } finally {
+      setInlineSaving({});
     }
   };
 
-  const handleSaveSingleStudent = async (student) => {
-    const sId = student.id || student._id;
-    const entry = inlineMarks[sId] || {};
+  const handleSaveSingleStudent = async student => {
+    if (!selectedExam) {
+      alert('Please select a CIA / Exam.');
+      return;
+    }
+
+    const studentId = student.id || student._id;
+    const entry = inlineMarks[studentId] || {};
+    const obtainedMarks = Number(entry.obtained);
+    const maximumMarks = Number(selectedExam.maxMarks || 100);
+
+    if (
+      entry.obtained === '' ||
+      obtainedMarks < 0 ||
+      obtainedMarks > maximumMarks
+    ) {
+      alert(`Enter marks between 0 and ${maximumMarks}.`);
+      return;
+    }
+
     const payload = [{
-      studentId: sId,
+      examId: selectedExam._id,
+      subjectId:
+        selectedExam.subjectId?._id ||
+        selectedExam.subjectId,
+      academicYearId: selectedExam.academicYearId?._id ||
+        selectedExam.academicYearId,
+      courseId: selectedExam.courseId,
+      semesterId: selectedExam.semesterId,
+      sectionId: selectedExam.sectionId,
+      section: selectedExam.section,
+      studentId,
       studentName: student.name,
-      department: staffDept,
-      semester: targetSem,
-      subject: selectedSubject || 'Java Programming',
-      internalMarks: Number(entry.internal || 0),
-      semesterMarks: Number(entry.external || 0)
+      registerNo: student.id || student.registerNo,
+      department: selectedExam.dept || staffDept,
+      semester: selectedExam.sem || targetSem,
+      subject:
+        selectedExam.subject ||
+        selectedExam.subjectId?.subjectName ||
+        selectedSubject,
+      marksObtained: obtainedMarks,
+      maxMarks: maximumMarks,
+      passMarks: Number(
+        selectedExam.passMarks ||
+        Math.ceil(maximumMarks * 0.4)
+      ),
+      resultStatus: 'Draft'
     }];
 
     try {
-      setInlineSaving(prev => ({ ...prev, [sId]: true }));
-      saveToLocalStorageMarks(payload);
-      await createMark(payload).catch(() => null);
+      setInlineSaving(previous => ({
+        ...previous,
+        [studentId]: true
+      }));
+
+      await createMark(payload);
       await loadData();
-      alert('✅ Marks saved successfully for ' + student.name);
-    } catch (err) {
-      alert('Failed to save marks: ' + err.message);
+
+      alert(`Marks saved successfully for ${student.name}`);
+    } catch (error) {
+      alert(
+        'Failed to save marks: ' +
+        (error.response?.data?.message || error.message)
+      );
     } finally {
-      setInlineSaving(prev => ({ ...prev, [sId]: false }));
+      setInlineSaving(previous => ({
+        ...previous,
+        [studentId]: false
+      }));
     }
   };
 
   const handleSaveAllInline = async () => {
+    if (!selectedExam) {
+      alert('Please select a CIA / Exam.');
+      return;
+    }
+
+    const maximumMarks = Number(selectedExam.maxMarks || 100);
+
+    const invalidStudent = filteredStudents.find(student => {
+      const studentId = student.id || student._id;
+      const value = inlineMarks[studentId]?.obtained;
+
+      return (
+        value === '' ||
+        Number(value) < 0 ||
+        Number(value) > maximumMarks
+      );
+    });
+
+    if (invalidStudent) {
+      alert(
+        `Enter marks between 0 and ${maximumMarks} for every student.`
+      );
+      return;
+    }
+
     const payloadArray = filteredStudents.map(student => {
-      const sId = student.id || student._id;
-      const entry = inlineMarks[sId] || {};
+      const studentId = student.id || student._id;
+
       return {
-        studentId: sId,
+        examId: selectedExam._id,
+        subjectId:
+          selectedExam.subjectId?._id ||
+          selectedExam.subjectId,
+        academicYearId:
+          selectedExam.academicYearId?._id ||
+          selectedExam.academicYearId,
+        courseId: selectedExam.courseId,
+        semesterId: selectedExam.semesterId,
+        sectionId: selectedExam.sectionId,
+        section: selectedExam.section,
+        studentId,
         studentName: student.name,
-        department: staffDept,
-        semester: targetSem,
-        subject: selectedSubject || 'Java Programming',
-        internalMarks: Number(entry.internal || 0),
-        semesterMarks: Number(entry.external || 0)
+        registerNo: student.id || student.registerNo,
+        department: selectedExam.dept || staffDept,
+        semester: selectedExam.sem || targetSem,
+        subject:
+          selectedExam.subject ||
+          selectedExam.subjectId?.subjectName ||
+          selectedSubject,
+        marksObtained: Number(
+          inlineMarks[studentId]?.obtained
+        ),
+        maxMarks: maximumMarks,
+        passMarks: Number(
+          selectedExam.passMarks ||
+          Math.ceil(maximumMarks * 0.4)
+        ),
+        resultStatus: 'Draft'
       };
     });
 
     try {
       setInlineSaving({ all: true });
-      saveToLocalStorageMarks(payloadArray);
-      await createMark(payloadArray).catch(() => null);
+      await createMark(payloadArray);
       await loadData();
-      alert('✅ All student marks saved successfully!');
-    } catch (err) {
-      alert('Failed to save marks: ' + err.message);
+      alert('All student marks saved successfully!');
+    } catch (error) {
+      alert(
+        'Failed to save marks: ' +
+        (error.response?.data?.message || error.message)
+      );
     } finally {
       setInlineSaving({});
     }
@@ -342,6 +602,37 @@ const StaffMarks = () => {
     }
   };
 
+  const handleSubmitToHod = async () => {
+    if (!selectedExamId) {
+      alert('Please select a CIA / Exam.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Submit these marks to the HOD? You cannot edit them after submission.'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const response = await submitMarksToHod(
+        selectedExamId
+      );
+
+      await loadData();
+
+      alert(
+        response?.data?.message ||
+        'Marks submitted to HOD successfully.'
+      );
+    } catch (error) {
+      alert(
+        'Unable to submit marks: ' +
+        (error.response?.data?.message || error.message)
+      );
+    }
+  };
+
   return (
     <div className="marks-management-staff animate-fade-in">
       <div className="page-header-staff">
@@ -349,13 +640,46 @@ const StaffMarks = () => {
           
           <div>
             <h1>Upload Marks</h1>
-            <p className="text-muted">Enter internals and semester scores for all subjects simultaneously.</p>
+            <p className="text-muted">Enter marks for the selected CIA or semester examination.</p>
           </div>
         </div>
       </div>
 
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.75rem',
+          marginBottom: '1.25rem'
+        }}
+      >
+        <button
+          type="button"
+          className={
+            marksView === 'cia'
+              ? 'btn-primary'
+              : 'btn-secondary'
+          }
+          onClick={() => setMarksView('cia')}
+        >
+          CIA Marks Entry
+        </button>
+
+        <button
+          type="button"
+          className={
+            marksView === 'semester'
+              ? 'btn-primary'
+              : 'btn-secondary'
+          }
+          onClick={() => setMarksView('semester')}
+        >
+          Semester Results
+        </button>
+      </div>
+
       {/* Marks Directory Table */}
-      <div className="glass-card table-section-card" style={{ borderRadius: '12px', overflow: 'hidden' }}>
+      {marksView === 'cia' && (
+        <div className="glass-card table-section-card" style={{ borderRadius: '12px', overflow: 'hidden' }}>
         <div className="table-filters-bar" style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Student Marks Roster</h3>
@@ -395,6 +719,54 @@ const StaffMarks = () => {
             </div>
 
             <div>
+              <label
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: 'var(--text-muted)',
+                  textTransform: 'uppercase',
+                  marginBottom: '4px',
+                  display: 'block'
+                }}
+              >
+                CIA / Exam
+              </label>
+
+              <select
+                value={selectedExamId}
+                onChange={e => setSelectedExamId(e.target.value)}
+                style={{
+                  padding: '0.5rem 0.8rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-main)',
+                  fontSize: '0.88rem',
+                  outline: 'none'
+                }}
+                required
+              >
+                <option value="">Select CIA / Exam</option>
+
+                {examsList
+                  .filter(exam =>
+                    exam.status !== 'Cancelled' &&
+                    normalizeSem(exam.sem) === normalizeSem(targetSem) &&
+                    (!exam.section || exam.section === targetSection) &&
+                    (
+                      exam.subject === selectedSubject ||
+                      exam.subjectId?.subjectName === selectedSubject
+                    )
+                  )
+                  .map(exam => (
+                    <option key={exam._id} value={exam._id}>
+                      {exam.name} — {exam.examType} ({exam.maxMarks} Marks)
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div>
               <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Search</label>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <Search style={{ position: 'absolute', left: '10px', color: 'var(--text-muted)', pointerEvents: 'none' }} size={16} />
@@ -412,16 +784,36 @@ const StaffMarks = () => {
 
         <div style={{ padding: '0.75rem 1.5rem', background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-            Subject: <strong style={{ color: 'var(--primary)' }}>{selectedSubject || 'Java Programming'}</strong> ({filteredStudents.length} Students)
+            Subject: <strong style={{ color: 'var(--primary)' }}>{selectedSubject || 'No subject assigned'}</strong> ({filteredStudents.length} Students)
           </span>
-          <button 
-            className="btn-primary" 
-            onClick={handleSaveAllInline}
-            disabled={inlineSaving.all}
-            style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <Save size={15} /> {inlineSaving.all ? 'Saving All...' : 'Save All Marks'}
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button 
+              className="btn-primary" 
+              onClick={handleSaveAllInline}
+              disabled={inlineSaving.all}
+              style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Save size={15} /> {inlineSaving.all ? 'Saving All...' : 'Save All Marks'}
+            </button>
+
+            <button
+              className="btn-primary"
+              type="button"
+              onClick={handleSubmitToHod}
+              disabled={!selectedExamId || inlineSaving.all}
+              style={{
+                padding: '0.4rem 1rem',
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#16a34a'
+              }}
+            >
+              <CheckCircle size={15} />
+              Submit to HOD
+            </button>
+          </div>
         </div>
 
         <div className="table-container-attendance">
@@ -431,9 +823,13 @@ const StaffMarks = () => {
                 <th>#</th>
                 <th>Register No</th>
                 <th>Student Name</th>
-                <th>Internal (Max 40)</th>
-                <th>External (Max 60)</th>
-                <th>Total (100)</th>
+                <th>
+                  Marks Obtained
+                  {selectedExam
+                    ? ` (Max ${selectedExam.maxMarks})`
+                    : ''}
+                </th>
+                <th>Percentage</th>
                 <th style={{ textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
@@ -441,7 +837,7 @@ const StaffMarks = () => {
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 6 }).map((_, j) => (
                       <td key={j}>
                         <div className="skeleton" style={{ height: '20px', borderRadius: '4px' }}></div>
                       </td>
@@ -450,13 +846,28 @@ const StaffMarks = () => {
                 ))
               ) : filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="no-students">No student academic records found.</td>
+                  <td colSpan={6} className="no-students">No student academic records found.</td>
                 </tr>
               ) : (
                 filteredStudents.map((s, idx) => {
                   const sId = s.id || s._id;
-                  const currentMarks = inlineMarks[sId] || { internal: '', external: '' };
-                  const total = (Number(currentMarks.internal) || 0) + (Number(currentMarks.external) || 0);
+                  const currentMarks = inlineMarks[sId] || {
+                    obtained: ''
+                  };
+
+                  const maximumMarks = Number(
+                    selectedExam?.maxMarks || 0
+                  );
+
+                  const obtainedMarks = Number(
+                    currentMarks.obtained || 0
+                  );
+
+                  const percentage = maximumMarks > 0
+                    ? Math.round(
+                        (obtainedMarks / maximumMarks) * 100
+                      )
+                    : 0;
 
                   return (
                     <tr key={sId}>
@@ -471,30 +882,50 @@ const StaffMarks = () => {
                         </div>
                       </td>
                       <td>
-                        <input 
+                        <input
                           type="number"
                           min="0"
-                          max="40"
-                          placeholder="e.g. 32"
-                          value={currentMarks.internal}
-                          onChange={e => handleInlineChange(sId, 'internal', e.target.value)}
-                          style={{ width: '110px', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-main)', fontWeight: 600, outline: 'none' }}
+                          max={maximumMarks}
+                          placeholder={
+                            selectedExam
+                              ? `0 - ${maximumMarks}`
+                              : 'Select exam'
+                          }
+                          value={currentMarks.obtained}
+                          onChange={event =>
+                            handleInlineChange(
+                              sId,
+                              'obtained',
+                              event.target.value
+                            )
+                          }
+                          disabled={!selectedExam}
+                          style={{
+                            width: '110px',
+                            padding: '0.4rem 0.6rem',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border-color)',
+                            background: 'var(--bg-primary)',
+                            color: 'var(--text-main)',
+                            fontWeight: 600,
+                            outline: 'none'
+                          }}
                         />
                       </td>
+
                       <td>
-                        <input 
-                          type="number"
-                          min="0"
-                          max="60"
-                          placeholder="e.g. 48"
-                          value={currentMarks.external}
-                          onChange={e => handleInlineChange(sId, 'external', e.target.value)}
-                          style={{ width: '110px', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-main)', fontWeight: 600, outline: 'none' }}
-                        />
-                      </td>
-                      <td>
-                        <span style={{ fontWeight: 700, fontSize: '0.95rem', color: total >= 50 ? 'var(--success)' : total > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
-                          {total} / 100
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            color:
+                              percentage >= 40
+                                ? 'var(--success)'
+                                : obtainedMarks > 0
+                                  ? 'var(--danger)'
+                                  : 'var(--text-muted)'
+                          }}
+                        >
+                          {percentage}%
                         </span>
                       </td>
                       <td style={{ textAlign: 'center' }}>
@@ -515,6 +946,7 @@ const StaffMarks = () => {
           </table>
         </div>
       </div>
+      )}
 
       {/* EDIT MODAL */}
       {modalOpen && (

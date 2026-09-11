@@ -8,15 +8,51 @@ import {
   getStudentSubmissions
 } from '../controllers/assignmentController.js';
 
-import { protect, collegeScope } from '../middleware/authMiddleware.js';
+import {
+  protect,
+  authorize,
+  collegeScope
+} from '../middleware/authMiddleware.js';
 
 router.use(protect);
 router.use(collegeScope);
 
-router.post('/', createAssignment);
-router.get('/', getAssignments);
-router.post('/:assignmentId/submit', submitAssignment);
-router.get('/:assignmentId/submissions', getAssignmentSubmissions);
-router.get('/student/:studentId', getStudentSubmissions);
+router.post(
+  '/',
+  authorize('Admin', 'Principal', 'HOD', 'Staff'),
+  createAssignment
+);
+
+router.get(
+  '/',
+  authorize(
+    'Admin',
+    'Principal',
+    'HOD',
+    'Staff',
+    'Student',
+    'Parent'
+  ),
+  getAssignments
+);
+
+router.post(
+  '/:assignmentId/submit',
+  authorize('Student'),
+  submitAssignment
+);
+
+router.get(
+  '/:assignmentId/submissions',
+  authorize('Admin', 'Principal', 'HOD', 'Staff'),
+  getAssignmentSubmissions
+);
+
+router.get(
+  '/student/:studentId',
+  authorize('Admin', 'Principal', 'HOD', 'Staff', 'Student', 'Parent'),
+  getStudentSubmissions
+);
 
 export default router;
+

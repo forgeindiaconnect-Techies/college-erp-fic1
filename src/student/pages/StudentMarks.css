@@ -31,3 +31,127 @@
 }
 .text-danger { color: #ef4444; }
 .text-success { color: #10b981; }
+
+/* Professional ERP Student Results Page */
+.student-marks-page {
+  gap: 1.5rem;
+  padding-bottom: 2rem;
+}
+
+.student-marks-page .page-header {
+  padding: 1.4rem 1.6rem;
+  background: linear-gradient(135deg, #ffffff, #f0fdfa);
+  border: 1px solid #ccfbf1;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.student-marks-page .page-header h1 {
+  color: #1e293b;
+  font-size: 1.75rem;
+  font-weight: 750;
+}
+
+.student-marks-page .summary-grade-card {
+  min-height: 115px;
+  background: #ffffff;
+  border: 1px solid #dbe3ec;
+  border-top: 4px solid #14b8a6;
+  border-radius: 12px;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
+}
+
+.student-marks-page .table-section-card-s {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #dbe3ec;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.student-marks-page .table-header-row-s {
+  background: linear-gradient(135deg, #ffffff, #f8fafc);
+}
+
+.student-marks-page .table-container-s {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.student-marks-page table {
+  width: 100%;
+  min-width: 1050px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.student-marks-page thead th {
+  padding: 0.9rem 1rem;
+  background: #f0fdfa;
+  color: #334155;
+  border-bottom: 2px solid #99f6e4;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.student-marks-page tbody td {
+  padding: 0.9rem 1rem;
+  color: #334155;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.student-marks-page tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.student-marks-page tbody tr:hover td {
+  background: #f0fdfa;
+}
+
+.student-marks-page .register-no-badge {
+  display: inline-flex;
+  padding: 0.25rem 0.6rem;
+  color: #0369a1;
+  background: #e0f2fe;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+.student-marks-page .status-badge-cell {
+  display: inline-flex;
+  padding: 0.25rem 0.7rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.student-marks-page .status-badge-cell.present {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.student-marks-page .status-badge-cell.absent {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.student-marks-page select {
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .student-marks-page .page-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .marks-hero-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -11,7 +11,8 @@ import {
   getDepartments,
   getCourses,
   getSemesters,
-  getSections
+  getSections,
+  createFacultyAllocation
 } from '../../api/index';
 import './SubjectsManagement.css';
 
@@ -63,6 +64,7 @@ const SubjectsManagement = () => {
     sem: "",
     sectionIds: [],
     teacher: "",
+    teacherId: "",
     credits: 4,
     workload: 4
   });
@@ -171,6 +173,9 @@ const SubjectsManagement = () => {
       sem: sub.sem,
       sectionIds: sub.sectionIds || [],
       teacher: sub.teacher || "",
+      teacherId:
+        staff.find(member => member.name === sub.teacher)?._id ||
+        "",
       credits: sub.credits,
       workload: sub.workload
     });
@@ -203,11 +208,48 @@ const SubjectsManagement = () => {
     };
 
     try {
+      let savedSubject;
       if (editTarget) {
-        await updateSubject(editTarget, payload);
+        const res = await updateSubject(editTarget, payload);
+        savedSubject = res.data;
       } else {
-        await createSubject(payload);
+        const res = await createSubject(payload);
+        savedSubject = res.data;
       }
+
+      if (form.teacher) {
+        const staffMember = staff.find(
+          member => (form.teacherId && member._id === form.teacherId) || member.name === form.teacher
+        );
+
+        if (staffMember) {
+          const subjectId = savedSubject?._id || savedSubject?.id || editTarget;
+          const selectedSectionIds = Array.isArray(form.sectionIds)
+            ? form.sectionIds
+            : [];
+
+          for (const sectionId of selectedSectionIds) {
+            const selectedSection = sections.find(
+              section => section.id === sectionId || section._id === sectionId
+            );
+
+            await createFacultyAllocation({
+              staffId: staffMember._id || staffMember.id,
+              subjectId,
+              department: form.dept,
+              departmentId: form.departmentId,
+              semester: form.sem,
+              semesterId: form.semesterId,
+              courseId: form.courseId,
+              sectionId,
+              section: selectedSection?.name || selectedSection?.section || ''
+            }).catch(allocErr => {
+              console.warn('Faculty allocation sync warning:', allocErr);
+            });
+          }
+        }
+      }
+
       fetchData();
       closeModal();
     } catch (err) {
@@ -580,10 +622,32 @@ const SubjectsManagement = () => {
 
                 <div className="form-group">
                   <label><User size={13} style={{ display: 'inline', marginRight: '4px' }} /> Assign Instructor</label>
-                  <select value={form.teacher} onChange={e => setForm({ ...form, teacher: e.target.value })}>
+                  <select
+                    value={form.teacherId}
+                    onChange={(event) => {
+                      const instructor = staff.find(
+                        member => member._id === event.target.value
+                      );
+
+                      setForm({
+                        ...form,
+                        teacherId: event.target.value,
+                        teacher: instructor?.name || ""
+                      });
+                    }}
+                  >
                     <option value="">— Select Instructor —</option>
-                    {staff.map((f, idx) => (
-                      <option key={f._id || f.id || idx} value={f.name}>{f.name}{f.department ? ` (${f.department})` : ''}</option>
+
+                    {staff.map(member => (
+                      <option
+                        key={member._id}
+                        value={member._id}
+                      >
+                        {member.name}
+                        {member.department || member.dept
+                          ? ` — ${member.department || member.dept}`
+                          : ""}
+                      </option>
                     ))}
                   </select>
                 </div>
