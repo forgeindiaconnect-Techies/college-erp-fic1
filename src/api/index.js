@@ -292,6 +292,7 @@ export const getMarksByStudent = (studentId) => api.get(`/marks/student/${studen
 export const createMark = (markData) => api.post('/marks', markData);
 export const submitMarksToHod = (examId) => api.post(`/marks/submit/${examId}`);
 export const updateMark = (id, markData) => api.put(`/marks/${id}`, markData);
+export const approveMark = (id) => api.patch(`/marks/${id}/approve`);
 export const deleteMark = (id) => api.delete(`/marks/${id}`);
 
 // Fees Endpoints
@@ -578,5 +579,15 @@ export const getStudentLiveClass = () => api.get('/class-sessions/student-live')
 export const getHodClassMonitoring = (department) => api.get('/class-sessions/hod-monitoring', { params: { department } });
 export const getPrincipalClassSummary = () => api.get('/class-sessions/principal-summary');
 
+// Fee Plans
+export const getFeePlans = (params = {}) =>
+  api.get('/fee-plans', { params });
 
+export const createFeePlan = (data) =>
+  api.post('/fee-plans', data);
 
+export const updateFeePlan = (id, data) =>
+  api.put(`/fee-plans/${id}`, data);
+
+export const deleteFeePlan = (id) =>
+  api.delete(`/fee-plans/${id}`);

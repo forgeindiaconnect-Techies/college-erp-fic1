@@ -187,6 +187,7 @@ import Scholarships from './accounts/pages/Scholarships';
 import AccountsLayout from './accounts/components/AccountsLayout';
 import AccountsLogin from './accounts/pages/AccountsLogin';
 import AccountsDashboard from './accounts/pages/AccountsDashboard';
+import StudentRegistration from './accounts/pages/StudentRegistration';
 import FeesCollection from './accounts/pages/FeesCollection';
 import PendingFees from './accounts/pages/PendingFees';
 import Salary from './accounts/pages/Salary';
@@ -209,8 +210,8 @@ import Unauthorized from './pages/Unauthorized';
 
 import './index.css';
 
-export const ThemeContext = createContext();
-export const SettingsContext = createContext();
+export const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {} });
+export const SettingsContext = createContext({ collegeSettings: null, setCollegeSettings: () => {} });
 
 const hasAnyOtherSession = (excludeKey) => {
   const keys = ['superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session'];
@@ -535,6 +536,7 @@ function App() {
             <Route path="/accounts" element={<AccountsGuard><GlobalLockdown><AccountsLayout /></GlobalLockdown></AccountsGuard>}>
               <Route index element={<Navigate to="/accounts/dashboard" replace />} />
               <Route path="dashboard" element={<AccountsDashboard />} />
+              <Route path="student-registration" element={<StudentRegistration />} />
               <Route path="fees-collection" element={<FeesCollection />} />
               <Route path="pending-fees" element={<PendingFees />} />
               <Route path="payment-history" element={<PaymentHistory />} />

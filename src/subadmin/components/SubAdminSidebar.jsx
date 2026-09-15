@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SettingsContext } from '../../App';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { 
@@ -25,7 +25,7 @@ import {
 import '../../components/layout/Sidebar.css';
 
 const SubAdminSidebar = ({ isOpen, onClose }) => {
-  const { collegeSettings } = React.useContext(SettingsContext);
+  const { collegeSettings } = React.useContext(SettingsContext) || {};
   const navigate = useNavigate();
   const [permissions, setPermissions] = useState([]);
   const [userName, setUserName] = useState('Sub Admin');

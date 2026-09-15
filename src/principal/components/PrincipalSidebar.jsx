@@ -9,7 +9,7 @@ import {
 import '../../components/layout/Sidebar.css';
 
 const PrincipalSidebar = ({ isOpen, onClose }) => {
-  const { collegeSettings } = React.useContext(SettingsContext);
+  const { collegeSettings } = React.useContext(SettingsContext) || {};
   const navigate = useNavigate();
   const [userName, setUserName] = useState('Principal');
   const [expandedGroups, setExpandedGroups] = useState({});

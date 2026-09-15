@@ -326,6 +326,7 @@ const StaffMarks = () => {
             selectedSubject,
           marksObtained: obtained,
           maxMarks: maximum,
+          examType: exam.examType || 'CIA',
           passMarks: Number(
             exam.passMarks || Math.ceil(maximum * 0.4)
           ),
@@ -396,6 +397,7 @@ const StaffMarks = () => {
         selectedSubject,
       marksObtained: obtainedMarks,
       maxMarks: maximumMarks,
+      examType: selectedExam.examType,
       passMarks: Number(
         selectedExam.passMarks ||
         Math.ceil(maximumMarks * 0.4)
@@ -480,6 +482,7 @@ const StaffMarks = () => {
           inlineMarks[studentId]?.obtained
         ),
         maxMarks: maximumMarks,
+        examType: selectedExam.examType,
         passMarks: Number(
           selectedExam.passMarks ||
           Math.ceil(maximumMarks * 0.4)
@@ -602,32 +605,65 @@ const StaffMarks = () => {
     }
   };
 
+  const getStudentCiaStatus = (student) => {
+    const studentId = student.id || student._id;
+
+    const statuses = ciaExams
+      .map(exam => {
+        const mark = rawMarksList.find(m => {
+          const examId = m.examId?._id || m.examId;
+
+          return (
+            String(m.studentId) === String(studentId) &&
+            String(examId) === String(exam._id)
+          );
+        });
+
+        return mark?.resultStatus;
+      })
+      .filter(Boolean);
+
+    if (statuses.length === ciaExams.length && statuses.every(status => status === 'Approved')) {
+      return 'Approved';
+    }
+
+    if (statuses.some(status => status === 'Submitted')) {
+      return 'Submitted';
+    }
+
+    return 'Draft';
+  };
+
   const handleSubmitToHod = async () => {
-    if (!selectedExamId) {
-      alert('Please select a CIA / Exam.');
+    const examsWithMarks = ciaExams.filter(exam =>
+      filteredStudents.some(student => {
+        const studentId = student.id || student._id;
+        const value = ciaMarks[studentId]?.[exam._id];
+        return value !== '' && value !== undefined;
+      })
+    );
+
+    if (examsWithMarks.length === 0) {
+      alert('Save at least one CIA mark first.');
       return;
     }
 
     const confirmed = window.confirm(
-      'Submit these marks to the HOD? You cannot edit them after submission.'
+      'Submit all saved CIA marks to the HOD?'
     );
 
     if (!confirmed) return;
 
     try {
-      const response = await submitMarksToHod(
-        selectedExamId
-      );
+      for (const exam of examsWithMarks) {
+        await submitMarksToHod(exam._id);
+      }
 
       await loadData();
-
-      alert(
-        response?.data?.message ||
-        'Marks submitted to HOD successfully.'
-      );
+      alert('CIA marks submitted to HOD successfully.');
     } catch (error) {
       alert(
-        'Unable to submit marks: ' +
+        'Unable to submit CIA marks: ' +
         (error.response?.data?.message || error.message)
       );
     }
@@ -789,30 +825,34 @@ const StaffMarks = () => {
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <button 
               className="btn-primary" 
-              onClick={handleSaveAllInline}
+              onClick={handleSaveCiaDraft}
               disabled={inlineSaving.all}
               style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <Save size={15} /> {inlineSaving.all ? 'Saving All...' : 'Save All Marks'}
+              <Save size={15} /> {inlineSaving.all ? 'Saving Draft...' : 'Save Draft'}
             </button>
 
-            <button
-              className="btn-primary"
-              type="button"
-              onClick={handleSubmitToHod}
-              disabled={!selectedExamId || inlineSaving.all}
-              style={{
-                padding: '0.4rem 1rem',
-                fontSize: '0.85rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: '#16a34a'
-              }}
-            >
-              <CheckCircle size={15} />
-              Submit to HOD
-            </button>
+            {filteredStudents.some(
+              student => getStudentCiaStatus(student) !== 'Approved'
+            ) && (
+              <button
+                className="btn-primary"
+                type="button"
+                onClick={handleSubmitToHod}
+                disabled={inlineSaving.all || ciaExams.length === 0}
+                style={{
+                  padding: '0.4rem 1rem',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#16a34a'
+                }}
+              >
+                <CheckCircle size={15} />
+                Submit to HOD
+              </button>
+            )}
           </div>
         </div>
 
@@ -823,125 +863,117 @@ const StaffMarks = () => {
                 <th>#</th>
                 <th>Register No</th>
                 <th>Student Name</th>
-                <th>
-                  Marks Obtained
-                  {selectedExam
-                    ? ` (Max ${selectedExam.maxMarks})`
-                    : ''}
-                </th>
-                <th>Percentage</th>
-                <th style={{ textAlign: 'center' }}>Action</th>
+
+                {ciaExams.map(exam => (
+                  <th key={exam._id}>
+                    {exam.examType}
+                    <div>Max {exam.maxMarks}</div>
+                  </th>
+                ))}
+
+                <th>Average</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <tr key={i}>
-                    {Array.from({ length: 6 }).map((_, j) => (
-                      <td key={j}>
-                        <div className="skeleton" style={{ height: '20px', borderRadius: '4px' }}></div>
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : filteredStudents.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="no-students">No student academic records found.</td>
-                </tr>
-              ) : (
-                filteredStudents.map((s, idx) => {
-                  const sId = s.id || s._id;
-                  const currentMarks = inlineMarks[sId] || {
-                    obtained: ''
-                  };
+              {filteredStudents.map((student, index) => {
+                const studentId = student.id || student._id;
 
-                  const maximumMarks = Number(
-                    selectedExam?.maxMarks || 0
-                  );
+                const enteredPercentages = ciaExams
+                  .map(exam => {
+                    const value = ciaMarks[studentId]?.[exam._id];
 
-                  const obtainedMarks = Number(
-                    currentMarks.obtained || 0
-                  );
+                    if (value === '' || value === undefined) {
+                      return null;
+                    }
 
-                  const percentage = maximumMarks > 0
-                    ? Math.round(
-                        (obtainedMarks / maximumMarks) * 100
-                      )
-                    : 0;
+                    const maximum = Number(exam.maxMarks || 20);
 
-                  return (
-                    <tr key={sId}>
-                      <td className="text-muted">{idx + 1}</td>
-                      <td><span className="register-no-badge">{s.id}</span></td>
-                      <td>
-                        <div className="student-profile-cell">
-                          <div className={`student-avatar-cell ${AVATAR_COLORS[idx % AVATAR_COLORS.length]}`}>
-                            {s.name[0]}
-                          </div>
-                          <span className="font-semibold">{s.name}</span>
-                        </div>
-                      </td>
-                      <td>
+                    return maximum > 0
+                      ? (Number(value) / maximum) * 100
+                      : 0;
+                  })
+                  .filter(value => value !== null);
+
+                const average = enteredPercentages.length
+                  ? Math.round(
+                      enteredPercentages.reduce(
+                        (sum, value) => sum + value,
+                        0
+                      ) / enteredPercentages.length
+                    )
+                  : 0;
+
+                return (
+                  <tr key={studentId}>
+                    <td>{index + 1}</td>
+
+                    <td>
+                      <span className="register-no-badge">
+                        {student.id || student.registerNo}
+                      </span>
+                    </td>
+
+                    <td>
+                      <strong>{student.name}</strong>
+                    </td>
+
+                    {ciaExams.map(exam => (
+                      <td key={exam._id}>
                         <input
                           type="number"
                           min="0"
-                          max={maximumMarks}
-                          placeholder={
-                            selectedExam
-                              ? `0 - ${maximumMarks}`
-                              : 'Select exam'
+                          max={exam.maxMarks}
+                          value={
+                            ciaMarks[studentId]?.[exam._id] ?? ''
                           }
-                          value={currentMarks.obtained}
+                          placeholder={`0 - ${exam.maxMarks}`}
                           onChange={event =>
-                            handleInlineChange(
-                              sId,
-                              'obtained',
+                            handleCiaMarkChange(
+                              studentId,
+                              exam._id,
                               event.target.value
                             )
                           }
-                          disabled={!selectedExam}
                           style={{
-                            width: '110px',
-                            padding: '0.4rem 0.6rem',
-                            borderRadius: '6px',
-                            border: '1px solid var(--border-color)',
-                            background: 'var(--bg-primary)',
-                            color: 'var(--text-main)',
-                            fontWeight: 600,
-                            outline: 'none'
+                            width: '90px',
+                            padding: '0.4rem 0.6rem'
                           }}
                         />
                       </td>
+                    ))}
 
-                      <td>
+                    <td>
+                      <strong>{average}%</strong>
+                    </td>
+
+                    <td>
+                      {getStudentCiaStatus(student) === 'Approved' ? (
                         <span
                           style={{
+                            color: 'var(--success)',
                             fontWeight: 700,
-                            color:
-                              percentage >= 40
-                                ? 'var(--success)'
-                                : obtainedMarks > 0
-                                  ? 'var(--danger)'
-                                  : 'var(--text-muted)'
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
                           }}
                         >
-                          {percentage}%
+                          <CheckCircle size={15} />
+                          Approved
                         </span>
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <button 
-                          className="btn-primary" 
-                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                          onClick={() => handleSaveSingleStudent(s)}
-                          disabled={inlineSaving[sId]}
-                        >
-                          <Save size={13} /> {inlineSaving[sId] ? 'Saving...' : 'Save'}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                      ) : getStudentCiaStatus(student) === 'Submitted' ? (
+                        <span style={{ color: 'var(--warning)', fontWeight: 700 }}>
+                          Submitted
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+                          Draft
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -347,7 +347,10 @@ const ExamsManagement = () => {
       room: form.hallName,
 
       maxMarks: Number(form.maxMarks),
-      passMarks: Number(form.passMarks),
+      passMarks:
+        form.examType?.toUpperCase().includes('CIA')
+          ? Math.ceil(Number(form.maxMarks) * 0.4)
+          : Number(form.passMarks),
       hallCapacity: Number(form.hallCapacity)
     };
 

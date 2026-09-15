@@ -19,7 +19,7 @@ const getStudentSession = () => {
 };
 
 const StudentSidebar = ({ isOpen, onClose }) => {
-  const { collegeSettings } = React.useContext(SettingsContext);
+  const { collegeSettings } = React.useContext(SettingsContext) || {};
   const navigate = useNavigate();
   const student = getStudentSession();
 

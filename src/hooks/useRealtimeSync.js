@@ -8,7 +8,7 @@ let subscriberCount = 0;
 const getSocket = () => {
   if (!sharedSocket || sharedSocket.disconnected) {
     sharedSocket = io(getBackendURL(), {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 10,

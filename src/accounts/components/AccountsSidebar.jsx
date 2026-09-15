@@ -4,7 +4,8 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CreditCard, AlertCircle, Banknote,
   Receipt, FileText, LogOut, ChevronRight, ChevronDown,
-  History, PieChart, Award, X, Wallet, FileBarChart
+  History, PieChart, Award, X, Wallet, FileBarChart,
+  UserPlus
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -17,7 +18,7 @@ const getAccountsSession = () => {
 };
 
 const AccountsSidebar = ({ isOpen, onClose }) => {
-  const { collegeSettings } = React.useContext(SettingsContext);
+  const { collegeSettings } = React.useContext(SettingsContext) || {};
   const navigate = useNavigate();
   const account = getAccountsSession();
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -33,6 +34,17 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
   };
 
   const menuGroups = [
+    {
+      name: 'Student Management',
+      icon: <UserPlus size={20} />,
+      items: [
+        {
+          name: 'Student Registration',
+          path: '/accounts/student-registration',
+          icon: <UserPlus size={20} />
+        }
+      ]
+    },
     {
       name: 'Fees & Collections',
       icon: <Wallet size={20} />,

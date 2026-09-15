@@ -1,14 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Search, Filter, DollarSign, TrendingUp, AlertTriangle,
   CheckCircle, X, Download, Eye, Receipt, IndianRupee, Users,
   Settings, UserPlus, FileText, Banknote, ShieldAlert, Award, LayoutGrid, Bell
 } from 'lucide-react';
-import { getStudents, getAllFees } from '../../api/index';
+import {
+  getStudents,
+  getAllFees,
+  getDepartments,
+  getCourses,
+  getFeePlans,
+  createFeePlan,
+  updateFeePlan,
+  deleteFeePlan
+} from '../../api/index';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
+import useRealtimeSync from '../../hooks/useRealtimeSync';
 import './FeesManagement.css';
 
 const DEPARTMENTS = ['All','Computer Science','Electrical Engg.','Mechanical Engg.','Civil Engg.','Information Tech.', 'Computer Science & Engineering', 'Information Technology', 'Biotechnology Engineering', 'Artificial Intelligence & Data Science', 'Cyber Security'];
@@ -18,12 +28,6 @@ const AVATAR_COLORS = ['bg-gradient-blue','bg-gradient-purple','bg-gradient-gree
 const getInitials = n => n.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
 const fmtCurrency = n => '₹' + Number(n).toLocaleString('en-IN');
 
-// MOCK DATA for new modules
-const MOCK_FEE_STRUCTURES = [
-  { id: 'FS001', dept: 'Computer Science', sem: 'Sem 6', tuition: 60000, lab: 10000, library: 5000, total: 75000 },
-  { id: 'FS002', dept: 'Electrical Engg.', sem: 'Sem 4', tuition: 55000, lab: 10000, library: 5000, total: 70000 },
-  { id: 'FS003', dept: 'Mechanical Engg.', sem: 'Sem 2', tuition: 50000, lab: 10000, library: 5000, total: 65000 },
-];
 
 // Scholarships loaded from localStorage (written by Accounts > Scholarships page)
 const loadScholarsLS = () => {
@@ -123,6 +127,22 @@ const FeesManagement = () => {
   
   // Fee Structure Form
   const [showFeeModal, setShowFeeModal] = useState(false);
+  const [feePlans, setFeePlans] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [feePlanForm, setFeePlanForm] = useState({
+    departmentId: '',
+    courseId: '',
+    semester: '',
+    academicYear: '',
+    tuitionFee: '',
+    examFee: '',
+    labFee: '',
+    libraryFee: '',
+    transportFee: '',
+    hostelFee: ''
+  });
+  const [editingFeePlan, setEditingFeePlan] = useState(null);
 
   const [scholarships, setScholarships] = useState(loadScholarsLS);
 
@@ -137,6 +157,41 @@ const FeesManagement = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    loadFeePlanData();
+  }, []);
+
+  useRealtimeSync(
+    useCallback(() => {
+      loadFeePlanData();
+    }, []),
+    'feePlans'
+  );
+
+  const loadFeePlanData = async () => {
+    try {
+      const [deptRes, courseRes, planRes] = await Promise.all([
+        getDepartments(),
+        getCourses(),
+        getFeePlans()
+      ]);
+
+      const deptList = Array.isArray(deptRes.data)
+        ? deptRes.data
+        : (deptRes.data?.departments || deptRes.data?.data || []);
+      const courseList = Array.isArray(courseRes.data)
+        ? courseRes.data
+        : (courseRes.data?.courses || courseRes.data?.data || []);
+      const planList = Array.isArray(planRes.data) ? planRes.data : [];
+
+      setDepartments(deptList);
+      setCourses(courseList);
+      setFeePlans(planList);
+    } catch (error) {
+      console.error('Failed to load fee plans:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -323,6 +378,64 @@ const FeesManagement = () => {
     return activePeriods.map(p => ({ month: p.month, collected: p.collected }));
   };
 
+  const handleSaveFeePlan = async () => {
+    try {
+      if (!feePlanForm.departmentId || !feePlanForm.courseId || !feePlanForm.semester) {
+        alert('Please select Department, Course and Semester.');
+        return;
+      }
+
+      const department = departments.find(
+        d => (d.id === feePlanForm.departmentId || d._id === feePlanForm.departmentId || d.departmentId === feePlanForm.departmentId)
+      );
+
+      const course = courses.find(
+        c => (c.id === feePlanForm.courseId || c._id === feePlanForm.courseId || c.courseId === feePlanForm.courseId)
+      );
+
+      const payload = {
+        ...feePlanForm,
+        departmentName: department?.name || department?.departmentName || '',
+        courseName: course?.name || course?.courseName || '',
+        tuitionFee: Number(feePlanForm.tuitionFee) || 0,
+        examFee: Number(feePlanForm.examFee) || 0,
+        labFee: Number(feePlanForm.labFee) || 0,
+        libraryFee: Number(feePlanForm.libraryFee) || 0,
+        transportFee: Number(feePlanForm.transportFee) || 0,
+        hostelFee: Number(feePlanForm.hostelFee) || 0
+      };
+
+      if (editingFeePlan) {
+        await updateFeePlan(editingFeePlan._id, payload);
+      } else {
+        await createFeePlan(payload);
+      }
+
+      await loadFeePlanData();
+
+      setShowFeeModal(false);
+      setEditingFeePlan(null);
+
+      setFeePlanForm({
+        departmentId: '',
+        courseId: '',
+        semester: '',
+        academicYear: '',
+        tuitionFee: '',
+        examFee: '',
+        labFee: '',
+        libraryFee: '',
+        transportFee: '',
+        hostelFee: ''
+      });
+
+      alert(editingFeePlan ? 'Fee Plan Updated!' : 'Fee Plan Created!');
+    } catch (error) {
+      console.error('Fee plan save error:', error);
+      alert(error.response?.data?.message || 'Failed to save fee plan.');
+    }
+  };
+
   const TABS = ['Dashboard', 'Fee Structure', 'Student Fees', 'Pending & Fines', 'Scholarships', 'Reports'];
 
   return (
@@ -429,61 +542,149 @@ const FeesManagement = () => {
             <button className="btn-primary" onClick={() => setShowFeeModal(true)}>+ Create New Plan</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {MOCK_FEE_STRUCTURES.map(fs => (
-              <div key={fs.id} className="glass-card p-4 fs-card hover:border-primary transition-all">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold">{fs.dept}</h3>
-                    <span className="badge-outline mt-1">{fs.sem}</span>
-                  </div>
-                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded dark:bg-gray-800">{fs.id}</span>
-                </div>
-                <div className="space-y-3 border-t border-b py-4 my-4">
-                  <div className="flex justify-between text-sm"><span className="text-muted">Tuition Fee</span><span className="font-medium">{fmtCurrency(fs.tuition)}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted">Lab Fee</span><span className="font-medium">{fmtCurrency(fs.lab)}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-muted">Library Fee</span><span className="font-medium">{fmtCurrency(fs.library)}</span></div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted font-medium">Total Fees</span>
-                  <span className="text-xl font-bold text-primary">{fmtCurrency(fs.total)}</span>
-                </div>
-                <div className="flex gap-2 mt-4">
-                  <button className="flex-1 btn-secondary text-sm">Edit Plan</button>
-                  <button className="flex-1 btn-danger-outline text-sm">Deactivate</button>
-                </div>
+            {feePlans.length === 0 ? (
+              <div className="col-span-full text-center py-10 text-muted">
+                No fee structures created yet.
               </div>
-            ))}
+            ) : (
+              feePlans.map(fs => {
+                const total =
+                  Number(fs.tuitionFee || 0) +
+                  Number(fs.examFee || 0) +
+                  Number(fs.labFee || 0) +
+                  Number(fs.libraryFee || 0);
+
+                return (
+                  <div
+                    key={fs._id}
+                    className="glass-card p-4 fs-card hover:border-primary transition-all"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-lg font-bold">
+                          {fs.departmentName}
+                        </h3>
+
+                        <p className="text-sm text-muted mt-1">
+                          {fs.courseName}
+                        </p>
+
+                        <span className="badge-outline mt-1">
+                          {fs.semester}
+                        </span>
+                      </div>
+
+                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded dark:bg-gray-800">
+                        {fs.academicYear || 'Current'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 border-t border-b py-4 my-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted">Tuition Fee</span>
+                        <span className="font-medium">
+                          {fmtCurrency(fs.tuitionFee || 0)}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted">Exam Fee</span>
+                        <span className="font-medium">
+                          {fmtCurrency(fs.examFee || 0)}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted">Lab Fee</span>
+                        <span className="font-medium">
+                          {fmtCurrency(fs.labFee || 0)}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted">Library Fee</span>
+                        <span className="font-medium">
+                          {fmtCurrency(fs.libraryFee || 0)}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted">Transport Fee</span>
+                        <span className="font-medium">
+                          {fmtCurrency(fs.transportFee || 0)}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted">Hostel Fee</span>
+                        <span className="font-medium">
+                          {fmtCurrency(fs.hostelFee || 0)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted font-medium">
+                        Academic Fees
+                      </span>
+
+                      <span className="text-xl font-bold text-primary">
+                        {fmtCurrency(total)}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        className="flex-1 btn-secondary text-sm"
+                        onClick={() => {
+                          setEditingFeePlan(fs);
+                          setFeePlanForm({
+                            departmentId: fs.departmentId || '',
+                            courseId: fs.courseId || '',
+                            semester: fs.semester || '',
+                            academicYear: fs.academicYear || '',
+                            tuitionFee: fs.tuitionFee || '',
+                            examFee: fs.examFee || '',
+                            labFee: fs.labFee || '',
+                            libraryFee: fs.libraryFee || '',
+                            transportFee: fs.transportFee || '',
+                            hostelFee: fs.hostelFee || ''
+                          });
+                          setShowFeeModal(true);
+                        }}
+                      >
+                        Edit Plan
+                      </button>
+
+                      <button
+                        className="flex-1 btn-danger-outline text-sm"
+                        onClick={async () => {
+                          if (
+                            window.confirm(
+                              'Are you sure you want to delete this fee plan?'
+                            )
+                          ) {
+                            try {
+                              await deleteFeePlan(fs._id);
+                              await loadFeePlanData();
+                            } catch (error) {
+                              alert(
+                                error.response?.data?.message ||
+                                'Failed to delete fee plan.'
+                              );
+                            }
+                          }
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
-          {showFeeModal && (
-            <div className="modal-overlay" onClick={()=>setShowFeeModal(false)}>
-              <div className="modal-box glass-card" onClick={e=>e.stopPropagation()}>
-                <div className="modal-hd">
-                  <h2>Create New Fee Structure</h2>
-                  <button className="modal-close-btn" onClick={()=>setShowFeeModal(false)}><X size={20}/></button>
-                </div>
-                <div className="modal-body space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="form-group">
-                      <label>Department</label>
-                      <select className="w-full p-2 rounded border bg-transparent"><option>Computer Science</option></select>
-                    </div>
-                    <div className="form-group">
-                      <label>Semester</label>
-                      <select className="w-full p-2 rounded border bg-transparent"><option>Sem 1</option></select>
-                    </div>
-                  </div>
-                  <div className="form-group"><label>Tuition Fee (₹)</label><input type="number" className="w-full p-2 rounded border bg-transparent" placeholder="e.g. 50000"/></div>
-                  <div className="form-group"><label>Laboratory Fee (₹)</label><input type="number" className="w-full p-2 rounded border bg-transparent" placeholder="e.g. 10000"/></div>
-                  <div className="form-group"><label>Library & Sports Fee (₹)</label><input type="number" className="w-full p-2 rounded border bg-transparent" placeholder="e.g. 5000"/></div>
-                </div>
-                <div className="modal-ft">
-                  <button className="btn-ghost" onClick={()=>setShowFeeModal(false)}>Cancel</button>
-                  <button className="btn-primary" onClick={()=>{alert('Fee Structure Saved!');setShowFeeModal(false)}}>Save Plan</button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -659,6 +860,250 @@ const FeesManagement = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Create / Edit Fee Structure Modal ── */}
+      {showFeeModal && (
+        <div className="modal-overlay" onClick={() => setShowFeeModal(false)}>
+          <div className="modal-box glass-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-hd">
+              <div>
+                <h2>{editingFeePlan ? 'Edit Fee Structure' : 'Create New Fee Structure'}</h2>
+                <p className="text-muted text-sm mt-1">Configure academic and facility fees for course and semester</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowFeeModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-body space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-group">
+                  <label className="block text-sm font-semibold mb-1">Department *</label>
+                  <select
+                    className="w-full p-2.5 rounded border bg-transparent"
+                    value={feePlanForm.departmentId}
+                    onChange={e =>
+                      setFeePlanForm(prev => ({
+                        ...prev,
+                        departmentId: e.target.value,
+                        courseId: '',
+                        semester: ''
+                      }))
+                    }
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map(dept => (
+                      <option
+                        key={dept.id || dept._id}
+                        value={dept.id || dept._id}
+                      >
+                        {dept.name || dept.departmentName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="block text-sm font-semibold mb-1">Course / Degree *</label>
+                  <select
+                    className="w-full p-2.5 rounded border bg-transparent"
+                    value={feePlanForm.courseId}
+                    onChange={e =>
+                      setFeePlanForm(prev => ({
+                        ...prev,
+                        courseId: e.target.value,
+                        semester: ''
+                      }))
+                    }
+                    disabled={!feePlanForm.departmentId}
+                  >
+                    <option value="">Select Course</option>
+                    {courses
+                      .filter(course => (
+                        course.departmentId === feePlanForm.departmentId ||
+                        course.deptId === feePlanForm.departmentId ||
+                        course.department === feePlanForm.departmentId ||
+                        !course.departmentId
+                      ))
+                      .map(course => (
+                        <option key={course.id || course._id} value={course.id || course._id}>
+                          {course.name || course.courseName} {course.code ? `(${course.code})` : ''}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="block text-sm font-semibold mb-1">Semester *</label>
+                  <select
+                    className="w-full p-2.5 rounded border bg-transparent"
+                    value={feePlanForm.semester}
+                    onChange={e =>
+                      setFeePlanForm(prev => ({
+                        ...prev,
+                        semester: e.target.value
+                      }))
+                    }
+                    disabled={!feePlanForm.courseId}
+                  >
+                    <option value="">Select Semester</option>
+                    {Array.from(
+                      {
+                        length:
+                          (courses.find(c => (c.id === feePlanForm.courseId || c._id === feePlanForm.courseId))?.totalSemesters) ||
+                          (courses.find(c => (c.id === feePlanForm.courseId || c._id === feePlanForm.courseId))?.semesters) ||
+                          8
+                      },
+                      (_, index) => (
+                        <option key={index + 1} value={`Sem ${index + 1}`}>
+                          Sem {index + 1}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="block text-sm font-semibold mb-1">Academic Year</label>
+                  <input
+                    type="text"
+                    className="w-full p-2.5 rounded border bg-transparent"
+                    placeholder="2026-2027"
+                    value={feePlanForm.academicYear}
+                    onChange={e =>
+                      setFeePlanForm(prev => ({
+                        ...prev,
+                        academicYear: e.target.value
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t">
+                <h4 className="text-sm font-bold text-muted uppercase tracking-wider mb-3">Tuition & Academic Fees</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="form-group">
+                    <label className="block text-sm font-medium mb-1">Tuition Fee (₹)</label>
+                    <input
+                      type="number"
+                      className="w-full p-2.5 rounded border bg-transparent"
+                      placeholder="0"
+                      value={feePlanForm.tuitionFee}
+                      onChange={e =>
+                        setFeePlanForm(prev => ({
+                          ...prev,
+                          tuitionFee: e.target.value
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="block text-sm font-medium mb-1">Exam Fee (₹)</label>
+                    <input
+                      type="number"
+                      className="w-full p-2.5 rounded border bg-transparent"
+                      placeholder="0"
+                      value={feePlanForm.examFee}
+                      onChange={e =>
+                        setFeePlanForm(prev => ({
+                          ...prev,
+                          examFee: e.target.value
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="block text-sm font-medium mb-1">Laboratory Fee (₹)</label>
+                    <input
+                      type="number"
+                      className="w-full p-2.5 rounded border bg-transparent"
+                      placeholder="0"
+                      value={feePlanForm.labFee}
+                      onChange={e =>
+                        setFeePlanForm(prev => ({
+                          ...prev,
+                          labFee: e.target.value
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="block text-sm font-medium mb-1">Library Fee (₹)</label>
+                    <input
+                      type="number"
+                      className="w-full p-2.5 rounded border bg-transparent"
+                      placeholder="0"
+                      value={feePlanForm.libraryFee}
+                      onChange={e =>
+                        setFeePlanForm(prev => ({
+                          ...prev,
+                          libraryFee: e.target.value
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t">
+                <h4 className="text-sm font-bold text-muted uppercase tracking-wider mb-3">Facility Fees (Conditional)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="form-group">
+                    <label className="block text-sm font-medium mb-1">Transport / Bus Fee (₹)</label>
+                    <input
+                      type="number"
+                      className="w-full p-2.5 rounded border bg-transparent"
+                      placeholder="0"
+                      value={feePlanForm.transportFee}
+                      onChange={e =>
+                        setFeePlanForm(prev => ({
+                          ...prev,
+                          transportFee: e.target.value
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="block text-sm font-medium mb-1">Hostel Fee (₹)</label>
+                    <input
+                      type="number"
+                      className="w-full p-2.5 rounded border bg-transparent"
+                      placeholder="0"
+                      value={feePlanForm.hostelFee}
+                      onChange={e =>
+                        setFeePlanForm(prev => ({
+                          ...prev,
+                          hostelFee: e.target.value
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-ft">
+              <button
+                className="btn-ghost px-4 py-2"
+                onClick={() => {
+                  setShowFeeModal(false);
+                  setEditingFeePlan(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button className="btn-primary px-5 py-2 font-semibold" onClick={handleSaveFeePlan}>
+                {editingFeePlan ? 'Update Plan' : 'Save Plan'}
+              </button>
+            </div>
           </div>
         </div>
       )}

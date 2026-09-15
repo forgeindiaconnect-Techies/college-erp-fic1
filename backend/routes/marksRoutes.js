@@ -180,9 +180,12 @@ const processMarkPayload = (data) => {
     ? Number(data.maxMarks) || 100
     : 150;
 
-  const passMarks = isExamBased
-    ? Number(data.passMarks) || Math.ceil(maxMarks * 0.4)
-    : 55;
+  const passMarks =
+    isExamBased && (String(data.examType || '').toUpperCase().includes('CIA') || (data.passMarks && Number(data.passMarks) >= maxMarks) || maxMarks <= 50)
+      ? Math.ceil(maxMarks * 0.4)
+      : isExamBased
+        ? Number(data.passMarks) || Math.ceil(maxMarks * 0.4)
+        : 55;
 
   const passed = isExamBased
     ? marksObtained >= passMarks
@@ -405,6 +408,53 @@ router.post(
       res.status(500).json({
         message: error.message
       });
+    }
+  }
+);
+
+// Approve submitted mark by HOD
+router.patch(
+  '/:id/approve',
+  protect,
+  authorize('HOD'),
+  collegeScope,
+  async (req, res) => {
+    try {
+      const mark = await Mark.findOneAndUpdate(
+        {
+          _id: req.params.id,
+          collegeId: req.collegeId,
+          resultStatus: 'Submitted'
+        },
+        {
+          $set: {
+            resultStatus: 'Approved',
+            reviewedAt: new Date(),
+            reviewedBy: req.user._id,
+            reviewRemarks: 'Approved by HOD'
+          }
+        },
+        { new: true }
+      );
+
+      if (!mark) {
+        return res.status(404).json({
+          message: 'Submitted mark not found'
+        });
+      }
+
+      req.app.get('io').emit('dataUpdated', {
+        module: 'marks',
+        action: 'approved',
+        markId: mark._id
+      });
+
+      res.json({
+        message: 'Mark approved successfully',
+        mark
+      });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
     }
   }
 );

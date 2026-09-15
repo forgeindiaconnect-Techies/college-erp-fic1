@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { SettingsContext } from '../../App';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
@@ -16,7 +16,7 @@ const getParentSession = () => {
 };
 
 const ParentSidebar = ({ isOpen, onClose }) => {
-  const { collegeSettings } = React.useContext(SettingsContext);
+  const { collegeSettings } = React.useContext(SettingsContext) || {};
   const navigate = useNavigate();
   const parent = getParentSession();
 

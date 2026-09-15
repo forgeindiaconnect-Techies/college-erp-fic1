@@ -17,7 +17,8 @@ import {
   getAllMarks,
   createMark,
   getExams,
-  getStudents
+  getStudents,
+  approveMark
 } from '../../api/index';
 import './HodMarks.css';
 
@@ -392,6 +393,22 @@ const HodMarks = () => {
     setForm(f => ({ ...f, [key]: val }));
   };
 
+  const handleApprove = async (mark) => {
+    if (mark.resultStatus !== 'Submitted') {
+      alert('Only submitted marks can be approved.');
+      return;
+    }
+
+    try {
+      await approveMark(mark.markId);
+      alert('Marks approved successfully.');
+      await fetchMarksData();
+    } catch (err) {
+      console.error('Failed to approve marks:', err);
+      alert(err.response?.data?.message || 'Failed to approve marks.');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -664,9 +681,32 @@ const HodMarks = () => {
                       }
                     </td>
                     <td>
-                      <button className="btn-icon" title="Log/Update Marks" onClick={() => openEdit(m)}>
-                        <Edit2 size={14} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="btn-icon"
+                          title="Log/Update Marks"
+                          onClick={() => openEdit(m)}
+                        >
+                          <Edit2 size={14} />
+                        </button>
+
+                        {m.resultStatus === 'Submitted' && (
+                          <button
+                            className="btn-icon"
+                            title="Approve Marks"
+                            onClick={() => handleApprove(m)}
+                            style={{ color: 'var(--success)' }}
+                          >
+                            <CheckCircle size={14} />
+                          </button>
+                        )}
+
+                        {m.resultStatus === 'Approved' && (
+                          <span className="text-success font-semibold">
+                            ✓ Approved
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

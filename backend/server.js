@@ -33,6 +33,7 @@ import sectionRoutes from './routes/sectionRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import marksRoutes from './routes/marksRoutes.js';
 import feesRoutes from './routes/feesRoutes.js';
+import feePlanRoutes from './routes/feePlanRoutes.js';
 import reportsRoutes from './routes/reportsRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import libraryRoutes from './routes/libraryRoutes.js';
@@ -261,12 +262,24 @@ const autoSeedIfEmpty = async () => {
         { name: 'Sree (Principal)', email: 'sree@gmail.com', password: 'sree123', role: 'Principal', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Dr. Agila (HOD)', email: 'agila@gmail.com', password: 'agila', role: 'HOD', department: 'Information Technology', referenceId: 'HOD001', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Pooja (Staff)', email: 'pooja@gmail.com', password: 'pooja', role: 'Staff', department: 'Computer Science', referenceId: 'STF008', subjects: ['Data Structures'], tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Accounts Officer', email: 'accounts@college.edu', password: 'password123', role: 'Accounts', tenantId: 'COL001', collegeId: 'COL001' },
       ];
+
+      // Find the primary/active college in the system
+      const adminCollege = (await College.findOne({
+        $or: [
+          { email: 'vaidee@gmail.com' },
+          { principalEmail: 'sree@gmail.com' },
+          { tenantId: 'COL002-8379189' }
+        ]
+      })) || (await College.findOne({ tenantId: { $ne: 'system' } }).sort({ createdAt: -1 }));
+
+      const defaultTenantId = adminCollege ? adminCollege.tenantId : 'COL002-8379189';
 
       for (const cred of customCredentials) {
         const u = await User.findOne({ email: cred.email });
         
-        let resolvedTenantId = cred.tenantId;
+        let resolvedTenantId = cred.role === 'Super Admin' ? 'system' : defaultTenantId;
         const matchingCollege = await College.findOne({
           $or: [
             { email: cred.email.trim().toLowerCase() },
@@ -293,6 +306,21 @@ const autoSeedIfEmpty = async () => {
           await u.save();
           console.log(`✅ Restored custom user: ${cred.email} to resolved tenantId: ${resolvedTenantId}`);
         }
+      }
+
+      if (defaultTenantId) {
+        await User.updateMany(
+          { role: { $in: ['Accounts', 'Staff', 'HOD', 'Student', 'Parent'] } },
+          { $set: { tenantId: defaultTenantId, collegeId: defaultTenantId } }
+        );
+        await Department.updateMany(
+          { collegeId: { $in: ['COL001', 'unassigned_college', null] } },
+          { $set: { collegeId: defaultTenantId } }
+        );
+        await Course.updateMany(
+          { collegeId: { $in: ['COL001', 'unassigned_college', null] } },
+          { $set: { collegeId: defaultTenantId } }
+        );
       }
 
       // Incremental patch: inject Principal if missing by checking email
@@ -828,6 +856,7 @@ app.use('/api/sections', sectionRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/marks', marksRoutes);
 app.use('/api/fees', feesRoutes);
+app.use('/api/fee-plans', feePlanRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/library', libraryRoutes);
 app.use('/api/transport', transportRoutes);

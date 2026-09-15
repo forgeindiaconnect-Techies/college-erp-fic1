@@ -17,26 +17,15 @@ router.get("/", protect, async (req, res) => {
   try {
     const collegeId = getCollegeId(req.user);
 
-    const filter = {};
+    const filter = { collegeId };
+
     if (req.query.departmentId) {
       filter.departmentId = req.query.departmentId;
     }
 
-    let courses = await Course.find({
-      ...filter,
-      $or: [
-        { collegeId },
-        { collegeId: 'COL002-8379189' },
-        { collegeId: 'COL001' },
-        { collegeId: 'unassigned_college' },
-        { collegeId: null },
-        { collegeId: { $exists: false } }
-      ]
-    }).sort({ createdAt: -1 });
-
-    if (!courses || courses.length === 0) {
-      courses = await Course.find(filter).sort({ createdAt: -1 });
-    }
+    const courses = await Course.find(filter).sort({
+      createdAt: -1
+    });
 
     res.status(200).json({
       success: true,
@@ -120,11 +109,6 @@ router.post(
         totalSemesters: Number(totalSemesters)
       });
 
-      req.app.get('io')?.emit('dataUpdated', {
-        module: 'courses',
-        action: 'created'
-      });
-
       res.status(201).json({
         success: true,
         message: "Course created successfully",
@@ -168,11 +152,6 @@ router.put(
           message: "Course not found"
         });
       }
-
-      req.app.get('io')?.emit('dataUpdated', {
-        module: 'courses',
-        action: 'updated'
-      });
 
       res.status(200).json({
         success: true,
@@ -218,11 +197,6 @@ router.delete(
           message: "Course not found"
         });
       }
-
-      req.app.get('io')?.emit('dataUpdated', {
-        module: 'courses',
-        action: 'deleted'
-      });
 
       res.status(200).json({
         success: true,

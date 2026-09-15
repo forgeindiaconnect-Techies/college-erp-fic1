@@ -1,11 +1,11 @@
-﻿import React from 'react';
+import React from 'react';
 import { SettingsContext } from '../../App';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Bus, MapPin, Users, Bell, Wrench, Calendar, Navigation, LogOut, ChevronRight, ChevronDown, CheckSquare, DollarSign } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
 const DriverSidebar = ({ isOpen, onClose }) => {
-  const { collegeSettings } = React.useContext(SettingsContext);
+  const { collegeSettings } = React.useContext(SettingsContext) || {};
   const navigate = useNavigate();
   const session = JSON.parse(sessionStorage.getItem('driver_session') || '{}');
 
