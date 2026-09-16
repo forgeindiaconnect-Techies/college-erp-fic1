@@ -6,6 +6,7 @@ import { protect, authorize, departmentScope, requirePermission, collegeScope, c
 import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import FeeStructure from '../models/FeeStructure.js';
+import StudentFee from '../models/StudentFee.js';
 import { sendNotification } from '../utils/notificationHelper.js';
 
 const router = express.Router();
@@ -85,17 +86,60 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
     
     // Create a FeeStructure for the student
     try {
+      const fb = req.body.feeBreakdown || {};
       const feeStructure = new FeeStructure({
+        collegeId: newStudent.collegeId || collegeId,
         studentId: newStudent.id,
-        tuitionFee: req.body.tuitionFee || 60000,
-        examFee: req.body.examFee || 2500,
-        libraryFee: req.body.libraryFee || 0,
-        hostelFee: (req.body.hostelRequired === 'yes' || req.body.hostelRequired === true) ? (req.body.hostelFeeAmount || 40000) : 0,
-        transportFee: (req.body.transportRequired === 'yes' || req.body.transportRequired === true) ? (req.body.transportFeeAmount || 15000) : 0
+        academicYear: newStudent.academicYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+        course: newStudent.course || 'General',
+        department: newStudent.dept || newStudent.department || 'General',
+        semester: Number(newStudent.semester || 1),
+        tuitionFee: Number(fb.tuitionFee) || Number(req.body.tuitionFee) || 15000,
+        admissionFee: Number(fb.admissionFee) || 2500,
+        universityFee: Number(fb.universityFee) || 1500,
+        marksheetVerification: Number(fb.marksheetVerification) || 500,
+        specialFee: Number(fb.specialFee) || 2000,
+        englishLabNssId: Number(fb.englishLabNssId) || 1000,
+        computerLab: Number(fb.computerLab) || 1000,
+        stationary: Number(fb.stationary) || 1000,
+        pta: Number(fb.pta) || 500,
+        examFee: Number(fb.examFee) || 1500,
+        libraryFee: Number(fb.libraryFee) || 1000,
+        hostelFee: (req.body.hostelRequired === 'yes' || req.body.hostel === 'Yes') ? (Number(req.body.hostelFeeAmount) || 40000) : 0,
+        transportFee: (req.body.transportRequired === 'yes' || req.body.transport === 'Yes') ? (Number(req.body.transportFeeAmount) || 15000) : 0,
+        totalAmount: Number(req.body.totalFee) || 26000
       });
       await feeStructure.save();
     } catch (feeErr) {
       console.error('Failed to create FeeStructure for Student:', feeErr);
+    }
+
+    // Create StudentFee account record
+    try {
+      let semNumber = 1;
+      if (typeof newStudent.sem === 'number') {
+        semNumber = newStudent.sem;
+      } else if (typeof newStudent.sem === 'string') {
+        const match = newStudent.sem.match(/\d+/);
+        if (match) semNumber = parseInt(match[0], 10);
+      }
+
+      await StudentFee.create({
+        collegeId: newStudent.collegeId || collegeId,
+        studentId: newStudent._id,
+        admissionNo: newStudent.id || 'ST-TEMP',
+        academicYear: newStudent.academicYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+        course: newStudent.courseId || newStudent.course || '',
+        department: newStudent.dept || newStudent.department || '',
+        semester: semNumber || 1,
+        feeItems: [],
+        totalAmount: 0,
+        paidAmount: 0,
+        balanceAmount: 0,
+        status: 'PENDING',
+      });
+    } catch (studentFeeErr) {
+      console.error('Failed to create StudentFee record for Student:', studentFeeErr);
     }
 
     // Send Notification to newly created Student User
@@ -238,7 +282,7 @@ router.put(
 );
 
 // Update student
-router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), requirePermission('manage_students'), collegeScope, checkSubscription, async (req, res) => {
+router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), requirePermission('manage_students'), collegeScope, checkSubscription, async (req, res) => {
   try {
     const updatedStudent = await Student.findOneAndUpdate(
       { id: req.params.id },

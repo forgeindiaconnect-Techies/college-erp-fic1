@@ -27,355 +27,359 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  Printer,
+  FileText,
+  IndianRupee,
+  Layers,
+  Award,
+  Eye
 } from 'lucide-react';
 import {
   createStudent,
   updateStudent,
+  createFee,
   getDepartments,
   getStudents,
   getCourses,
-  getFeePlans
+  getFeePlans,
+  getFeeStructures,
+  getSections
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
+import './StudentRegistration.css';
 
-const SEMESTERS = [
-  '1stYear-Sem-I',
-  '1stYear-Sem-II',
-  '2ndYear-Sem-III',
-  '2ndYear-Sem-IV',
-  '3rdYear-Sem-V',
-  '3rdYear-Sem-VI',
-  '4thYear-Sem-VII',
-  '4thYear-Sem-VIII'
+const COMMUNITIES = ['Select', 'BC', 'MBC', 'SC', 'ST', 'OC', 'BCM', 'DNC'];
+const BLOOD_GROUPS = ['Select', 'A1+', 'A1-', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+const DEGREE_TYPES = ['UG', 'PG', 'Diploma', 'Ph.D'];
+const SEMESTERS_LIST = [1, 2, 3, 4, 5, 6, 7, 8];
+const RELIGIONS = ['Hindu', 'Muslim', 'Christian', 'Jain', 'Sikh', 'Buddhist', 'Other'];
+
+const DEFAULT_QUALIFICATIONS = [
+  { study: 'SSLC', institute: '', board: '', percentage: '', passYear: '', marksheetNo: '' },
+  { study: 'HSC', institute: '', board: '', percentage: '', passYear: '', marksheetNo: '' },
+  { study: 'enter if', institute: '', board: '', percentage: '', passYear: '', marksheetNo: '' }
 ];
 
-const BLOOD_GROUPS = ['Select', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
-
-const getFeePlanSemester = (sem) => {
-  const map = {
-    '1stYear-Sem-I': 'Sem 1',
-    '1stYear-Sem-II': 'Sem 2',
-    '2ndYear-Sem-III': 'Sem 3',
-    '2ndYear-Sem-IV': 'Sem 4',
-    '3rdYear-Sem-V': 'Sem 5',
-    '3rdYear-Sem-VI': 'Sem 6',
-    '4thYear-Sem-VII': 'Sem 7',
-    '4thYear-Sem-VIII': 'Sem 8'
-  };
-
-  return map[sem] || sem;
+const DEFAULT_FEE_BREAKDOWN = {
+  admissionFee: 0,
+  universityFee: 0,
+  marksheetVerification: 0,
+  tuitionFee: 0,
+  specialFee: 0,
+  englishLabNssId: 0,
+  computerLab: 0,
+  stationary: 0,
+  pta: 0,
+  otherFee: 0
 };
 
 const EMPTY_FORM = {
+  // Admission Core
+  previousAdmissionNo: '',
   id: '',
+  admissionNo: '',
+  admissionDate: new Date().toISOString().split('T')[0],
+  academicYear: `${new Date().getFullYear()} - ${new Date().getFullYear() + 1}`,
+  degreeType: 'UG',
+  course: '',
+  courseId: '',
+  dept: '',
+  department: '',
+  semester: 1,
+  sem: '1stYear-Sem-I',
+  section: 'A',
+
+  // Personal Info
   firstName: '',
   midName: '',
   lastName: '',
   name: '',
-  email: '',
-  phone: '',
-  dept: '',
-  courseId: '',
-  sem: '1stYear-Sem-I',
-  academicYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
-  section: 'A',
-  admissionDate: new Date().toISOString().split('T')[0],
-  admissionInfo: 'Regular Merit',
-  applicationType: 'New Enrollment',
-  applicationStatus: 'Approved',
-
   dob: '',
   gender: 'Male',
-  aadharNo: '',
-  identification: '',
-  familyStat: 'Nuclear',
-  firstLang: 'English',
-  secondLang: 'Tamil',
+  placeOfBirth: '',
   bloodGroup: 'Select',
-  religion: '',
   nationality: 'Indian',
+  religion: 'Hindu',
+  community: 'BC',
   caste: '',
-  ethnicity: '',
-  panNo: '',
+  communityCertNo: '',
+  motherTongue: 'Tamil',
+  handicapped: 'No',
   physicallyChallenged: false,
-
-  country: 'India',
-  state: 'Tamil Nadu',
-  district: '',
-  subDistrict: '',
-  pincode: '',
-  address: '',
-
+  aadharNo: '',
+  panNo: '',
   photoUrl: '',
+
+  // Family & Guardian
+  fatherName: '',
+  motherName: '',
+  fatherOccupation: '',
+  yearlyIncome: '',
+  fatherPhone: '',
+  fatherEmail: '',
+  guardianName: '',
+  guardianPhone: '',
+  guardianEmail: '',
+  guardianAddress: '',
+
+  // Contact & Address
+  phone: '',
+  email: '',
+  address: '',
+  city: '',
+  state: 'Tamil Nadu',
+  country: 'India',
+  pincode: '',
+
+  // Facilities
+  hostel: 'No',
+  dormFacility: false,
+  hostelRequired: 'no',
+  transport: 'No',
   busFacility: false,
+  transportRequired: 'no',
   busRoute: '',
   pickupPoint: '',
-  dormFacility: false,
-  hostelName: '',
-  roomNumber: '',
 
-  languages: [
-    { language: 'English', reading: true, writing: true, speaking: true },
-    { language: 'Tamil', reading: true, writing: true, speaking: true }
-  ],
+  // Prior Academic Qualifications
+  qualifications: [...DEFAULT_QUALIFICATIONS],
 
-  familyMembers: [
-    { relation: 'Father', firstName: '', middleName: '', lastName: '', mobile: '', email: '' },
-    { relation: 'Mother', firstName: '', middleName: '', lastName: '', mobile: '', email: '' }
-  ],
-
-  feePlanId: '',
-  feeDetails: null,
-  baseFee: 0,
-  transportFee: 0,
-  hostelFee: 0,
+  // Fee Details (RS)
+  feeBreakdown: { ...DEFAULT_FEE_BREAKDOWN },
   totalFee: 0,
+  amountPaid: 0,
+  balanceFee: 0,
+  paymentMode: 'Cash',
+  paymentStatus: 'Pending',
+  receiptNumber: '',
+  paymentDate: null,
 
-  feeStatus: 'Pending',
+  applicationStatus: 'Approved',
+  admissionStatus: 'Confirmed',
   status: 'Active'
 };
 
-const DEPARTMENT_CODES = {
-  'Computer Science Engineering': 'CSE',
-  'Computer Science & Engineering': 'CSE',
-  'Information Technology': 'IT',
-  'Electronics & Communication Engineering': 'ECE',
-  'Electrical & Electronics Engineering': 'EEE',
-  'Mechanical Engineering': 'MECH',
-  'Civil Engineering': 'CIVIL',
-  'Artificial Intelligence & Data Science': 'AIDS',
-  'Artificial Intelligence & Machine Learning': 'AIML',
-  'Cyber Security': 'CYBER',
-  'Biomedical Engineering': 'BME',
-  'Aeronautical Engineering': 'AERO',
-  'Automobile Engineering': 'AUTO',
-  'Robotics Engineering': 'ROBOTICS',
-  'Chemical Engineering': 'CHEM',
-  'Biotechnology Engineering': 'BIOTECH',
-  'MATHEMATICS': 'MATH',
-  'Mathematics': 'MATH',
-  'History and Arts': 'HIS',
-  'History': 'HIS',
-  'Physics': 'PHY',
-  'Chemistry': 'CHEM'
-};
-
-const generateRegNo = (dept, studentsList) => {
-  const code = DEPARTMENT_CODES[dept] || (dept ? dept.substring(0, 3).toUpperCase() : 'ST');
+const generateRegNo = (codeOrName, studentsList) => {
+  const cleanCode = (codeOrName || 'ST').replace(/[^A-Za-z0-9]/g, '').substring(0, 4).toUpperCase() || 'ST';
   const year = new Date().getFullYear();
 
-  const deptStudents = (studentsList || []).filter(
-    student =>
-      (student.dept === dept || student.department === dept) &&
-      student.id &&
-      String(student.id).startsWith(`${code}${year}`)
+  const matchingStudents = (studentsList || []).filter(
+    student => student.id && String(student.id).startsWith(`${cleanCode}${year}`)
   );
 
   let maxSeq = 0;
-
-  deptStudents.forEach(student => {
+  matchingStudents.forEach(student => {
     const parts = String(student.id).split('-');
-
     if (parts.length > 1) {
       const seq = parseInt(parts[1], 10);
-
       if (!Number.isNaN(seq) && seq > maxSeq) {
         maxSeq = seq;
       }
     }
   });
 
-  return `${code}${year}-${String(maxSeq + 1).padStart(3, '0')}`;
+  return `${cleanCode}${year}-${String(maxSeq + 1).padStart(3, '0')}`;
 };
 
-const WIZARD_STEPS = [
-  { id: 1, title: 'Personal Details', subtitle: 'Basic & Identity Info', icon: User },
-  { id: 2, title: 'Contact & Address', subtitle: 'Demographics & Location', icon: MapPin },
-  { id: 3, title: 'Enrolling & Fees', subtitle: 'Course, Facilities & Plan', icon: GraduationCap },
-  { id: 4, title: 'Languages & Family', subtitle: 'Proficiency & Parents', icon: Users }
-];
+const printReceiptDirect = (data) => {
+  const win = window.open('', '_blank', 'width=800,height=750');
+  if (!win) return;
+  
+  const recNo = data.receiptNumber || `REC-${Date.now()}`;
+  const total = Number(data.totalFee || data.totalAmount || 0);
+  const paid = Number(data.amountPaid || data.paidAmount || 0);
+  const balance = Number(data.balanceFee || data.balanceAmount || Math.max(0, total - paid));
+
+  win.document.write(`
+    <!DOCTYPE html><html><head><title>Fee Receipt - ${recNo}</title>
+    <style>
+      body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 30px; background: #fff; color: #1e293b; }
+      .receipt-box { border: 2px solid #cbd5e1; border-radius: 8px; padding: 25px; max-width: 720px; margin: 0 auto; }
+      .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 15px; margin-bottom: 18px; }
+      .header h1 { margin: 0; color: #1e40af; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+      .header p { margin: 3px 0; color: #64748b; font-size: 13px; }
+      .badge-row { display: flex; justify-content: space-between; align-items: center; margin: 15px 0; padding: 8px 12px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; }
+      .badge-row .rec-no { font-weight: bold; color: #2563eb; font-size: 14px; }
+      .badge-row .rec-date { color: #64748b; font-size: 13px; }
+      .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; margin-bottom: 18px; font-size: 13px; }
+      .grid-2 .item { display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 4px; }
+      .grid-2 .label { color: #64748b; font-weight: 500; }
+      .grid-2 .val { font-weight: 600; color: #0f172a; }
+      table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 13px; }
+      th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+      th { background: #f1f5f9; color: #334155; font-weight: 600; }
+      .amount-col { text-align: right; }
+      .totals-area { margin-top: 15px; border-top: 2px solid #cbd5e1; padding-top: 10px; font-size: 14px; }
+      .totals-row { display: flex; justify-content: space-between; padding: 4px 0; }
+      .total-bold { font-size: 16px; font-weight: 700; color: #1e40af; }
+      .paid-bold { font-size: 15px; font-weight: 700; color: #16a34a; }
+      .bal-bold { font-size: 15px; font-weight: 700; color: #dc2626; }
+      .footer { margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end; padding-top: 20px; font-size: 12px; color: #64748b; }
+      .sign-box { text-align: center; width: 160px; border-top: 1px solid #94a3b8; padding-top: 6px; }
+    </style></head><body>
+    <div class="receipt-box">
+      <div class="header">
+        <h1>COLLEGE ERP SYSTEM</h1>
+        <p>Finance & Accounts Department — Official Student Fee Receipt</p>
+      </div>
+      <div class="badge-row">
+        <div class="rec-no">RECEIPT NO: ${recNo}</div>
+        <div class="rec-date">Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+      </div>
+      <div class="grid-2">
+        <div class="item"><span class="label">Student Name:</span><span class="val">${data.name || data.firstName + ' ' + data.lastName}</span></div>
+        <div class="item"><span class="label">Admission No:</span><span class="val">${data.id || data.admissionNo || 'N/A'}</span></div>
+        <div class="item"><span class="label">Course & Dept:</span><span class="val">${data.course || ''} - ${data.department || data.dept || ''}</span></div>
+        <div class="item"><span class="label">Semester / Year:</span><span class="val">Semester ${data.semester || 1} (${data.academicYear || ''})</span></div>
+        <div class="item"><span class="label">Payment Mode:</span><span class="val">${data.paymentMode || 'Cash'}</span></div>
+        <div class="item"><span class="label">Payment Status:</span><span class="val">${paid >= total ? 'PAID IN FULL' : paid > 0 ? 'PARTIAL' : 'PENDING'}</span></div>
+      </div>
+      
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Fee Description</th>
+            <th class="amount-col">Amount (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Object.entries(data.feeBreakdown || DEFAULT_FEE_BREAKDOWN)
+            .filter(([_, val]) => Number(val) > 0)
+            .map(([key, val], idx) => `
+              <tr>
+                <td>${idx + 1}</td>
+                <td>${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</td>
+                <td class="amount-col">₹${Number(val).toLocaleString()}</td>
+              </tr>
+            `).join('')}
+        </tbody>
+      </table>
+
+      <div class="totals-area">
+        <div class="totals-row total-bold">
+          <span>Total Fee Payable:</span>
+          <span>₹${total.toLocaleString()}</span>
+        </div>
+        <div class="totals-row paid-bold">
+          <span>Amount Paid:</span>
+          <span>₹${paid.toLocaleString()}</span>
+        </div>
+        <div class="totals-row bal-bold">
+          <span>Balance Outstanding:</span>
+          <span>₹${balance.toLocaleString()}</span>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div>
+          <p style="margin:0;">* This is a system-generated computer receipt.</p>
+          <p style="margin:2px 0 0;">Accounts Verification Stamp Included.</p>
+        </div>
+        <div class="sign-box">
+          Authorized Signatory<br>Accounts Officer
+        </div>
+      </div>
+    </div>
+    </body></html>
+  `);
+  win.document.close();
+  setTimeout(() => win.print(), 500);
+};
 
 const StudentRegistration = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeStep, setActiveStep] = useState(1);
+
+  // Workflow modes: 1 = Form Entry, 2 = Confirmation / Verification Preview, 3 = Registered Students Directory
+  const [activeTab, setActiveTab] = useState(1);
+
   const [form, setForm] = useState(EMPTY_FORM);
   const [departments, setDepartments] = useState([]);
   const [courses, setCourses] = useState([]);
+  const [sectionsList, setSectionsList] = useState([]);
   const [students, setStudents] = useState([]);
-  const [feePlans, setFeePlans] = useState([]);
-  const [selectedFeePlan, setSelectedFeePlan] = useState(null);
+  const [feeStructuresList, setFeeStructuresList] = useState([]);
+
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [editingStudentId, setEditingStudentId] = useState(null);
 
-  // Left sidebar filter state
-  const [filterAcademicYear, setFilterAcademicYear] = useState('All');
-  const [filterDegree, setFilterDegree] = useState('All');
-  const [filterCourseYear, setFilterCourseYear] = useState('All');
-  const [filterAppStatus, setFilterAppStatus] = useState('All');
+  // Directory search/filter
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [filterAcademicYear, setFilterAcademicYear] = useState('All');
+  const [filterDept, setFilterDept] = useState('All');
 
-  const [showBulkModal, setShowBulkModal] = useState(false);
-  const [bulkDataText, setBulkDataText] = useState('');
-  const [bulkImporting, setBulkImporting] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const loadSelectedFeePlan = async (departmentName, courseId, semester) => {
-    try {
-      if (!departmentName || !courseId) {
-        setSelectedFeePlan(null);
-        return;
-      }
-
-      const department = departments.find(
-        dept =>
-          (dept?.name || dept?.departmentName || dept) === departmentName ||
-          dept?.code === departmentName ||
-          dept?.id === departmentName ||
-          dept?._id === departmentName
-      );
-
-      const courseObj = courses.find(
-        c =>
-          String(c.id || c._id) === String(courseId) ||
-          c.name === courseId ||
-          c.code === courseId
-      );
-
-      const deptId = department?.id || department?._id || departmentName;
-      const deptName = department?.name || department?.departmentName || departmentName;
-      const cId = courseObj?.id || courseObj?._id || courseId;
-      const cName = courseObj?.name || courseId;
-      const feeSemester = getFeePlanSemester(semester || form.sem);
-
-      // 1. Try finding in loaded feePlans first
-      let matchedPlan = feePlans.find(plan => {
-        if (plan.status === 'Inactive') return false;
-        const dMatch =
-          plan.departmentId === deptId ||
-          plan.departmentName === deptName ||
-          String(plan.departmentId).toLowerCase() === String(deptName).toLowerCase() ||
-          String(plan.departmentName).toLowerCase() === String(deptName).toLowerCase();
-
-        const cMatch =
-          plan.courseId === cId ||
-          plan.courseName === cName ||
-          String(plan.courseId).toLowerCase() === String(cName).toLowerCase() ||
-          String(plan.courseName).toLowerCase() === String(cName).toLowerCase();
-
-        const sMatch =
-          !plan.semester ||
-          plan.semester === 'All' ||
-          plan.semester === feeSemester ||
-          plan.semester === semester;
-
-        return dMatch && cMatch && sMatch;
-      });
-
-      // 2. If not in state, query backend API
-      if (!matchedPlan) {
-        try {
-          const response = await getFeePlans({
-            departmentId: deptId,
-            departmentName: deptName,
-            courseId: String(cId),
-            courseName: cName,
-            semester: feeSemester
-          });
-
-          const plans = Array.isArray(response.data) ? response.data : [];
-          matchedPlan = plans.find(plan => plan.status === 'Active') || null;
-        } catch (apiErr) {
-          console.warn('API fee plan query:', apiErr.message);
-        }
-      }
-
-      // 3. If no specific custom plan found in DB, supply standard ERP fee plan
-      if (!matchedPlan) {
-        matchedPlan = {
-          _id: `standard-${deptId}-${cId}`,
-          departmentId: deptId,
-          departmentName: deptName,
-          courseId: cId,
-          courseName: cName,
-          semester: feeSemester,
-          tuitionFee: 55000,
-          examFee: 2500,
-          labFee: 5000,
-          libraryFee: 2500,
-          transportFee: 15000,
-          hostelFee: 40000,
-          isDefaultStandard: true,
-          status: 'Active'
-        };
-      }
-
-      setSelectedFeePlan(matchedPlan);
-    } catch (error) {
-      console.error('Failed to load fee plan:', error);
-      setSelectedFeePlan({
-        _id: 'standard-fallback',
-        tuitionFee: 55000,
-        examFee: 2500,
-        labFee: 5000,
-        libraryFee: 2500,
-        transportFee: 15000,
-        hostelFee: 40000,
-        isDefaultStandard: true,
-        status: 'Active'
-      });
-    }
-  };
-
+  // Load real departments, courses, sections, students, and fee structures from backend APIs
   const loadInitialData = async () => {
     try {
-      const [deptRes, courseRes, studRes, feePlanRes] = await Promise.all([
-        getDepartments().catch(() => ({ data: [] })),
-        getCourses().catch(() => ({ data: { courses: [] } })),
-        getStudents().catch(() => ({ data: [] })),
-        getFeePlans().catch(() => ({ data: [] }))
+      setLoading(true);
+      const [deptRes, courseRes, studRes, structRes, secRes] = await Promise.allSettled([
+        getDepartments(),
+        getCourses(),
+        getStudents(),
+        getFeeStructures(),
+        getSections()
       ]);
 
-      const deptList = Array.isArray(deptRes.data)
-        ? deptRes.data
-        : deptRes.data?.departments || [];
+      let loadedDepts = [];
+      if (deptRes.status === 'fulfilled') {
+        loadedDepts = Array.isArray(deptRes.value?.data)
+          ? deptRes.value.data
+          : deptRes.value?.data?.departments || [];
+        setDepartments(loadedDepts);
+      }
 
-      const studentList = Array.isArray(studRes.data)
-        ? studRes.data
-        : studRes.data?.students || [];
+      let loadedCourses = [];
+      if (courseRes.status === 'fulfilled') {
+        loadedCourses = Array.isArray(courseRes.value?.data?.courses)
+          ? courseRes.value.data.courses
+          : Array.isArray(courseRes.value?.data)
+          ? courseRes.value.data
+          : [];
+        setCourses(loadedCourses);
+      }
 
-      const courseList = Array.isArray(courseRes.data)
-        ? courseRes.data
-        : courseRes.data?.courses || [];
+      if (secRes.status === 'fulfilled') {
+        const secData = Array.isArray(secRes.value?.data?.sections)
+          ? secRes.value.data.sections
+          : Array.isArray(secRes.value?.data)
+          ? secRes.value.data
+          : [];
+        setSectionsList(secData);
+      }
 
-      const feePlanList = Array.isArray(feePlanRes.data)
-        ? feePlanRes.data
-        : [];
+      if (studRes.status === 'fulfilled') {
+        const sData = Array.isArray(studRes.value?.data)
+          ? studRes.value.data
+          : studRes.value?.data?.students || [];
+        setStudents(sData);
+      }
 
-      setDepartments(deptList);
-      setCourses(courseList);
-      setStudents(studentList);
-      setFeePlans(feePlanList);
+      if (structRes.status === 'fulfilled') {
+        const strData = Array.isArray(structRes.value?.data) ? structRes.value.data : [];
+        setFeeStructuresList(strData);
+      }
 
-      if (deptList.length > 0 && !editingStudentId) {
-        const firstDept =
-          deptList[0]?.name ||
-          deptList[0]?.departmentName ||
-          deptList[0];
-
+      // Initialize default department if none selected
+      if (!form.department && loadedDepts.length > 0) {
+        const firstDept = loadedDepts[0]?.name || loadedDepts[0]?.departmentName || loadedDepts[0];
+        const deptCode = loadedDepts[0]?.code || firstDept.substring(0, 3).toUpperCase();
         setForm(prev => ({
           ...prev,
-          dept: prev.dept || firstDept,
-          id: prev.id || generateRegNo(firstDept, studentList)
+          dept: firstDept,
+          department: firstDept,
+          id: prev.id || generateRegNo(deptCode, studRes.value?.data || [])
         }));
       }
-    } catch (error) {
-      console.error('Failed to load registration data:', error);
+
+    } catch (err) {
+      console.error('Initial data load failed:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -383,139 +387,313 @@ const StudentRegistration = () => {
     loadInitialData();
   }, []);
 
-  useEffect(() => {
-    loadSelectedFeePlan(
-      form.dept,
-      form.courseId,
-      form.sem
-    );
-  }, [form.dept, form.courseId, form.sem, feePlans]);
+  useRealtimeSync('students', loadInitialData);
+  useRealtimeSync('departments', loadInitialData);
+  useRealtimeSync('courses', loadInitialData);
+  useRealtimeSync('sections', loadInitialData);
+  useRealtimeSync('feeStructure', loadInitialData);
 
-  useEffect(() => {
-    if (!selectedFeePlan) {
-      setForm(prev => ({
-        ...prev,
-        feeDetails: null,
-        baseFee: 0,
-        transportFee: 0,
-        hostelFee: 0,
-        totalFee: 0
-      }));
-      return;
+  // Filter sections dynamically based on the selected Department & Course
+  const availableSections = useMemo(() => {
+    const currentDept = form.department || form.dept;
+    if (!currentDept) return ['A', 'B', 'C', 'D'];
+
+    const deptObj = departments.find(d =>
+      (d?.name && d.name.toLowerCase() === currentDept.toLowerCase()) ||
+      (d?.id && String(d.id).toLowerCase() === String(currentDept).toLowerCase()) ||
+      (d?.code && d.code.toLowerCase() === currentDept.toLowerCase())
+    );
+
+    const deptId = deptObj?.id || deptObj?._id || currentDept;
+    const deptCode = deptObj?.code || '';
+    const deptName = deptObj?.name || currentDept;
+
+    const matched = sectionsList.filter(sec => {
+      const sDeptId = String(sec?.departmentId || sec?.department || '').trim().toLowerCase();
+      return (
+        (deptId && sDeptId === String(deptId).trim().toLowerCase()) ||
+        (deptCode && sDeptId === String(deptCode).trim().toLowerCase()) ||
+        (deptName && sDeptId === String(deptName).trim().toLowerCase())
+      );
+    });
+
+    if (matched.length > 0) {
+      const uniqueNames = Array.from(new Set(matched.map(s => s.name || s.sectionName || s))).filter(Boolean);
+      return uniqueNames.length > 0 ? uniqueNames : ['A', 'B', 'C', 'D'];
     }
 
-    const baseFee =
-      Number(selectedFeePlan.tuitionFee || 0) +
-      Number(selectedFeePlan.examFee || 0) +
-      Number(selectedFeePlan.labFee || 0) +
-      Number(selectedFeePlan.libraryFee || 0);
+    return ['A', 'B', 'C', 'D'];
+  }, [form.department, form.dept, departments, sectionsList]);
 
-    const transportFee = form.busFacility
-      ? Number(selectedFeePlan.transportFee || 0)
-      : 0;
+  // Filter courses strictly by the selected Department
+  const availableCourses = useMemo(() => {
+    const currentDeptName = form.department || form.dept;
+    if (!currentDeptName) return [];
 
-    const hostelFee = form.dormFacility
-      ? Number(selectedFeePlan.hostelFee || 0)
-      : 0;
+    const deptObj = departments.find(d =>
+      (d?.name && d.name.toLowerCase() === currentDeptName.toLowerCase()) ||
+      (d?.id && String(d.id).toLowerCase() === String(currentDeptName).toLowerCase()) ||
+      (d?.code && d.code.toLowerCase() === currentDeptName.toLowerCase())
+    );
 
-    const totalFee = baseFee + transportFee + hostelFee;
+    const deptId = deptObj?.id || deptObj?._id || currentDeptName;
+    const deptCode = deptObj?.code || '';
+    const deptName = deptObj?.name || currentDeptName;
+
+    const matched = courses.filter(c => {
+      const cDeptId = String(c?.departmentId || '').trim().toLowerCase();
+      const cDept = String(c?.department || c?.departmentName || '').trim().toLowerCase();
+
+      return (
+        (deptId && cDeptId === String(deptId).trim().toLowerCase()) ||
+        (deptCode && cDeptId === String(deptCode).trim().toLowerCase()) ||
+        (deptName && cDeptId === String(deptName).trim().toLowerCase()) ||
+        (deptName && cDept === String(deptName).trim().toLowerCase()) ||
+        (deptCode && cDept === String(deptCode).trim().toLowerCase())
+      );
+    });
+
+    return matched;
+  }, [form.department, form.dept, departments, courses]);
+
+  const getDepartmentDefaultFeeBreakdown = (deptName) => {
+    const dLower = String(deptName || '').toLowerCase();
+
+    if (dLower.includes('computer') || dLower.includes('cse') || dLower.includes('tech') || dLower.includes('engineering')) {
+      return {
+        admissionFee: 5000,
+        universityFee: 2500,
+        marksheetVerification: 500,
+        tuitionFee: 35000,
+        specialFee: 5000,
+        englishLabNssId: 2000,
+        computerLab: 4000,
+        stationary: 1500,
+        pta: 1000,
+        otherFee: 1500
+      };
+    }
+
+    if (dLower.includes('food') || dLower.includes('nutrition') || dLower.includes('math') || dLower.includes('science')) {
+      return {
+        admissionFee: 3500,
+        universityFee: 2000,
+        marksheetVerification: 500,
+        tuitionFee: 22000,
+        specialFee: 3500,
+        englishLabNssId: 1500,
+        computerLab: 3000,
+        stationary: 1000,
+        pta: 1000,
+        otherFee: 1000
+      };
+    }
+
+    // Arts / Language / History / BA Tamil / General
+    return {
+      admissionFee: 2500,
+      universityFee: 1500,
+      marksheetVerification: 500,
+      tuitionFee: 15000,
+      specialFee: 2000,
+      englishLabNssId: 1000,
+      computerLab: 1000,
+      stationary: 1000,
+      pta: 500,
+      otherFee: 1000
+    };
+  };
+
+  // Synchronize Fee Breakdown whenever Course, Dept, Semester or Academic Year changes
+  useEffect(() => {
+    const courseName = form.course;
+    const deptName = form.department || form.dept;
+    const semNum = Number(form.semester) || 1;
+    const acadYrNorm = (form.academicYear || '').replace(/\s+/g, '').toLowerCase();
+
+    if (!deptName) return;
+
+    // Search configured FeeStructure
+    const matched = feeStructuresList.find(s => {
+      const sDept = (s.department || '').toLowerCase().trim();
+      const sCourse = (s.course || '').toLowerCase().trim();
+      const sAcadYr = (s.academicYear || '').replace(/\s+/g, '').toLowerCase();
+      const dNorm = deptName.toLowerCase().trim();
+      const cNorm = (courseName || '').toLowerCase().trim();
+
+      const deptMatches = sDept === dNorm || (s.departmentId && String(s.departmentId).toLowerCase() === dNorm);
+      const courseMatches = !courseName || sCourse === cNorm || cNorm.includes(sCourse) || sCourse.includes(cNorm);
+      const semMatches = Number(s.semester) === semNum;
+      const yrMatches = !sAcadYr || !acadYrNorm || sAcadYr === acadYrNorm;
+
+      return deptMatches && courseMatches && semMatches && yrMatches;
+    });
+
+    let breakdown = {};
+    let total = 0;
+
+    if (matched && matched.fees && matched.fees.length > 0) {
+      breakdown = {
+        admissionFee: 0,
+        universityFee: 0,
+        marksheetVerification: 0,
+        tuitionFee: 0,
+        specialFee: 0,
+        englishLabNssId: 0,
+        computerLab: 0,
+        stationary: 0,
+        pta: 0,
+        otherFee: 0
+      };
+
+      matched.fees.forEach(f => {
+        const fType = (f.feeType || '').toLowerCase();
+        const amt = Number(f.amount) || 0;
+        total += amt;
+
+        if (fType.includes('admission')) breakdown.admissionFee = amt;
+        else if (fType.includes('tuition')) breakdown.tuitionFee = amt;
+        else if (fType.includes('exam') || fType.includes('univ')) breakdown.universityFee = amt;
+        else if (fType.includes('mark') || fType.includes('verif')) breakdown.marksheetVerification = amt;
+        else if (fType.includes('library') || fType.includes('id') || fType.includes('nss')) breakdown.englishLabNssId = amt;
+        else if (fType.includes('lab') || fType.includes('computer')) breakdown.computerLab = amt;
+        else if (fType.includes('station')) breakdown.stationary = amt;
+        else if (fType.includes('special')) breakdown.specialFee = amt;
+        else if (fType.includes('pta')) breakdown.pta = amt;
+        else breakdown.otherFee = (breakdown.otherFee || 0) + amt;
+      });
+    } else {
+      breakdown = getDepartmentDefaultFeeBreakdown(deptName);
+      total = Object.values(breakdown).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    }
+
+    const currentPaid = Number(form.amountPaid) || 0;
+    setForm(prev => ({
+      ...prev,
+      feeBreakdown: breakdown,
+      totalFee: total,
+      balanceFee: Math.max(0, total - currentPaid)
+    }));
+  }, [form.course, form.department, form.dept, form.semester, form.academicYear, feeStructuresList]);
+
+  // Recalculate totals whenever fee breakdown fields change
+  const handleFeeBreakdownChange = (field, val) => {
+    const num = Math.max(0, Number(val) || 0);
+    const updatedBreakdown = {
+      ...form.feeBreakdown,
+      [field]: num
+    };
+
+    const total = Object.values(updatedBreakdown).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    const paid = Number(form.amountPaid) || 0;
 
     setForm(prev => ({
       ...prev,
-      feePlanId: selectedFeePlan._id,
-      feeDetails: selectedFeePlan,
-      baseFee,
-      transportFee,
-      hostelFee,
-      totalFee
+      feeBreakdown: updatedBreakdown,
+      totalFee: total,
+      balanceFee: Math.max(0, total - paid)
     }));
-  }, [selectedFeePlan, form.busFacility, form.dormFacility]);
+  };
 
-  useRealtimeSync(() => {
-    loadInitialData();
-  }, ['departments', 'courses', 'students', 'feePlans']);
+  const handleAmountPaidChange = (val) => {
+    const paid = Math.max(0, Number(val) || 0);
+    const total = Number(form.totalFee) || 0;
+    const balance = Math.max(0, total - paid);
 
-  const handleChange = (field, value) => {
+    let status = 'Pending';
+    if (paid >= total && total > 0) status = 'Paid';
+    else if (paid > 0) status = 'Partial';
+
+    setForm(prev => ({
+      ...prev,
+      amountPaid: paid,
+      balanceFee: balance,
+      paymentStatus: status
+    }));
+  };
+
+  const handleChange = (field, val) => {
     setForm(prev => {
-      const updated = { ...prev, [field]: value };
-      if (field === 'firstName' || field === 'midName' || field === 'lastName') {
-        const fn = field === 'firstName' ? value : prev.firstName;
-        const mn = field === 'midName' ? value : prev.midName;
-        const ln = field === 'lastName' ? value : prev.lastName;
-        updated.name = [fn, mn, ln].filter(Boolean).join(' ').trim();
+      const updated = { ...prev, [field]: val };
+
+      if (field === 'firstName' || field === 'lastName' || field === 'midName') {
+        updated.name = [updated.firstName, updated.midName, updated.lastName].filter(Boolean).join(' ').trim();
       }
+
+      if (field === 'dept' || field === 'department') {
+        updated.dept = val;
+        updated.department = val;
+
+        const deptObj = departments.find(d =>
+          (d?.name && d.name.toLowerCase() === val.toLowerCase()) ||
+          (d?.id && String(d.id).toLowerCase() === String(val).toLowerCase()) ||
+          (d?.code && d.code.toLowerCase() === val.toLowerCase())
+        );
+        const deptId = deptObj?.id || deptObj?._id || val;
+        const deptCode = deptObj?.code || '';
+        const deptName = deptObj?.name || val;
+
+        const matchingCourses = courses.filter(c => {
+          const cDeptId = String(c?.departmentId || '').trim().toLowerCase();
+          const cDept = String(c?.department || c?.departmentName || '').trim().toLowerCase();
+
+          return (
+            (deptId && cDeptId === String(deptId).trim().toLowerCase()) ||
+            (deptCode && cDeptId === String(deptCode).trim().toLowerCase()) ||
+            (deptName && cDeptId === String(deptName).trim().toLowerCase()) ||
+            (deptName && cDept === String(deptName).trim().toLowerCase()) ||
+            (deptCode && cDept === String(deptCode).trim().toLowerCase())
+          );
+        });
+
+        if (matchingCourses.length > 0) {
+          updated.course = matchingCourses[0]?.name || matchingCourses[0]?.courseName || '';
+          updated.courseId = matchingCourses[0]?.id || matchingCourses[0]?._id || '';
+          if (matchingCourses[0]?.degreeType) {
+            updated.degreeType = matchingCourses[0].degreeType;
+          }
+        } else {
+          updated.course = '';
+          updated.courseId = '';
+        }
+
+        const codeForReg = deptCode || (val ? val.substring(0, 3).toUpperCase() : 'ST');
+        updated.id = generateRegNo(codeForReg, students);
+        updated.admissionNo = updated.id;
+      }
+
+      if (field === 'course') {
+        updated.course = val;
+        const matchedCourse = courses.find(c => (c.name === val || c.courseName === val));
+        if (matchedCourse) {
+          updated.courseId = matchedCourse.id || matchedCourse._id || '';
+          if (matchedCourse.degreeType) {
+            updated.degreeType = matchedCourse.degreeType;
+          }
+        }
+      }
+
+      if (field === 'hostel') {
+        updated.dormFacility = val === 'Yes' || val === 'yes';
+        updated.hostelRequired = updated.dormFacility ? 'yes' : 'no';
+      }
+
+      if (field === 'transport') {
+        updated.busFacility = val === 'Yes' || val === 'yes';
+        updated.transportRequired = updated.busFacility ? 'yes' : 'no';
+      }
+
       return updated;
     });
   };
 
-  const handleDepartmentChange = value => {
-    setForm(prev => ({
-      ...prev,
-      dept: value,
-      courseId: '',
-      feePlanId: '',
-      feeDetails: null,
-      baseFee: 0,
-      transportFee: 0,
-      hostelFee: 0,
-      totalFee: 0,
-      id: generateRegNo(value, students)
-    }));
+  const handleQualificationChange = (index, field, value) => {
+    const updated = [...form.qualifications];
+    updated[index] = { ...updated[index], [field]: value };
+    setForm(prev => ({ ...prev, qualifications: updated }));
   };
 
-  const handleSelectStudentForEdit = student => {
-    setEditingStudentId(student.id || student._id);
-    setActiveStep(1);
-    setSuccessMsg('');
-    setErrorMsg('');
-
-    const parts = (student.name || '').trim().split(' ');
-    const firstName = parts[0] || '';
-    const lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
-    const midName = student.midName || '';
-
-    setForm({
-      ...EMPTY_FORM,
-      ...student,
-      firstName: student.firstName || firstName,
-      midName: midName,
-      lastName: student.lastName || lastName,
-      dept: student.dept || student.department || '',
-      courseId: student.courseId || '',
-      sem: student.sem || student.semester || '1stYear-Sem-I',
-      academicYear: student.academicYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
-      section: student.section || 'A',
-      admissionDate: student.admissionDate || new Date().toISOString().split('T')[0],
-      gender: student.gender || 'Male',
-      bloodGroup: student.bloodGroup || 'Select',
-      aadharNo: student.aadharNo || student.idNumber || '',
-      physicallyChallenged: !!student.physicallyChallenged,
-      busFacility: student.transportRequired === 'yes' || !!student.busFacility,
-      dormFacility: student.hostelRequired === 'yes' || !!student.dormFacility,
-      photoUrl: student.photoUrl || ''
-    });
-  };
-
-  const handleAddNewUser = () => {
-    setEditingStudentId(null);
-    setActiveStep(1);
-    const firstDept =
-      departments[0]?.name ||
-      departments[0]?.departmentName ||
-      departments[0] ||
-      '';
-
-    setForm({
-      ...EMPTY_FORM,
-      dept: firstDept,
-      id: generateRegNo(firstDept, students),
-      admissionDate: new Date().toISOString().split('T')[0]
-    });
-    setSuccessMsg('');
-    setErrorMsg('');
-  };
-
-  const handlePhotoUpload = e => {
+  const handlePhotoUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -526,2047 +704,1816 @@ const StudentRegistration = () => {
     }
   };
 
-  // Language management
-  const handleAddLanguage = () => {
-    setForm(prev => ({
-      ...prev,
-      languages: [
-        ...prev.languages,
-        { language: 'Hindi', reading: true, writing: true, speaking: true }
-      ]
-    }));
-  };
-
-  const handleRemoveLanguage = index => {
-    setForm(prev => ({
-      ...prev,
-      languages: prev.languages.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleLanguageChange = (index, field, value) => {
-    setForm(prev => {
-      const updated = [...prev.languages];
-      updated[index] = { ...updated[index], [field]: value };
-      return { ...prev, languages: updated };
+  const handleReset = () => {
+    const firstDept = departments[0]?.name || '';
+    const deptCode = departments[0]?.code || firstDept.substring(0, 3).toUpperCase();
+    setForm({
+      ...EMPTY_FORM,
+      dept: firstDept,
+      department: firstDept,
+      id: generateRegNo(deptCode, students),
+      admissionNo: generateRegNo(deptCode, students)
     });
+    setEditingStudentId(null);
+    setSuccessMsg('');
+    setErrorMsg('');
   };
 
-  // Family details management
-  const handleAddFamilyMember = () => {
-    setForm(prev => ({
-      ...prev,
-      familyMembers: [
-        ...prev.familyMembers,
-        { relation: 'Guardian', firstName: '', middleName: '', lastName: '', mobile: '', email: '' }
-      ]
-    }));
-  };
-
-  const handleRemoveFamilyMember = index => {
-    setForm(prev => ({
-      ...prev,
-      familyMembers: prev.familyMembers.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleFamilyChange = (index, field, value) => {
-    setForm(prev => {
-      const updated = [...prev.familyMembers];
-      updated[index] = { ...updated[index], [field]: value };
-      return { ...prev, familyMembers: updated };
-    });
-  };
-
-  const handleSubmit = async event => {
-    if (event) event.preventDefault();
+  const handleProceedToConfirmation = (e) => {
+    e?.preventDefault();
     setSuccessMsg('');
     setErrorMsg('');
 
-    const fullName = form.name.trim() || [form.firstName, form.midName, form.lastName].filter(Boolean).join(' ').trim();
-
-    if (!fullName) {
-      setErrorMsg('Please enter student First Name or Last Name in Step 1.');
-      setActiveStep(1);
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      setErrorMsg('Please enter both First Name and Last Name.');
       return;
     }
 
-    if (!form.dept) {
-      setErrorMsg('Please select a Department in Step 3.');
-      setActiveStep(3);
+    if (!form.id.trim()) {
+      const fallbackDept = departments[0]?.code || 'ST';
+      const newId = generateRegNo(fallbackDept, students);
+      setForm(prev => ({ ...prev, id: newId, admissionNo: newId }));
+    }
+
+    if (!form.receiptNumber) {
+      setForm(prev => ({ ...prev, receiptNumber: `REC-${Date.now()}` }));
+    }
+
+    setActiveTab(2); // Go to Step 2: Verification (Confirm)
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleProceedFromStep2ToStep3 = (e) => {
+    e?.preventDefault();
+    setSuccessMsg('');
+    setErrorMsg('');
+    setActiveTab(3); // Go to Step 3: First Year New Admission Form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleProceedFromStep3ToStep4 = (e) => {
+    e?.preventDefault();
+    setSuccessMsg('');
+    setErrorMsg('');
+
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      setErrorMsg('Please enter both First Name and Last Name.');
       return;
     }
 
-    if (!form.courseId && courses.length > 0) {
-      setErrorMsg('Please select a Degree / Course in Step 3.');
-      setActiveStep(3);
+    if (!form.department && !form.dept) {
+      setErrorMsg('Please select a Department.');
       return;
     }
+
+    if (!form.course) {
+      setErrorMsg('Please select a Course.');
+      return;
+    }
+
+    setActiveTab(4); // Go to Step 4: Final Summary & Full-Page View
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleFinalSubmit = async (autoPrint = false) => {
+    setSubmitting(true);
+    setSuccessMsg('');
+    setErrorMsg('');
 
     try {
-      setLoading(true);
+      const fullName = form.name.trim() || [form.firstName, form.midName, form.lastName].filter(Boolean).join(' ').trim();
+      const generatedId = form.id || form.admissionNo || generateRegNo(form.department, students);
+      const generatedRecNo = form.receiptNumber || `REC-${Date.now()}`;
 
-      const studentPayload = {
+      const payload = {
         ...form,
+        id: generatedId,
+        admissionNo: generatedId,
         name: fullName,
-        id: form.id || generateRegNo(form.dept, students),
-        email: form.email || `${(form.firstName || 'student').toLowerCase()}.${Date.now().toString().slice(-4)}@college.edu`,
-        transportRequired: form.busFacility ? 'yes' : 'no',
-        hostelRequired: form.dormFacility ? 'yes' : 'no',
-        idNumber: form.aadharNo
+        receiptNumber: generatedRecNo,
+        paymentDate: new Date(),
+        email: form.email || `${form.firstName.toLowerCase()}.${Date.now().toString().slice(-4)}@college.edu`,
+        transportRequired: form.transport === 'Yes' || form.busFacility ? 'yes' : 'no',
+        hostelRequired: form.hostel === 'Yes' || form.dormFacility ? 'yes' : 'no'
       };
 
       if (editingStudentId) {
-        await updateStudent(editingStudentId, studentPayload);
-        setSuccessMsg(`Student record updated successfully — ${studentPayload.id}`);
+        await updateStudent(editingStudentId, payload);
+        setSuccessMsg(`Student Admission Updated Successfully: ${generatedId}`);
       } else {
-        await createStudent(studentPayload);
-        setSuccessMsg(`Student admission registered successfully — ${studentPayload.id}`);
-      }
-
-      const updatedStudentsResponse = await getStudents().catch(() => ({ data: [] }));
-      const updatedStudents = Array.isArray(updatedStudentsResponse.data)
-        ? updatedStudentsResponse.data
-        : updatedStudentsResponse.data?.students || [];
-
-      setStudents(updatedStudents);
-
-      if (!editingStudentId) {
-        const nextRegNo = generateRegNo(form.dept, updatedStudents);
-        setForm({
-          ...EMPTY_FORM,
-          dept: form.dept,
-          id: nextRegNo,
-          academicYear: form.academicYear,
-          admissionDate: new Date().toISOString().split('T')[0]
-        });
-        setActiveStep(1);
-      }
-    } catch (error) {
-      console.error('Student registration failed:', error);
-      setErrorMsg(
-        error.response?.data?.message ||
-          error.message ||
-          'Failed to process student admission.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Bulk Import
-  const handleProcessBulkImport = async () => {
-    if (!bulkDataText.trim()) return;
-    setBulkImporting(true);
-    try {
-      const lines = bulkDataText.split('\n').map(l => l.trim()).filter(Boolean);
-      let count = 0;
-      for (const line of lines) {
-        const [name, email, dept, sem] = line.split(',').map(s => s?.trim());
-        if (name) {
-          const autoId = generateRegNo(dept || form.dept, students);
-          await createStudent({
-            ...EMPTY_FORM,
-            name,
-            email: email || `${name.toLowerCase().replace(/\s+/g, '')}@college.edu`,
-            dept: dept || form.dept,
-            sem: sem || '1stYear-Sem-I',
-            id: autoId
-          }).catch(err => console.error('Bulk item error', err));
-          count++;
+        await createStudent(payload);
+        if (Number(form.amountPaid) > 0) {
+          try {
+            await createFee({
+              studentId: generatedId,
+              studentName: fullName,
+              department: form.department || form.dept || 'General',
+              semester: `Sem ${form.semester || 1}`,
+              feeType: 'Tuition Fee',
+              totalFees: Number(form.totalFee) || Number(form.amountPaid),
+              paidAmount: Number(form.amountPaid),
+              paymentMode: 'Cash',
+              receiptNo: generatedRecNo,
+              paymentDate: new Date(),
+            });
+          } catch (feeErr) {
+            console.warn('Auto fee creation note:', feeErr);
+          }
         }
+        setSuccessMsg(`First Year New Admission Confirmed: ${generatedId} (Receipt: ${generatedRecNo})`);
       }
-      setShowBulkModal(false);
-      setBulkDataText('');
-      setSuccessMsg(`Bulk imported ${count} students successfully!`);
-      loadInitialData();
+
+      await loadInitialData();
+
+      if (autoPrint) {
+        printReceiptDirect(payload);
+      }
+
+      setTimeout(() => {
+        setActiveTab(5); // Switch to Step 5: Confirmed Directory view
+      }, 1500);
+
     } catch (err) {
-      setErrorMsg('Failed to process bulk import: ' + err.message);
+      console.error('Admission submit failed:', err);
+      setErrorMsg(err.response?.data?.message || 'Failed to confirm admission. Please check inputs.');
     } finally {
-      setBulkImporting(false);
+      setSubmitting(false);
     }
   };
 
-  // Available courses strictly filtered by the selected department in the form
-  const availableCourses = useMemo(() => {
-    if (!form.dept) return [];
-
-    const selectedDept = departments.find(
-      d =>
-        (typeof d === 'string' && d.trim().toLowerCase() === form.dept.trim().toLowerCase()) ||
-        (d?.name && String(d.name).trim().toLowerCase() === form.dept.trim().toLowerCase()) ||
-        (d?.departmentName && String(d.departmentName).trim().toLowerCase() === form.dept.trim().toLowerCase()) ||
-        (d?.code && String(d.code).trim().toLowerCase() === form.dept.trim().toLowerCase()) ||
-        (d?.id && String(d.id).trim().toLowerCase() === form.dept.trim().toLowerCase()) ||
-        (d?._id && String(d._id).trim().toLowerCase() === form.dept.trim().toLowerCase())
-    );
-
-    const validDeptMatches = new Set();
-    validDeptMatches.add(form.dept.trim().toLowerCase());
-
-    if (selectedDept) {
-      if (selectedDept.id) validDeptMatches.add(String(selectedDept.id).trim().toLowerCase());
-      if (selectedDept._id) validDeptMatches.add(String(selectedDept._id).trim().toLowerCase());
-      if (selectedDept.name) validDeptMatches.add(String(selectedDept.name).trim().toLowerCase());
-      if (selectedDept.departmentName) validDeptMatches.add(String(selectedDept.departmentName).trim().toLowerCase());
-      if (selectedDept.code) validDeptMatches.add(String(selectedDept.code).trim().toLowerCase());
-    }
-
-    return courses.filter(course => {
-      if (course.status === 'Inactive') return false;
-
-      const courseDeptId = course.departmentId ? String(course.departmentId).trim().toLowerCase() : '';
-      const courseDept = typeof course.department === 'string'
-        ? course.department.trim().toLowerCase()
-        : (course.department?.id || course.department?._id || course.department?.name || course.department?.code || '');
-      const courseDeptStr = courseDept ? String(courseDept).trim().toLowerCase() : '';
-      const courseDeptName = course.departmentName ? String(course.departmentName).trim().toLowerCase() : '';
-      const courseDeptCode = course.dept ? String(course.dept).trim().toLowerCase() : '';
-      const courseDeptIdField = course.deptId ? String(course.deptId).trim().toLowerCase() : '';
-
-      return (
-        (courseDeptId && validDeptMatches.has(courseDeptId)) ||
-        (courseDeptStr && validDeptMatches.has(courseDeptStr)) ||
-        (courseDeptName && validDeptMatches.has(courseDeptName)) ||
-        (courseDeptCode && validDeptMatches.has(courseDeptCode)) ||
-        (courseDeptIdField && validDeptMatches.has(courseDeptIdField))
-      );
+  const handleEditStudent = (student) => {
+    setEditingStudentId(student.id || student._id);
+    setForm({
+      ...EMPTY_FORM,
+      ...student,
+      firstName: student.firstName || (student.name ? student.name.split(' ')[0] : ''),
+      lastName: student.lastName || (student.name ? student.name.split(' ').slice(1).join(' ') : ''),
+      department: student.dept || student.department || '',
+      dept: student.dept || student.department || '',
+      course: student.course || '',
+      hostel: student.hostelRequired === 'yes' ? 'Yes' : 'No',
+      transport: student.transportRequired === 'yes' ? 'Yes' : 'No',
+      feeBreakdown: student.feeBreakdown || { ...DEFAULT_FEE_BREAKDOWN, tuitionFee: student.totalFee || 0 }
     });
-  }, [courses, departments, form.dept]);
+    setActiveTab(1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
-  // Filtered student list for the left panel
+  // Filter directory students
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
       const q = searchQuery.toLowerCase();
-      const matchesSearch =
-        !q ||
-        (s.name && s.name.toLowerCase().includes(q)) ||
-        (s.id && s.id.toLowerCase().includes(q));
+      const matchSearch =
+        (s.name || '').toLowerCase().includes(q) ||
+        (s.id || '').toLowerCase().includes(q) ||
+        (s.dept || s.department || '').toLowerCase().includes(q) ||
+        (s.course || '').toLowerCase().includes(q) ||
+        (s.phone || '').includes(q);
 
-      const matchesYear = filterAcademicYear === 'All' || s.academicYear === filterAcademicYear;
-      const matchesDept = filterDegree === 'All' || (s.dept === filterDegree || s.department === filterDegree);
-      const matchesSem = filterCourseYear === 'All' || s.sem === filterCourseYear;
-      const matchesStatus = filterAppStatus === 'All' || (s.status || 'Approved') === filterAppStatus;
+      const matchYear = filterAcademicYear === 'All' || s.academicYear === filterAcademicYear;
+      const matchDept = filterDept === 'All' || s.dept === filterDept || s.department === filterDept;
 
-      return matchesSearch && matchesYear && matchesDept && matchesSem && matchesStatus;
+      return matchSearch && matchYear && matchDept;
     });
-  }, [students, searchQuery, filterAcademicYear, filterDegree, filterCourseYear, filterAppStatus]);
-
-  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
-  const paginatedStudents = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredStudents.slice(start, start + itemsPerPage);
-  }, [filteredStudents, currentPage]);
-
-  // Modern Enterprise ERP styling tokens (Clear, legible, professional)
-  const erpInputStyle = {
-    width: '100%',
-    height: '34px',
-    padding: '6px 10px',
-    fontSize: '13px',
-    fontFamily: 'inherit',
-    borderRadius: '5px',
-    border: '1px solid #cbd5e1',
-    background: '#ffffff',
-    color: '#0f172a',
-    outline: 'none',
-    boxSizing: 'border-box',
-    transition: 'border-color 0.15s, box-shadow 0.15s'
-  };
-
-  const erpBoxStyle = {
-    border: '1px solid #d8e2ec',
-    borderRadius: '8px',
-    background: '#ffffff',
-    padding: '16px 18px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-    boxSizing: 'border-box'
-  };
-
-  const erpLabelStyle = {
-    fontSize: '12px',
-    fontWeight: 600,
-    fontFamily: 'inherit',
-    color: '#334155',
-    marginBottom: '4px',
-    display: 'block'
-  };
+  }, [students, searchQuery, filterAcademicYear, filterDept]);
 
   return (
-    <div
-      style={{
-        background: '#f1f5f9',
-        height: 'calc(100vh - 75px)',
+    <div className="erp-container" style={{ height: 'auto', minHeight: '100vh', padding: '16px', background: '#f0f4f8' }}>
+      {/* Top Header & Step Navigation */}
+      <div style={{
+        background: '#ffffff',
+        borderRadius: '8px',
+        padding: '12px 20px',
+        border: '1px solid #cbd5e1',
+        marginBottom: '16px',
         display: 'flex',
-        flexDirection: 'column',
-        padding: '8px 12px',
-        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-        overflow: 'hidden',
-        boxSizing: 'border-box'
-      }}
-    >
-      
-      {/* ── BREADCRUMB BAR ── */}
-      <div
-        style={{
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: '#ffffff',
-          border: '1px solid #cbd5e1',
-          borderRadius: '6px',
-          padding: '6px 14px',
-          marginBottom: '8px',
-          fontSize: '12.5px',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e3a5f', fontWeight: 600 }}>
-          <button
-            type="button"
-            onClick={() => navigate(location.pathname.startsWith('/admin') ? '/admin/dashboard' : '/accounts/dashboard')}
-            title="Navigate to Dashboard"
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: '2px 4px',
-              borderRadius: '4px',
-              color: '#2563eb',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '12.5px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-          >
-            ⌂ Home
-          </button>
-          <span style={{ color: '#94a3b8' }}>»</span>
-          <button
-            type="button"
-            onClick={() => {
-              if (location.pathname.startsWith('/admin')) {
-                navigate('/admin/departments');
-              } else {
-                navigate('/accounts/dashboard');
-              }
-            }}
-            title="College Setup"
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: '2px 4px',
-              borderRadius: '4px',
-              color: '#2563eb',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '12.5px'
-            }}
-          >
-            College Setup
-          </button>
-          <span style={{ color: '#94a3b8' }}>»</span>
-          <span style={{ color: '#2563eb', fontWeight: 600 }}>User Registrations</span>
-          <span style={{ color: '#94a3b8' }}>»</span>
-          <span style={{ color: '#1e3a5f', fontWeight: 700 }}>Student Admissions</span>
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px', fontWeight: '800', color: '#1e3a5f' }}>
+              COLLEGE ERP — ADMISSION & FEE DESK
+            </span>
+          </div>
+          <span style={{ fontSize: '12px', color: '#64748b' }}>
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#64748b' }}>
-          <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
-            Academic Year: {form.academicYear}
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#16a34a', fontWeight: 700 }}>
-            ● Live Connected
-          </span>
+        {/* 5-Step Tab Navigator */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setActiveTab(1)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              borderRadius: '6px',
+              fontWeight: '700',
+              fontSize: '13px',
+              cursor: 'pointer',
+              border: activeTab === 1 ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+              background: activeTab === 1 ? '#2563eb' : '#ffffff',
+              color: activeTab === 1 ? '#ffffff' : '#475569'
+            }}
+          >
+            <UserPlus size={16} /> Step 1: Admission Form
+          </button>
+
+          <button
+            onClick={() => {
+              if (form.firstName) setActiveTab(2);
+              else handleProceedToConfirmation();
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              borderRadius: '6px',
+              fontWeight: '700',
+              fontSize: '13px',
+              cursor: 'pointer',
+              border: activeTab === 2 ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+              background: activeTab === 2 ? '#2563eb' : '#ffffff',
+              color: activeTab === 2 ? '#ffffff' : '#475569'
+            }}
+          >
+            <CheckCircle size={16} /> Step 2: Verification (Confirm)
+          </button>
+
+          <button
+            onClick={() => {
+              if (form.firstName) setActiveTab(3);
+              else handleProceedToConfirmation();
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              borderRadius: '6px',
+              fontWeight: '700',
+              fontSize: '13px',
+              cursor: 'pointer',
+              border: activeTab === 3 ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+              background: activeTab === 3 ? '#2563eb' : '#ffffff',
+              color: activeTab === 3 ? '#ffffff' : '#475569'
+            }}
+          >
+            <Award size={16} /> Step 3: First Year New Admission
+          </button>
+
+          <button
+            onClick={() => {
+              if (form.firstName) setActiveTab(4);
+              else handleProceedToConfirmation();
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              borderRadius: '6px',
+              fontWeight: '700',
+              fontSize: '13px',
+              cursor: 'pointer',
+              border: activeTab === 4 ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+              background: activeTab === 4 ? '#2563eb' : '#ffffff',
+              color: activeTab === 4 ? '#ffffff' : '#475569'
+            }}
+          >
+            <Printer size={16} /> Step 4: Admission Summary & Print
+          </button>
+
+          <button
+            onClick={() => setActiveTab(5)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              borderRadius: '6px',
+              fontWeight: '700',
+              fontSize: '13px',
+              cursor: 'pointer',
+              border: activeTab === 5 ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+              background: activeTab === 5 ? '#2563eb' : '#ffffff',
+              color: activeTab === 5 ? '#ffffff' : '#475569'
+            }}
+          >
+            <FileText size={16} /> Step 5: Admission Directory ({students.length})
+          </button>
         </div>
       </div>
 
-      {/* ── ALERTS ── */}
+      {/* Success / Error Alerts */}
       {successMsg && (
-        <div
-          style={{
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '8px 14px',
-            borderRadius: '6px',
-            background: '#dcfce7',
-            border: '1px solid #86efac',
-            color: '#166534',
-            fontSize: '13px',
-            fontWeight: 700,
-            marginBottom: '8px'
-          }}
-        >
-          <CheckCircle size={16} />
-          {successMsg}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          background: '#dcfce7',
+          color: '#15803d',
+          padding: '12px 18px',
+          borderRadius: '8px',
+          marginBottom: '16px',
+          border: '1px solid #86efac',
+          fontWeight: '600',
+          fontSize: '14px'
+        }}>
+          <CheckCircle size={20} />
+          <span>{successMsg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div
-          style={{
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '8px 14px',
-            borderRadius: '6px',
-            background: '#fee2e2',
-            border: '1px solid #fca5a5',
-            color: '#991b1b',
-            fontSize: '13px',
-            fontWeight: 700,
-            marginBottom: '8px'
-          }}
-        >
-          <AlertCircle size={16} />
-          {errorMsg}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          background: '#fee2e2',
+          color: '#b91c1c',
+          padding: '12px 18px',
+          borderRadius: '8px',
+          marginBottom: '16px',
+          border: '1px solid #fca5a5',
+          fontWeight: '600',
+          fontSize: '14px'
+        }}>
+          <AlertCircle size={20} />
+          <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* ── MAIN WORKBENCH SPLIT (Left Filter Panel + Right Admissions Console) ── */}
-      <div
-        style={{
-          flex: 1,
-          display: 'grid',
-          gridTemplateColumns: '275px 1fr',
-          gap: '10px',
-          alignItems: 'stretch',
-          minHeight: 0,
-          overflow: 'hidden'
-        }}
-      >
-        
-        {/* ========================================================= */}
-        {/* LEFT PANEL: ERP FILTER MATRIX & ADMISSION LIST TABLE */}
-        {/* ========================================================= */}
-        <div
-          style={{
-            background: '#ffffff',
-            border: '1px solid #cbd5e1',
-            borderRadius: '8px',
-            padding: '12px',
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            boxSizing: 'border-box',
-            overflow: 'hidden',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-          }}
-        >
-          {/* 2x2 Filter Matrix */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px', flexShrink: 0 }}>
-            <div>
-              <label style={{ fontSize: '11px', color: '#475569', fontWeight: 600, display: 'block', marginBottom: '3px' }}>Academic Year</label>
-              <select
-                value={filterAcademicYear}
-                onChange={e => { setFilterAcademicYear(e.target.value); setCurrentPage(1); }}
-                style={{ ...erpInputStyle, height: '30px', fontSize: '12px', padding: '3px 6px' }}
-              >
-                <option value="All">Select</option>
-                <option value="2026-2027">2026-2027</option>
-                <option value="2025-2026">2025-2026</option>
-              </select>
+      {/* ========================================================================= */}
+      {/* TAB 1: STEP 1 - ADMISSION FORM (EXACT MATCH FOR IMAGE 1)                 */}
+      {/* ========================================================================= */}
+      {activeTab === 1 && (
+        <form noValidate onSubmit={handleProceedToConfirmation}>
+          <div style={{ maxWidth: '1020px', margin: '0 auto' }}>
+            <div style={{ marginBottom: '14px' }}>
+              <p style={{ margin: '0 0 6px 0', fontSize: '15px', color: '#000000', fontWeight: '500' }}>
+                In student new admission list we can enter the student academic details for new student.
+              </p>
             </div>
 
-            <div>
-              <label style={{ fontSize: '11px', color: '#475569', fontWeight: 600, display: 'block', marginBottom: '3px' }}>Degree Code</label>
-              <select
-                value={filterDegree}
-                onChange={e => { setFilterDegree(e.target.value); setCurrentPage(1); }}
-                style={{ ...erpInputStyle, height: '30px', fontSize: '12px', padding: '3px 6px' }}
-              >
-                <option value="All">Select</option>
-                {departments.map((d, i) => {
-                  const n = d.name || d.departmentName || d;
-                  return <option key={d._id || i} value={n}>{d.code || n}</option>;
-                })}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ fontSize: '11px', color: '#475569', fontWeight: 600, display: 'block', marginBottom: '3px' }}>CourseYear</label>
-              <select
-                value={filterCourseYear}
-                onChange={e => { setFilterCourseYear(e.target.value); setCurrentPage(1); }}
-                style={{ ...erpInputStyle, height: '30px', fontSize: '12px', padding: '3px 6px' }}
-              >
-                <option value="All">Select</option>
-                {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ fontSize: '11px', color: '#475569', fontWeight: 600, display: 'block', marginBottom: '3px' }}>App Status</label>
-              <select
-                value={filterAppStatus}
-                onChange={e => { setFilterAppStatus(e.target.value); setCurrentPage(1); }}
-                style={{ ...erpInputStyle, height: '30px', fontSize: '12px', padding: '3px 6px' }}
-              >
-                <option value="All">Select</option>
-                <option value="Approved">Approved</option>
-                <option value="Pending">Pending</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Add User [+] Button & Search Input */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={handleAddNewUser}
-              style={{
-                display: 'inline-flex',
+            <div style={{
+              background: '#ffffff',
+              border: '1px solid #7ba7cc',
+              borderRadius: '4px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+              overflow: 'hidden'
+            }}>
+              {/* Header Tab Bar matching Image 1: [Icon] Admission */}
+              <div style={{
+                background: 'linear-gradient(180deg, #e3f2fd 0%, #bbdefb 100%)',
+                borderBottom: '1px solid #90caf9',
+                padding: '6px 14px',
+                display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                padding: '5px 10px',
-                borderRadius: '5px',
-                background: '#ffffff',
-                border: '1px solid #94a3b8',
-                color: '#1e3a5f',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              Add User <span style={{ color: '#2563eb', fontWeight: 900 }}>+</span>
-            </button>
+                gap: '8px'
+              }}>
+                <div style={{
+                  background: '#f59e0b',
+                  color: '#ffffff',
+                  borderRadius: '3px',
+                  padding: '2px 5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontSize: '11px'
+                }}>
+                  <FolderOpen size={13} />
+                </div>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#000000' }}>
+                  Admission
+                </span>
+              </div>
 
-            <div style={{ position: 'relative', flex: 1 }}>
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                style={{ ...erpInputStyle, height: '30px', fontSize: '12px', paddingRight: '24px' }}
-              />
-              <Search size={14} style={{ position: 'absolute', right: '7px', top: '8px', color: '#64748b' }} />
+              <div style={{ padding: '20px 24px' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '150px 1fr 160px 1fr',
+                  gap: '10px 16px',
+                  alignItems: 'center'
+                }}>
+                  
+                  {/* Row 1: First Name | Last Name */}
+                  <div style={labelStyle}>First Name</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.firstName}
+                      onChange={e => handleChange('firstName', e.target.value)}
+                      placeholder="priya"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={labelStyle}>Last Name</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.lastName}
+                      onChange={e => handleChange('lastName', e.target.value)}
+                      placeholder="r"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Row 2: Father's Name | Mother's name */}
+                  <div style={labelStyle}>Father's Name</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.fatherName}
+                      onChange={e => handleChange('fatherName', e.target.value)}
+                      placeholder="rajasekar m"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={labelStyle}>Mother's name</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.motherName}
+                      onChange={e => handleChange('motherName', e.target.value)}
+                      placeholder="latha r"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Row 3: Gender | Date of birth */}
+                  <div style={labelStyle}>Gender</div>
+                  <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#000' }}>
+                      <input
+                        type="radio"
+                        name="gender"
+                        value="Female"
+                        checked={form.gender === 'Female'}
+                        onChange={e => handleChange('gender', e.target.value)}
+                      /> Female
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#000' }}>
+                      <input
+                        type="radio"
+                        name="gender"
+                        value="Male"
+                        checked={form.gender === 'Male'}
+                        onChange={e => handleChange('gender', e.target.value)}
+                      /> Male
+                    </label>
+                  </div>
+
+                  <div style={labelStyle}>Date of birth</div>
+                  <div>
+                    <input
+                      type="date"
+                      value={form.dob}
+                      onChange={e => handleChange('dob', e.target.value)}
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Row 4: Place of Birth | Blood Group */}
+                  <div style={labelStyle}>Place of Birth</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.placeOfBirth}
+                      onChange={e => handleChange('placeOfBirth', e.target.value)}
+                      placeholder="chennai"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={labelStyle}>Blood Group</div>
+                  <div>
+                    <select
+                      value={form.bloodGroup}
+                      onChange={e => handleChange('bloodGroup', e.target.value)}
+                      style={inputStyle}
+                    >
+                      <option value="">Select</option>
+                      {BLOOD_GROUPS.map(bg => (
+                        <option key={bg} value={bg}>{bg}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Row 5: Nationality | Religion */}
+                  <div style={labelStyle}>Nationality</div>
+                  <div>
+                    <select
+                      value={form.nationality}
+                      onChange={e => handleChange('nationality', e.target.value)}
+                      style={inputStyle}
+                    >
+                      <option value="Indian">Indian</option>
+                      <option value="NRI">NRI</option>
+                      <option value="Foreigner">Foreigner</option>
+                    </select>
+                  </div>
+
+                  <div style={labelStyle}>Religion</div>
+                  <div>
+                    <select
+                      value={form.religion}
+                      onChange={e => handleChange('religion', e.target.value)}
+                      style={inputStyle}
+                    >
+                      {RELIGIONS.map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Row 6: Community | Caste */}
+                  <div style={labelStyle}>Community</div>
+                  <div>
+                    <select
+                      value={form.community}
+                      onChange={e => handleChange('community', e.target.value)}
+                      style={inputStyle}
+                    >
+                      {COMMUNITIES.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={labelStyle}>Caste</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.caste}
+                      onChange={e => handleChange('caste', e.target.value)}
+                      placeholder="Agamudayar"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Row 7: City | Country */}
+                  <div style={labelStyle}>City</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.city}
+                      onChange={e => handleChange('city', e.target.value)}
+                      placeholder="chennai"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={labelStyle}>Country</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.country}
+                      onChange={e => handleChange('country', e.target.value)}
+                      placeholder="India"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Row 8: State | E-mail Id */}
+                  <div style={labelStyle}>State</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.state}
+                      onChange={e => handleChange('state', e.target.value)}
+                      placeholder="tamilnadu"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={labelStyle}>E-mail Id</div>
+                  <div>
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={e => handleChange('email', e.target.value)}
+                      placeholder="mpriya123@gmail.com"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Row 9: Pin code | Handicapped */}
+                  <div style={labelStyle}>Pin code</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.pincode}
+                      onChange={e => handleChange('pincode', e.target.value)}
+                      placeholder="600089"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={labelStyle}>Handicapped</div>
+                  <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#000' }}>
+                      <input
+                        type="radio"
+                        name="handicapped"
+                        value="Yes"
+                        checked={form.handicapped === 'Yes'}
+                        onChange={e => handleChange('handicapped', e.target.value)}
+                      /> Yes
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', color: '#000' }}>
+                      <input
+                        type="radio"
+                        name="handicapped"
+                        value="No"
+                        checked={form.handicapped === 'No' || !form.handicapped}
+                        onChange={e => handleChange('handicapped', e.target.value)}
+                      /> No
+                    </label>
+                  </div>
+
+                  {/* Row 10: Phone no | Mother tongue */}
+                  <div style={labelStyle}>Phone no</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.phone}
+                      onChange={e => handleChange('phone', e.target.value)}
+                      placeholder="9000234617"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={labelStyle}>Mother tongue</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.motherTongue}
+                      onChange={e => handleChange('motherTongue', e.target.value)}
+                      placeholder="tamil"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Row 11: Student Photo | Community Certificate no */}
+                  <div style={labelStyle}>Student Photo</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      style={{ fontSize: '12px', width: '100%' }}
+                    />
+                    {form.photoUrl && (
+                      <img
+                        src={form.photoUrl}
+                        alt="Preview"
+                        style={{ width: '28px', height: '28px', objectFit: 'cover', borderRadius: '2px', border: '1px solid #7ba7cc', flexShrink: 0 }}
+                      />
+                    )}
+                  </div>
+
+                  <div style={labelStyle}>Community Certificate no</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.communityCertNo}
+                      onChange={e => handleChange('communityCertNo', e.target.value)}
+                      placeholder="58694"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Row 12: Father's Occupation | Guardian Name */}
+                  <div style={labelStyle}>Father's Occupation</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.fatherOccupation}
+                      onChange={e => handleChange('fatherOccupation', e.target.value)}
+                      placeholder="clerck"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={labelStyle}>Guardian Name</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.guardianName}
+                      onChange={e => handleChange('guardianName', e.target.value)}
+                      placeholder=""
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Row 13: Yearly Income | Guardian Phone */}
+                  <div style={labelStyle}>Yearly Income</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.yearlyIncome}
+                      onChange={e => handleChange('yearlyIncome', e.target.value)}
+                      placeholder="150000"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={labelStyle}>Guardian Phone</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.guardianPhone}
+                      onChange={e => handleChange('guardianPhone', e.target.value)}
+                      placeholder="07299188844"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Row 14: Father's Phone no | Guardian Email Id */}
+                  <div style={labelStyle}>Father's Phone no</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={form.fatherPhone}
+                      onChange={e => handleChange('fatherPhone', e.target.value)}
+                      placeholder="987654321"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={labelStyle}>Guardian Email Id</div>
+                  <div>
+                    <input
+                      type="email"
+                      value={form.guardianEmail}
+                      onChange={e => handleChange('guardianEmail', e.target.value)}
+                      placeholder=""
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  {/* Row 15: Father's Email Id | Guardian Address */}
+                  <div style={labelStyle}>Father's Email Id</div>
+                  <div>
+                    <input
+                      type="email"
+                      value={form.fatherEmail}
+                      onChange={e => handleChange('fatherEmail', e.target.value)}
+                      placeholder="raja123@gmail.com"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={{ ...labelStyle, alignSelf: 'start', paddingTop: '6px' }}>Guardian Address</div>
+                  <div style={{ gridRow: 'span 2' }}>
+                    <textarea
+                      value={form.guardianAddress}
+                      onChange={e => handleChange('guardianAddress', e.target.value)}
+                      placeholder=""
+                      rows={3}
+                      style={{ ...inputStyle, height: '72px', resize: 'vertical' }}
+                    />
+                  </div>
+
+                  {/* Row 16: Address : */}
+                  <div style={{ ...labelStyle, alignSelf: 'start', paddingTop: '6px' }}>Address :</div>
+                  <div>
+                    <textarea
+                      value={form.address}
+                      onChange={e => handleChange('address', e.target.value)}
+                      placeholder="6 anna salai,perambur, chennai-600082"
+                      rows={3}
+                      style={{ ...inputStyle, height: '72px', resize: 'vertical' }}
+                    />
+                  </div>
+
+                </div>
+
+                {/* Form Buttons */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '28px', borderTop: '1px solid #cbd5e1', paddingTop: '18px' }}>
+                  <button
+                    type="submit"
+                    style={{
+                      background: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '3px',
+                      padding: '8px 32px',
+                      fontWeight: '700',
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Confirm
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    style={{
+                      background: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '3px',
+                      padding: '8px 24px',
+                      fontWeight: '700',
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: STEP 2 - CONFIRMATION & VERIFICATION VIEW (IMAGE 2)               */}
+      {/* ========================================================================= */}
+      {activeTab === 2 && (
+        <div style={{ maxWidth: '980px', margin: '0 auto' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#000000', letterSpacing: '-0.2px' }}>
+              Click on the “confirm” button after entering all details
+            </h2>
+          </div>
+
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '4px',
+            border: '2px solid #ef4444',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+            overflow: 'hidden',
+            padding: '24px 28px'
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', marginBottom: '20px' }}>
+            {/* Left Column Details */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>First Name :</span><span style={summaryValStyle}>{form.firstName || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Last Name :</span><span style={summaryValStyle}>{form.lastName || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Father's Name :</span><span style={summaryValStyle}>{form.fatherName || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Mother's name :</span><span style={summaryValStyle}>{form.motherName || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Gender :</span><span style={summaryValStyle}>{form.gender || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Date of birth :</span><span style={summaryValStyle}>{form.dob || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Place of Birth :</span><span style={summaryValStyle}>{form.placeOfBirth || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Blood Group :</span><span style={summaryValStyle}>{form.bloodGroup || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Caste :</span><span style={summaryValStyle}>{form.caste || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Religion :</span><span style={summaryValStyle}>{form.religion || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Community Certificate no :</span><span style={summaryValStyle}>{form.communityCertNo || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Father's Occupation :</span><span style={summaryValStyle}>{form.fatherOccupation || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Father's Phone no :</span><span style={summaryValStyle}>{form.fatherPhone || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Father's Email Id :</span><span style={summaryValStyle}>{form.fatherEmail || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Address :</span><span style={summaryValStyle}>{form.address || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>city :</span><span style={summaryValStyle}>{form.city || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>State :</span><span style={summaryValStyle}>{form.state || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Pin code :</span><span style={summaryValStyle}>{form.pincode || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>E-mail Id :</span><span style={summaryValStyle}>{form.email || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Phone no :</span><span style={summaryValStyle}>{form.phone || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Mother tongue :</span><span style={summaryValStyle}>{form.motherTongue || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Handicapped :</span><span style={summaryValStyle}>{form.handicapped || 'No'}</span></div>
+            </div>
+
+            {/* Right Column Details */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Yearly Income :</span><span style={summaryValStyle}>{form.yearlyIncome || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Nationality :</span><span style={summaryValStyle}>{form.nationality || 'Indian'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Community :</span><span style={summaryValStyle}>{form.community || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Guardian Name :</span><span style={summaryValStyle}>{form.guardianName || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Guardian Phone no :</span><span style={summaryValStyle}>{form.guardianPhone || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Guardian E-mail :</span><span style={summaryValStyle}>{form.guardianEmail || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Guardian Address :</span><span style={summaryValStyle}>{form.guardianAddress || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Country :</span><span style={summaryValStyle}>{form.country || 'India'}</span></div>
+              
+              <div style={{ textAlign: 'center', padding: '12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #cbd5e1', margin: '8px 0' }}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '6px' }}>Student Photo</div>
+                {form.photoUrl ? (
+                  <img
+                    src={form.photoUrl}
+                    alt="Student"
+                    style={{ width: '130px', height: '150px', objectFit: 'cover', borderRadius: '4px', border: '2px solid #cbd5e1', margin: '0 auto', display: 'block' }}
+                  />
+                ) : (
+                  <div style={{ width: '130px', height: '150px', background: '#e2e8f0', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', color: '#94a3b8' }}>
+                    <User size={48} />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Left Student Table with Independent Scroll */}
-          <div style={{ border: '1px solid #cbd5e1', borderRadius: '5px', overflowY: 'auto', flex: 1, marginBottom: '8px' }}>
+          {/* Qualifications Entry Table (Image 2) */}
+          <div style={{ marginTop: '16px', marginBottom: '24px' }}>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#1e3a5f', marginBottom: '8px' }}>
+              Academic Qualification / Prior School Education Details
+            </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                <tr style={{ background: '#2c5282', color: '#ffffff', textAlign: 'left' }}>
-                  <th style={{ padding: '6px 8px', fontWeight: 700 }}>Student Name ▴</th>
-                  <th style={{ padding: '6px 8px', fontWeight: 700 }}>Course Year</th>
+              <thead>
+                <tr style={{ background: '#e0f2fe', color: '#0369a1' }}>
+                  <th style={thStyle}>Study</th>
+                  <th style={thStyle}>Institute Name</th>
+                  <th style={thStyle}>University/Board</th>
+                  <th style={thStyle}>Percentage</th>
+                  <th style={thStyle}>Pass out year</th>
+                  <th style={thStyle}>Mark sheet sno</th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedStudents.length === 0 ? (
-                  <tr>
-                    <td colSpan="2" style={{ padding: '16px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>
-                      No student records found
+                {form.qualifications.map((q, idx) => (
+                  <tr key={idx}>
+                    <td style={tdStyle}>
+                      <input
+                        type="text"
+                        value={q.study}
+                        onChange={e => handleQualificationChange(idx, 'study', e.target.value)}
+                        style={{ ...inputStyle, padding: '4px 6px', height: '28px' }}
+                      />
+                    </td>
+                    <td style={tdStyle}>
+                      <input
+                        type="text"
+                        value={q.institute}
+                        onChange={e => handleQualificationChange(idx, 'institute', e.target.value)}
+                        placeholder="e.g. Holy child"
+                        style={{ ...inputStyle, padding: '4px 6px', height: '28px' }}
+                      />
+                    </td>
+                    <td style={tdStyle}>
+                      <input
+                        type="text"
+                        value={q.board}
+                        onChange={e => handleQualificationChange(idx, 'board', e.target.value)}
+                        placeholder="matriculation"
+                        style={{ ...inputStyle, padding: '4px 6px', height: '28px' }}
+                      />
+                    </td>
+                    <td style={tdStyle}>
+                      <input
+                        type="text"
+                        value={q.percentage}
+                        onChange={e => handleQualificationChange(idx, 'percentage', e.target.value)}
+                        placeholder="99.2"
+                        style={{ ...inputStyle, padding: '4px 6px', height: '28px' }}
+                      />
+                    </td>
+                    <td style={tdStyle}>
+                      <input
+                        type="text"
+                        value={q.passYear}
+                        onChange={e => handleQualificationChange(idx, 'passYear', e.target.value)}
+                        placeholder="2009"
+                        style={{ ...inputStyle, padding: '4px 6px', height: '28px' }}
+                      />
+                    </td>
+                    <td style={tdStyle}>
+                      <input
+                        type="text"
+                        value={q.marksheetNo}
+                        onChange={e => handleQualificationChange(idx, 'marksheetNo', e.target.value)}
+                        placeholder="12356"
+                        style={{ ...inputStyle, padding: '4px 6px', height: '28px' }}
+                      />
                     </td>
                   </tr>
-                ) : (
-                  paginatedStudents.map((s, idx) => {
-                    const isSelected = editingStudentId === (s.id || s._id);
-                    return (
-                      <tr
-                        key={s.id || s._id || idx}
-                        onClick={() => handleSelectStudentForEdit(s)}
-                        style={{
-                          background: isSelected ? '#bfdbfe' : idx % 2 === 0 ? '#ffffff' : '#f8fafc',
-                          borderBottom: '1px solid #e2e8f0',
-                          cursor: 'pointer',
-                          transition: 'background 0.1s'
-                        }}
-                      >
-                        <td style={{ padding: '6px 8px', fontWeight: 600, color: '#1e293b' }}>
-                          <div style={{ fontSize: '12.5px' }}>{s.name}</div>
-                          <div style={{ fontSize: '10.5px', color: '#64748b' }}>{s.id}</div>
-                        </td>
-                        <td style={{ padding: '6px 8px', color: '#334155' }}>
-                          <div style={{ fontSize: '11.5px' }}>{s.sem || '1stYear-Sem-I'}</div>
-                          <div style={{ fontSize: '10.5px', color: '#64748b' }}>{s.dept ? (DEPARTMENT_CODES[s.dept] || s.dept) : ''}</div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                ))}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '12px', padding: '2px 0', flexShrink: 0 }}>
+          {/* Bottom Buttons (Confirm and Back matching Image 2) */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '16px',
+            paddingTop: '16px',
+            borderTop: '1px solid #e2e8f0'
+          }}>
             <button
               type="button"
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              onClick={handleProceedFromStep2ToStep3}
               style={{
-                padding: '2px 8px',
-                border: '1px solid #cbd5e1',
-                borderRadius: '3px',
-                background: '#f8fafc',
-                cursor: currentPage <= 1 ? 'default' : 'pointer',
-                color: currentPage <= 1 ? '#94a3b8' : '#1e293b',
-                fontSize: '12px'
+                background: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '10px 32px',
+                fontWeight: '700',
+                fontSize: '14px',
+                cursor: 'pointer'
               }}
             >
-              «
+              Confirm
             </button>
-            {Array.from({ length: Math.max(4, totalPages) }, (_, i) => i + 1).map(page => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => setCurrentPage(page)}
-                style={{
-                  padding: '2px 8px',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '3px',
-                  background: currentPage === page ? '#2c5282' : '#ffffff',
-                  color: currentPage === page ? '#ffffff' : '#1e293b',
-                  cursor: 'pointer',
-                  fontWeight: currentPage === page ? 700 : 600,
-                  fontSize: '12px'
-                }}
-              >
-                {page}
-              </button>
-            ))}
+
             <button
               type="button"
-              disabled={currentPage >= Math.max(4, totalPages)}
-              onClick={() => setCurrentPage(prev => Math.min(Math.max(4, totalPages), prev + 1))}
+              onClick={() => {
+                setActiveTab(1);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               style={{
-                padding: '2px 8px',
-                border: '1px solid #cbd5e1',
-                borderRadius: '3px',
-                background: '#f8fafc',
-                cursor: currentPage >= Math.max(4, totalPages) ? 'default' : 'pointer',
-                color: currentPage >= Math.max(4, totalPages) ? '#94a3b8' : '#1e293b',
-                fontSize: '12px'
+                background: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '10px 28px',
+                fontWeight: '700',
+                fontSize: '14px',
+                cursor: 'pointer'
               }}
             >
-              »
+              Back
             </button>
           </div>
         </div>
+      </div>
+      )}
 
-        {/* ========================================================= */}
-        {/* RIGHT WORK AREA: STEP-BY-STEP ADMISSIONS WIZARD CONSOLE */}
-        {/* ========================================================= */}
-        <div
-          style={{
-            background: '#ffffff',
-            border: '1px solid #cbd5e1',
-            borderRadius: '8px',
-            padding: '14px 18px',
-            height: '100%',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            boxSizing: 'border-box',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-          }}
-        >
-          
-          {/* Top Tabs & Action Buttons Bar */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              borderBottom: '2px solid #2c5282',
-              paddingBottom: '8px',
-              marginBottom: '12px',
-              flexShrink: 0
-            }}
-          >
-            {/* Student Admissions Tab Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div
-                style={{
-                  background: '#2c5282',
-                  color: '#ffffff',
-                  padding: '6px 16px',
-                  borderRadius: '5px 5px 0 0',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  letterSpacing: '0.2px'
-                }}
-              >
-                {editingStudentId ? `Edit Student (${form.id || form.name})` : 'Student Admissions'}
-              </div>
-
-              {/* Physically Challenged Switch */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155', fontWeight: 600, marginLeft: '10px' }}>
-                <span>PhysicallyChallenged?</span>
-                <button
-                  type="button"
-                  onClick={() => handleChange('physicallyChallenged', !form.physicallyChallenged)}
-                  style={{
-                    padding: '3px 10px',
-                    borderRadius: '12px',
-                    border: '1px solid #94a3b8',
-                    background: form.physicallyChallenged ? '#10b981' : '#e2e8f0',
-                    color: form.physicallyChallenged ? '#ffffff' : '#475569',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {form.physicallyChallenged ? 'YES' : 'NO'}
-                </button>
-              </div>
+      {/* ========================================================================= */}
+      {/* TAB 3: STEP 3 - 1.2 FIRST YEAR NEW ADMISSION FORM (IMAGE 3)              */}
+      {/* ========================================================================= */}
+      {activeTab === 3 && (
+        <form onSubmit={handleProceedFromStep3ToStep4}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ marginBottom: '14px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px 0' }}>
+                1.2 First Year New Admission form:
+              </h2>
+              <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>
+                In First year New Admission form we can enter the academic details for new student.
+              </p>
             </div>
 
-            {/* Top Action Buttons: Bulk Import + Save */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setShowBulkModal(true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 14px',
-                  borderRadius: '5px',
-                  background: '#1e3a5f',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
-                }}
-              >
-                <CloudUpload size={15} /> Bulk Import
-              </button>
+            <div style={{
+              background: '#ffffff',
+              border: '2px solid #ef4444',
+              borderRadius: '8px',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                background: '#f8fafc',
+                borderBottom: '2px solid #ef4444',
+                padding: '12px 20px',
+                textAlign: 'center'
+              }}>
+                <h3 style={{
+                  margin: 0,
+                  fontSize: '17px',
+                  fontWeight: '800',
+                  color: '#d946ef',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px'
+                }}>
+                  FIRST YEAR NEW ADMISSION
+                </h3>
+              </div>
 
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={loading}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 18px',
-                  borderRadius: '5px',
-                  background: '#15803d',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '12.5px',
-                  fontWeight: 700,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.12)'
-                }}
-              >
-                <Save size={15} /> {loading ? 'Saving...' : editingStudentId ? 'Update Student' : 'Save Admission'}
-              </button>
-            </div>
-          </div>
-
-          {/* ── STEPPER PROGRESS BAR (1 -> 2 -> 3 -> 4) ── */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: '8px',
-              marginBottom: '14px',
-              flexShrink: 0
-            }}
-          >
-            {WIZARD_STEPS.map((step) => {
-              const isActive = activeStep === step.id;
-              const isPast = activeStep > step.id;
-
-              return (
-                <button
-                  key={step.id}
-                  type="button"
-                  onClick={() => setActiveStep(step.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: isActive
-                      ? '2px solid #2563eb'
-                      : isPast
-                      ? '1.5px solid #86efac'
-                      : '1px solid #cbd5e1',
-                    background: isActive
-                      ? '#eff6ff'
-                      : isPast
-                      ? '#f0fdf4'
-                      : '#f8fafc',
-                    color: isActive ? '#1e3a5f' : isPast ? '#166534' : '#64748b',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'all 0.15s ease',
-                    boxShadow: isActive ? '0 2px 4px rgba(37,99,235,0.12)' : 'none'
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '26px',
-                      height: '26px',
-                      borderRadius: '50%',
-                      background: isActive ? '#2563eb' : isPast ? '#16a34a' : '#cbd5e1',
-                      color: '#ffffff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '12px',
-                      fontWeight: 800,
-                      flexShrink: 0
-                    }}
-                  >
-                    {isPast ? <Check size={14} strokeWidth={3} /> : step.id}
+              <div style={{ padding: '24px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px' }}>
+                  {/* Previous Admission No */}
+                  <div>
+                    <label style={labelStyle}>Previous Admission No</label>
+                    <input
+                      type="text"
+                      value={form.previousAdmissionNo}
+                      onChange={e => handleChange('previousAdmissionNo', e.target.value)}
+                      placeholder="536"
+                      style={inputStyle}
+                    />
                   </div>
 
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: '12.5px', fontWeight: isActive ? 800 : 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {step.title}
-                    </div>
-                    <div style={{ fontSize: '11px', color: isActive ? '#2563eb' : '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {step.subtitle}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* ── STEP CONTENT WORKSPACE ── */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-
-            {/* ========================================================= */}
-            {/* STEP 1: PERSONAL DETAILS */}
-            {/* ========================================================= */}
-            {activeStep === 1 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
-                <div style={erpBoxStyle}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px', marginBottom: '12px' }}>
-                    <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#1e3a5f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <User size={16} color="#2563eb" /> Step 1: Personal Details & Identification
-                    </span>
-                    <span style={{ fontSize: '11.5px', color: '#64748b' }}>* Indicates required fields</span>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 16px' }}>
-                    <div>
-                      <label style={erpLabelStyle}>*First Name :</label>
+                  {/* New Admission No */}
+                  <div>
+                    <label style={labelStyle}>New Admission No *</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
                       <input
                         type="text"
                         required
-                        value={form.firstName}
-                        onChange={e => handleChange('firstName', e.target.value)}
-                        placeholder="e.g. John"
-                        style={erpInputStyle}
+                        value={form.id || form.admissionNo}
+                        onChange={e => {
+                          handleChange('id', e.target.value);
+                          handleChange('admissionNo', e.target.value);
+                        }}
+                        placeholder="151"
+                        style={{ ...inputStyle, fontWeight: '700', color: '#1e3a5f' }}
                       />
-                    </div>
-
-                    <div>
-                      <label style={erpLabelStyle}>Mid Name :</label>
-                      <input
-                        type="text"
-                        value={form.midName}
-                        onChange={e => handleChange('midName', e.target.value)}
-                        placeholder="e.g. Robert"
-                        style={erpInputStyle}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={erpLabelStyle}>*Last Name :</label>
-                      <input
-                        type="text"
-                        required
-                        value={form.lastName}
-                        onChange={e => handleChange('lastName', e.target.value)}
-                        placeholder="e.g. Doe"
-                        style={erpInputStyle}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={erpLabelStyle}>*DOB (Date of Birth) :</label>
-                      <input
-                        type="date"
-                        value={form.dob}
-                        onChange={e => handleChange('dob', e.target.value)}
-                        style={erpInputStyle}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={erpLabelStyle}>*Gender :</label>
-                      <div style={{ display: 'flex', gap: '18px', fontSize: '13px', color: '#1e293b', height: '34px', alignItems: 'center' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 600 }}>
-                          <input
-                            type="radio"
-                            name="gender"
-                            value="Male"
-                            checked={form.gender === 'Male'}
-                            onChange={e => handleChange('gender', e.target.value)}
-                          /> Male
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 600 }}>
-                          <input
-                            type="radio"
-                            name="gender"
-                            value="Female"
-                            checked={form.gender === 'Female'}
-                            onChange={e => handleChange('gender', e.target.value)}
-                          /> Female
-                        </label>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label style={erpLabelStyle}>Aadhar Card No :</label>
-                      <input
-                        type="text"
-                        value={form.aadharNo}
-                        onChange={e => handleChange('aadharNo', e.target.value)}
-                        placeholder="12-digit UID"
-                        style={erpInputStyle}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={erpLabelStyle}>Identification Marks :</label>
-                      <input
-                        type="text"
-                        value={form.identification}
-                        onChange={e => handleChange('identification', e.target.value)}
-                        placeholder="e.g. Mole on right wrist"
-                        style={erpInputStyle}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={erpLabelStyle}>Family Status :</label>
-                      <select
-                        value={form.familyStat}
-                        onChange={e => handleChange('familyStat', e.target.value)}
-                        style={erpInputStyle}
-                      >
-                        <option value="Nuclear">Nuclear</option>
-                        <option value="Joint">Joint</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={erpLabelStyle}>1st Language :</label>
-                      <select
-                        value={form.firstLang}
-                        onChange={e => handleChange('firstLang', e.target.value)}
-                        style={erpInputStyle}
-                      >
-                        <option value="English">English</option>
-                        <option value="Tamil">Tamil</option>
-                        <option value="Hindi">Hindi</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={erpLabelStyle}>2nd Language :</label>
-                      <select
-                        value={form.secondLang}
-                        onChange={e => handleChange('secondLang', e.target.value)}
-                        style={erpInputStyle}
-                      >
-                        <option value="Tamil">Tamil</option>
-                        <option value="English">English</option>
-                        <option value="Hindi">Hindi</option>
-                        <option value="French">French</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={erpLabelStyle}>Physically Challenged :</label>
                       <button
                         type="button"
-                        onClick={() => handleChange('physicallyChallenged', !form.physicallyChallenged)}
-                        style={{
-                          height: '34px',
-                          width: '100%',
-                          padding: '4px 14px',
-                          borderRadius: '5px',
-                          border: '1px solid #94a3b8',
-                          background: form.physicallyChallenged ? '#10b981' : '#f8fafc',
-                          color: form.physicallyChallenged ? '#ffffff' : '#475569',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          cursor: 'pointer'
+                        onClick={() => {
+                          const deptObj = departments.find(d => (d.name === form.department || d.id === form.department));
+                          const code = deptObj?.code || form.department?.substring(0, 3).toUpperCase() || 'ST';
+                          const newId = generateRegNo(code, students);
+                          handleChange('id', newId);
+                          handleChange('admissionNo', newId);
                         }}
+                        style={{
+                          background: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '4px',
+                          padding: '0 8px',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          fontWeight: '700'
+                        }}
+                        title="Auto Generate Admission No"
                       >
-                        {form.physicallyChallenged ? '✓ Yes (Physically Challenged)' : '✕ No'}
+                        Gen
                       </button>
                     </div>
                   </div>
-                </div>
 
-                {/* Step 1 Footer Navigation */}
-                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', paddingTop: '12px' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!form.firstName.trim() && !form.lastName.trim() && !form.name.trim()) {
-                        setErrorMsg('Please enter First Name or Last Name to proceed.');
-                        return;
-                      }
-                      setErrorMsg('');
-                      setActiveStep(2);
-                    }}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '9px 22px',
-                      borderRadius: '5px',
-                      background: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(37,99,235,0.2)'
-                    }}
-                  >
-                    Next: Contact & Address <ArrowRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ========================================================= */}
-            {/* STEP 2: CONTACT & ADDRESS DETAILS */}
-            {/* ========================================================= */}
-            {activeStep === 2 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', alignItems: 'start' }}>
-                  
-                  {/* Contact & Demographics */}
-                  <div style={erpBoxStyle}>
-                    <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#1e3a5f', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <User size={16} color="#2563eb" /> Contact & Identification Details
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 12px' }}>
-                      <div style={{ gridColumn: 'span 2' }}>
-                        <label style={erpLabelStyle}>Email Id :</label>
-                        <input
-                          type="email"
-                          value={form.email}
-                          onChange={e => handleChange('email', e.target.value)}
-                          placeholder="student@college.edu"
-                          style={erpInputStyle}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={erpLabelStyle}>Phone :</label>
-                        <input
-                          type="tel"
-                          value={form.phone}
-                          onChange={e => handleChange('phone', e.target.value)}
-                          placeholder="Mobile Number"
-                          style={erpInputStyle}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={erpLabelStyle}>Blood Grp :</label>
-                        <select
-                          value={form.bloodGroup}
-                          onChange={e => handleChange('bloodGroup', e.target.value)}
-                          style={erpInputStyle}
-                        >
-                          {BLOOD_GROUPS.map(bg => <option key={bg} value={bg}>{bg}</option>)}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label style={erpLabelStyle}>Religion :</label>
-                        <input
-                          type="text"
-                          value={form.religion}
-                          onChange={e => handleChange('religion', e.target.value)}
-                          placeholder="e.g. Hindu / Muslim / Christian"
-                          style={erpInputStyle}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={erpLabelStyle}>Nationality :</label>
-                        <input
-                          type="text"
-                          value={form.nationality}
-                          onChange={e => handleChange('nationality', e.target.value)}
-                          style={erpInputStyle}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={erpLabelStyle}>Caste :</label>
-                        <input
-                          type="text"
-                          value={form.caste}
-                          onChange={e => handleChange('caste', e.target.value)}
-                          placeholder="Caste category"
-                          style={erpInputStyle}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={erpLabelStyle}>Ethnicity :</label>
-                        <input
-                          type="text"
-                          value={form.ethnicity}
-                          onChange={e => handleChange('ethnicity', e.target.value)}
-                          style={erpInputStyle}
-                        />
-                      </div>
-
-                      <div style={{ gridColumn: 'span 2' }}>
-                        <label style={erpLabelStyle}>PAN No :</label>
-                        <input
-                          type="text"
-                          value={form.panNo}
-                          onChange={e => handleChange('panNo', e.target.value)}
-                          placeholder="PAN Card Number"
-                          style={erpInputStyle}
-                        />
-                      </div>
-                    </div>
+                  {/* First Name */}
+                  <div>
+                    <label style={labelStyle}>First Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={form.firstName}
+                      onChange={e => handleChange('firstName', e.target.value)}
+                      placeholder="karthika"
+                      style={inputStyle}
+                    />
                   </div>
 
-                  {/* Address Details */}
-                  <div style={erpBoxStyle}>
-                    <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#1e3a5f', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <MapPin size={16} color="#2563eb" /> Residential Address
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 12px' }}>
-                      <div>
-                        <label style={erpLabelStyle}>Country :</label>
-                        <select
-                          value={form.country}
-                          onChange={e => handleChange('country', e.target.value)}
-                          style={erpInputStyle}
-                        >
-                          <option value="India">India</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label style={erpLabelStyle}>State :</label>
-                        <input
-                          type="text"
-                          value={form.state}
-                          onChange={e => handleChange('state', e.target.value)}
-                          style={erpInputStyle}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={erpLabelStyle}>District :</label>
-                        <input
-                          type="text"
-                          value={form.district}
-                          onChange={e => handleChange('district', e.target.value)}
-                          style={erpInputStyle}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={erpLabelStyle}>Sub-District / Taluk :</label>
-                        <input
-                          type="text"
-                          value={form.subDistrict}
-                          onChange={e => handleChange('subDistrict', e.target.value)}
-                          style={erpInputStyle}
-                        />
-                      </div>
-
-                      <div style={{ gridColumn: 'span 2' }}>
-                        <label style={erpLabelStyle}>Pin Code :</label>
-                        <input
-                          type="text"
-                          value={form.pincode}
-                          onChange={e => handleChange('pincode', e.target.value)}
-                          placeholder="6-digit PIN code"
-                          style={erpInputStyle}
-                        />
-                      </div>
-
-                      <div style={{ gridColumn: 'span 2' }}>
-                        <label style={erpLabelStyle}>Address :</label>
-                        <textarea
-                          rows="3"
-                          value={form.address}
-                          onChange={e => handleChange('address', e.target.value)}
-                          placeholder="House / Street / Door No..."
-                          style={{ ...erpInputStyle, height: '62px', padding: '6px 10px', resize: 'none' }}
-                        />
-                      </div>
-                    </div>
+                  {/* Last Name */}
+                  <div>
+                    <label style={labelStyle}>Last Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={form.lastName}
+                      onChange={e => handleChange('lastName', e.target.value)}
+                      placeholder="A"
+                      style={inputStyle}
+                    />
                   </div>
 
-                </div>
+                  {/* Date of birth */}
+                  <div>
+                    <label style={labelStyle}>Date of birth</label>
+                    <input
+                      type="date"
+                      value={form.dob}
+                      onChange={e => handleChange('dob', e.target.value)}
+                      style={inputStyle}
+                    />
+                  </div>
 
-                {/* Step 2 Footer Navigation */}
-                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', paddingTop: '12px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveStep(1)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '9px 20px',
-                      borderRadius: '5px',
-                      background: '#ffffff',
-                      color: '#475569',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <ArrowLeft size={16} /> Back to Personal Details
-                  </button>
+                  {/* Father's Name */}
+                  <div>
+                    <label style={labelStyle}>Father's Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={form.fatherName}
+                      onChange={e => handleChange('fatherName', e.target.value)}
+                      placeholder="Adhikesaven R"
+                      style={inputStyle}
+                    />
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setActiveStep(3)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '9px 22px',
-                      borderRadius: '5px',
-                      background: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(37,99,235,0.2)'
-                    }}
-                  >
-                    Next: Enrolling & Fees <ArrowRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
+                  {/* Mother's name */}
+                  <div>
+                    <label style={labelStyle}>Mother's name</label>
+                    <input
+                      type="text"
+                      value={form.motherName}
+                      onChange={e => handleChange('motherName', e.target.value)}
+                      placeholder="Rani A"
+                      style={inputStyle}
+                    />
+                  </div>
 
-            {/* ========================================================= */}
-            {/* STEP 3: ENROLLING & FEES */}
-            {/* ========================================================= */}
-            {activeStep === 3 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: '14px', alignItems: 'start' }}>
-                  
-                  {/* Academic & Enrolling Information */}
-                  <div style={erpBoxStyle}>
-                    <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#1e3a5f', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <GraduationCap size={16} color="#2563eb" /> Academic Enrolling Information
-                    </div>
+                  {/* Community */}
+                  <div>
+                    <label style={labelStyle}>Community</label>
+                    <select
+                      value={form.community}
+                      onChange={e => handleChange('community', e.target.value)}
+                      style={inputStyle}
+                    >
+                      {COMMUNITIES.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 12px' }}>
-                      {/* Register Number */}
-                      <div style={{ gridColumn: 'span 2' }}>
-                        <label style={erpLabelStyle}>*Admission ID / Reg No :</label>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <input
-                            type="text"
-                            required
-                            value={form.id}
-                            onChange={e => handleChange('id', e.target.value)}
-                            style={{ ...erpInputStyle, fontWeight: 700, color: '#1e3a5f' }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleChange('id', generateRegNo(form.dept, students))}
-                            title="Regenerate Next Reg No"
-                            style={{ padding: '4px 10px', border: '1px solid #94a3b8', background: '#f1f5f9', cursor: 'pointer', borderRadius: '5px' }}
-                          >
-                            <RefreshCw size={14} />
-                          </button>
-                        </div>
-                      </div>
+                  {/* Phone No */}
+                  <div>
+                    <label style={labelStyle}>Phone No *</label>
+                    <input
+                      type="text"
+                      required
+                      value={form.phone}
+                      onChange={e => handleChange('phone', e.target.value)}
+                      placeholder="9875412360"
+                      style={inputStyle}
+                    />
+                  </div>
 
-                      {/* Department */}
-                      <div>
-                        <label style={erpLabelStyle}>*Department / Degree :</label>
-                        <select
-                          required
-                          value={form.dept}
-                          onChange={e => handleDepartmentChange(e.target.value)}
-                          style={{ ...erpInputStyle, fontWeight: 600 }}
-                        >
-                          <option value="">Select Department</option>
-                          {departments.map((dept, index) => {
-                            const name = dept?.name || dept?.departmentName || dept;
-                            return <option key={dept?._id || index} value={name}>{name}</option>;
-                          })}
-                        </select>
-                      </div>
+                  {/* Academic Year */}
+                  <div>
+                    <label style={labelStyle}>Academic Year *</label>
+                    <input
+                      type="text"
+                      value={form.academicYear}
+                      onChange={e => handleChange('academicYear', e.target.value)}
+                      placeholder="2015 - 2018"
+                      style={inputStyle}
+                    />
+                  </div>
 
-                      {/* Course / Program (Strictly Filtered to Department) */}
-                      <div>
-                        <label style={erpLabelStyle}>*Course / Program :</label>
-                        <select
-                          required
-                          value={form.courseId}
-                          onChange={(e) => handleChange('courseId', e.target.value)}
-                          disabled={!form.dept}
-                          style={erpInputStyle}
-                        >
-                          <option value="">
-                            {!form.dept
-                              ? 'Select Department First'
-                              : availableCourses.length === 0
-                              ? 'No Courses Found For This Department'
-                              : 'Select Course'}
+                  {/* Type of Degree */}
+                  <div>
+                    <label style={labelStyle}>Type of Degree *</label>
+                    <select
+                      value={form.degreeType}
+                      onChange={e => handleChange('degreeType', e.target.value)}
+                      style={inputStyle}
+                    >
+                      {DEGREE_TYPES.map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Department */}
+                  <div>
+                    <label style={labelStyle}>Department *</label>
+                    <select
+                      value={form.department || form.dept || ''}
+                      onChange={e => {
+                        handleChange('department', e.target.value);
+                        handleChange('dept', e.target.value);
+                      }}
+                      style={inputStyle}
+                    >
+                      <option value="">Select Department</option>
+                      {departments.map((d, i) => {
+                        const dName = d.name || d.departmentName || d;
+                        return (
+                          <option key={d.id || d._id || i} value={dName}>
+                            {dName}
                           </option>
+                        );
+                      })}
+                    </select>
+                  </div>
 
-                          {availableCourses.map(course => (
-                            <option
-                              key={course.id || course._id}
-                              value={course.id || course._id}
-                            >
-                              {course.name} ({course.code})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                  {/* Course */}
+                  <div>
+                    <label style={labelStyle}>Course *</label>
+                    <select
+                      value={form.course || ''}
+                      onChange={e => handleChange('course', e.target.value)}
+                      style={inputStyle}
+                    >
+                      <option value="">
+                        {!(form.department || form.dept)
+                          ? 'Select Department First'
+                          : availableCourses.length === 0
+                          ? 'No courses found for this department'
+                          : 'Select Course'}
+                      </option>
+                      {availableCourses.map((c, i) => {
+                        const cName = c.name || c.courseName || c;
+                        return (
+                          <option key={c.id || c._id || i} value={cName}>
+                            {cName} {c.code ? `(${c.code})` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
 
-                      {/* Semester */}
-                      <div>
-                        <label style={erpLabelStyle}>*CourseYear / Semester :</label>
-                        <select
-                          required
-                          value={form.sem}
-                          onChange={e => handleChange('sem', e.target.value)}
-                          style={erpInputStyle}
-                        >
-                          {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
+                  {/* Semester */}
+                  <div>
+                    <label style={labelStyle}>Semester *</label>
+                    <select
+                      value={form.semester}
+                      onChange={e => handleChange('semester', Number(e.target.value))}
+                      style={inputStyle}
+                    >
+                      {SEMESTERS_LIST.map(s => (
+                        <option key={s} value={s}>semester - {s}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                      {/* Application Type */}
-                      <div>
-                        <label style={erpLabelStyle}>*Application Type :</label>
-                        <select
-                          value={form.applicationType}
-                          onChange={e => handleChange('applicationType', e.target.value)}
-                          style={erpInputStyle}
-                        >
-                          <option value="New Enrollment">New Enrollment</option>
-                          <option value="Lateral Entry">Lateral Entry</option>
-                          <option value="Transfer">Transfer</option>
-                        </select>
-                      </div>
+                  {/* Date of Admission */}
+                  <div>
+                    <label style={labelStyle}>Date of Admission</label>
+                    <input
+                      type="date"
+                      value={form.admissionDate}
+                      onChange={e => handleChange('admissionDate', e.target.value)}
+                      style={inputStyle}
+                    />
+                  </div>
 
-                      {/* Facility Toggles: Bus & Dorm */}
-                      <div style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', paddingTop: '4px' }}>
-                        <div>
-                          <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px', display: 'block' }}>Bus Facility?</label>
-                          <button
-                            type="button"
-                            onClick={() => handleChange('busFacility', !form.busFacility)}
-                            style={{
-                              width: '100%',
-                              height: '34px',
-                              padding: '4px',
-                              borderRadius: '5px',
-                              border: '1px solid #94a3b8',
-                              background: form.busFacility ? '#10b981' : '#f1f5f9',
-                              color: form.busFacility ? '#ffffff' : '#475569',
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {form.busFacility ? 'YES (Bus Facility Active)' : 'NO (No Bus)'}
-                          </button>
-                        </div>
-
-                        <div>
-                          <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px', display: 'block' }}>Dorm / Hostel?</label>
-                          <button
-                            type="button"
-                            onClick={() => handleChange('dormFacility', !form.dormFacility)}
-                            style={{
-                              width: '100%',
-                              height: '34px',
-                              padding: '4px',
-                              borderRadius: '5px',
-                              border: '1px solid #94a3b8',
-                              background: form.dormFacility ? '#10b981' : '#f1f5f9',
-                              color: form.dormFacility ? '#ffffff' : '#475569',
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {form.dormFacility ? 'YES (Hostel Resident)' : 'NO (Day Scholar)'}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Conditional Bus Facility Fields */}
-                      {form.busFacility && (
-                        <div
-                          style={{
-                            gridColumn: 'span 2',
-                            background: '#f0f9ff',
-                            padding: '10px 12px',
-                            borderRadius: '6px',
-                            border: '1px solid #bae6fd',
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '10px'
-                          }}
-                        >
-                          <div>
-                            <label style={{ fontSize: '11.5px', color: '#0369a1', fontWeight: 700, display: 'block', marginBottom: '3px' }}>Bus Route :</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. Route 12"
-                              value={form.busRoute || ''}
-                              onChange={e => handleChange('busRoute', e.target.value)}
-                              style={{ ...erpInputStyle, height: '32px' }}
-                            />
-                          </div>
-                          <div>
-                            <label style={{ fontSize: '11.5px', color: '#0369a1', fontWeight: 700, display: 'block', marginBottom: '3px' }}>Pickup Point :</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. Main Gate"
-                              value={form.pickupPoint || ''}
-                              onChange={e => handleChange('pickupPoint', e.target.value)}
-                              style={{ ...erpInputStyle, height: '32px' }}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Conditional Hostel Fields */}
-                      {form.dormFacility && (
-                        <div
-                          style={{
-                            gridColumn: 'span 2',
-                            background: '#f0fdf4',
-                            padding: '10px 12px',
-                            borderRadius: '6px',
-                            border: '1px solid #bbf7d0',
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '10px'
-                          }}
-                        >
-                          <div>
-                            <label style={{ fontSize: '11.5px', color: '#15803d', fontWeight: 700, display: 'block', marginBottom: '3px' }}>Hostel Name :</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. Block A"
-                              value={form.hostelName || ''}
-                              onChange={e => handleChange('hostelName', e.target.value)}
-                              style={{ ...erpInputStyle, height: '32px' }}
-                            />
-                          </div>
-                          <div>
-                            <label style={{ fontSize: '11.5px', color: '#15803d', fontWeight: 700, display: 'block', marginBottom: '3px' }}>Room Number :</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. 204"
-                              value={form.roomNumber || ''}
-                              onChange={e => handleChange('roomNumber', e.target.value)}
-                              style={{ ...erpInputStyle, height: '32px' }}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Application Status */}
-                      <div style={{ gridColumn: 'span 2' }}>
-                        <label style={erpLabelStyle}>*Application Status :</label>
-                        <select
-                          value={form.applicationStatus}
-                          onChange={e => handleChange('applicationStatus', e.target.value)}
-                          style={erpInputStyle}
-                        >
-                          <option value="Approved">Approved</option>
-                          <option value="Pending">Pending</option>
-                          <option value="Provisionally Admitted">Provisionally Admitted</option>
-                        </select>
-                      </div>
-
+                  {/* Hostel */}
+                  <div>
+                    <label style={labelStyle}>Hostel</label>
+                    <div style={{ display: 'flex', gap: '16px', height: '32px', alignItems: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                        <input
+                          type="radio"
+                          name="hostelStep3"
+                          value="Yes"
+                          checked={form.hostel === 'Yes'}
+                          onChange={e => handleChange('hostel', e.target.value)}
+                        /> yes
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                        <input
+                          type="radio"
+                          name="hostelStep3"
+                          value="No"
+                          checked={form.hostel === 'No' || !form.hostel}
+                          onChange={e => handleChange('hostel', e.target.value)}
+                        /> No
+                      </label>
                     </div>
                   </div>
 
-                  {/* Right Column: Photo & Live Fee Plan */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    
-                    {/* Photo Upload Box */}
-                    <div style={erpBoxStyle}>
-                      <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#1e3a5f', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Camera size={16} color="#2563eb" /> Student Photograph
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <div
-                          style={{
-                            width: '70px',
-                            height: '80px',
-                            border: '1.5px solid #cbd5e1',
-                            background: '#f8fafc',
-                            borderRadius: '6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden',
-                            flexShrink: 0
-                          }}
-                        >
-                          {form.photoUrl ? (
-                            <img src={form.photoUrl} alt="Student" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <User size={36} color="#94a3b8" />
-                          )}
-                        </div>
-
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            ref={fileInputRef}
-                            onChange={handlePhotoUpload}
-                            style={{ display: 'none' }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px',
-                              padding: '7px 12px',
-                              borderRadius: '5px',
-                              background: '#315d86',
-                              color: '#ffffff',
-                              border: 'none',
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <Camera size={14} /> Upload Photo
-                          </button>
-                          {form.photoUrl && (
-                            <button
-                              type="button"
-                              onClick={() => handleChange('photoUrl', '')}
-                              style={{
-                                padding: '2px',
-                                background: 'none',
-                                border: 'none',
-                                color: '#ef4444',
-                                fontSize: '11.5px',
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                fontWeight: 600
-                              }}
-                            >
-                              Remove Photo
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                  {/* Transport */}
+                  <div>
+                    <label style={labelStyle}>Transport</label>
+                    <div style={{ display: 'flex', gap: '16px', height: '32px', alignItems: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                        <input
+                          type="radio"
+                          name="transportStep3"
+                          value="Yes"
+                          checked={form.transport === 'Yes'}
+                          onChange={e => handleChange('transport', e.target.value)}
+                        /> yes
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                        <input
+                          type="radio"
+                          name="transportStep3"
+                          value="No"
+                          checked={form.transport === 'No' || !form.transport}
+                          onChange={e => handleChange('transport', e.target.value)}
+                        /> No
+                      </label>
                     </div>
-
-                    {/* Live Fee Plan Card */}
-                    <div style={{
-                      ...erpBoxStyle,
-                      border: '1.5px solid #93c5fd',
-                      background: '#f0f7ff'
-                    }}>
-                      <div style={{ fontWeight: 800, fontSize: '13px', color: '#1e3a5f', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', borderBottom: '1px solid #bfdbfe', paddingBottom: '6px' }}>
-                        <span>Live Fee Structure</span>
-                        <span style={{
-                          fontSize: '11px',
-                          color: selectedFeePlan?.isDefaultStandard ? '#1d4ed8' : '#15803d',
-                          background: selectedFeePlan?.isDefaultStandard ? '#dbeafe' : '#dcfce7',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          fontWeight: 700
-                        }}>
-                          {selectedFeePlan?.isDefaultStandard ? 'Standard Plan' : 'Custom Plan Linked'}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px', color: '#334155' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Tuition Fee:</span>
-                          <strong>₹{Number(selectedFeePlan?.tuitionFee || 55000).toLocaleString('en-IN')}</strong>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Exam, Lab & Library Fee:</span>
-                          <strong>₹{Number((selectedFeePlan?.examFee || 2500) + (selectedFeePlan?.labFee || 5000) + (selectedFeePlan?.libraryFee || 2500)).toLocaleString('en-IN')}</strong>
-                        </div>
-
-                        {form.busFacility && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2563eb' }}>
-                            <span>Transport / Bus Fee:</span>
-                            <strong>₹{Number(form.transportFee || selectedFeePlan?.transportFee || 15000).toLocaleString('en-IN')}</strong>
-                          </div>
-                        )}
-
-                        {form.dormFacility && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a' }}>
-                            <span>Hostel / Dorm Fee:</span>
-                            <strong>₹{Number(form.hostelFee || selectedFeePlan?.hostelFee || 40000).toLocaleString('en-IN')}</strong>
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '14.5px', color: '#15803d', borderTop: '2px dashed #93c5fd', paddingTop: '8px', marginTop: '4px' }}>
-                          <span>Total Admission Fee:</span>
-                          <span>₹{Number(form.totalFee || 0).toLocaleString('en-IN')}</span>
-                        </div>
-                      </div>
-                    </div>
-
                   </div>
                 </div>
 
-                {/* Step 3 Footer Navigation */}
-                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', paddingTop: '12px' }}>
+                {/* Step 3 Form Buttons (Submit & Reset matching Image 3) */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', marginTop: '28px' }}>
                   <button
-                    type="button"
-                    onClick={() => setActiveStep(2)}
+                    type="submit"
                     style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '9px 20px',
-                      borderRadius: '5px',
-                      background: '#ffffff',
-                      color: '#475569',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '13px',
-                      fontWeight: 700,
+                      background: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '10px 32px',
+                      fontWeight: '700',
+                      fontSize: '14px',
                       cursor: 'pointer'
                     }}
                   >
-                    <ArrowLeft size={16} /> Back to Contact & Address
+                    Submit
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    style={{
+                      background: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '10px 24px',
+                      fontWeight: '700',
+                      fontSize: '14px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Reset
                   </button>
 
                   <button
                     type="button"
                     onClick={() => {
-                      if (!form.dept) {
-                        setErrorMsg('Please select a Department in Step 3.');
-                        return;
-                      }
-                      if (!form.courseId && courses.length > 0) {
-                        setErrorMsg('Please select a Course in Step 3.');
-                        return;
-                      }
-                      setErrorMsg('');
-                      setActiveStep(4);
+                      setActiveTab(2);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '9px 22px',
-                      borderRadius: '5px',
-                      background: '#2563eb',
+                      background: '#64748b',
                       color: '#ffffff',
                       border: 'none',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(37,99,235,0.2)'
-                    }}
-                  >
-                    Next: Languages & Family Details <ArrowRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ========================================================= */}
-            {/* STEP 4: LANGUAGES, FAMILY DETAILS & FINAL SUBMISSION */}
-            {/* ========================================================= */}
-            {activeStep === 4 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
-                
-                {/* Language Proficiency Table */}
-                <div style={{ ...erpBoxStyle, padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#1e3a5f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Languages size={16} color="#2563eb" /> Language Proficiency
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleAddLanguage}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: '4px',
-                        background: '#2c5282',
-                        color: '#ffffff',
-                        border: 'none',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      + Add Language
-                    </button>
-                  </div>
-
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px', border: '1px solid #cbd5e1' }}>
-                    <thead>
-                      <tr style={{ background: '#2c5282', color: '#ffffff', textAlign: 'left' }}>
-                        <th style={{ padding: '6px 10px', fontWeight: 600 }}>Language</th>
-                        <th style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 600 }}>Reading</th>
-                        <th style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 600 }}>Writing</th>
-                        <th style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 600 }}>Speaking</th>
-                        <th style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 600 }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.languages.map((lang, idx) => (
-                        <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                          <td style={{ padding: '5px 10px' }}>
-                            <input
-                              type="text"
-                              value={lang.language}
-                              onChange={e => handleLanguageChange(idx, 'language', e.target.value)}
-                              style={{ ...erpInputStyle, width: '180px', height: '30px' }}
-                            />
-                          </td>
-                          <td style={{ padding: '5px 10px', textAlign: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={lang.reading}
-                              onChange={e => handleLanguageChange(idx, 'reading', e.target.checked)}
-                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                          </td>
-                          <td style={{ padding: '5px 10px', textAlign: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={lang.writing}
-                              onChange={e => handleLanguageChange(idx, 'writing', e.target.checked)}
-                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                          </td>
-                          <td style={{ padding: '5px 10px', textAlign: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={lang.speaking}
-                              onChange={e => handleLanguageChange(idx, 'speaking', e.target.checked)}
-                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                          </td>
-                          <td style={{ padding: '5px 10px', textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveLanguage(idx)}
-                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}
-                              title="Delete Language"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Family Details Table */}
-                <div style={{ ...erpBoxStyle, padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#1e3a5f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Users size={16} color="#2563eb" /> Parent & Family Details
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleAddFamilyMember}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: '4px',
-                        background: '#2c5282',
-                        color: '#ffffff',
-                        border: 'none',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      + Add Member
-                    </button>
-                  </div>
-
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px', border: '1px solid #cbd5e1' }}>
-                    <thead>
-                      <tr style={{ background: '#2c5282', color: '#ffffff', textAlign: 'left' }}>
-                        <th style={{ padding: '6px 10px', fontWeight: 600, width: '110px' }}>Relation</th>
-                        <th style={{ padding: '6px 10px', fontWeight: 600 }}>First Name</th>
-                        <th style={{ padding: '6px 10px', fontWeight: 600 }}>Middle Name</th>
-                        <th style={{ padding: '6px 10px', fontWeight: 600 }}>Last Name</th>
-                        <th style={{ padding: '6px 10px', fontWeight: 600 }}>Mobile</th>
-                        <th style={{ padding: '6px 10px', fontWeight: 600 }}>Parent Email</th>
-                        <th style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 600, width: '45px' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.familyMembers.map((member, idx) => (
-                        <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                          <td style={{ padding: '5px 8px', fontWeight: 600 }}>
-                            <select
-                              value={member.relation}
-                              onChange={e => handleFamilyChange(idx, 'relation', e.target.value)}
-                              style={{ ...erpInputStyle, height: '30px', fontSize: '12px' }}
-                            >
-                              <option value="Father">Father</option>
-                              <option value="Mother">Mother</option>
-                              <option value="Guardian">Guardian</option>
-                            </select>
-                          </td>
-                          <td style={{ padding: '5px 8px' }}>
-                            <input
-                              type="text"
-                              value={member.firstName}
-                              onChange={e => handleFamilyChange(idx, 'firstName', e.target.value)}
-                              placeholder="First Name"
-                              style={{ ...erpInputStyle, height: '30px' }}
-                            />
-                          </td>
-                          <td style={{ padding: '5px 8px' }}>
-                            <input
-                              type="text"
-                              value={member.middleName}
-                              onChange={e => handleFamilyChange(idx, 'middleName', e.target.value)}
-                              placeholder="Middle Name"
-                              style={{ ...erpInputStyle, height: '30px' }}
-                            />
-                          </td>
-                          <td style={{ padding: '5px 8px' }}>
-                            <input
-                              type="text"
-                              value={member.lastName}
-                              onChange={e => handleFamilyChange(idx, 'lastName', e.target.value)}
-                              placeholder="Last Name"
-                              style={{ ...erpInputStyle, height: '30px' }}
-                            />
-                          </td>
-                          <td style={{ padding: '5px 8px' }}>
-                            <input
-                              type="tel"
-                              value={member.mobile}
-                              onChange={e => handleFamilyChange(idx, 'mobile', e.target.value)}
-                              placeholder="Phone"
-                              style={{ ...erpInputStyle, height: '30px' }}
-                            />
-                          </td>
-                          <td style={{ padding: '5px 8px' }}>
-                            <input
-                              type="email"
-                              value={member.email}
-                              onChange={e => handleFamilyChange(idx, 'email', e.target.value)}
-                              placeholder="Email"
-                              style={{ ...erpInputStyle, height: '30px' }}
-                            />
-                          </td>
-                          <td style={{ padding: '5px 8px', textAlign: 'center' }}>
-                            {form.familyMembers.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveFamilyMember(idx)}
-                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}
-                                title="Delete Member"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Admission Summary Snapshot */}
-                <div style={{ ...erpBoxStyle, background: '#f8fafc', padding: '12px 16px' }}>
-                  <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#1e3a5f', marginBottom: '6px' }}>
-                    Quick Summary Checklist:
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '12px', color: '#334155' }}>
-                    <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
-                      Student: {form.name || form.firstName || 'Not Specified'}
-                    </span>
-                    <span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
-                      Reg No: {form.id || 'Auto'}
-                    </span>
-                    <span style={{ background: '#dcfce7', color: '#166534', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
-                      Dept: {form.dept || 'None'}
-                    </span>
-                    <span style={{ background: '#fef3c7', color: '#92400e', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
-                      Semester: {form.sem}
-                    </span>
-                    <span style={{ background: '#dcfce7', color: '#15803d', padding: '3px 10px', borderRadius: '12px', fontWeight: 800 }}>
-                      Total Fee: ₹{Number(form.totalFee || 0).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Step 4 Footer Navigation */}
-                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', paddingTop: '12px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveStep(3)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '9px 20px',
-                      borderRadius: '5px',
-                      background: '#ffffff',
-                      color: '#475569',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '13px',
-                      fontWeight: 700,
+                      borderRadius: '4px',
+                      padding: '10px 20px',
+                      fontWeight: '700',
+                      fontSize: '14px',
                       cursor: 'pointer'
                     }}
                   >
-                    <ArrowLeft size={16} /> Back to Enrolling & Fees
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '10px 26px',
-                      borderRadius: '5px',
-                      background: '#15803d',
-                      color: '#ffffff',
-                      border: 'none',
-                      fontSize: '13.5px',
-                      fontWeight: 800,
-                      cursor: loading ? 'not-allowed' : 'pointer',
-                      boxShadow: '0 2px 6px rgba(21,128,61,0.25)'
-                    }}
-                  >
-                    <Save size={16} /> {loading ? 'Saving Admission...' : editingStudentId ? 'Update Student Record' : 'Submit & Save Admission'}
+                    Back
                   </button>
                 </div>
               </div>
-            )}
+            </div>
+          </div>
+        </form>
+      )}
 
+      {/* ========================================================================= */}
+      {/* TAB 4: STEP 4 - NEW ADMISSION FINAL SUMMARY & RECEIPT (IMAGE 4)          */}
+      {/* ========================================================================= */}
+      {activeTab === 4 && (
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '8px',
+          border: '1px solid #cbd5e1',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+          overflow: 'hidden',
+          maxWidth: '850px',
+          margin: '0 auto'
+        }}>
+          {/* Top ERP Header Banner (Image 4) */}
+          <div style={{
+            background: '#ec4899',
+            color: '#ffffff',
+            padding: '16px 24px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '800', letterSpacing: '0.5px' }}>
+              ERP Management System
+            </h1>
+            <span style={{ fontSize: '12px', fontWeight: '600' }}>
+              Date : {new Date().toLocaleDateString('en-US')} Time :{new Date().toLocaleTimeString('en-US')}
+            </span>
           </div>
 
-        </div>
-      </div>
-
-      {/* ── BULK IMPORT MODAL ── */}
-      {showBulkModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.65)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '20px'
-          }}
-        >
-          <div
-            style={{
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
+          <div style={{ padding: '24px' }}>
+            <div style={{
+              background: '#f0f9ff',
+              border: '1px solid #bae6fd',
               borderRadius: '6px',
-              maxWidth: '540px',
-              width: '100%',
-              padding: '18px 22px',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#1e3a5f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CloudUpload size={18} color="#2c5282" /> Bulk Import Students
-              </h3>
-              <button onClick={() => setShowBulkModal(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
+              padding: '10px 16px',
+              marginBottom: '20px',
+              textAlign: 'center'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#0369a1' }}>
+                New Admission
+              </h2>
             </div>
 
-            <p style={{ fontSize: '12px', color: '#475569', marginBottom: '10px' }}>
-              Paste CSV rows in the format: <br />
-              <code style={{ background: '#f1f5f9', padding: '3px 8px', borderRadius: '4px', color: '#0f172a', fontSize: '11.5px', display: 'inline-block', marginTop: '4px' }}>
-                Full Name, Email, Department, CourseYear
-              </code>
-            </p>
+            {/* Summary Key-Values (Image 4 exact list) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>First Name</span><span style={summaryValStyle}>{form.firstName || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Last Name</span><span style={summaryValStyle}>{form.lastName || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Gender</span><span style={summaryValStyle}>{form.gender || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Date of birth</span><span style={summaryValStyle}>{form.dob || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Father's Name</span><span style={summaryValStyle}>{form.fatherName || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Mother's name</span><span style={summaryValStyle}>{form.motherName || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Blood Group</span><span style={summaryValStyle}>{form.bloodGroup || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Phone no</span><span style={summaryValStyle}>{form.phone || form.fatherPhone || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Email</span><span style={summaryValStyle}>{form.email || form.fatherEmail || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Academic Year</span><span style={summaryValStyle}>{form.academicYear || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Type of Degree</span><span style={summaryValStyle}>{form.degreeType || 'UG'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Course</span><span style={{ ...summaryValStyle, fontWeight: '700' }}>{form.course || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Department</span><span style={{ ...summaryValStyle, fontWeight: '700' }}>{form.department || form.dept || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Semester</span><span style={summaryValStyle}>{form.semester || 1}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Section</span><span style={summaryValStyle}>{form.section || 'A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Date of Admission</span><span style={summaryValStyle}>{form.admissionDate || 'N/A'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Hostel</span><span style={summaryValStyle}>{form.hostel || 'No'}</span></div>
+              <div style={summaryRowStyle}><span style={summaryLabelStyle}>Transport</span><span style={summaryValStyle}>{form.transport || 'No'}</span></div>
+              
+              <div style={{ borderTop: '2px dashed #cbd5e1', margin: '8px 0' }} />
+              
+              <div style={summaryRowStyle}><span style={{ ...summaryLabelStyle, fontWeight: '700', color: '#16a34a' }}>Paid Amount(Rs)</span><span style={{ ...summaryValStyle, color: '#16a34a', fontWeight: '800', fontSize: '15px' }}>₹{Number(form.amountPaid || 0).toLocaleString()}</span></div>
+              <div style={summaryRowStyle}><span style={{ ...summaryLabelStyle, fontWeight: '700', color: '#dc2626' }}>Balance Amount(Rs)</span><span style={{ ...summaryValStyle, color: '#dc2626', fontWeight: '800', fontSize: '15px' }}>₹{Number(form.balanceFee || 0).toLocaleString()}</span></div>
+              <div style={summaryRowStyle}><span style={{ ...summaryLabelStyle, fontWeight: '800', color: '#1e40af' }}>Total Amount(Rs)</span><span style={{ ...summaryValStyle, color: '#1e40af', fontWeight: '900', fontSize: '16px' }}>₹{Number(form.totalFee || 0).toLocaleString()}</span></div>
+            </div>
 
-            <textarea
-              rows="6"
-              value={bulkDataText}
-              onChange={e => setBulkDataText(e.target.value)}
-              placeholder="Rohan Sharma, rohan@college.edu, Computer Science & Engineering, 1stYear-Sem-I&#10;Sneha Patel, sneha@college.edu, MATHEMATICS, 1stYear-Sem-I"
-              style={{
-                width: '100%',
-                padding: '10px',
-                fontSize: '12px',
-                fontFamily: 'monospace',
-                borderRadius: '4px',
-                border: '1px solid #cbd5e1',
-                background: '#f8fafc',
-                color: '#1e293b',
-                boxSizing: 'border-box',
-                marginBottom: '14px'
+            {/* Bottom 3 Action Buttons (Image 4 exact buttons: Back, Submit, save&print) */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '12px',
+              paddingTop: '16px',
+              borderTop: '1px solid #e2e8f0'
+            }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab(3);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                style={{
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '9px 24px',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                Back
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => handleFinalSubmit(false)}
+                style={{
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '9px 26px',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: submitting ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {submitting ? 'Submitting...' : 'Submit'}
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => handleFinalSubmit(true)}
+                style={{
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '9px 24px',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Printer size={15} /> save&print
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 5: STEP 5 - REGISTERED ADMISSION DIRECTORY                            */}
+      {/* ========================================================================= */}
+      {activeTab === 5 && (
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '8px',
+          border: '1px solid #cbd5e1',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+          padding: '20px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#1e3a5f' }}>
+              Confirmed Student Admissions Directory ({filteredStudents.length})
+            </h2>
+
+            <button
+              onClick={() => {
+                handleReset();
+                setActiveTab(1);
               }}
-            />
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '8px 16px',
+                fontWeight: '700',
+                fontSize: '13px',
+                cursor: 'pointer'
+              }}
+            >
+              <Plus size={16} /> New First Year Admission
+            </button>
+          </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setShowBulkModal(false)}
-                style={{ padding: '7px 14px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={bulkImporting || !bulkDataText.trim()}
-                onClick={handleProcessBulkImport}
-                style={{ padding: '7px 18px', borderRadius: '4px', border: 'none', background: '#2c5282', color: '#ffffff', cursor: bulkImporting ? 'not-allowed' : 'pointer', fontSize: '12.5px', fontWeight: 700 }}
-              >
-                {bulkImporting ? 'Importing...' : 'Start Import'}
-              </button>
+          {/* Search Bar */}
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+              <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text"
+                placeholder="Search by Name, Reg No, Department..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{ ...inputStyle, paddingLeft: '32px' }}
+              />
             </div>
+
+            <select
+              value={filterDept}
+              onChange={e => setFilterDept(e.target.value)}
+              style={{ ...inputStyle, width: 'auto', minWidth: '180px' }}
+            >
+              <option value="All">All Departments</option>
+              {departments.map((d, i) => {
+                const dName = d.name || d.departmentName || d;
+                return (
+                  <option key={d.id || d._id || i} value={dName}>
+                    {dName}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Table */}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
+                  <th style={thStyle}>Reg / Admission No</th>
+                  <th style={thStyle}>Student Name</th>
+                  <th style={thStyle}>Department & Course</th>
+                  <th style={thStyle}>Year & Sem</th>
+                  <th style={thStyle}>Total Fee</th>
+                  <th style={thStyle}>Paid</th>
+                  <th style={thStyle}>Balance</th>
+                  <th style={thStyle}>Receipt No</th>
+                  <th style={thStyle}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" style={{ textAlign: 'center', padding: '30px', color: '#64748b' }}>
+                      No students found. Click <b>New First Year Admission</b> to register.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStudents.map((s, idx) => (
+                    <tr key={s._id || s.id || idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ ...tdStyle, fontWeight: '700', color: '#1e3a5f' }}>{s.id || s.admissionNo}</td>
+                      <td style={{ ...tdStyle, fontWeight: '600' }}>{s.name || `${s.firstName || ''} ${s.lastName || ''}`}</td>
+                      <td style={tdStyle}>{s.course || 'N/A'} — {s.dept || s.department || 'N/A'}</td>
+                      <td style={tdStyle}>Sem {s.semester || 1} ({s.academicYear || '2026-2027'})</td>
+                      <td style={{ ...tdStyle, fontWeight: '700', color: '#1e40af' }}>₹{Number(s.totalFee || s.totalAmount || 0).toLocaleString()}</td>
+                      <td style={{ ...tdStyle, fontWeight: '700', color: '#16a34a' }}>₹{Number(s.amountPaid || s.paidAmount || 0).toLocaleString()}</td>
+                      <td style={{ ...tdStyle, fontWeight: '700', color: '#dc2626' }}>₹{Number(s.balanceFee || s.balanceAmount || 0).toLocaleString()}</td>
+                      <td style={{ ...tdStyle, fontSize: '12px', color: '#64748b' }}>{s.receiptNumber || 'REC-' + (s.id || '001')}</td>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => printReceiptDirect(s)}
+                            style={{
+                              background: '#eff6ff',
+                              color: '#2563eb',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '4px',
+                              padding: '4px 8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px',
+                              fontWeight: '600'
+                            }}
+                            title="Print Official Receipt"
+                          >
+                            <Printer size={13} /> Receipt
+                          </button>
+
+                          <button
+                            onClick={() => handleEditStudent(s)}
+                            style={{
+                              background: '#f8fafc',
+                              color: '#475569',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '4px',
+                              padding: '4px 8px',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              fontWeight: '600'
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
     </div>
   );
+};
+
+// Inline helper styles
+const labelStyle = {
+  fontSize: '13px',
+  fontWeight: '700',
+  color: '#000000',
+  whiteSpace: 'nowrap'
+};
+
+const inputStyle = {
+  width: '100%',
+  height: '28px',
+  padding: '2px 8px',
+  fontSize: '13px',
+  borderRadius: '2px',
+  border: '1px solid #7ba7cc',
+  background: '#ffffff',
+  color: '#000000',
+  outline: 'none',
+  boxSizing: 'border-box'
+};
+
+const feeRowStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '12px'
+};
+
+const feeLabelStyle = {
+  fontSize: '13px',
+  fontWeight: '600',
+  color: '#334155',
+  flex: 1
+};
+
+const feeInputStyle = {
+  width: '140px',
+  height: '30px',
+  padding: '4px 8px',
+  fontSize: '13px',
+  fontWeight: '600',
+  textAlign: 'right',
+  borderRadius: '4px',
+  border: '1px solid #94a3b8',
+  background: '#ffffff',
+  color: '#0f172a',
+  outline: 'none',
+  boxSizing: 'border-box'
+};
+
+const summaryRowStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  padding: '6px 0',
+  borderBottom: '1px dashed #e2e8f0',
+  fontSize: '13px'
+};
+
+const summaryLabelStyle = {
+  fontWeight: '700',
+  color: '#334155',
+  fontSize: '13px'
+};
+
+const summaryValStyle = {
+  fontWeight: '700',
+  color: '#000000',
+  fontSize: '13px',
+  textAlign: 'right'
+};
+
+const thStyle = {
+  padding: '8px 10px',
+  textAlign: 'left',
+  fontWeight: '700',
+  fontSize: '12px',
+  border: '1px solid #cbd5e1'
+};
+
+const tdStyle = {
+  padding: '6px 10px',
+  border: '1px solid #cbd5e1'
 };
 
 export default StudentRegistration;

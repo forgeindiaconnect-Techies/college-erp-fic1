@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, FileText, CheckCircle2, AlertCircle, User, X, Printer, UserPlus } from 'lucide-react';
-import { getStudents, createFee, createStudent, getAllFees, getStudentFeeStructure, getFeesByStudent } from '../../api/index';
+import { getStudents, createFee, createStudent, getAllFees, getStudentFeeStructure, getFeesByStudent, getDepartments } from '../../api/index';
 
 const printReceipt = (student, receiptNo, feeType, semester, amount, paymentMode) => {
   const win = window.open('', '_blank', 'width=700,height=650');
@@ -47,18 +47,126 @@ const FeesCollection = () => {
   const [studentPayments, setStudentPayments] = useState([]);
   const [studentScholarship, setStudentScholarship] = useState(null);
 
+  const ALL_FEE_DEFINITIONS = [
+    { label: 'All Fees (Total Bill)', key: 'allFees' },
+    { label: 'Tuition Fee', key: 'tuitionFee' },
+    { label: 'Admission Fee', key: 'admissionFee' },
+    { label: 'University Fee', key: 'universityFee' },
+    { label: 'Marksheet Verification', key: 'marksheetVerification' },
+    { label: 'Special Fee', key: 'specialFee' },
+    { label: 'English Lab / NSS / ID', key: 'englishLabNssId' },
+    { label: 'Computer Lab Fee', key: 'computerLab' },
+    { label: 'Stationary Fee', key: 'stationary' },
+    { label: 'PTA Fund', key: 'pta' },
+    { label: 'Exam Fee', key: 'examFee' },
+    { label: 'Library Fee', key: 'libraryFee' },
+    { label: 'Hostel Fee', key: 'hostelFee' },
+    { label: 'Transport Fee', key: 'transportFee' },
+    { label: 'Other Fee', key: 'otherFee' }
+  ];
+
+  const getDefaultFeeStructureForDept = (deptName) => {
+    const dLower = String(deptName || '').toLowerCase();
+    if (dLower.includes('computer') || dLower.includes('cse') || dLower.includes('tech') || dLower.includes('engineering')) {
+      return {
+        tuitionFee: 35000,
+        admissionFee: 5000,
+        universityFee: 2500,
+        marksheetVerification: 500,
+        specialFee: 5000,
+        englishLabNssId: 2000,
+        computerLab: 4000,
+        stationary: 1500,
+        pta: 1000,
+        otherFee: 1500,
+        examFee: 2500,
+        libraryFee: 1000
+      };
+    }
+    if (dLower.includes('food') || dLower.includes('nutrition') || dLower.includes('math') || dLower.includes('science')) {
+      return {
+        tuitionFee: 22000,
+        admissionFee: 3500,
+        universityFee: 2000,
+        marksheetVerification: 500,
+        specialFee: 3500,
+        englishLabNssId: 1500,
+        computerLab: 3000,
+        stationary: 1000,
+        pta: 1000,
+        otherFee: 1000,
+        examFee: 2000,
+        libraryFee: 1000
+      };
+    }
+    // Arts / History / Language / General
+    return {
+      tuitionFee: 15000,
+      admissionFee: 2500,
+      universityFee: 1500,
+      marksheetVerification: 500,
+      specialFee: 2000,
+      englishLabNssId: 1000,
+      computerLab: 1000,
+      stationary: 1000,
+      pta: 500,
+      otherFee: 1000,
+      examFee: 1500,
+      libraryFee: 1000
+    };
+  };
+
   const getDiscountedAmount = (key, baseAmount, scholarship) => {
-    if (!scholarship || key !== 'tuitionFee') return baseAmount;
+    if (!scholarship || key !== 'tuitionFee') return Number(baseAmount) || 0;
     let discount = 0;
-    if (scholarship.amount === '100%') discount = baseAmount;
-    else if (scholarship.amount === '75%') discount = baseAmount * 0.75;
-    else if (scholarship.amount === '50%') discount = baseAmount * 0.50;
-    else if (scholarship.amount === '25%') discount = baseAmount * 0.25;
-    return Math.max(0, baseAmount - discount);
+    const numBase = Number(baseAmount) || 0;
+    if (scholarship.amount === '100%') discount = numBase;
+    else if (scholarship.amount === '75%') discount = numBase * 0.75;
+    else if (scholarship.amount === '50%') discount = numBase * 0.50;
+    else if (scholarship.amount === '25%') discount = numBase * 0.25;
+    return Math.max(0, numBase - discount);
+  };
+
+  const getFeeRate = (fType) => {
+    if (!feeStructure) return 0;
+    if (fType === 'All Fees (Total Bill)') {
+      return Number(feeStructure.allFees) || 26000;
+    }
+    const def = ALL_FEE_DEFINITIONS.find(f => f.label === fType);
+    if (!def) return 0;
+    return Number(feeStructure[def.key]) || 0;
+  };
+
+  const getFeePaid = (fType) => {
+    if (fType === 'All Fees (Total Bill)') {
+      return studentPayments.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
+    }
+    return studentPayments.filter(f => f.feeType === fType).reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
+  };
+
+  const getFeePending = (fType) => {
+    if (!feeStructure) return 0;
+    const rate = getFeeRate(fType);
+    const paid = getFeePaid(fType);
+    const discounted = fType === 'All Fees (Total Bill)' 
+      ? Math.max(0, rate - (studentScholarship ? (studentScholarship.amount === '100%' ? (Number(feeStructure.tuitionFee) || 0) : 0) : 0))
+      : getDiscountedAmount(ALL_FEE_DEFINITIONS.find(f => f.label === fType)?.key || '', rate, studentScholarship);
+    return Math.max(0, discounted - paid);
+  };
+
+  const getSuggestedFeeAmount = (fType) => {
+    if (!feeStructure) return 0;
+    const pending = getFeePending(fType);
+    if (pending > 0) return pending;
+    // If pending balance is 0, show the standard fee amount so the user sees the rate
+    const rate = getFeeRate(fType);
+    const def = ALL_FEE_DEFINITIONS.find(f => f.label === fType);
+    return def ? getDiscountedAmount(def.key, rate, studentScholarship) : rate;
   };
 
   // New Student Modal States
   const [showRegModal, setShowRegModal] = useState(false);
+  const [departments, setDepartments] = useState([]);
   const [regForm, setRegForm] = useState({
     name: '',
     email: '',
@@ -66,7 +174,7 @@ const FeesCollection = () => {
     phone: '',
     aadhar: '',
     dob: '',
-    dept: 'Computer Science Engineering',
+    dept: '',
     sem: 'Sem 1',
     cgpa: '',
     attendance: '',
@@ -94,9 +202,9 @@ const FeesCollection = () => {
   const [regSuccess, setRegSuccess] = useState('');
 
   // Payment form
-  const [feeType, setFeeType]       = useState('Tuition Fee');
-  const [semester, setSemester]     = useState('Sem 6');
-  const [amount, setAmount]         = useState(45000);
+  const [feeType, setFeeType]       = useState('All Fees (Total Bill)');
+  const [semester, setSemester]     = useState('Sem 1');
+  const [amount, setAmount]         = useState(0);
   const [paymentMode, setPaymentMode] = useState('Bank Transfer (NEFT/RTGS)');
   const [refNo, setRefNo]           = useState('');
 
@@ -105,12 +213,15 @@ const FeesCollection = () => {
   const load = async () => {
     try {
       setLoadingStudents(true);
-      const [studRes, feeRes] = await Promise.all([
+      const [studRes, feeRes, deptRes] = await Promise.all([
         getStudents().catch(() => ({ data: [] })),
-        getAllFees().catch(() => ({ data: [] }))
+        getAllFees().catch(() => ({ data: [] })),
+        getDepartments().catch(() => ({ data: [] }))
       ]);
       const backendStudents = studRes.data || [];
       const fees = feeRes.data || [];
+      const loadedDepts = Array.isArray(deptRes.data) ? deptRes.data : deptRes.data?.departments || [];
+      setDepartments(loadedDepts);
 
       // Combine with localStorage mock students to ensure full visibility
       const erpStudents = JSON.parse(localStorage.getItem(`erp_students_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
@@ -169,14 +280,32 @@ const FeesCollection = () => {
         getFeesByStudent(s.id || s._id).catch(() => ({ data: [] }))
       ]);
       
-      const structure = structRes.data || {
-        tuitionFee: 60000,
-        examFee: 2500,
-        libraryFee: 1000,
-        hostelFee: 40000,
-        transportFee: 15000
-      };
+      const payments = feesRes.data || [];
+      const deptDefaults = getDefaultFeeStructureForDept(s.dept || s.department);
       
+      // Merge: deptDefaults < s.feeBreakdown < structRes.data
+      const sFeeBreakdown = s.feeBreakdown || {};
+      const serverStructure = structRes.data || {};
+
+      const mergedStructure = {
+        ...deptDefaults,
+        ...sFeeBreakdown,
+        ...serverStructure
+      };
+
+      // Add hostel & transport if student opted in
+      if (s.hostelFeeAmount || s.hostel === 'Yes' || s.hostelRequired === 'yes' || s.dormFacility) {
+        mergedStructure.hostelFee = Number(s.hostelFeeAmount) || mergedStructure.hostelFee || 40000;
+      }
+      if (s.transportFeeAmount || s.transport === 'Yes' || s.transportRequired === 'yes' || s.busFacility) {
+        mergedStructure.transportFee = Number(s.transportFeeAmount) || mergedStructure.transportFee || 15000;
+      }
+
+      // Compute total sum of all itemized keys
+      const itemizedKeys = ['tuitionFee', 'admissionFee', 'universityFee', 'marksheetVerification', 'specialFee', 'englishLabNssId', 'computerLab', 'stationary', 'pta', 'examFee', 'libraryFee', 'hostelFee', 'transportFee', 'otherFee'];
+      const calculatedTotal = itemizedKeys.reduce((sum, k) => sum + (Number(mergedStructure[k]) || 0), 0);
+      mergedStructure.allFees = Number(s.totalFee) || calculatedTotal || 26000;
+
       let foundScholarship = null;
       try {
         const savedScholars = localStorage.getItem(`erp_scholarships_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
@@ -187,18 +316,22 @@ const FeesCollection = () => {
       } catch (e) { console.error('Error parsing scholarships', e); }
       
       setStudentScholarship(foundScholarship);
-      setFeeStructure(structure);
-      setStudentPayments(feesRes.data || []);
+      setFeeStructure(mergedStructure);
+      setStudentPayments(payments);
       
-      setFeeType('Tuition Fee');
-      
-      // Calculate pending amount for Tuition Fee
-      const effectiveTuition = getDiscountedAmount('tuitionFee', structure.tuitionFee, foundScholarship);
-      const paid = (feesRes.data || []).filter(f => f.feeType === 'Tuition Fee').reduce((acc, curr) => acc + curr.paidAmount, 0);
-      const pending = effectiveTuition - paid;
-      setAmount(pending > 0 ? pending : 0);
+      // Calculate total paid across all fees
+      const totalPaidAmount = payments.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
+      const discountVal = foundScholarship ? (foundScholarship.amount === '100%' ? (Number(mergedStructure.tuitionFee) || 0) : (Number(mergedStructure.tuitionFee) || 0) * (parseFloat(foundScholarship.amount) / 100 || 0)) : 0;
+      const netTotalFee = Math.max(0, mergedStructure.allFees - discountVal);
+      const netPendingTotal = Math.max(0, netTotalFee - totalPaidAmount);
 
-      if (s.sem) setSemester(s.sem);
+      setFeeType('All Fees (Total Bill)');
+      setAmount(netPendingTotal > 0 ? netPendingTotal : netTotalFee);
+
+      if (s.sem || s.semester) {
+        const semVal = s.sem || s.semester;
+        setSemester(typeof semVal === 'string' && semVal.startsWith('Sem') ? semVal : `Sem ${semVal}`);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -209,18 +342,19 @@ const FeesCollection = () => {
     setQuery('');
     setSuggestions([]);
     setStudentScholarship(null);
+    setFeeStructure(null);
+    setStudentPayments([]);
+    setAmount(0);
+    setFeeType('All Fees (Total Bill)');
     inputRef.current?.focus();
   };
 
   const generateRegNo = (deptName, existingCount) => {
-    const codes = {
-      'Computer Science': 'CS',
-      'Electrical Engg.': 'EE',
-      'Mechanical Engg.': 'ME',
-      'Civil Engg.': 'CE',
-      'Information Tech.': 'IT',
-    };
-    const code = codes[deptName] || 'ST';
+    const deptObj = departments.find(d => 
+      (d?.name && d.name.toLowerCase() === (deptName || '').toLowerCase()) ||
+      (d?.code && d.code.toLowerCase() === (deptName || '').toLowerCase())
+    );
+    const code = deptObj?.code || (deptName ? deptName.replace(/[^A-Za-z0-9]/g, '').substring(0, 3).toUpperCase() : 'ST');
     const year = new Date().getFullYear();
     return `${code}${year}${String(existingCount + 1).padStart(3, '0')}`;
   };
@@ -279,7 +413,7 @@ const FeesCollection = () => {
         setSelectedStudent(res.data);
         setQuery(res.data.name);
         setSemester(res.data.sem || 'Sem 1');
-        setAmount(45000); // Set default tuition fee amount
+        setAmount(26000);
         
         setTimeout(() => {
           setShowRegModal(false);
@@ -311,13 +445,26 @@ const FeesCollection = () => {
     setErrorMsg('');
     try {
       const receiptNo = `REC-${Math.floor(100000 + Math.random() * 900000)}`;
+      let totalFees = Number(amount);
+      if (feeStructure) {
+        if (feeType === 'All Fees (Total Bill)') {
+          const discountVal = studentScholarship ? (studentScholarship.amount === '100%' ? (Number(feeStructure.tuitionFee) || 0) : (Number(feeStructure.tuitionFee) || 0) * (parseFloat(studentScholarship.amount) / 100 || 0)) : 0;
+          totalFees = Math.max(0, (Number(feeStructure.allFees) || Number(amount)) - discountVal);
+        } else {
+          const def = ALL_FEE_DEFINITIONS.find(f => f.label === feeType);
+          const feeKey = def ? def.key : feeType.replace(/\s+/g, '').replace(/^\w/, c => c.toLowerCase());
+          const baseTotal = Number(feeStructure[feeKey]) || Number(amount);
+          totalFees = getDiscountedAmount(feeKey, baseTotal, studentScholarship);
+        }
+      }
+
       const payload = {
         studentId: selectedStudent.id,
         studentName: selectedStudent.name,
-        department: selectedStudent.dept || selectedStudent.department || 'Computer Science',
+        department: selectedStudent.dept || selectedStudent.department || 'General',
         semester,
         feeType,
-        totalFees: feeStructure ? getDiscountedAmount(feeType.replace(' ', '').replace(/^\w/, c => c.toLowerCase()), feeStructure[feeType.replace(' ', '').replace(/^\w/, c => c.toLowerCase())], studentScholarship) : Number(amount),
+        totalFees,
         paidAmount: Number(amount),
         paymentMode,
         receiptNo,
@@ -520,14 +667,21 @@ const FeesCollection = () => {
                 {[
                   ['Name', selectedStudent.name],
                   ['Student ID', selectedStudent.id],
-                  ['Department', selectedStudent.dept || selectedStudent.department],
-                  ['Current Sem', selectedStudent.sem || 'N/A'],
-                  ['CGPA', selectedStudent.cgpa || 'N/A'],
-                  ['Fee Status', selectedStudent.feeStatus || 'N/A'],
+                  ['Department', selectedStudent.dept || selectedStudent.department || 'N/A'],
+                  ['Course', selectedStudent.course || 'N/A'],
+                  ['Year & Sem', `${selectedStudent.sem || selectedStudent.semester || 'Sem 1'} (${selectedStudent.academicYear || '2026 - 2027'})`],
+                  ['Total Registered Fee', `₹${(Number(feeStructure?.allFees) || Number(selectedStudent.totalFee) || 26000).toLocaleString()}`],
+                  ['Amount Paid', `₹${studentPayments.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0).toLocaleString()}`],
+                  ['Balance Amount', `₹${Math.max(0, (Number(feeStructure?.allFees) || Number(selectedStudent.totalFee) || 26000) - studentPayments.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0)).toLocaleString()}`],
+                  ['Fee Status', selectedStudent.feeStatus || (Math.max(0, (Number(feeStructure?.allFees) || Number(selectedStudent.totalFee) || 26000) - studentPayments.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0)) === 0 ? 'Paid' : 'Pending')],
                 ].map(([label, val]) => (
-                  <div key={label} style={{ display:'flex', justifycontent:'space-between', paddingBottom:'8px', borderBottom:'1px solid var(--border-color)', justifyContent:'space-between' }}>
+                  <div key={label} style={{ display:'flex', justifyContent:'space-between', paddingBottom:'8px', borderBottom:'1px solid var(--border-color)' }}>
                     <span style={{ color:'var(--text-muted)', fontSize:'0.85rem' }}>{label}</span>
-                    <span style={{ fontWeight:600, color: label === 'Fee Status' ? (val === 'Paid' ? '#10b981' : '#f59e0b') : 'var(--text-main)', fontSize:'0.9rem' }}>{val}</span>
+                    <span style={{ 
+                      fontWeight: 700, 
+                      color: label === 'Balance Amount' ? '#dc2626' : (label === 'Amount Paid' ? '#16a34a' : (label === 'Total Registered Fee' ? '#1e40af' : (label === 'Fee Status' ? (val === 'Paid' ? '#10b981' : '#f59e0b') : 'var(--text-main)'))), 
+                      fontSize:'0.9rem' 
+                    }}>{val}</span>
                   </div>
                 ))}
               </div>
@@ -551,33 +705,27 @@ const FeesCollection = () => {
               </button>
 
               {feeStructure && (() => {
-                const validFees = [
-                  { label: 'Tuition Fee', key: 'tuitionFee' },
-                  { label: 'Exam Fee', key: 'examFee' },
-                  { label: 'Library Fee', key: 'libraryFee' },
-                  { label: 'Hostel Fee', key: 'hostelFee' },
-                  { label: 'Transport Fee', key: 'transportFee' }
-                ].filter(fee => (feeStructure[fee.key] || 0) > 0);
+                const validFees = ALL_FEE_DEFINITIONS.filter(fee => fee.key !== 'allFees' && (Number(feeStructure[fee.key]) || 0) > 0);
 
                 let grossFee = 0;
                 let totalDiscount = 0;
                 let totalPaid = 0;
                 
                 validFees.forEach(fee => {
-                  const baseTotal = feeStructure[fee.key] || 0;
+                  const baseTotal = Number(feeStructure[fee.key]) || 0;
                   const netTotal = getDiscountedAmount(fee.key, baseTotal, studentScholarship);
-                  const paid = studentPayments.filter(f => f.feeType === fee.label).reduce((acc, curr) => acc + curr.paidAmount, 0);
+                  const paid = studentPayments.filter(f => f.feeType === fee.label).reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
                   grossFee += baseTotal;
                   totalDiscount += (baseTotal - netTotal);
                   totalPaid += paid;
                 });
 
                 const netFee = grossFee - totalDiscount;
-                const pendingFee = netFee - totalPaid;
+                const pendingFee = Math.max(0, netFee - totalPaid);
 
                 return (
                   <div style={{ marginTop: '20px' }}>
-                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '10px' }}>Fee Status Table</h4>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '10px' }}>Itemized Fee Status Table</h4>
                     <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
                         <thead style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
@@ -592,18 +740,19 @@ const FeesCollection = () => {
                         </thead>
                         <tbody>
                           {validFees.map(fee => {
-                            const baseTotal = feeStructure[fee.key] || 0;
+                            const baseTotal = Number(feeStructure[fee.key]) || 0;
                             const total = getDiscountedAmount(fee.key, baseTotal, studentScholarship);
                             const discountAmount = baseTotal - total;
-                            const paid = studentPayments.filter(f => f.feeType === fee.label).reduce((acc, curr) => acc + curr.paidAmount, 0);
-                            const pending = total - paid;
+                            const paid = studentPayments.filter(f => f.feeType === fee.label).reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
+                            const pending = Math.max(0, total - paid);
                             const status = paid >= total && total > 0 ? 'Paid' : (paid > 0 ? 'Partial' : 'Pending');
                             
                             return (
                               <tr key={fee.key} 
                                 onClick={() => {
                                   setFeeType(fee.label);
-                                  setAmount(pending > 0 ? pending : 0);
+                                  const suggested = getSuggestedFeeAmount(fee.label);
+                                  setAmount(suggested);
                                 }}
                                 style={{ 
                                   cursor: 'pointer', 
@@ -630,15 +779,15 @@ const FeesCollection = () => {
                       </table>
                     </div>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center', marginBottom: '16px' }}>
-                      Click a row to load the pending amount into the form.
+                      Click any fee row to pay that specific fee, or choose "All Fees (Total Bill)" to pay the entire balance.
                     </p>
 
                     <div style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                       <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '12px' }}>Total Fee Summary</h4>
                       
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.85rem' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>Original Gross Fee</span>
-                        <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>₹{grossFee.toLocaleString()}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>Original Gross Bill</span>
+                        <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>₹{(Number(feeStructure.allFees) || grossFee).toLocaleString()}</span>
                       </div>
                       
                       {totalDiscount > 0 && (
@@ -656,13 +805,13 @@ const FeesCollection = () => {
                       </div>
                       
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.85rem' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>Amount Paid</span>
+                        <span style={{ color: 'var(--text-muted)' }}>Total Amount Paid</span>
                         <span style={{ fontWeight: 600, color: '#3b82f6' }}>₹{totalPaid.toLocaleString()}</span>
                       </div>
                       
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>Pending Amount</span>
-                        <span style={{ fontWeight: 800, color: pendingFee > 0 ? '#f59e0b' : '#10b981' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Net Pending Balance</span>
+                        <span style={{ fontWeight: 800, color: pendingFee > 0 ? '#dc2626' : '#10b981' }}>
                           {pendingFee > 0 ? `₹${pendingFee.toLocaleString()}` : 'Fully Paid'}
                         </span>
                       </div>
@@ -698,32 +847,29 @@ const FeesCollection = () => {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'18px', marginBottom:'18px' }}>
               <div>
                 <label style={{ display:'block', fontSize:'0.85rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'6px' }}>Fee Type</label>
-                <select value={feeType} onChange={e => {
-                  setFeeType(e.target.value);
-                  if (feeStructure) {
-                    const key = e.target.value === 'Tuition Fee' ? 'tuitionFee' : 
-                                e.target.value === 'Exam Fee' ? 'examFee' : 
-                                e.target.value === 'Library Fee' ? 'libraryFee' : 
-                                e.target.value === 'Hostel Fee' ? 'hostelFee' : 
-                                e.target.value === 'Transport Fee' ? 'transportFee' : '';
-                    if (key) {
-                      const effectiveTotal = getDiscountedAmount(key, feeStructure[key], studentScholarship);
-                      const paid = studentPayments.filter(f => f.feeType === e.target.value).reduce((acc, curr) => acc + curr.paidAmount, 0);
-                      const pending = effectiveTotal - paid;
-                      setAmount(pending > 0 ? pending : 0);
+                <select 
+                  value={feeType} 
+                  onChange={e => {
+                    const selectedVal = e.target.value;
+                    setFeeType(selectedVal);
+                    if (feeStructure) {
+                      const suggested = getSuggestedFeeAmount(selectedVal);
+                      setAmount(suggested);
                     }
+                  }}
+                  style={{ width:'100%', padding:'10px 14px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-main)', fontSize:'0.95rem', outline:'none' }}
+                >
+                  {ALL_FEE_DEFINITIONS
+                    .filter(fee => fee.key === 'allFees' || !feeStructure || (Number(feeStructure[fee.key]) || 0) > 0)
+                    .map(fee => {
+                      const feeRate = getFeeRate(fee.label);
+                      return (
+                        <option key={fee.key} value={fee.label}>
+                          {fee.label} {feeRate > 0 ? `(₹${feeRate.toLocaleString()})` : ''}
+                        </option>
+                      );
+                    })
                   }
-                }}
-                  style={{ width:'100%', padding:'10px 14px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-main)', fontSize:'0.95rem', outline:'none' }}>
-                  {[
-                    { label: 'Tuition Fee', key: 'tuitionFee' },
-                    { label: 'Exam Fee', key: 'examFee' },
-                    { label: 'Library Fee', key: 'libraryFee' },
-                    { label: 'Hostel Fee', key: 'hostelFee' },
-                    { label: 'Transport Fee', key: 'transportFee' }
-                  ].filter(fee => !feeStructure || feeStructure[fee.key] > 0).map(fee => (
-                    <option key={fee.key} value={fee.label}>{fee.label}</option>
-                  ))}
                 </select>
               </div>
               <div>
@@ -736,9 +882,31 @@ const FeesCollection = () => {
             </div>
 
             <div style={{ marginBottom:'18px' }}>
-              <label style={{ display:'block', fontSize:'0.85rem', fontWeight:600, color:'var(--text-muted)', marginBottom:'6px' }}>Amount (₹)</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label style={{ fontSize:'0.85rem', fontWeight:600, color:'var(--text-muted)' }}>Amount (₹)</label>
+                {feeStructure && selectedStudent && (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Standard Rate: <strong>₹{getFeeRate(feeType).toLocaleString()}</strong>
+                  </span>
+                )}
+              </div>
               <input type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)}
                 style={{ width:'100%', padding:'12px 14px', borderRadius:'8px', border:'2px solid #10b981', background:'var(--bg-secondary)', color:'var(--text-main)', fontSize:'1.1rem', fontWeight:700, outline:'none', boxSizing:'border-box' }} />
+              {feeStructure && selectedStudent && (
+                <div style={{ marginTop: '8px', padding: '8px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  <span>
+                    Rate: <strong style={{ color: 'var(--text-main)' }}>₹{getFeeRate(feeType).toLocaleString()}</strong>
+                  </span>
+                  <span>
+                    Paid: <strong style={{ color: '#16a34a' }}>₹{getFeePaid(feeType).toLocaleString()}</strong>
+                  </span>
+                  <span>
+                    Pending: <strong style={{ color: getFeePending(feeType) > 0 ? '#dc2626' : '#16a34a' }}>
+                      {getFeePending(feeType) > 0 ? `₹${getFeePending(feeType).toLocaleString()}` : '✓ Fully Paid'}
+                    </strong>
+                  </span>
+                </div>
+              )}
             </div>
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'18px', marginBottom:'18px' }}>
@@ -886,21 +1054,14 @@ const FeesCollection = () => {
                       <select required value={regForm.dept} onChange={e => setRegForm({...regForm, dept: e.target.value})}
                         style={{ width:'100%', padding:'12px 14px', borderRadius:'6px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-main)', outline:'none', boxSizing:'border-box', fontSize:'0.95rem' }}>
                         <option value="">— Select Department —</option>
-                        <option value="Computer Science Engineering">Computer Science Engineering</option>
-                        <option value="Information Technology">Information Technology</option>
-                        <option value="Electronics & Communication Engineering">Electronics & Communication Engineering</option>
-                        <option value="Electrical & Electronics Engineering">Electrical & Electronics Engineering</option>
-                        <option value="Mechanical Engineering">Mechanical Engineering</option>
-                        <option value="Civil Engineering">Civil Engineering</option>
-                        <option value="Artificial Intelligence & Data Science">Artificial Intelligence & Data Science</option>
-                        <option value="Artificial Intelligence & Machine Learning">Artificial Intelligence & Machine Learning</option>
-                        <option value="Cyber Security">Cyber Security</option>
-                        <option value="Biomedical Engineering">Biomedical Engineering</option>
-                        <option value="Aeronautical Engineering">Aeronautical Engineering</option>
-                        <option value="Automobile Engineering">Automobile Engineering</option>
-                        <option value="Robotics Engineering">Robotics Engineering</option>
-                        <option value="Chemical Engineering">Chemical Engineering</option>
-                        <option value="Biotechnology Engineering">Biotechnology Engineering</option>
+                        {departments.map((d, i) => {
+                          const dName = d?.name || d?.departmentName || d;
+                          return (
+                            <option key={d?.id || d?._id || i} value={dName}>
+                              {dName}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                     <div>
