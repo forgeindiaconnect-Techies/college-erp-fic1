@@ -107,33 +107,21 @@ const AccountsDashboard = () => {
   // Department-wise pending
   const deptPendingMap = {};
   fees.filter(f => f.status !== 'Paid').forEach(f => {
-    const d = (f.department || 'Other').split(' ')[0];
+    const d = f.department || 'Other';
     deptPendingMap[d] = (deptPendingMap[d] || 0) + (f.pendingAmount || f.totalFees || 0);
   });
   const pendingFeesData = Object.entries(deptPendingMap).map(([name, Pending]) => ({ name, Pending }));
-  if (pendingFeesData.length === 0) {
-    pendingFeesData.push(
-      { name: 'Computer', Pending: 100000 }, { name: 'Electrical', Pending: 80000 },
-      { name: 'Mechanical', Pending: 80000 }
-    );
-  }
 
   // Department-wise collected (pie)
   const DEPT_COLORS = ['#3b82f6','#10b981','#f59e0b','#6366F1','#ef4444','#06b6d4'];
   const deptCollectedMap = {};
   fees.filter(f => f.status === 'Paid').forEach(f => {
-    const d = (f.department || 'Other').split(' ')[0];
+    const d = f.department || 'Other';
     deptCollectedMap[d] = (deptCollectedMap[d] || 0) + (f.paidAmount || f.totalFees || 0);
   });
   const deptFeesData = Object.entries(deptCollectedMap).map(([name, value], i) => ({
     name, value, color: DEPT_COLORS[i % DEPT_COLORS.length]
   }));
-  if (deptFeesData.length === 0) {
-    deptFeesData.push(
-      { name: 'CSE', value: 1500000, color: '#3b82f6' }, { name: 'EEE', value: 1200000, color: '#10b981' },
-      { name: 'MECH', value: 1000000, color: '#f59e0b' }
-    );
-  }
 
   // Expense distribution (salary + other expenses)
   const expenseDeptMap = { 'Salaries': salaryTotal };

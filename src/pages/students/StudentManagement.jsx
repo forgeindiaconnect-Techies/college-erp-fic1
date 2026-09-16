@@ -23,6 +23,7 @@ const FEE_STATUS = ['Paid', 'Pending', 'Partial', 'Waived'];
 const EMPTY_FORM = {
   name:'', email:'', password:'', phone:'', dept:'', sem:'',
   cgpa:'', attendance:'', status:'Active', feeStatus:'Pending',
+  admissionStatus:'Applied',
   idNumber: '', dob: '', academicYear: '', section: '', batch: '',
   admissionDate: '', hostelRequired: '', roomNumber: '',
   hostelName: '', blockWing: '', bedNumber: '', wardenName: '',
@@ -236,6 +237,30 @@ const StudentManagement = () => {
     }
   };
 
+  const updateAdmissionStatus = async (student, admissionStatus) => {
+    try {
+      const payload = {
+        ...student,
+        admissionStatus
+      };
+
+      await updateStudent(student.id, payload);
+
+      setStudents(prev =>
+        prev.map(s =>
+          s.id === student.id
+            ? { ...s, admissionStatus }
+            : s
+        )
+      );
+
+      alert(`Admission status updated to ${admissionStatus}`);
+    } catch (err) {
+      console.error('Admission status update failed:', err);
+      alert('Failed to update admission status.');
+    }
+  };
+
   const field = (key) => ({
     value: form[key],
     onChange: e => setForm(f => ({ ...f, [key]: e.target.value })),
@@ -330,7 +355,8 @@ const StudentManagement = () => {
                 {[
                   ['name','Student Name'], ['id','Register No'], ['dept','Department'],
                   ['hostelRequired','Hostel Req'], ['transportRequired','Transport Req'],
-                  ['sem','Semester'], ['feeStatus','Fee Status'], ['status','Status'],
+                  ['sem','Semester'], ['feeStatus','Fee Status'], ['admissionStatus','Admission'],
+                  ['status','Status'],
                 ].map(([k, label]) => (
                   <th key={k} className="sortable-th" onClick={() => handleSort(k)}>
                     {label} {makeSortIcon(k, sortKey, sortAsc)}
@@ -377,8 +403,61 @@ const StudentManagement = () => {
                         <td><span className={`status-badge ${s.status === 'Active' ? 'status-active' : 'status-inactive'}`}>{s.status}</span></td>
                         <td>
                           <div className="action-btns">
-                            <button className="act-btn" title="Edit" onClick={() => openEdit(s)}><Edit2 size={15}/></button>
-                            <button className="act-btn act-delete" title="Delete" onClick={() => handleDelete(s.id)}><Trash2 size={15}/></button>
+                            <button
+                              className="act-btn"
+                              title="Edit"
+                              onClick={() => openEdit(s)}
+                            >
+                              <Edit2 size={15} />
+                            </button>
+
+                            {s.admissionStatus === 'Applied' && (
+                              <button
+                                className="act-btn"
+                                title="Move to Under Review"
+                                onClick={() => updateAdmissionStatus(s, 'Under Review')}
+                              >
+                                <CheckCircle size={15} />
+                              </button>
+                            )}
+
+                            {s.admissionStatus === 'Under Review' && (
+                              <>
+                                <button
+                                  className="act-btn"
+                                  title="Approve"
+                                  onClick={() => updateAdmissionStatus(s, 'Approved')}
+                                >
+                                  <CheckCircle size={15} />
+                                </button>
+
+                                <button
+                                  className="act-btn act-delete"
+                                  title="Reject"
+                                  onClick={() => updateAdmissionStatus(s, 'Rejected')}
+                                >
+                                  <X size={15} />
+                                </button>
+                              </>
+                            )}
+
+                            {s.admissionStatus === 'Approved' && (
+                              <button
+                                className="act-btn"
+                                title="Confirm Admission"
+                                onClick={() => updateAdmissionStatus(s, 'Confirmed')}
+                              >
+                                <CheckCircle size={15} />
+                              </button>
+                            )}
+
+                            <button
+                              className="act-btn act-delete"
+                              title="Delete"
+                              onClick={() => handleDelete(s.id)}
+                            >
+                              <Trash2 size={15} />
+                            </button>
                           </div>
                         </td>
                       </tr>

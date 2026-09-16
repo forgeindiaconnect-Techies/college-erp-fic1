@@ -5,7 +5,7 @@ import {
   LayoutDashboard, CreditCard, AlertCircle, Banknote,
   Receipt, FileText, LogOut, ChevronRight, ChevronDown,
   History, PieChart, Award, X, Wallet, FileBarChart,
-  UserPlus
+  UserPlus, Layers
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -49,6 +49,7 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
       name: 'Fees & Collections',
       icon: <Wallet size={20} />,
       items: [
+        { name: 'Fee Structure', path: '/accounts/fee-structure', icon: <Layers size={20} /> },
         { name: 'Fees Collection', path: '/accounts/fees-collection', icon: <CreditCard size={20} /> },
         { name: 'Pending Fees', path: '/accounts/pending-fees', icon: <AlertCircle size={20} /> },
         { name: 'Payment History', path: '/accounts/payment-history', icon: <History size={20} /> }

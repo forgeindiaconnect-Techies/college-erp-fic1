@@ -1,14 +1,69 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const feeStructureSchema = new mongoose.Schema({
-  studentId: { type: String, required: true, unique: true },
-  tuitionFee: { type: Number, default: 60000 },
-  examFee: { type: Number, default: 2500 },
-  libraryFee: { type: Number, default: 0 },
-  hostelFee: { type: Number, default: 0 },
-  transportFee: { type: Number, default: 0 },
-  scholarshipAmount: { type: Number, default: 0 },
-  scholarshipName: { type: String, default: '' }
-, collegeId: { type: String } }, { timestamps: true });
+const feeStructureSchema = new mongoose.Schema(
+  {
+    collegeId: {
+      type: mongoose.Schema.Types.Mixed,
+      ref: "College",
+      required: true,
+      index: true,
+    },
 
-export default mongoose.model('FeeStructure', feeStructureSchema);
+    academicYear: {
+      type: String,
+      required: true,
+    },
+
+    course: {
+      type: String,
+      required: true,
+    },
+
+    department: {
+      type: String,
+      required: true,
+    },
+
+    semester: {
+      type: Number,
+      required: true,
+    },
+
+    fees: [
+      {
+        feeType: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+
+        amount: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+      },
+    ],
+
+    totalAmount: {
+      type: Number,
+      default: 0,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+feeStructureSchema.index(
+  {
+    collegeId: 1,
+    academicYear: 1,
+    course: 1,
+    department: 1,
+    semester: 1,
+  },
+  { unique: true }
+);
+
+export default mongoose.model("FeeStructure", feeStructureSchema);

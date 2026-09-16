@@ -1,22 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Filter, Mail, CheckCircle2 } from 'lucide-react';
-import { getAllFees, updateFee, getStudents, createFee } from '../../api/index';
+import { getAllFees, updateFee, getStudents, createFee, getDepartments } from '../../api/index';
 
 const PendingFees = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All Departments');
   const [rawFees, setRawFees] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [successMsg, setSuccessMsg] = useState('');
 
   const loadPendingFees = async () => {
     try {
-      const [feeRes, studRes] = await Promise.all([
+      const [feeRes, studRes, deptRes] = await Promise.all([
         getAllFees().catch(() => ({ data: [] })),
-        getStudents().catch(() => ({ data: [] }))
+        getStudents().catch(() => ({ data: [] })),
+        getDepartments().catch(() => ({ data: [] }))
       ]);
       
       const fees = feeRes.data || [];
       const backendStudents = studRes.data || [];
+      const loadedDepts = Array.isArray(deptRes.data) ? deptRes.data : deptRes.data?.departments || [];
+      setDepartments(loadedDepts);
       
       const erpStudents = JSON.parse(localStorage.getItem(`erp_students_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
       const students = [...backendStudents];
@@ -79,13 +83,14 @@ const PendingFees = () => {
           feeType: 'Tuition Fee',
           totalFees: fee.totalFees,
           paidAmount: fee.totalFees,
-          paymentMode: 'Cash',
+          pendingAmount: 0,
           status: 'Paid',
-          paymentDate: new Date()
+          paymentDate: new Date(),
+          paymentMode: 'Cash'
         };
         const res = await createFee(payload);
         if (res && (res.status === 200 || res.status === 201)) {
-          setSuccessMsg(`Successfully cleared dues of ₹${fee.totalFees.toLocaleString()} for ${fee.studentName}!`);
+          setSuccessMsg(`Successfully cleared dues of ₹${fee.totalFees.toLocaleString()} for ${fee.studentName || fee.studentId}!`);
           await loadPendingFees();
           setTimeout(() => setSuccessMsg(''), 2000);
         }
@@ -116,11 +121,8 @@ const PendingFees = () => {
   // Apply department filter
   const filteredPending = pendingItems.filter(item => {
     if (filter === 'All Departments') return true;
-    const deptCode = item.department || '';
-    return deptCode.toLowerCase() === filter.toLowerCase() || 
-           (filter === 'CS' && deptCode.toLowerCase().includes('computer')) ||
-           (filter === 'EE' && deptCode.toLowerCase().includes('electrical')) ||
-           (filter === 'ME' && deptCode.toLowerCase().includes('mechanical'));
+    const deptCode = String(item.department || '').toLowerCase();
+    return deptCode === filter.toLowerCase();
   });
 
   return (
@@ -141,10 +143,15 @@ const PendingFees = () => {
               onChange={(e) => setFilter(e.target.value)}
               style={{ minHeight: '42px' }}
             >
-              <option>All Departments</option>
-              <option>CS</option>
-              <option>EE</option>
-              <option>ME</option>
+              <option value="All Departments">All Departments</option>
+              {departments.map((d, i) => {
+                const dName = d?.name || d?.departmentName || d;
+                return (
+                  <option key={d?.id || d?._id || i} value={dName}>
+                    {dName}
+                  </option>
+                );
+              })}
             </select>
             <div className="absolute right-3 pointer-events-none text-[var(--text-muted)]">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
