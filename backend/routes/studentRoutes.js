@@ -8,8 +8,17 @@ import bcrypt from 'bcryptjs';
 import FeeStructure from '../models/FeeStructure.js';
 import StudentFee from '../models/StudentFee.js';
 import { sendNotification } from '../utils/notificationHelper.js';
+import { recordAdmissionPayment, updateAdmissionPayment, deleteAdmissionPayment } from '../controllers/admissionController.js';
+
 
 const router = express.Router();
+
+// Payment routes for Students / Admissions
+router.put('/:id/payment', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, recordAdmissionPayment);
+router.post('/:id/payment', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, recordAdmissionPayment);
+router.put('/:id/payment/:paymentId', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, updateAdmissionPayment);
+router.delete('/:id/payment/:paymentId', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, deleteAdmissionPayment);
+
 
 // Get all students
 router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff', 'Accounts'), requirePermission('manage_students'), departmentScope, collegeScope, async (req, res) => {
@@ -21,6 +30,33 @@ router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'St
     }
     const students = await Student.find(query);
     res.json(students);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Purge all student records
+router.all('/purge-all', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, async (req, res) => {
+  try {
+    const students = await Student.find({});
+    const emails = students.map(s => s.email).filter(Boolean);
+    const ids = students.map(s => s.id).filter(Boolean);
+
+    await Student.deleteMany({});
+    if (emails.length > 0) {
+      await User.deleteMany({ email: { $in: emails }, role: 'Student' });
+    }
+    if (ids.length > 0) {
+      try {
+        await FeeStructure.deleteMany({ studentId: { $in: ids } });
+        await StudentFee.deleteMany({ admissionNo: { $in: ids } });
+      } catch (fErr) {
+        console.warn('Fee bulk cleanup note:', fErr.message);
+      }
+    }
+
+    req.app.get('io')?.emit('dataUpdated', { module: 'students', action: 'purged' });
+    res.json({ message: `Purged ${students.length} student records successfully` });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -49,9 +85,97 @@ router.get('/:id', protect, collegeScope, async (req, res) => {
   }
 });
 
-// Create new student
+// Create a new student / Admission
 router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), requirePermission('manage_students'), collegeScope, checkSubscription, async (req, res) => {
-  const student = new Student(req.body);
+  const paidAmount = Number(req.body.paidAmount !== undefined ? req.body.paidAmount : (req.body.amountPaid !== undefined ? req.body.amountPaid : 0));
+  const remainingFee = Number(req.body.remainingFee !== undefined ? req.body.remainingFee : (req.body.balanceFee !== undefined ? req.body.balanceFee : 0));
+  const paymentStatus = req.body.paymentStatus || (paidAmount > 0 && remainingFee === 0 ? 'Paid' : paidAmount > 0 ? 'Partial' : 'Pending');
+
+  const fb = req.body.feeBreakdown || {};
+  const isHostel = Boolean(req.body.hostelRequired === 'yes' || req.body.hostelRequired === true || req.body.hostel === 'Yes' || req.body.dormFacility);
+  const isTransport = Boolean(req.body.transportRequired === 'yes' || req.body.transportRequired === true || req.body.transport === 'Yes' || req.body.busFacility);
+
+  const tuitionFee = Number(req.body.tuitionFee !== undefined ? req.body.tuitionFee : (fb.tuitionFee || 0));
+  const hostelFee = isHostel ? Number(req.body.hostelFee !== undefined ? req.body.hostelFee : (req.body.hostelFeeAmount || fb.hostelFee || 0)) : 0;
+  const transportFee = isTransport ? Number(req.body.transportFee !== undefined ? req.body.transportFee : (req.body.transportFeeAmount || fb.transportFee || 0)) : 0;
+  const otherFee = Number(req.body.otherFee !== undefined ? req.body.otherFee : (fb.otherFee || fb.otherFees || 0));
+
+  const verifiedTotal = Number(req.body.totalFee) || (tuitionFee + hostelFee + transportFee + otherFee);
+  let normalFee = Number(req.body.normalFee !== undefined ? req.body.normalFee : (req.body.totalFee || tuitionFee || 0));
+  let discountAmount = Number(req.body.discountAmount || 0);
+  let quota = req.body.quota || null;
+  let quotaName = req.body.quotaName || req.body.admissionQuota || 'General Quota';
+
+  // Step 54.12: Backend quota recalculation & verification
+  if (quota && quota !== 'general' && quota !== 'General Quota') {
+    try {
+      const matchedQuota = await Quota.findOne({
+        $or: [{ _id: mongoose.Types.ObjectId.isValid(quota) ? quota : null }, { quotaName: quotaName }],
+        status: 'active'
+      });
+      if (matchedQuota) {
+        quota = matchedQuota._id;
+        quotaName = matchedQuota.quotaName;
+        if (matchedQuota.normalFee > 0 && normalFee === 0) {
+          normalFee = matchedQuota.normalFee;
+        }
+        if (matchedQuota.discountType === 'fixed') {
+          discountAmount = matchedQuota.discountValue;
+        } else if (matchedQuota.discountType === 'percentage') {
+          discountAmount = (normalFee * matchedQuota.discountValue) / 100;
+        }
+        if (discountAmount > normalFee) {
+          discountAmount = normalFee;
+        }
+      }
+    } catch (qErr) {
+      console.warn('Backend quota verification note:', qErr.message);
+    }
+  }
+
+  // Step 49.14 & Step 54.12: Add Backend Validation
+  if (normalFee < 0) {
+    return res.status(400).json({ message: "Normal fee cannot be negative" });
+  }
+  if (discountAmount < 0) {
+    return res.status(400).json({ message: "Discount cannot be negative" });
+  }
+  if (normalFee > 0 && discountAmount > normalFee) {
+    return res.status(400).json({ message: "Discount cannot exceed the normal fee" });
+  }
+
+  const calculatedFinalFee = Math.max(0, normalFee - discountAmount);
+  const finalFee = req.body.finalFee !== undefined ? Number(req.body.finalFee) : (discountAmount > 0 ? (calculatedFinalFee + hostelFee + transportFee + otherFee) : verifiedTotal);
+
+  if (finalFee > 0 && paidAmount > finalFee) {
+    return res.status(400).json({ message: "Paid amount cannot exceed final fee" });
+  }
+  if (remainingFee < 0) {
+    return res.status(400).json({ message: "Remaining fee cannot be negative" });
+  }
+
+  const student = new Student({
+    ...req.body,
+    course: req.body.course || '',
+    feeType: req.body.feeType || 'all',
+    quota,
+    quotaName,
+    normalFee,
+    discountAmount,
+    finalFee,
+    hostelRequired: isHostel ? 'yes' : 'no',
+    transportRequired: isTransport ? 'yes' : 'no',
+    tuitionFee,
+    hostelFee,
+    transportFee,
+    otherFee,
+    totalFee: finalFee || verifiedTotal,
+    paidAmount,
+    amountPaid: paidAmount,
+    remainingFee,
+    balanceFee: remainingFee,
+    paymentStatus
+  });
   try {
     const newStudent = await student.save();
     let studentUser = null;
@@ -126,17 +250,165 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
 
       await StudentFee.create({
         collegeId: newStudent.collegeId || collegeId,
+
         studentId: newStudent._id,
-        admissionNo: newStudent.id || 'ST-TEMP',
-        academicYear: newStudent.academicYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
-        course: newStudent.courseId || newStudent.course || '',
-        department: newStudent.dept || newStudent.department || '',
-        semester: semNumber || 1,
-        feeItems: [],
-        totalAmount: 0,
-        paidAmount: 0,
-        balanceAmount: 0,
-        status: 'PENDING',
+
+        admissionNo: newStudent.id || "ST-TEMP",
+
+        academicYear:
+          newStudent.academicYear ||
+          `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+
+        course:
+          newStudent.courseId ||
+          newStudent.course ||
+          "",
+
+        department:
+          newStudent.dept ||
+          newStudent.department ||
+          "",
+
+        semester:
+          Number(newStudent.semester) || 1,
+
+        quota:
+          req.body.quota ||
+          "General / Merit",
+
+        feeItems: [
+          {
+            feeType: "Admission & Processing Fee",
+            amount: Number(
+              req.body.feeBreakdown?.admissionFee || 0
+            ),
+          },
+
+          {
+            feeType: "Tuition Fee (Semester 1)",
+            amount: Number(
+              req.body.feeBreakdown?.tuitionFee || 0
+            ),
+          },
+
+          {
+            feeType: "University / Exam Affiliation Fee",
+            amount: Number(
+              req.body.feeBreakdown?.universityFee || 0
+            ),
+          },
+
+          {
+            feeType: "Marksheet & Document Verification",
+            amount: Number(
+              req.body.feeBreakdown?.marksheetVerification || 0
+            ),
+          },
+
+          {
+            feeType: "Special / Lab Equipment Fee",
+            amount: Number(
+              req.body.feeBreakdown?.specialFee || 0
+            ),
+          },
+
+          {
+            feeType: "Computer & Software Lab Access",
+            amount: Number(
+              req.body.feeBreakdown?.computerLab || 0
+            ),
+          },
+
+          {
+            feeType: "English Language Lab & NSS / ID Card",
+            amount: Number(
+              req.body.feeBreakdown?.englishLabNssId || 0
+            ),
+          },
+
+          {
+            feeType: "Stationery & Syllabus Kit",
+            amount: Number(
+              req.body.feeBreakdown?.stationary || 0
+            ),
+          },
+
+          {
+            feeType: "Parent Teacher Association (PTA)",
+            amount: Number(
+              req.body.feeBreakdown?.pta || 0
+            ),
+          },
+
+          {
+            feeType: "Other Institutional Amenities",
+            amount: Number(
+              req.body.feeBreakdown?.otherFee || 0
+            ),
+          },
+        ],
+
+        normalAmount:
+          Number(
+            req.body.normalFee ||
+            req.body.totalFee ||
+            0
+          ),
+
+        concessionAmount:
+          Number(
+            req.body.quotaConcession || 0
+          ),
+
+        finalAmount:
+          Number(
+            req.body.finalAssessedFee ||
+            req.body.totalFee ||
+            0
+          ),
+
+        totalAmount:
+          Number(
+            req.body.finalAssessedFee ||
+            req.body.totalFee ||
+            0
+          ),
+
+        paidAmount:
+          Number(req.body.amountPaid || 0),
+
+        balanceAmount: Math.max(
+          0,
+          Number(
+            req.body.finalAssessedFee ||
+            req.body.totalFee ||
+            0
+          ) -
+            Number(req.body.amountPaid || 0)
+        ),
+
+        status:
+          Number(req.body.amountPaid || 0) <= 0
+            ? "PENDING"
+            : Number(req.body.amountPaid || 0) >=
+              Number(
+                req.body.finalAssessedFee ||
+                req.body.totalFee ||
+                0
+              )
+              ? "PAID"
+              : "PARTIALLY_PAID",
+
+        paymentMode:
+          req.body.paymentMode || "Cash",
+
+        receiptNo:
+          req.body.receiptNumber || "",
+
+        lastPaymentDate:
+          Number(req.body.amountPaid || 0) > 0
+            ? new Date()
+            : null,
       });
     } catch (studentFeeErr) {
       console.error('Failed to create StudentFee record for Student:', studentFeeErr);
@@ -281,7 +553,16 @@ router.put(
   }
 );
 
+// Step 32: Record payment for student / admission
+router.put('/:id/payment', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, recordAdmissionPayment);
+router.post('/:id/payment', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, recordAdmissionPayment);
+
+// Step 34.7 & 34.8: Edit and delete payment endpoints
+router.put('/:id/payment/:paymentId', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, updateAdmissionPayment);
+router.delete('/:id/payment/:paymentId', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, deleteAdmissionPayment);
+
 // Update student
+
 router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), requirePermission('manage_students'), collegeScope, checkSubscription, async (req, res) => {
   try {
     const updatedStudent = await Student.findOneAndUpdate(
@@ -314,24 +595,23 @@ router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 
 });
 
 // Delete student
-router.delete('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), requirePermission('manage_students'), collegeScope, checkSubscription, async (req, res) => {
+router.delete('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, async (req, res) => {
   try {
     const studentId = req.params.id;
-    const deletedStudent = await Student.findOneAndDelete({ id: studentId });
+    let query = { id: studentId };
+    if (mongoose.Types.ObjectId.isValid(studentId)) {
+      query = { $or: [{ id: studentId }, { _id: studentId }] };
+    }
+    const deletedStudent = await Student.findOneAndDelete(query);
     const collegeId = req.collegeId || req.user.collegeId || 'unassigned_college';
 
     if (deletedStudent && deletedStudent.email) {
-      const user = await User.findOneAndDelete({ email: deletedStudent.email });
-      if (user && req.user._id) {
-        await sendNotification(req, {
-          receiverId: req.user._id,
-          collegeId,
-          tenantId: collegeId,
-          title: 'Student Record Deleted',
-          message: `Student record for ${deletedStudent.name} (${studentId}) was deleted.`,
-          category: 'student',
-          type: 'Warning'
-        });
+      await User.findOneAndDelete({ email: deletedStudent.email });
+      try {
+        await FeeStructure.deleteMany({ studentId: deletedStudent.id });
+        await StudentFee.deleteMany({ admissionNo: deletedStudent.id });
+      } catch (fErr) {
+        console.warn('Fee cleanup note:', fErr.message);
       }
     }
 
@@ -342,8 +622,36 @@ router.delete('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD
       console.warn('Failed to delete marks for student:', err.message);
     }
     
-    req.app.get('io').emit('dataUpdated', { module: 'students', action: 'deleted' });
-    res.json({ message: 'Student deleted' });
+    req.app.get('io')?.emit('dataUpdated', { module: 'students', action: 'deleted' });
+    res.json({ message: 'Student deleted successfully', id: studentId });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Purge all student records
+router.post('/purge-all', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, async (req, res) => {
+  try {
+    const collegeId = req.collegeId || req.user.collegeId || 'unassigned_college';
+    const students = await Student.find({});
+    const emails = students.map(s => s.email).filter(Boolean);
+    const ids = students.map(s => s.id).filter(Boolean);
+
+    await Student.deleteMany({});
+    if (emails.length > 0) {
+      await User.deleteMany({ email: { $in: emails }, role: 'Student' });
+    }
+    if (ids.length > 0) {
+      try {
+        await FeeStructure.deleteMany({ studentId: { $in: ids } });
+        await StudentFee.deleteMany({ admissionNo: { $in: ids } });
+      } catch (fErr) {
+        console.warn('Fee bulk cleanup note:', fErr.message);
+      }
+    }
+
+    req.app.get('io')?.emit('dataUpdated', { module: 'students', action: 'purged' });
+    res.json({ message: `Purged ${students.length} student records successfully` });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -407,3 +715,5 @@ router.post('/promote', protect, authorize('Admin', 'Sub Admin', 'Principal', 'H
 });
 
 export default router;
+
+

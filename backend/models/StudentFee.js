@@ -89,6 +89,41 @@ const studentFeeSchema = new mongoose.Schema(
       enum: ["PENDING", "PARTIALLY_PAID", "PAID"],
       default: "PENDING",
     },
+
+    quota: {
+      type: String,
+      default: "General / Merit",
+    },
+
+    normalAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    concessionAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    finalAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    paymentMode: {
+      type: String,
+      default: "Cash",
+    },
+
+    receiptNo: {
+      type: String,
+      default: "",
+    },
+
+    lastPaymentDate: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
