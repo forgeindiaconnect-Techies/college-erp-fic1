@@ -2,68 +2,79 @@ import mongoose from "mongoose";
 
 const feeStructureSchema = new mongoose.Schema(
   {
-    collegeId: {
-      type: mongoose.Schema.Types.Mixed,
-      ref: "College",
-      required: true,
-      index: true,
-    },
-
     academicYear: {
       type: String,
       required: true,
     },
 
     course: {
-      type: String,
+      type: mongoose.Schema.Types.Mixed,
+      ref: "Course",
       required: true,
     },
 
-    department: {
+    quota: {
       type: String,
       required: true,
+      enum: [
+        "General / Merit",
+        "Management Quota",
+        "Government Quota",
+        "Sports Quota",
+        "Ex-Servicemen / Special",
+      ],
+      default: "General / Merit",
     },
 
-    semester: {
+    tuitionFee: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+
+    otherFees: {
+      type: Number,
+      default: 0,
+    },
+
+    totalFee: {
       type: Number,
       required: true,
     },
 
+    // Multitenancy & legacy compatibility support
+    collegeId: {
+      type: mongoose.Schema.Types.Mixed,
+      ref: "College",
+      default: "COL001",
+      index: true,
+    },
+    department: {
+      type: String,
+    },
+    semester: {
+      type: Number,
+    },
     fees: [
       {
-        feeType: {
-          type: String,
-          required: true,
-          trim: true,
-        },
-
-        amount: {
-          type: Number,
-          required: true,
-          min: 0,
-        },
+        feeType: { type: String, trim: true },
+        amount: { type: Number, min: 0 },
       },
     ],
-
     totalAmount: {
       type: Number,
       default: 0,
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
+// Compound index for quota-wise structures
 feeStructureSchema.index(
-  {
-    collegeId: 1,
-    academicYear: 1,
-    course: 1,
-    department: 1,
-    semester: 1,
-  },
-  { unique: true }
+  { academicYear: 1, course: 1, quota: 1 },
+  { unique: false }
 );
 
-export default mongoose.model("FeeStructure", feeStructureSchema);
+const FeeStructure = mongoose.model("FeeStructure", feeStructureSchema);
+
+export default FeeStructure;

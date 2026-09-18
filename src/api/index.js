@@ -165,15 +165,26 @@ export const loginUser = (credentials) => api.post('/auth/login', {
 export const getMyProfile = () => api.get('/auth/me');
 export const forgotPassword = (email) => api.post('/auth/forgot-password', { email });
 
-// Student Endpoints
+// Student & Admission Endpoints
 export const getStudents = () => api.get('/students');
 export const getStudentById = (id) => api.get(`/students/${id}`);
 export const createStudent = (studentData) => api.post('/students', studentData);
 export const updateStudent = (id, studentData) => api.put(`/students/${id}`, studentData);
 export const deleteStudent = (id) => api.delete(`/students/${id}`);
+export const purgeAllStudents = () => api.post('/students/purge-all');
 export const promoteStudents = (payload) => api.post('/students/promote', payload);
 export const allocateStudentsToSection = (payload) =>
   api.put('/students/allocate-section', payload);
+
+// Step 32: Backend Payment API
+export const recordAdmissionPayment = (id, paymentData) =>
+  api.put(`/admissions/${id}/payment`, paymentData);
+export const updateAdmissionPayment = (id, paymentId, paymentData) =>
+  api.put(`/admissions/${id}/payment/${paymentId}`, paymentData);
+export const deleteAdmissionPayment = (id, paymentId) =>
+  api.delete(`/admissions/${id}/payment/${paymentId}`);
+export const getAdmissions = () => api.get('/admissions');
+export const getAdmissionById = (id) => api.get(`/admissions/${id}`);
 
 // Staff Endpoints
 export const getStaff = () => api.get('/staff');
@@ -299,9 +310,18 @@ export const deleteMark = (id) => api.delete(`/marks/${id}`);
 export const getAllFees = () => api.get('/fees');
 export const getFeesByStudent = (studentId) => api.get(`/fees/student/${studentId}`);
 export const getStudentFeeStructure = (studentId) => api.get(`/fees/structure/${studentId}`);
-export const getFeeStructures = (params) => api.get('/fees/structures', { params });
-export const saveFeeStructure = (data) => api.post('/fees/structures', data);
-export const deleteFeeStructure = (id) => api.delete(`/fees/structures/${id}`);
+export const getFeeStructures = (params = {}) => api.get('/fee-structures', { params });
+export const saveFeeStructure = (data) => api.post('/fee-structures', data);
+export const createFeeStructure = (data) => api.post('/fee-structures', data);
+export const updateFeeStructure = (id, data) => api.put(`/fee-structures/${id}`, data);
+// Step 49: Quota Management Endpoints
+export const getQuotas = (params = {}) => api.get('/quotas', { params });
+export const getQuotaById = (id) => api.get(`/quotas/${id}`);
+export const createQuota = (data) => api.post('/quotas', data);
+export const updateQuota = (id, data) => api.put(`/quotas/${id}`, data);
+export const deleteQuota = (id) => api.delete(`/quotas/${id}`);
+
+export const deleteFeeStructure = (id) => api.delete(`/fee-structures/${id}`);
 export const createFee = (feeData) => api.post('/fees', feeData);
 export const updateFee = (id, feeData) => api.put(`/fees/${id}`, feeData);
 export const deleteFee = (id) => api.delete(`/fees/${id}`);
@@ -594,3 +614,19 @@ export const updateFeePlan = (id, data) =>
 
 export const deleteFeePlan = (id) =>
   api.delete(`/fee-plans/${id}`);
+
+// Fee Collection Backend Pagination & Search
+export const getFeeCollectionRecords = (params = {}) =>
+  api.get('/admissions/fee-collection', { params });
+
+// Payments API
+export const createPayment = (data) =>
+  api.post('/payments', data);
+
+export const getPaymentHistory = (admissionId) =>
+  api.get(`/payments/history/${admissionId}`);
+
+
+
+
+

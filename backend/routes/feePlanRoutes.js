@@ -1,8 +1,52 @@
 import express from 'express';
 import FeePlan from '../models/FeePlan.js';
+import FeeStructure from '../models/FeeStructure.js';
 import { protect, authorize, collegeScope } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Helper to sync FeePlan to FeeStructure
+const syncPlanToStructure = async (collegeId, plan) => {
+  try {
+    const course = plan.courseName || plan.courseId;
+    const department = plan.departmentName || plan.departmentId;
+    const semesterNumber = parseInt(String(plan.semester).replace(/\D/g, '')) || 1;
+    const academicYear = plan.academicYear || '2026-2027';
+
+    const feesList = [
+      { feeType: 'Tuition Fee', amount: Number(plan.tuitionFee) || 0 },
+      { feeType: 'Exam Fee', amount: Number(plan.examFee) || 0 },
+      { feeType: 'Lab Fee', amount: Number(plan.labFee) || 0 },
+      { feeType: 'Library Fee', amount: Number(plan.libraryFee) || 0 },
+      { feeType: 'Transport Fee', amount: Number(plan.transportFee) || 0 },
+      { feeType: 'Hostel Fee', amount: Number(plan.hostelFee) || 0 }
+    ].filter(f => f.amount > 0);
+
+    const totalAmount = feesList.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+    await FeeStructure.findOneAndUpdate(
+      {
+        collegeId,
+        academicYear,
+        course,
+        department,
+        semester: semesterNumber
+      },
+      {
+        collegeId,
+        academicYear,
+        course,
+        department,
+        semester: semesterNumber,
+        fees: feesList,
+        totalAmount
+      },
+      { upsert: true, new: true }
+    );
+  } catch (err) {
+    console.error('Failed to sync FeePlan to FeeStructure:', err);
+  }
+};
 
 // Get fee plans
 router.get(
@@ -77,7 +121,7 @@ router.get(
 router.post(
   '/',
   protect,
-  authorize('Admin', 'Principal'),
+  authorize('Admin', 'Principal', 'Accounts'),
   collegeScope,
   async (req, res) => {
     try {
@@ -89,8 +133,15 @@ router.post(
         collegeId
       });
 
+      // Synchronize with FeeStructure
+      await syncPlanToStructure(collegeId, plan);
+
       req.app.get('io')?.emit('dataUpdated', {
         module: 'feePlans',
+        action: 'created'
+      });
+      req.app.get('io')?.emit('dataUpdated', {
+        module: 'feeStructure',
         action: 'created'
       });
 
@@ -105,17 +156,19 @@ router.post(
 router.put(
   '/:id',
   protect,
-  authorize('Admin', 'Principal'),
+  authorize('Admin', 'Principal', 'Accounts'),
   collegeScope,
   async (req, res) => {
     try {
+      const collegeId =
+        req.collegeId ||
+        req.user?.collegeId ||
+        'unassigned_college';
+
       const plan = await FeePlan.findOneAndUpdate(
         {
           _id: req.params.id,
-          collegeId:
-            req.collegeId ||
-            req.user?.collegeId ||
-            'unassigned_college'
+          collegeId
         },
         req.body,
         { new: true, runValidators: true }
@@ -125,8 +178,15 @@ router.put(
         return res.status(404).json({ message: 'Fee plan not found' });
       }
 
+      // Synchronize with FeeStructure
+      await syncPlanToStructure(collegeId, plan);
+
       req.app.get('io')?.emit('dataUpdated', {
         module: 'feePlans',
+        action: 'updated'
+      });
+      req.app.get('io')?.emit('dataUpdated', {
+        module: 'feeStructure',
         action: 'updated'
       });
 
@@ -141,24 +201,41 @@ router.put(
 router.delete(
   '/:id',
   protect,
-  authorize('Admin', 'Principal'),
+  authorize('Admin', 'Principal', 'Accounts'),
   collegeScope,
   async (req, res) => {
     try {
+      const collegeId =
+        req.collegeId ||
+        req.user?.collegeId ||
+        'unassigned_college';
+
       const plan = await FeePlan.findOneAndDelete({
         _id: req.params.id,
-        collegeId:
-          req.collegeId ||
-          req.user?.collegeId ||
-          'unassigned_college'
+        collegeId
       });
 
       if (!plan) {
         return res.status(404).json({ message: 'Fee plan not found' });
       }
 
+      // Also clean up matching FeeStructure if any
+      const course = plan.courseName || plan.courseId;
+      const department = plan.departmentName || plan.departmentId;
+      const semesterNumber = parseInt(String(plan.semester).replace(/\D/g, '')) || 1;
+      await FeeStructure.findOneAndDelete({
+        collegeId,
+        course,
+        department,
+        semester: semesterNumber
+      });
+
       req.app.get('io')?.emit('dataUpdated', {
         module: 'feePlans',
+        action: 'deleted'
+      });
+      req.app.get('io')?.emit('dataUpdated', {
+        module: 'feeStructure',
         action: 'deleted'
       });
 

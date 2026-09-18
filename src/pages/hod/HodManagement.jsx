@@ -5,15 +5,6 @@ import useRealtimeSync from '../../hooks/useRealtimeSync';
 import CustomSelect from '../../components/CustomSelect';
 import './HodManagement.css';
 
-const DEFAULT_HODS = [
-  { id: 'HOD001', name: 'Dr. Ananya Rao', email: 'csehod@gmail.com', phone: '9876543210', dept: 'Computer Science', deptCode: 'CSE', status: 'Active' },
-  { id: 'HOD002', name: 'Prof. Rajan Iyer', email: 'ecehod@gmail.com', phone: '9845123456', dept: 'Electronics & Comm.', deptCode: 'ECE', status: 'Active' },
-  { id: 'HOD003', name: 'Dr. Meena Pillai', email: 'mechhod@gmail.com', phone: '9812987654', dept: 'Mechanical Engg.', deptCode: 'MECH', status: 'Active' },
-  { id: 'HOD004', name: 'Dr. Shalini Nair', email: 'eeehod@gmail.com', phone: '9867123456', dept: 'Electrical & Electronics', deptCode: 'EEE', status: 'Active' },
-  { id: 'HOD005', name: 'Prof. Karthik S.', email: 'bcahod@gmail.com', phone: '9823456789', dept: 'Bachelor of Computer App.', deptCode: 'BCA', status: 'Active' },
-  { id: 'HOD006', name: 'Dr. Sanjay Sen', email: 'mbahod@gmail.com', phone: '9854321098', dept: 'Master of Business Admin.', deptCode: 'MBA', status: 'Active' }
-];
-
 const DEPARTMENTS = [
   { name: 'Computer Science Engineering', code: 'CSE' },
   { name: 'Information Technology', code: 'IT' },
@@ -81,20 +72,12 @@ const HodManagement = () => {
     try {
       setLoading(true);
       const res = await getStaff();
-      let allHods = res.data.filter(s => s.designation === 'HOD');
-      
-      // Merge manually entered local data that might not be in DB
-      const local = localStorage.getItem('erp_staff');
-      if (local) {
-        const parsed = JSON.parse(local).filter(s => s.designation === 'HOD' || s.role === 'HOD');
-        const dbIds = new Set(allHods.map(h => h.id || h._id));
-        parsed.forEach(h => { if (!dbIds.has(h.id)) allHods.push(h); });
-      }
+      const staffList = Array.isArray(res.data) ? res.data : (res.data?.staff || []);
+      const allHods = staffList.filter(s => s.designation === 'HOD' || s.role === 'HOD');
       setHods(allHods);
     } catch (err) {
       console.error('Failed to fetch HODs:', err);
-      const local = localStorage.getItem('erp_staff');
-      setHods(local ? JSON.parse(local).filter(s => s.designation === 'HOD' || s.role === 'HOD') : []);
+      setHods([]);
     } finally {
       setLoading(false);
     }
@@ -195,7 +178,7 @@ const HodManagement = () => {
     if (window.confirm('Are you sure you want to delete this HOD record?')) {
       try {
         await deleteStaff(id);
-        setHods(hods.filter(h => h.id !== id));
+        setHods(prev => prev.filter(h => h.id !== id && h._id !== id));
       } catch (err) {
         console.error('Delete failed:', err);
         alert('Failed to delete HOD.');
@@ -296,7 +279,7 @@ const HodManagement = () => {
                     <td>
                       <div className="action-buttons">
                         <button className="btn-icon" onClick={() => openEdit(hod)}><Edit2 size={15} /></button>
-                        <button className="btn-icon btn-icon-danger" onClick={() => handleDelete(hod.id)}><Trash2 size={15} /></button>
+                        <button className="btn-icon btn-icon-danger" onClick={() => handleDelete(hod.id || hod._id)}><Trash2 size={15} /></button>
                       </div>
                     </td>
                   </tr>

@@ -40,8 +40,8 @@ router.get("/", protect, async (req, res) => {
 
     res.status(200).json({
       success: true,
-      count: courses.length,
-      courses
+      count: courses ? courses.length : 0,
+      courses: courses || []
     });
   } catch (error) {
     console.error("Get courses error:", error);

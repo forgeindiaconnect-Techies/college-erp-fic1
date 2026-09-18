@@ -34,6 +34,7 @@ import attendanceRoutes from './routes/attendanceRoutes.js';
 import marksRoutes from './routes/marksRoutes.js';
 import feesRoutes from './routes/feesRoutes.js';
 import feePlanRoutes from './routes/feePlanRoutes.js';
+import feeStructuresRoutes from './routes/feeStructures.js';
 import reportsRoutes from './routes/reportsRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import libraryRoutes from './routes/libraryRoutes.js';
@@ -65,6 +66,9 @@ import periodMasterRoutes from './routes/periodMasterRoutes.js';
 import classMonitoringRoutes from './routes/classMonitoringRoutes.js';
 import substitutionRoutes from './routes/substitutionRoutes.js';
 import classSessionRoutes from './routes/classSessionRoutes.js';
+import admissionRoutes from './routes/admissionRoutes.js';
+import quotaRoutes from './routes/quotaRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
 
 // Import Cron Jobs
 import { initCronJobs } from './cron/scheduler.js';
@@ -848,6 +852,7 @@ const autoSeedIfEmpty = async () => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
+app.use('/api/admissions', admissionRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/courses', courseRoutes);
@@ -857,6 +862,9 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/marks', marksRoutes);
 app.use('/api/fees', feesRoutes);
 app.use('/api/fee-plans', feePlanRoutes);
+app.use('/api/fee-structures', feeStructuresRoutes);
+app.use('/api/quotas', quotaRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/library', libraryRoutes);
 app.use('/api/transport', transportRoutes);

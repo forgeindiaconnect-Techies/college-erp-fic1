@@ -23,7 +23,19 @@ const getSocket = () => {
  * @param {function} onUpdate - callback fired when a relevant update arrives; receives the event payload { module, action, data }
  * @param {string|string[]|null} watchModules - filter to specific module(s), e.g. 'students' or ['students','staff']. Pass null to watch ALL modules.
  */
-const useRealtimeSync = (onUpdate, watchModules = null) => {
+const useRealtimeSync = (param1, param2 = null) => {
+  let onUpdate = param1;
+  let watchModules = param2;
+
+  // Defensive support for swapped arguments e.g. useRealtimeSync('students', callback)
+  if (typeof param1 === 'string' && typeof param2 === 'function') {
+    onUpdate = param2;
+    watchModules = param1;
+  } else if (Array.isArray(param1) && typeof param2 === 'function') {
+    onUpdate = param2;
+    watchModules = param1;
+  }
+
   const callbackRef = useRef(onUpdate);
   const watchModulesRef = useRef(watchModules);
 

@@ -117,7 +117,42 @@ const studentSchema = new mongoose.Schema({
     marksheetNo: String
   }],
   feeBreakdown: { type: mongoose.Schema.Types.Mixed },
-  totalFee: { type: Number },
+  feeType: { type: String, default: 'all' },
+  quota: { type: mongoose.Schema.Types.Mixed, ref: 'Quota', default: null },
+  quotaName: { type: String, default: 'General Quota' },
+  normalFee: { type: Number, default: 0 },
+  discountAmount: { type: Number, default: 0 },
+  finalFee: { type: Number, default: 0 },
+  tuitionFee: { type: Number, default: 0 },
+  hostelFee: { type: Number, default: 0 },
+  transportFee: { type: Number, default: 0 },
+  otherFee: { type: Number, default: 0 },
+  totalFee: { type: Number, default: 0 },
+  paidAmount: { type: Number, default: 0 },
+  remainingFee: { type: Number, default: 0 },
+
+  paymentHistory: [
+    {
+      amount: {
+        type: Number,
+        required: true,
+      },
+      paymentMethod: {
+        type: String,
+        default: "Cash",
+      },
+      paymentDate: {
+        type: Date,
+        default: Date.now,
+      },
+      receiptNo: {
+        type: String,
+      },
+      receiptNumber: {
+        type: String,
+      }
+    },
+  ],
 
   academicHistory: [{
     semester: String,
@@ -129,3 +164,4 @@ const studentSchema = new mongoose.Schema({
 }, { timestamps: true, strict: false });
 
 export default mongoose.model('Student', studentSchema);
+

@@ -5,7 +5,7 @@ import {
   X, LayoutDashboard, Building2, GraduationCap, Users, Heart, BookOpen, 
   Calendar, CalendarCheck, FileSpreadsheet, BookOpenCheck, Inbox, FileBarChart, 
   ClipboardList, Megaphone, ShieldCheck, Settings, ChevronRight, ChevronDown, 
-  Wallet, Activity, PieChart, LogOut, Library, Bus, Building, Briefcase, Bot, Layers, Clock
+  Wallet, Activity, PieChart, LogOut, Library, Bus, Building, Briefcase, Bot, Layers, Clock, Award
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -63,10 +63,11 @@ const Sidebar = ({ isOpen, onClose }) => {
       ]
     },
     {
-      name: 'Finance',
+      name: 'Fee Management',
       icon: <Wallet size={20} />,
       items: [
-        { name: 'Fees', path: '/admin/fees', icon: <Wallet size={20} /> },
+        { name: 'Fees & Collections', path: '/admin/fees', icon: <Wallet size={20} /> },
+        { name: 'Quota Management', path: '/admin/quota-management', icon: <Award size={20} /> },
         { name: 'Payroll', path: '/admin/payroll', icon: <FileSpreadsheet size={20} /> }
       ]
     },
