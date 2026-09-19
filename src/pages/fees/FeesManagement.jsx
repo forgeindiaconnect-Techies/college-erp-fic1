@@ -19,6 +19,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
+import FeeStructure from '../../accounts/pages/FeeStructure';
 import './FeesManagement.css';
 
 const DEPARTMENTS = ['All','Computer Science','Electrical Engg.','Mechanical Engg.','Civil Engg.','Information Tech.', 'Computer Science & Engineering', 'Information Technology', 'Biotechnology Engineering', 'Artificial Intelligence & Data Science', 'Cyber Security'];
@@ -164,6 +165,13 @@ const FeesManagement = () => {
 
   useRealtimeSync(
     useCallback(() => {
+      fetchData();
+    }, []),
+    ['fees', 'students', 'admissions', 'feePlans', 'welfare', 'scholarships', 'feeStructure']
+  );
+
+  useRealtimeSync(
+    useCallback(() => {
       loadFeePlanData();
     }, []),
     'feePlans'
@@ -227,60 +235,85 @@ const FeesManagement = () => {
       const savedScholars = JSON.parse(localStorage.getItem(`erp_scholarships_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
 
       const mergedRecords = combinedStudents.map(s => {
+        const sId = s.id || s.studentId || s._id || s.admissionNumber;
+        const sName = s.name || s.studentName || '';
+        const feeRecord = feeMap[sId] || (feeGroups[sId] && feeGroups[sId][0]) || actualFees.find(f => (f.studentName && f.studentName.toLowerCase() === sName.toLowerCase()) || (f.registerNo && f.registerNo === sId)) || {};
+        
         const studentPayments = [];
-        const rawGroups = feeGroups[s.id] || [];
-        rawGroups.forEach(g => {
-          if (Array.isArray(g.payments) && g.payments.length > 0) {
-            g.payments.forEach(p => {
-              studentPayments.push({
-                id: p.id || p.receiptNo || g.receiptNo || g._id || 'N/A',
-                date: p.date || p.paymentDate || g.paymentDate || g.createdAt || new Date().toISOString(),
-                amount: p.amount || p.paidAmount || 0,
-                mode: p.mode || p.paymentMode || g.paymentMode || 'Online',
-                feeType: p.feeType || g.feeType || 'Tuition Fee'
-              });
+        if (Array.isArray(feeRecord.payments) && feeRecord.payments.length > 0) {
+          feeRecord.payments.forEach(p => {
+            studentPayments.push({
+              id: p.id || p.receiptNo || feeRecord.receiptNo || 'N/A',
+              date: p.date || p.paymentDate || feeRecord.paymentDate || feeRecord.createdAt || new Date().toISOString(),
+              amount: Number(p.amount || p.paidAmount || 0),
+              mode: p.mode || p.paymentMode || feeRecord.paymentMode || 'Online',
+              feeType: p.feeType || feeRecord.feeType || 'Tuition Fee'
             });
-          } else {
-            const amt = g.paidAmount || g.amount || g.paid || 0;
-            if (amt > 0) {
-              studentPayments.push({
-                id: g.receiptNo || g._id || g.id || 'N/A',
-                date: g.paymentDate || g.date || g.createdAt || new Date().toISOString(),
-                amount: amt,
-                mode: g.paymentMode || g.mode || 'Online',
-                feeType: g.feeType || 'Tuition Fee'
-              });
-            }
-          }
-        });
-        
-        // Calculate dynamic total fees
-        let tuitionFee = 60000;
-        let examFee = 2500;
-        let hostelFee = (s.hostelRequired === 'yes' || s.hostelRequired === true) ? 40000 : 0;
-        let transportFee = (s.transportRequired === 'yes' || s.transportRequired === true) ? 15000 : 0;
-        
-        // In this simple fallback, we use 62500 base + optional
-        let grossFee = tuitionFee + examFee + hostelFee + transportFee;
-        
-        let discount = 0;
-        const sch = savedScholars.find(x => x.studentId === s.id && x.status === 'Active');
-        if (sch) {
-          if (sch.amount === '100%') discount = tuitionFee;
-          else if (sch.amount === '75%') discount = tuitionFee * 0.75;
-          else if (sch.amount === '50%') discount = tuitionFee * 0.50;
-          else if (sch.amount === '25%') discount = tuitionFee * 0.25;
+          });
+        } else if (Number(feeRecord.paidAmount) > 0) {
+          studentPayments.push({
+            id: feeRecord.receiptNo || feeRecord._id || 'N/A',
+            date: feeRecord.paymentDate || feeRecord.createdAt || new Date().toISOString(),
+            amount: Number(feeRecord.paidAmount),
+            mode: feeRecord.paymentMode || 'Online',
+            feeType: feeRecord.feeType || 'Tuition Fee'
+          });
         }
-        
-        let semesterFee = grossFee - discount;
-        
-        // Total Paid
-        let paid = studentPayments.reduce((acc, curr) => acc + curr.amount, 0);
-        
-        let feeStatus = 'Pending';
-        if (paid >= semesterFee && semesterFee > 0) feeStatus = 'Paid';
-        else if (paid > 0) feeStatus = 'Partial';
-        else if (semesterFee === 0) feeStatus = 'Waived';
+
+        const grossFee = Number(
+          feeRecord.normalFee ||
+          s.normalFee ||
+          feeRecord.totalFees ||
+          s.totalFee ||
+          s.totalAmount ||
+          0
+        );
+
+        const quotaDiscount = Number(
+          feeRecord.discountAmount !== undefined && Number(feeRecord.discountAmount) > 0
+            ? feeRecord.discountAmount
+            : (s.discountAmount || 0)
+        );
+
+        const scholarshipDiscount = Number(feeRecord.scholarshipAmount || s.scholarshipAmount || 0);
+        const discount = quotaDiscount + scholarshipDiscount;
+
+        const semesterFee = Number(
+          feeRecord.finalFee !== undefined && feeRecord.finalFee !== null && Number(feeRecord.finalFee) > 0
+            ? feeRecord.finalFee
+            : (s.finalFee !== undefined && s.finalFee !== null && Number(s.finalFee) > 0
+              ? s.finalFee
+              : Math.max(0, grossFee - discount))
+        );
+
+        const paid = Number(
+          s.paidAmount !== undefined && s.paidAmount !== null && Number(s.paidAmount) >= 0
+            ? s.paidAmount
+            : (s.amountPaid !== undefined && s.amountPaid !== null && Number(s.amountPaid) >= 0
+              ? s.amountPaid
+              : (feeRecord.paidAmount !== undefined && Number(feeRecord.paidAmount) >= 0
+                ? feeRecord.paidAmount
+                : studentPayments.reduce((acc, curr) => acc + curr.amount, 0)))
+        );
+
+        const pending = Number(
+          s.remainingFee !== undefined && s.remainingFee !== null
+            ? s.remainingFee
+            : (s.balanceFee !== undefined && s.balanceFee !== null
+              ? s.balanceFee
+              : (feeRecord.pendingAmount !== undefined && feeRecord.pendingAmount !== null
+                ? feeRecord.pendingAmount
+                : (feeRecord.remainingFee !== undefined && feeRecord.remainingFee !== null
+                  ? feeRecord.remainingFee
+                  : Math.max(0, semesterFee - paid))))
+        );
+
+        let feeStatus = s.paymentStatus || s.feeStatus || feeRecord.status || 'Pending';
+        if (pending === 0 && semesterFee > 0 && paid >= semesterFee) feeStatus = 'Paid';
+        else if (paid > 0 && pending > 0) feeStatus = 'Partial';
+        else if (semesterFee === 0 && grossFee === 0) feeStatus = 'Pending';
+        else if (semesterFee === 0 && grossFee > 0) feeStatus = 'Waived';
+        else if (paid === 0 && pending > 0) feeStatus = 'Pending';
         
         return {
           id: s.id,
@@ -292,6 +325,7 @@ const FeesManagement = () => {
           semesterFee: semesterFee,
           fine: 0,
           paid: paid,
+          pending: pending,
           status: feeStatus,
           payments: studentPayments
         };
@@ -536,155 +570,8 @@ const FeesManagement = () => {
       )}
 
       {activeTab === 'Fee Structure' && (
-        <div className="fm-tab-content animate-fade-in">
-          <div className="flex justify-between items-center mb-4">
-            <h2>Current Fee Structures</h2>
-            <button className="btn-primary" onClick={() => setShowFeeModal(true)}>+ Create New Plan</button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {feePlans.length === 0 ? (
-              <div className="col-span-full text-center py-10 text-muted">
-                No fee structures created yet.
-              </div>
-            ) : (
-              feePlans.map(fs => {
-                const total =
-                  Number(fs.tuitionFee || 0) +
-                  Number(fs.examFee || 0) +
-                  Number(fs.labFee || 0) +
-                  Number(fs.libraryFee || 0);
-
-                return (
-                  <div
-                    key={fs._id}
-                    className="glass-card p-4 fs-card hover:border-primary transition-all"
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-lg font-bold">
-                          {fs.departmentName}
-                        </h3>
-
-                        <p className="text-sm text-muted mt-1">
-                          {fs.courseName}
-                        </p>
-
-                        <span className="badge-outline mt-1">
-                          {fs.semester}
-                        </span>
-                      </div>
-
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded dark:bg-gray-800">
-                        {fs.academicYear || 'Current'}
-                      </span>
-                    </div>
-
-                    <div className="space-y-3 border-t border-b py-4 my-4">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted">Tuition Fee</span>
-                        <span className="font-medium">
-                          {fmtCurrency(fs.tuitionFee || 0)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted">Exam Fee</span>
-                        <span className="font-medium">
-                          {fmtCurrency(fs.examFee || 0)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted">Lab Fee</span>
-                        <span className="font-medium">
-                          {fmtCurrency(fs.labFee || 0)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted">Library Fee</span>
-                        <span className="font-medium">
-                          {fmtCurrency(fs.libraryFee || 0)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted">Transport Fee</span>
-                        <span className="font-medium">
-                          {fmtCurrency(fs.transportFee || 0)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted">Hostel Fee</span>
-                        <span className="font-medium">
-                          {fmtCurrency(fs.hostelFee || 0)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted font-medium">
-                        Academic Fees
-                      </span>
-
-                      <span className="text-xl font-bold text-primary">
-                        {fmtCurrency(total)}
-                      </span>
-                    </div>
-
-                    <div className="flex gap-2 mt-4">
-                      <button
-                        className="flex-1 btn-secondary text-sm"
-                        onClick={() => {
-                          setEditingFeePlan(fs);
-                          setFeePlanForm({
-                            departmentId: fs.departmentId || '',
-                            courseId: fs.courseId || '',
-                            semester: fs.semester || '',
-                            academicYear: fs.academicYear || '',
-                            tuitionFee: fs.tuitionFee || '',
-                            examFee: fs.examFee || '',
-                            labFee: fs.labFee || '',
-                            libraryFee: fs.libraryFee || '',
-                            transportFee: fs.transportFee || '',
-                            hostelFee: fs.hostelFee || ''
-                          });
-                          setShowFeeModal(true);
-                        }}
-                      >
-                        Edit Plan
-                      </button>
-
-                      <button
-                        className="flex-1 btn-danger-outline text-sm"
-                        onClick={async () => {
-                          if (
-                            window.confirm(
-                              'Are you sure you want to delete this fee plan?'
-                            )
-                          ) {
-                            try {
-                              await deleteFeePlan(fs._id);
-                              await loadFeePlanData();
-                            } catch (error) {
-                              alert(
-                                error.response?.data?.message ||
-                                'Failed to delete fee plan.'
-                              );
-                            }
-                          }
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
+        <div className="fm-tab-content animate-fade-in" style={{ marginTop: '0.5rem' }}>
+          <FeeStructure />
         </div>
       )}
 
@@ -762,8 +649,8 @@ const FeesManagement = () => {
                         (statusFilter === 'All' || activeTab === 'Pending & Fines' || f.status === statusFilter)
                       )
                       .map((f, idx) => {
-                      const totalFee = f.semesterFee + f.fine;
-                      const balance  = Math.max(0, totalFee - f.paid);
+                      const totalFee = f.semesterFee + (f.fine || 0);
+                      const balance  = f.pending !== undefined ? f.pending : Math.max(0, totalFee - f.paid);
                       const paidPct  = totalFee > 0 ? Math.min(100, Math.round((f.paid / totalFee) * 100)) : 0;
                       return (
                         <tr key={f.id} className={f.status === 'Pending' ? 'row-pending' : ''}>

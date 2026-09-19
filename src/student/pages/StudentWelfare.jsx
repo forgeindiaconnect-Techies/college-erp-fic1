@@ -52,6 +52,7 @@ export default function StudentWelfare() {
       
       await createWelfareRecord({
         studentName: student.name,
+        studentId: student.id,
         department: student.dept,
         issueType: formData.issueType,
         priority: formData.priority,

@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 const welfareRecordSchema = new mongoose.Schema({
+  studentId: { type: String },
   studentName: { type: String, required: true },
   department: { type: String, required: true },
   issueType: { type: String, required: true },
@@ -12,7 +13,8 @@ const welfareRecordSchema = new mongoose.Schema({
   timeline: [{
     date: { type: String },
     text: { type: String }
-  }]
-, collegeId: { type: String } }, { timestamps: true });
+  }],
+  collegeId: { type: String }
+}, { timestamps: true });
 
 export default mongoose.model('WelfareRecord', welfareRecordSchema);

@@ -9,21 +9,12 @@ const feeStructureSchema = new mongoose.Schema(
 
     course: {
       type: mongoose.Schema.Types.Mixed,
-      ref: "Course",
       required: true,
     },
 
     quota: {
       type: String,
-      required: true,
-      enum: [
-        "General / Merit",
-        "Management Quota",
-        "Government Quota",
-        "Sports Quota",
-        "Ex-Servicemen / Special",
-      ],
-      default: "General / Merit",
+      required: false,
     },
 
     tuitionFee: {

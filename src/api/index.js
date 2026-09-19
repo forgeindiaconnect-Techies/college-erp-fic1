@@ -626,7 +626,15 @@ export const createPayment = (data) =>
 export const getPaymentHistory = (admissionId) =>
   api.get(`/payments/history/${admissionId}`);
 
+// Scholarship Management API
+export const getScholarships = () =>
+  api.get("/scholarships");
 
+export const createScholarship = (data) =>
+  api.post("/scholarships", data);
 
+export const updateScholarship = (id, data) =>
+  api.put(`/scholarships/${id}`, data);
 
-
+export const deleteScholarship = (id) =>
+  api.delete(`/scholarships/${id}`);

@@ -212,8 +212,8 @@ const StudentDashboard = () => {
         }
         
         const feesData = feesRes?.data || [];
-        const pendingFee = feesData.find(f => f.status === 'Pending');
-        setStudentDetails(prev => prev ? { ...prev, feeStatus: pendingFee ? 'Pending' : 'Paid' } : prev);
+        const hasPending = feesData.some(f => (Number(f.pendingAmount) > 0 || Number(f.remainingFee) > 0 || f.status === 'Pending' || f.status === 'Partial'));
+        setStudentDetails(prev => prev ? { ...prev, feeStatus: hasPending ? 'Pending' : 'Paid' } : prev);
 
       } catch (err) {
         console.error('Error fetching student dashboard data:', err);
@@ -225,7 +225,7 @@ const StudentDashboard = () => {
     init();
   }, [navigate, loadLiveSession]);
 
-  useRealtimeSync(loadLiveSession, ['timetable', 'substitutions', 'class_started']);
+  useRealtimeSync(loadLiveSession, ['timetable', 'substitutions', 'class_started', 'fees', 'scholarships', 'welfare']);
 
   if (loading || !studentDetails) {
     return (

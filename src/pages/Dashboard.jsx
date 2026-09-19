@@ -22,7 +22,9 @@ import {
   Inbox,
   Crown,
   ClipboardList,
-  Rocket
+  Rocket,
+  Layers,
+  Award
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -170,14 +172,11 @@ const Dashboard = () => {
   const activeExamsCount = exams.length;
 
   // Calculate dynamic fees collected
-  let totalFeesCollected = fees.reduce((sum, f) => sum + (f.paidAmount || 0), 0);
-  if (totalFeesCollected === 0) {
-    totalFeesCollected = 317000; // Fallback to MOCK_FEES sum for demonstration
-  }
+  const totalFeesCollected = fees.reduce((sum, f) => sum + (Number(f.paidAmount) || 0), 0);
   
   const feesDisplay = totalFeesCollected >= 100000 
-    ? `₹${(totalFeesCollected / 100000).toFixed(1)}L`
-    : `₹${totalFeesCollected.toLocaleString()}`;
+    ? `₹${(totalFeesCollected / 100000).toFixed(2)}L`
+    : `₹${totalFeesCollected.toLocaleString('en-IN')}`;
 
   // Calculate dynamic average attendance
   const averageAttendance = students.length > 0
@@ -523,6 +522,10 @@ const Dashboard = () => {
             <h3>Super Admin Quick Actions</h3>
           </div>
           <div className="quick-actions-grid p-6" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <button className="quick-action-btn" onClick={() => navigate('/admin/fee-structure')}>
+              <div className="action-icon bg-icon-primary"><Layers size={20} /></div>
+              <span>Fee Structure</span>
+            </button>
             <button className="quick-action-btn" onClick={() => navigate('/admin/hods')}>
               <div className="action-icon bg-icon-primary"><UserPlus size={20} /></div>
               <span>Register HOD</span>
@@ -586,6 +589,8 @@ const Dashboard = () => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             {[
+              { title: 'Fee Structure', val: 'Setup', path: '/admin/fee-structure', icon: <Layers size={16} /> },
+              { title: 'Quota Concessions', val: 'Rules', path: '/admin/quota-management', icon: <Award size={16} /> },
               { title: 'Subjects', val: totalSubjectsCount, path: '/admin/subjects', icon: <BookOpen size={16} /> },
               { title: 'Timetables', val: activeTimetablesCount, path: '/admin/timetable', icon: <Calendar size={16} /> },
               { title: 'Exams', val: activeExamsCount, path: '/admin/exams', icon: <FileText size={16} /> },

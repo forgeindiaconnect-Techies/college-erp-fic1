@@ -189,6 +189,7 @@ import AccountsLogin from './accounts/pages/AccountsLogin';
 import AccountsDashboard from './accounts/pages/AccountsDashboard';
 import FeeStructure from './accounts/pages/FeeStructure';
 import QuotaManagement from './accounts/pages/QuotaManagement';
+import ScholarshipManagement from './accounts/pages/ScholarshipManagement';
 import StudentRegistration from './accounts/pages/StudentRegistration';
 import FeesCollection from './accounts/pages/FeesCollection';
 import PendingFees from './accounts/pages/PendingFees';
@@ -420,6 +421,11 @@ function App() {
               <Route path="fees"          element={<FeesManagement />} />
               <Route path="fee-structure" element={<FeeStructure />} />
               <Route path="quota-management" element={<QuotaManagement />} />
+              <Route path="scholarship-management" element={<ScholarshipManagement />} />
+              <Route
+                path="student-welfare"
+                element={<PrincipalStudentWelfare />}
+              />
               <Route path="payroll"       element={<Salary />} />
               <Route path="reports"       element={<ReportsManagement />} />
               <Route path="library"       element={<LibraryManagement />} />
@@ -542,6 +548,7 @@ function App() {
               <Route path="dashboard" element={<AccountsDashboard />} />
               <Route path="fee-structure" element={<FeeStructure />} />
               <Route path="quota-management" element={<QuotaManagement />} />
+              <Route path="scholarship-management" element={<ScholarshipManagement />} />
               <Route path="student-registration" element={<StudentRegistration />} />
               <Route path="fees-collection" element={<FeesCollection />} />
               <Route path="pending-fees" element={<PendingFees />} />

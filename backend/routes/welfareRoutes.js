@@ -23,7 +23,10 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const newRecord = new WelfareRecord(req.body);
+    const newRecord = new WelfareRecord({
+      ...req.body,
+      collegeId: req.collegeId || req.user?.collegeId || 'COL001'
+    });
     await newRecord.save();
     
     // Auto-update clients if io is available
@@ -37,7 +40,20 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id/approve-scholarship', async (req, res) => {
+router.put(
+  '/:id/approve-scholarship',
+  (req, res, next) => {
+    const allowedRoles = ['Admin', 'Principal', 'Super Admin'];
+
+    if (!allowedRoles.includes(req.user?.role)) {
+      return res.status(403).json({
+        message: 'Only Admin or Principal can approve scholarships.'
+      });
+    }
+
+    next();
+  },
+  async (req, res) => {
   try {
     const { amount, name, studentId } = req.body;
     
@@ -47,32 +63,55 @@ router.put('/:id/approve-scholarship', async (req, res) => {
       $push: { timeline: { date: new Date().toISOString().split('T')[0], text: `Scholarship "${name}" of ₹${amount} Approved by Principal` } }
     }, { new: true });
 
-    // 2. Update Fee Structure
-    // Find fee by studentId, or by studentName from the record
-    const feeFilter = studentId ? { studentId } : { studentName: updated.studentName };
-    
-    await FeeStructure.findOneAndUpdate(
-      studentId ? { studentId } : { studentId: 'CS2022001' }, // Fallback to CS2022001 for demo if no studentId is available
-      { scholarshipAmount: amount, scholarshipName: name },
-      { upsert: true, new: true }
-    );
-    
-    // Update Fee pendingAmount if exists
-    const fee = await Fee.findOne(feeFilter);
+    // 2. Update student's actual Fee record
+    let fee = null;
+
+    if (studentId) {
+      fee = await Fee.findOne({ studentId });
+    }
+
+    if (!fee && updated?.studentName) {
+      fee = await Fee.findOne({ studentName: updated.studentName });
+    }
+
+    console.log('SCHOLARSHIP DEBUG:', { studentId, welfareStudentName: updated?.studentName, feeFound: !!fee, feeId: fee?._id, feeStudentId: fee?.studentId, feeStudentName: fee?.studentName, feeNormalFee: fee?.normalFee, feeDiscountAmount: fee?.discountAmount, feeFinalFee: fee?.finalFee, feeTotalFees: fee?.totalFees, feePaidAmount: fee?.paidAmount });
+
     if (fee) {
-      // Decrease totalFees and pendingAmount
-      fee.totalFees = fee.totalFees - amount;
-      fee.pendingAmount = Math.max(0, fee.pendingAmount - amount);
-      if (fee.pendingAmount === 0 && fee.paidAmount > 0) fee.status = 'Paid';
+      // Store scholarship details
+      fee.scholarshipAmount = Number(amount) || 0;
+      fee.scholarshipName = name || '';
+
+      // Calculate from the original normal fee
+      const normalFee = Number(fee.normalFee || fee.totalFees || 0);
+      const quotaDiscount = Number(fee.discountAmount || 0);
+      const scholarshipAmount = Number(amount || 0);
+
+      // Normal Fee - Quota Concession - Scholarship
+      const calculatedFinalFee = Math.max(
+        0,
+        normalFee - quotaDiscount - scholarshipAmount
+      );
+
+      fee.finalFee = calculatedFinalFee;
+      fee.totalFees = calculatedFinalFee;
+
+      // Recalculate balance from amount already paid
+      fee.pendingAmount = Math.max(
+        0,
+        calculatedFinalFee - Number(fee.paidAmount || 0)
+      );
+
+      fee.remainingFee = fee.pendingAmount;
+
+      if (fee.pendingAmount === 0) {
+        fee.status = 'Paid';
+      } else if (Number(fee.paidAmount || 0) > 0) {
+        fee.status = 'Partial';
+      } else {
+        fee.status = 'Pending';
+      }
+
       await fee.save();
-    } else if (!studentId) {
-       // fallback for demo to affect John Doe's fee
-       const fallbackFee = await Fee.findOne({ studentId: 'CS2022001' });
-       if (fallbackFee) {
-          fallbackFee.totalFees = fallbackFee.totalFees - amount;
-          fallbackFee.pendingAmount = Math.max(0, fallbackFee.pendingAmount - amount);
-          await fallbackFee.save();
-       }
     }
 
     if (req.app.get('io')) req.app.get('io').emit('welfareUpdated');
@@ -173,3 +212,4 @@ router.delete('/:id', async (req, res) => {
 });
 
 export default router;
+

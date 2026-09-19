@@ -238,7 +238,7 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
       console.error('Failed to create FeeStructure for Student:', feeErr);
     }
 
-    // Create StudentFee account record
+    // Create or Update StudentFee account record
     try {
       let semNumber = 1;
       if (typeof newStudent.sem === 'number') {
@@ -248,168 +248,262 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
         if (match) semNumber = parseInt(match[0], 10);
       }
 
-      await StudentFee.create({
+      const existingStudentFee = await StudentFee.findOne({
         collegeId: newStudent.collegeId || collegeId,
-
         studentId: newStudent._id,
-
-        admissionNo: newStudent.id || "ST-TEMP",
-
         academicYear:
           newStudent.academicYear ||
           `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
-
-        course:
-          newStudent.courseId ||
-          newStudent.course ||
-          "",
-
-        department:
-          newStudent.dept ||
-          newStudent.department ||
-          "",
-
-        semester:
-          Number(newStudent.semester) || 1,
-
-        quota:
-          req.body.quota ||
-          "General / Merit",
-
-        feeItems: [
-          {
-            feeType: "Admission & Processing Fee",
-            amount: Number(
-              req.body.feeBreakdown?.admissionFee || 0
-            ),
-          },
-
-          {
-            feeType: "Tuition Fee (Semester 1)",
-            amount: Number(
-              req.body.feeBreakdown?.tuitionFee || 0
-            ),
-          },
-
-          {
-            feeType: "University / Exam Affiliation Fee",
-            amount: Number(
-              req.body.feeBreakdown?.universityFee || 0
-            ),
-          },
-
-          {
-            feeType: "Marksheet & Document Verification",
-            amount: Number(
-              req.body.feeBreakdown?.marksheetVerification || 0
-            ),
-          },
-
-          {
-            feeType: "Special / Lab Equipment Fee",
-            amount: Number(
-              req.body.feeBreakdown?.specialFee || 0
-            ),
-          },
-
-          {
-            feeType: "Computer & Software Lab Access",
-            amount: Number(
-              req.body.feeBreakdown?.computerLab || 0
-            ),
-          },
-
-          {
-            feeType: "English Language Lab & NSS / ID Card",
-            amount: Number(
-              req.body.feeBreakdown?.englishLabNssId || 0
-            ),
-          },
-
-          {
-            feeType: "Stationery & Syllabus Kit",
-            amount: Number(
-              req.body.feeBreakdown?.stationary || 0
-            ),
-          },
-
-          {
-            feeType: "Parent Teacher Association (PTA)",
-            amount: Number(
-              req.body.feeBreakdown?.pta || 0
-            ),
-          },
-
-          {
-            feeType: "Other Institutional Amenities",
-            amount: Number(
-              req.body.feeBreakdown?.otherFee || 0
-            ),
-          },
-        ],
-
-        normalAmount:
-          Number(
-            req.body.normalFee ||
-            req.body.totalFee ||
-            0
-          ),
-
-        concessionAmount:
-          Number(
-            req.body.quotaConcession || 0
-          ),
-
-        finalAmount:
-          Number(
-            req.body.finalAssessedFee ||
-            req.body.totalFee ||
-            0
-          ),
-
-        totalAmount:
-          Number(
-            req.body.finalAssessedFee ||
-            req.body.totalFee ||
-            0
-          ),
-
-        paidAmount:
-          Number(req.body.amountPaid || 0),
-
-        balanceAmount: Math.max(
-          0,
-          Number(
-            req.body.finalAssessedFee ||
-            req.body.totalFee ||
-            0
-          ) -
-            Number(req.body.amountPaid || 0)
-        ),
-
-        status:
-          Number(req.body.amountPaid || 0) <= 0
-            ? "PENDING"
-            : Number(req.body.amountPaid || 0) >=
-              Number(
-                req.body.finalAssessedFee ||
-                req.body.totalFee ||
-                0
-              )
-              ? "PAID"
-              : "PARTIALLY_PAID",
-
-        paymentMode:
-          req.body.paymentMode || "Cash",
-
-        receiptNo:
-          req.body.receiptNumber || "",
-
-        lastPaymentDate:
-          Number(req.body.amountPaid || 0) > 0
-            ? new Date()
-            : null,
       });
+
+      if (existingStudentFee) {
+        const paymentAmount =
+          Number(req.body.amountPaid || 0);
+
+        const currentPaid =
+          Number(existingStudentFee.paidAmount || 0);
+
+        const finalAmount =
+          Number(
+            existingStudentFee.finalAmount ||
+            req.body.finalAssessedFee ||
+            req.body.totalFee ||
+            0
+          );
+
+        const newPaidAmount =
+          currentPaid + paymentAmount;
+
+        const newBalance =
+          Math.max(
+            0,
+            finalAmount - newPaidAmount
+          );
+
+        const newStatus =
+          newPaidAmount <= 0
+            ? "PENDING"
+            : newPaidAmount >= finalAmount
+              ? "PAID"
+              : "PARTIALLY_PAID";
+
+        existingStudentFee.paidAmount =
+          newPaidAmount;
+
+        existingStudentFee.balanceAmount =
+          newBalance;
+
+        existingStudentFee.status =
+          newStatus;
+
+        existingStudentFee.paymentMode =
+          req.body.paymentMode || "Cash";
+
+        existingStudentFee.receiptNo =
+          req.body.receiptNumber ||
+          existingStudentFee.receiptNo ||
+          "";
+
+        existingStudentFee.lastPaymentDate =
+          paymentAmount > 0
+            ? new Date()
+            : existingStudentFee.lastPaymentDate;
+
+        if (paymentAmount > 0) {
+          existingStudentFee.payments =
+            existingStudentFee.payments || [];
+
+          existingStudentFee.payments.push({
+            amount: paymentAmount,
+            paymentMode:
+              req.body.paymentMode || "Cash",
+            receiptNo:
+              req.body.receiptNumber || "",
+            paymentDate: new Date(),
+          });
+        }
+
+        await existingStudentFee.save();
+      } else {
+        await StudentFee.create({
+          collegeId: newStudent.collegeId || collegeId,
+
+          studentId: newStudent._id,
+
+          admissionNo: newStudent.id || "ST-TEMP",
+
+          academicYear:
+            newStudent.academicYear ||
+            `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+
+          course:
+            newStudent.courseId ||
+            newStudent.course ||
+            "",
+
+          department:
+            newStudent.dept ||
+            newStudent.department ||
+            "",
+
+          semester:
+            Number(newStudent.semester) || 1,
+
+          quota:
+            req.body.quota ||
+            "General / Merit",
+
+          feeItems: [
+            {
+              feeType: "Admission & Processing Fee",
+              amount: Number(
+                req.body.feeBreakdown?.admissionFee || 0
+              ),
+            },
+
+            {
+              feeType: "Tuition Fee (Semester 1)",
+              amount: Number(
+                req.body.feeBreakdown?.tuitionFee || 0
+              ),
+            },
+
+            {
+              feeType: "University / Exam Affiliation Fee",
+              amount: Number(
+                req.body.feeBreakdown?.universityFee || 0
+              ),
+            },
+
+            {
+              feeType: "Marksheet & Document Verification",
+              amount: Number(
+                req.body.feeBreakdown?.marksheetVerification || 0
+              ),
+            },
+
+            {
+              feeType: "Special / Lab Equipment Fee",
+              amount: Number(
+                req.body.feeBreakdown?.specialFee || 0
+              ),
+            },
+
+            {
+              feeType: "Computer & Software Lab Access",
+              amount: Number(
+                req.body.feeBreakdown?.computerLab || 0
+              ),
+            },
+
+            {
+              feeType: "English Language Lab & NSS / ID Card",
+              amount: Number(
+                req.body.feeBreakdown?.englishLabNssId || 0
+              ),
+            },
+
+            {
+              feeType: "Stationery & Syllabus Kit",
+              amount: Number(
+                req.body.feeBreakdown?.stationary || 0
+              ),
+            },
+
+            {
+              feeType: "Parent Teacher Association (PTA)",
+              amount: Number(
+                req.body.feeBreakdown?.pta || 0
+              ),
+            },
+
+            {
+              feeType: "Other Institutional Amenities",
+              amount: Number(
+                req.body.feeBreakdown?.otherFee || 0
+              ),
+            },
+          ],
+
+          normalAmount:
+            Number(
+              req.body.normalFee ||
+              req.body.totalFee ||
+              0
+            ),
+
+          concessionAmount:
+            Number(
+              req.body.quotaConcession || 0
+            ),
+
+          finalAmount:
+            Number(
+              req.body.finalAssessedFee ||
+              req.body.totalFee ||
+              0
+            ),
+
+          totalAmount:
+            Number(
+              req.body.finalAssessedFee ||
+              req.body.totalFee ||
+              0
+            ),
+
+          paidAmount:
+            Number(req.body.amountPaid || 0),
+
+          balanceAmount: Math.max(
+            0,
+            Number(
+              req.body.finalAssessedFee ||
+              req.body.totalFee ||
+              0
+            ) -
+              Number(req.body.amountPaid || 0)
+          ),
+
+          status:
+            Number(req.body.amountPaid || 0) <= 0
+              ? "PENDING"
+              : Number(req.body.amountPaid || 0) >=
+                Number(
+                  req.body.finalAssessedFee ||
+                  req.body.totalFee ||
+                  0
+                )
+                ? "PAID"
+                : "PARTIALLY_PAID",
+
+          paymentMode:
+            req.body.paymentMode || "Cash",
+
+          receiptNo:
+            req.body.receiptNumber || "",
+
+          lastPaymentDate:
+            Number(req.body.amountPaid || 0) > 0
+              ? new Date()
+              : null,
+
+          payments:
+            Number(req.body.amountPaid || 0) > 0
+              ? [
+                  {
+                    amount: Number(
+                      req.body.amountPaid || 0
+                    ),
+                    paymentMode:
+                      req.body.paymentMode || "Cash",
+                    receiptNo:
+                      req.body.receiptNumber || "",
+                    paymentDate: new Date(),
+                  },
+                ]
+              : [],
+        });
+      }
     } catch (studentFeeErr) {
       console.error('Failed to create StudentFee record for Student:', studentFeeErr);
     }

@@ -331,10 +331,18 @@ router.get('/', protect, authorize('Admin', 'Principal', 'Accounts', 'HOD'), dep
 // Get fees for a specific student
 router.get('/student/:studentId', protect, collegeScope, async (req, res) => {
   try {
-    if ((req.user.role === 'Student' || req.user.role === 'Parent') && req.user.referenceId !== req.params.studentId) {
-      return res.status(403).json({ message: 'Unauthorized to view this record' });
+    const sId = req.params.studentId;
+    const query = {
+      $or: [
+        { studentId: sId },
+        { registerNo: sId },
+        { studentName: new RegExp(`^${sId.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
+      ]
+    };
+    if (req.user?.name && (req.user.role === 'Student' || req.user.role === 'Parent')) {
+      query.$or.push({ studentName: req.user.name });
     }
-    const fees = await Fee.find({ studentId: req.params.studentId }).sort({ createdAt: -1 });
+    const fees = await Fee.find(query).sort({ createdAt: -1 });
     res.json(fees);
   } catch (err) {
     res.status(500).json({ message: err.message });

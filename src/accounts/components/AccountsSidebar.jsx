@@ -51,6 +51,7 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
       items: [
         { name: 'Fee Structure', path: '/accounts/fee-structure', icon: <Layers size={20} /> },
         { name: 'Quota Management', path: '/accounts/quota-management', icon: <Award size={20} /> },
+        { name: 'Scholarship Management', path: '/accounts/scholarship-management', icon: <Award size={20} /> },
         { name: 'Fees Collection', path: '/accounts/fees-collection', icon: <CreditCard size={20} /> },
         { name: 'Pending Fees', path: '/accounts/pending-fees', icon: <AlertCircle size={20} /> },
         { name: 'Payment History', path: '/accounts/payment-history', icon: <History size={20} /> }

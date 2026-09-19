@@ -599,20 +599,22 @@ const StudentRegistration = () => {
       }
 
       let loadedDepts = [];
-      if (deptRes.status === 'fulfilled') {
-        loadedDepts = Array.isArray(deptRes.value?.data)
+      if (deptRes.status === 'fulfilled' && deptRes.value?.data) {
+        loadedDepts = Array.isArray(deptRes.value.data)
           ? deptRes.value.data
-          : deptRes.value?.data?.departments || [];
+          : (Array.isArray(deptRes.value.data.departments)
+              ? deptRes.value.data.departments
+              : (Array.isArray(deptRes.value.data.data) ? deptRes.value.data.data : []));
         setDepartments(loadedDepts);
       }
 
       let loadedCourses = [];
-      if (courseRes.status === 'fulfilled') {
-        loadedCourses = Array.isArray(courseRes.value?.data?.courses)
+      if (courseRes.status === 'fulfilled' && courseRes.value?.data) {
+        loadedCourses = Array.isArray(courseRes.value.data.courses)
           ? courseRes.value.data.courses
-          : Array.isArray(courseRes.value?.data)
-          ? courseRes.value.data
-          : [];
+          : (Array.isArray(courseRes.value.data.data)
+              ? courseRes.value.data.data
+              : (Array.isArray(courseRes.value.data) ? courseRes.value.data : []));
         setCourses(loadedCourses);
       }
 
@@ -934,13 +936,7 @@ const StudentRegistration = () => {
     }));
   };
 
-  useEffect(() => {
-    fetchApplicableFee(
-      form.course,
-      form.admissionQuota || form.quotaName || form.quota,
-      form.academicYear
-    );
-  }, [form.course, form.admissionQuota, form.quotaName, form.quota, form.academicYear, feeStructuresList, quotasList]);
+
 
   // Filter sections dynamically based on the selected Department & Course
   const availableSections = useMemo(() => {
@@ -976,33 +972,47 @@ const StudentRegistration = () => {
 
   // Filter courses strictly by the selected Department
   const availableCourses = useMemo(() => {
-    const currentDeptName = form.department || form.dept;
-    if (!currentDeptName) return courses;
+    const currentDeptName = String(form.department || form.dept || '').trim().toLowerCase();
+    if (!currentDeptName) return courses || [];
 
-    const deptObj = departments.find(d =>
-      (d?.name && d.name.toLowerCase() === currentDeptName.toLowerCase()) ||
-      (d?.id && String(d.id).toLowerCase() === String(currentDeptName).toLowerCase()) ||
-      (d?.code && d.code.toLowerCase() === currentDeptName.toLowerCase())
-    );
-
-    const deptId = deptObj?.id || deptObj?._id || currentDeptName;
-    const deptCode = deptObj?.code || '';
-    const deptName = deptObj?.name || currentDeptName;
-
-    const matched = courses.filter(c => {
-      const cDeptId = String(c?.departmentId || '').trim().toLowerCase();
-      const cDept = String(c?.department || c?.departmentName || '').trim().toLowerCase();
-
+    const deptObj = (departments || []).find(d => {
+      const dName = String(d?.name || d?.departmentName || '').trim().toLowerCase();
+      const dCode = String(d?.code || '').trim().toLowerCase();
+      const dId = String(d?.id || '').trim().toLowerCase();
+      const dMongoId = String(d?._id || '').trim().toLowerCase();
       return (
-        (deptId && cDeptId === String(deptId).trim().toLowerCase()) ||
-        (deptCode && cDeptId === String(deptCode).trim().toLowerCase()) ||
-        (deptName && cDeptId === String(deptName).trim().toLowerCase()) ||
-        (deptName && cDept === String(deptName).trim().toLowerCase()) ||
-        (deptCode && cDept === String(deptCode).trim().toLowerCase())
+        dName === currentDeptName ||
+        dCode === currentDeptName ||
+        dId === currentDeptName ||
+        dMongoId === currentDeptName
       );
     });
 
-    return matched.length > 0 ? matched : courses;
+    const validDeptIdentifiers = new Set();
+    validDeptIdentifiers.add(currentDeptName);
+    if (deptObj) {
+      if (deptObj.id) validDeptIdentifiers.add(String(deptObj.id).trim().toLowerCase());
+      if (deptObj._id) validDeptIdentifiers.add(String(deptObj._id).trim().toLowerCase());
+      if (deptObj.code) validDeptIdentifiers.add(String(deptObj.code).trim().toLowerCase());
+      if (deptObj.name) validDeptIdentifiers.add(String(deptObj.name).trim().toLowerCase());
+      if (deptObj.departmentName) validDeptIdentifiers.add(String(deptObj.departmentName).trim().toLowerCase());
+    }
+
+    return (courses || []).filter(c => {
+      if (!c) return false;
+      const courseDeptIdentifiers = [
+        c.departmentId,
+        typeof c.department === 'object' ? c.department?._id : null,
+        typeof c.department === 'object' ? c.department?.id : null,
+        typeof c.department === 'object' ? c.department?.name : (typeof c.department === 'string' ? c.department : null),
+        typeof c.department === 'object' ? c.department?.code : null,
+        c.departmentName,
+      ]
+        .filter(Boolean)
+        .map(v => String(v).trim().toLowerCase());
+
+      return courseDeptIdentifiers.some(id => validDeptIdentifiers.has(id));
+    });
   }, [form.department, form.dept, departments, courses]);
 
   const getDepartmentDefaultFeeBreakdown = (deptName) => {
@@ -1054,84 +1064,138 @@ const StudentRegistration = () => {
   };
 
   useEffect(() => {
-    const courseName = String(form.course || "").trim();
-    const deptName = String(form.department || form.dept || "").trim();
+    const departmentName = String(
+      form.department || ""
+    ).trim().toLowerCase();
 
-    const semNum =
-      Number(String(form.semester || "1").replace(/\D/g, "")) || 1;
+    const courseName = String(
+      form.course || ""
+    ).trim().toLowerCase();
 
-    const acadYrNorm = String(form.academicYear || "")
+    const semesterNumber =
+      Number(
+        String(form.semester || "1")
+          .replace(/\D/g, "")
+      ) || 1;
+
+    const academicYear = String(
+      form.academicYear || ""
+    )
       .replace(/\s+/g, "")
       .toLowerCase();
 
-    const quotaName = String(form.quotaName || form.admissionQuota || form.quota || "").trim().toLowerCase();
+    console.log("ADMISSION FEE MATCH DEBUG", {
+      departmentName,
+      courseName,
+      semesterNumber,
+      academicYear,
+      feeStructuresCount: feeStructuresList?.length,
+      feeStructuresList,
+    });
 
-    if (!deptName || !feeStructuresList?.length) {
+    if (
+      !departmentName ||
+      !courseName ||
+      !feeStructuresList?.length
+    ) {
+      setForm((prev) => ({
+        ...prev,
+        feeBreakdown: {
+          admissionFee: 0,
+          tuitionFee: 0,
+          universityFee: 0,
+          marksheetVerification: 0,
+          specialFee: 0,
+          computerLab: 0,
+          englishLabNssId: 0,
+          stationary: 0,
+          pta: 0,
+          otherFee: 0,
+        },
+        totalFee: 0,
+        balanceFee: 0,
+      }));
       return;
     }
 
-    // Find the exact configured fee structure
-    const matched = feeStructuresList.find((s) => {
-      const sDept = String(s.department || "").trim().toLowerCase();
+    const matchedStructure =
+      feeStructuresList.find((structure) => {
+        const structureDepartment =
+          String(
+            structure.department ||
+            structure.departmentName ||
+            ""
+          )
+            .trim()
+            .toLowerCase();
 
-      const sCourse =
-        typeof s.course === "object"
-          ? String(
-              s.course?.name ||
-              s.course?.courseName ||
-              s.course?._id ||
-              ""
-            )
-              .trim()
-              .toLowerCase()
-          : String(s.course || "").trim().toLowerCase();
+        const structureCourse =
+          typeof structure.course === "object"
+            ? String(
+                structure.course?.name ||
+                structure.course?.courseName ||
+                structure.course?._id ||
+                ""
+              )
+                .trim()
+                .toLowerCase()
+            : String(
+                structure.course || ""
+              )
+                .trim()
+                .toLowerCase();
 
-      const sAcadYr = String(s.academicYear || "")
-        .replace(/\s+/g, "")
-        .toLowerCase();
+        const structureYear =
+          String(
+            structure.academicYear || ""
+          )
+            .replace(/\s+/g, "")
+            .toLowerCase();
 
-      const sQuota = String(s.quota || "").trim().toLowerCase();
+        const structureSemester =
+          Number(structure.semester || 1);
 
-      const deptMatches =
-        sDept === deptName.toLowerCase() ||
-        String(s.departmentId || "").trim().toLowerCase() ===
-          deptName.toLowerCase() ||
-        isDeptMatch(s.department || s.departmentName, deptName, s.departmentId, form.deptId);
+        const normStructDept = cleanNormalizedStr(structure.department || structure.departmentName || "");
+        const normStructCourse = cleanNormalizedStr(typeof structure.course === "object" ? (structure.course?.name || structure.course?.courseName || "") : structure.course || "");
+        const normFormDept = cleanNormalizedStr(departmentName);
+        const normFormCourse = cleanNormalizedStr(courseName);
 
-      const courseMatches =
-        !courseName ||
-        sCourse === courseName.toLowerCase() ||
-        sCourse.includes(courseName.toLowerCase()) ||
-        courseName.toLowerCase().includes(sCourse) ||
-        isCourseMatch(s.course || s.courseName, courseName, s.courseId, form.courseId);
+        const departmentMatches = !normStructDept || !normFormDept || normStructDept === normFormDept || normStructDept.includes(normFormDept) || normFormDept.includes(normStructDept);
+        const courseMatches = !normStructCourse || !normFormCourse || normStructCourse === normFormCourse || normStructCourse.includes(normFormCourse) || normFormCourse.includes(normStructCourse);
+        const semesterMatches = structureSemester === semesterNumber;
+        const yearMatches = !structureYear || !academicYear || structureYear === academicYear || structureYear.includes(academicYear) || academicYear.includes(structureYear);
 
-      const semesterMatches =
-        Number(s.semester || 1) === semNum;
+        return (
+          departmentMatches &&
+          courseMatches &&
+          semesterMatches &&
+          yearMatches
+        );
+      });
 
-      const academicYearMatches =
-        !sAcadYr ||
-        !acadYrNorm ||
-        sAcadYr === acadYrNorm;
+    if (!matchedStructure) {
+      setForm((prev) => ({
+        ...prev,
+        feeBreakdown: {
+          admissionFee: 0,
+          tuitionFee: 0,
+          universityFee: 0,
+          marksheetVerification: 0,
+          specialFee: 0,
+          computerLab: 0,
+          englishLabNssId: 0,
+          stationary: 0,
+          pta: 0,
+          otherFee: 0,
+        },
+        totalFee: 0,
+        balanceFee: 0,
+      }));
 
-      // If quota is selected, quota MUST match.
-      const quotaMatches =
-        !quotaName ||
-        !sQuota ||
-        sQuota === quotaName ||
-        sQuota.includes(quotaName) ||
-        quotaName.includes(sQuota) ||
-        isQuotaNameMatch(s.quota, quotaName);
+      return;
+    }
 
-      return (
-        deptMatches &&
-        courseMatches &&
-        semesterMatches &&
-        academicYearMatches &&
-        quotaMatches
-      );
-    });
-
-    let breakdown = {
+    const breakdown = {
       admissionFee: 0,
       tuitionFee: 0,
       universityFee: 0,
@@ -1144,148 +1208,153 @@ const StudentRegistration = () => {
       otherFee: 0,
     };
 
-    let total = 0;
+    let normalFee = 0;
 
-    if (matched?.fees?.length) {
-      matched.fees.forEach((fee) => {
-        const feeType = String(fee.feeType || "").toLowerCase();
-        const amount = Number(fee.amount) || 0;
+    (
+      Array.isArray(matchedStructure.fees)
+        ? matchedStructure.fees
+        : []
+    ).forEach((item) => {
+      const type = String(
+        item.feeType || ""
+      ).toLowerCase();
 
-        total += amount;
+      const amount =
+        Number(item.amount) || 0;
 
-        if (feeType.includes("admission")) {
-          breakdown.admissionFee += amount;
-        } else if (feeType.includes("tuition")) {
-          breakdown.tuitionFee += amount;
-        } else if (
-          feeType.includes("university") ||
-          feeType.includes("exam")
-        ) {
-          breakdown.universityFee += amount;
-        } else if (
-          feeType.includes("marksheet") ||
-          feeType.includes("document") ||
-          feeType.includes("verification")
-        ) {
-          breakdown.marksheetVerification += amount;
-        } else if (
-          feeType.includes("special") ||
-          feeType.includes("equipment")
-        ) {
-          breakdown.specialFee += amount;
-        } else if (
-          feeType.includes("computer") ||
-          feeType.includes("software")
-        ) {
-          breakdown.computerLab += amount;
-        } else if (
-          feeType.includes("english") ||
-          feeType.includes("nss") ||
-          feeType.includes("id card")
-        ) {
-          breakdown.englishLabNssId += amount;
-        } else if (
-          feeType.includes("stationery") ||
-          feeType.includes("stationary") ||
-          feeType.includes("syllabus")
-        ) {
-          breakdown.stationary += amount;
-        } else if (
-          feeType.includes("pta") ||
-          feeType.includes("parent teacher")
-        ) {
-          breakdown.pta += amount;
-        } else {
-          breakdown.otherFee += amount;
-        }
-      });
-    } else {
-      // If no matching fee structure is configured, total is 0
-      total = 0;
-    }
+      normalFee += amount;
 
-    const quotaRule = findMatchingQuotaRule(deptName, courseName, quotaName);
-    const normalFee = total;
-    let concession = 0;
-
-    if (quotaRule && normalFee > 0) {
-      if (quotaRule.discountType === "fixed") {
-        concession = Number(quotaRule.discountValue || 0);
-      } else if (quotaRule.discountType === "percentage") {
-        concession = (normalFee * Number(quotaRule.discountValue || 0)) / 100;
+      if (type.includes("admission")) {
+        breakdown.admissionFee += amount;
+      } else if (type.includes("tuition")) {
+        breakdown.tuitionFee += amount;
+      } else if (
+        type.includes("university") ||
+        type.includes("exam")
+      ) {
+        breakdown.universityFee += amount;
+      } else if (
+        type.includes("marksheet") ||
+        type.includes("document") ||
+        type.includes("verification")
+      ) {
+        breakdown.marksheetVerification += amount;
+      } else if (
+        type.includes("special") ||
+        type.includes("equipment")
+      ) {
+        breakdown.specialFee += amount;
+      } else if (
+        type.includes("computer") ||
+        type.includes("software")
+      ) {
+        breakdown.computerLab += amount;
+      } else if (
+        type.includes("english") ||
+        type.includes("nss") ||
+        type.includes("id card")
+      ) {
+        breakdown.englishLabNssId += amount;
+      } else if (
+        type.includes("stationery") ||
+        type.includes("stationary") ||
+        type.includes("syllabus")
+      ) {
+        breakdown.stationary += amount;
+      } else if (
+        type.includes("pta") ||
+        type.includes("parent teacher")
+      ) {
+        breakdown.pta += amount;
+      } else {
+        breakdown.otherFee += amount;
       }
-    }
-
-    if (concession > normalFee) {
-      concession = normalFee;
-    }
-
-    const finalFee = Math.max(0, normalFee - concession);
-    const paid = Number(form.amountPaid) || 0;
-    const balance = Math.max(0, finalFee - paid);
-
-    const paymentStatus =
-      paid <= 0
-        ? "Pending"
-        : paid >= finalFee && finalFee > 0
-        ? "Paid"
-        : "Partial";
+    });
 
     setForm((prev) => ({
       ...prev,
       feeBreakdown: breakdown,
-      normalFee: normalFee,
-      discountAmount: concession,
-      finalFee: finalFee,
-      totalFee: finalFee,
-      balanceFee: balance,
-      remainingFee: balance,
-      paymentStatus: paymentStatus,
-      quota: quotaRule?._id || prev.quota || prev.quotaName || prev.admissionQuota,
+      totalFee: normalFee,
+      balanceFee: Math.max(
+        0,
+        normalFee -
+          Number(prev.amountPaid || 0)
+      ),
     }));
   }, [
-    form.course,
     form.department,
-    form.dept,
+    form.course,
     form.semester,
     form.academicYear,
-    form.quota,
-    form.quotaName,
-    form.admissionQuota,
     feeStructuresList,
-    quotasList,
   ]);
 
   // Step 8: Dynamic Quota Concession Calculation Effect
   useEffect(() => {
-    const baseFee = Number(form.normalFee || form.totalFee) || 0;
+    const baseFee = Number(form.totalFee) || 0;
+
     setNormalFee(baseFee);
 
-    if (!form.quota || !quotaList?.length) {
+    const department = String(
+      form.department || ""
+    ).trim().toLowerCase();
+
+    const course = String(
+      form.course || ""
+    ).trim().toLowerCase();
+
+    const quotaName = String(
+      form.quota || ""
+    ).trim().toLowerCase();
+
+    const academicYear = String(
+      form.academicYear || ""
+    )
+      .replace(/\s+/g, "")
+      .toLowerCase();
+
+    // No department/course/quota selected
+    if (
+      !department ||
+      !course ||
+      !quotaName
+    ) {
       setQuotaConcession(0);
       setFinalAssessedFee(baseFee);
       return;
     }
 
-    const selectedQuota = quotaList.find((q) => {
-      const configuredQuota = String(
-        q.quotaName || q.name || ""
-      )
-        .trim()
-        .toLowerCase();
+    const normFormDept = cleanNormalizedStr(department);
+    const normFormCourse = cleanNormalizedStr(course);
+    const normFormQuota = cleanNormalizedStr(quotaName).replace(/quota/g, "");
+    const normFormYear = cleanNormalizedStr(academicYear);
 
-      const selectedQuotaName = String(form.quota)
-        .trim()
-        .toLowerCase();
+    // Find the matching Accounts quota configuration
+    const matchedQuota = (quotaList || []).find((quota) => {
+      if (form.quota && (String(quota._id) === String(form.quota) || String(quota.id) === String(form.quota))) {
+        return true;
+      }
+
+      const qDept = cleanNormalizedStr(quota.departmentName || quota.department || "");
+      const qCourse = cleanNormalizedStr(quota.courseName || quota.course || "");
+      const qQuotaName = cleanNormalizedStr(quota.quotaName || quota.name || "").replace(/quota/g, "");
+      const qYear = cleanNormalizedStr(quota.academicYear || "");
+
+      const deptMatches = !qDept || !normFormDept || qDept === normFormDept || qDept.includes(normFormDept) || normFormDept.includes(qDept);
+      const courseMatches = !qCourse || qCourse === "allcourses" || !normFormCourse || qCourse === normFormCourse || qCourse.includes(normFormCourse) || normFormCourse.includes(qCourse);
+      const quotaMatches = qQuotaName === normFormQuota || qQuotaName.includes(normFormQuota) || normFormQuota.includes(qQuotaName);
+      const yearMatches = !qYear || !normFormYear || qYear === normFormYear || qYear.includes(normFormYear) || normFormYear.includes(qYear);
 
       return (
-        configuredQuota === selectedQuotaName ||
-        configuredQuota.includes(selectedQuotaName) ||
-        selectedQuotaName.includes(configuredQuota)
+        deptMatches &&
+        courseMatches &&
+        quotaMatches &&
+        yearMatches
       );
     });
 
-    if (!selectedQuota) {
+    // No matching Accounts configuration
+    if (!matchedQuota) {
       setQuotaConcession(0);
       setFinalAssessedFee(baseFee);
       return;
@@ -1293,18 +1362,35 @@ const StudentRegistration = () => {
 
     let concession = 0;
 
-    if (selectedQuota.discountAmount !== undefined) {
-      concession = Number(selectedQuota.discountAmount) || 0;
-    } else if (
-      selectedQuota.discountType === "percentage"
+    // Fixed concession already calculated by Accounts
+    if (
+      matchedQuota.discountAmount !== undefined &&
+      matchedQuota.discountAmount !== null
     ) {
       concession =
-        (baseFee * Number(selectedQuota.discountValue || 0)) /
-        100;
-    } else {
-      concession = Number(selectedQuota.discountValue || 0);
+        Number(matchedQuota.discountAmount) || 0;
     }
 
+    // Percentage concession
+    else if (
+      matchedQuota.discountType === "percentage"
+    ) {
+      concession =
+        (
+          baseFee *
+          Number(matchedQuota.discountValue || 0)
+        ) / 100;
+    }
+
+    // Fixed amount concession
+    else {
+      concession =
+        Number(
+          matchedQuota.discountValue || 0
+        );
+    }
+
+    // Never allow concession above normal fee
     concession = Math.min(
       Math.max(0, concession),
       baseFee
@@ -1318,21 +1404,25 @@ const StudentRegistration = () => {
     setQuotaConcession(concession);
     setFinalAssessedFee(finalFee);
 
-    const paid = Number(form.amountPaid) || 0;
+    const paid =
+      Number(form.amountPaid) || 0;
 
     setForm((prev) => ({
       ...prev,
-      normalFee: baseFee,
       discountAmount: concession,
       finalFee: finalFee,
-      balanceFee: Math.max(0, finalFee - paid),
-      remainingFee: Math.max(0, finalFee - paid),
-      paymentStatus: paid <= 0 ? "Pending" : paid >= finalFee && finalFee > 0 ? "Paid" : "Partial",
+      normalFee: baseFee,
+      balanceFee: Math.max(
+        0,
+        finalFee - paid
+      ),
     }));
   }, [
-    form.normalFee,
-    form.totalFee,
+    form.department,
+    form.course,
     form.quota,
+    form.academicYear,
+    form.totalFee,
     form.amountPaid,
     quotaList,
   ]);
@@ -1669,15 +1759,13 @@ const StudentRegistration = () => {
         id: generatedId,
         admissionNo: generatedId,
         name: fullName,
-        receiptNumber: generatedRecNo,
-        paymentDate: form.paymentDate || new Date(),
         email: form.email || `${form.firstName.toLowerCase()}.${Date.now().toString().slice(-4)}@college.edu`,
 
         course: form.course,
         feeType: form.feeType || 'all',
 
         // Selected Admission Quota
-        quota: form.quota || form.quotaName || "General / Merit",
+        quota: form.quota || "General / Merit",
         quotaName: form.quotaName || form.admissionQuota || form.quota || "General / Merit",
 
         // 10 Fee Component Breakdown
@@ -1685,29 +1773,35 @@ const StudentRegistration = () => {
           admissionFee: Number(form.feeBreakdown?.admissionFee || 0),
           tuitionFee: Number(form.feeBreakdown?.tuitionFee || 0),
           universityFee: Number(form.feeBreakdown?.universityFee || 0),
-          marksheetVerification: Number(form.feeBreakdown?.marksheetVerification || 0),
+          marksheetVerification: Number(
+            form.feeBreakdown?.marksheetVerification || 0
+          ),
           specialFee: Number(form.feeBreakdown?.specialFee || 0),
           computerLab: Number(form.feeBreakdown?.computerLab || 0),
-          englishLabNssId: Number(form.feeBreakdown?.englishLabNssId || 0),
+          englishLabNssId: Number(
+            form.feeBreakdown?.englishLabNssId || 0
+          ),
           stationary: Number(form.feeBreakdown?.stationary || 0),
           pta: Number(form.feeBreakdown?.pta || 0),
           otherFee: Number(form.feeBreakdown?.otherFee || 0),
         },
 
-        normalFee: calculatedNormalFee,
-        quotaConcession: calculatedConcession,
-        discountAmount: calculatedConcession,
-        finalAssessedFee: calculatedFinalFee,
-        finalFee: calculatedFinalFee,
-        totalFee: calculatedFinalFee,
+        normalFee: Number(normalFee || 0),
+        quotaConcession: Number(quotaConcession || 0),
+        discountAmount: Number(quotaConcession || 0),
+        finalAssessedFee: Number(finalAssessedFee || 0),
+        finalFee: Number(finalAssessedFee || 0),
+        totalFee: Number(finalAssessedFee || 0),
 
-        amountPaid: calculatedPaid,
-        paidAmount: calculatedPaid,
-        balanceFee: calculatedBalance,
-        remainingFee: calculatedBalance,
+        amountPaid: Number(form.amountPaid || 0),
+        paidAmount: Number(form.amountPaid || 0),
+        balanceFee: Number(form.balanceFee || 0),
+        remainingFee: Number(form.balanceFee || 0),
 
         paymentMode: form.paymentMode || "Cash",
-        paymentStatus: calculatedStatus,
+        receiptNumber: form.receiptNumber || generatedRecNo || "",
+        paymentDate: form.paymentDate || new Date(),
+        paymentStatus: form.paymentStatus || "Pending",
 
         hostelRequired: isHostelReq ? 'yes' : 'no',
         transportRequired: isTransportReq ? 'yes' : 'no',
@@ -1722,7 +1816,7 @@ const StudentRegistration = () => {
         setSuccessMsg(`Student Admission Record Updated Successfully: ${generatedId}`);
       } else {
         await createStudent(payload);
-        if (Number(calculatedPaid) > 0 || Number(calculatedFinalFee) > 0) {
+        if (Number(form.amountPaid) > 0 || Number(finalAssessedFee) > 0) {
           try {
             await createFee({
               studentId: generatedId,
@@ -1730,18 +1824,18 @@ const StudentRegistration = () => {
               department: form.department || form.dept || 'General',
               semester: `Sem ${form.semester || 1}`,
               feeType: 'Tuition Fee',
-              totalFees: calculatedFinalFee,
-              paidAmount: calculatedPaid,
+              totalFees: Number(finalAssessedFee || 0),
+              paidAmount: Number(form.amountPaid || 0),
               paymentMode: form.paymentMode || 'Cash',
-              receiptNo: generatedRecNo,
+              receiptNo: form.receiptNumber || generatedRecNo,
               paymentDate: new Date(),
               quota: form.quota || form.quotaName || "General / Merit",
               quotaName: form.quotaName || form.admissionQuota || form.quota || "General / Merit",
-              normalFee: calculatedNormalFee,
-              discountAmount: calculatedConcession,
-              finalFee: calculatedFinalFee,
-              remainingFee: calculatedBalance,
-              status: calculatedStatus
+              normalFee: Number(normalFee || 0),
+              discountAmount: Number(quotaConcession || 0),
+              finalFee: Number(finalAssessedFee || 0),
+              remainingFee: Number(form.balanceFee || 0),
+              status: form.paymentStatus || "Pending"
             });
           } catch (feeErr) {
             console.warn('Auto fee creation note:', feeErr);
@@ -2718,9 +2812,45 @@ const StudentRegistration = () => {
                   <select
                     className="erp-select"
                     value={form.department || form.dept || ''}
-                    onChange={e => {
-                      handleChange('department', e.target.value);
-                      handleChange('dept', e.target.value);
+                    onChange={(e) => {
+                      const department = e.target.value;
+
+                      setForm((prev) => ({
+                        ...prev,
+
+                        department,
+                        dept: department,
+
+                        // Clear old department selections
+                        course: "",
+                        quota: "",
+                        quotaName: "",
+                        admissionQuota: "",
+
+                        // Clear old fee calculation
+                        feeBreakdown: {
+                          admissionFee: 0,
+                          tuitionFee: 0,
+                          universityFee: 0,
+                          marksheetVerification: 0,
+                          specialFee: 0,
+                          computerLab: 0,
+                          englishLabNssId: 0,
+                          stationary: 0,
+                          pta: 0,
+                          otherFee: 0,
+                        },
+
+                        totalFee: 0,
+                        balanceFee: 0,
+                        amountPaid: 0,
+                        paymentStatus: "Pending",
+                      }));
+
+                      // Clear quota calculation immediately
+                      setNormalFee(0);
+                      setQuotaConcession(0);
+                      setFinalAssessedFee(0);
                     }}
                   >
                     <option value="">Select Department</option>
@@ -2739,21 +2869,52 @@ const StudentRegistration = () => {
                   <label className="erp-label">Course / Major <span className="erp-req">*</span></label>
                   <select
                     className="erp-select"
-                    value={form.course || ''}
-                    onChange={e => handleChange('course', e.target.value)}
+                    value={form.course || ""}
+                    onChange={(e) => {
+                      const course = e.target.value;
+
+                      setForm((prev) => ({
+                        ...prev,
+                        course,
+                        quota: "",
+                        quotaName: "",
+                        admissionQuota: "",
+
+                        feeBreakdown: {
+                          admissionFee: 0,
+                          tuitionFee: 0,
+                          universityFee: 0,
+                          marksheetVerification: 0,
+                          specialFee: 0,
+                          computerLab: 0,
+                          englishLabNssId: 0,
+                          stationary: 0,
+                          pta: 0,
+                          otherFee: 0,
+                        },
+
+                        totalFee: 0,
+                        balanceFee: 0,
+                        amountPaid: 0,
+                        paymentStatus: "Pending",
+                      }));
+
+                      setNormalFee(0);
+                      setQuotaConcession(0);
+                      setFinalAssessedFee(0);
+                    }}
                   >
-                    <option value="">
-                      {!(form.department || form.dept)
-                        ? 'Select Department First'
-                        : availableCourses.length === 0
-                        ? 'No courses configured for this department'
-                        : 'Select Course'}
-                    </option>
-                    {availableCourses.map((c, i) => {
-                      const cName = c.name || c.courseName || c;
+                    <option value="">Select Course</option>
+
+                    {availableCourses.map((course) => {
+                      const cName = course.name || course.courseName || course.title || course.code || "Unnamed Course";
+                      const cVal = course.name || course.courseName || course._id || course.id || cName;
                       return (
-                        <option key={c.id || c._id || i} value={cName}>
-                          {cName} {c.code ? `(${c.code})` : ''}
+                        <option
+                          key={course._id || course.id || cVal}
+                          value={cVal}
+                        >
+                          {cName} {course.code && course.code !== cName ? `(${course.code})` : ''}
                         </option>
                       );
                     })}
@@ -2791,96 +2952,142 @@ const StudentRegistration = () => {
                     <label className="erp-label" style={{ margin: 0 }}>
                       Admission Quota / Seat Type <span className="erp-req">*</span>
                     </label>
-                    {quotasList.some(q => {
-                      const deptVal = form.department || form.dept || '';
-                      return isDeptMatch(q.departmentName || q.department, deptVal, q.department, form.deptId) && q.status !== 'inactive';
-                    }) && (
-                      <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: '700' }}>
-                        ★ Concessions Available for this Dept
-                      </span>
-                    )}
                   </div>
-                  <select
-                    className="erp-select"
-                    disabled={!(form.department || form.dept)}
-                    value={form.admissionQuota || form.quotaName || 'General Quota'}
-                    onChange={e => {
-                      const selectedQ = e.target.value;
-                      handleChange('admissionQuota', selectedQ);
-                      handleChange('quotaName', selectedQ);
-                      if (applicableFee) {
-                        applyFeeStructure(applicableFee, form.feeType, selectedQ);
-                      }
-                    }}
-                  >
-                    {STANDARD_QUOTA_CATEGORIES.map(cat => {
-                      const matchedRule = findMatchingQuotaRule(form.department || form.dept, form.course, cat);
+                  {(() => {
+                    const selectedDepartment = String(
+                      form.department || ""
+                    ).trim().toLowerCase();
 
-                      if (matchedRule && Number(matchedRule.discountValue || 0) > 0) {
-                        const disc = matchedRule.discountType === 'percentage' ? `${matchedRule.discountValue}%` : `₹${Number(matchedRule.discountValue || 0).toLocaleString('en-IN')}`;
-                        const net = Number(matchedRule.finalFee || (Number(matchedRule.normalFee || 50000) - Number(matchedRule.discountValue || 0)) || 0);
-                        return (
-                          <option key={cat} value={matchedRule.quotaName || cat}>
-                            {matchedRule.quotaName || cat} (-{disc} Concession ➔ Net: ₹{net.toLocaleString('en-IN')})
-                          </option>
-                        );
-                      }
+                    const selectedCourse = String(
+                      form.course || ""
+                    ).trim().toLowerCase();
+
+                    const selectedAcademicYear = String(
+                      form.academicYear || ""
+                    )
+                      .replace(/\s+/g, "")
+                      .toLowerCase();
+
+                    const normSelectedDept = cleanNormalizedStr(form.department || "");
+                    const normSelectedCourse = cleanNormalizedStr(form.course || "");
+                    const normSelectedYear = cleanNormalizedStr(form.academicYear || "");
+
+                    const availableQuotas = (quotaList || []).filter((quota) => {
+                      const qDept = cleanNormalizedStr(quota.departmentName || quota.department || "");
+                      const qCourse = cleanNormalizedStr(quota.courseName || quota.course || "");
+                      const qYear = cleanNormalizedStr(quota.academicYear || "");
+
+                      const departmentMatches = !qDept || !normSelectedDept || qDept === normSelectedDept || qDept.includes(normSelectedDept) || normSelectedDept.includes(qDept);
+                      const courseMatches = !qCourse || qCourse === "allcourses" || !normSelectedCourse || qCourse === normSelectedCourse || qCourse.includes(normSelectedCourse) || normSelectedCourse.includes(qCourse);
+                      const academicYearMatches = !qYear || !normSelectedYear || qYear === normSelectedYear || qYear.includes(normSelectedYear) || normSelectedYear.includes(qYear);
 
                       return (
-                        <option key={cat} value={cat}>
-                          {cat} {cat === 'General Quota' ? '(Standard Normal Fee)' : ''}
-                        </option>
+                        departmentMatches &&
+                        courseMatches &&
+                        academicYearMatches
                       );
-                    })}
-                  </select>
+                    });
 
-                  {/* Active Quota Quick Selection Chips */}
-                  {quotasList.filter(q => {
-                    const deptVal = form.department || form.dept || '';
-                    return isDeptMatch(q.departmentName || q.department, deptVal, q.department, form.deptId) && q.status !== 'inactive';
-                  }).length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', alignSelf: 'center' }}>Quick Apply:</span>
-                      {quotasList
-                        .filter(q => {
-                          const deptVal = form.department || form.dept || '';
-                          return isDeptMatch(q.departmentName || q.department, deptVal, q.department, form.deptId) && q.status !== 'inactive';
-                        })
-                        .map(q => {
-                          const isSel = isQuotaNameMatch(form.admissionQuota || form.quotaName, q.quotaName);
+                    return (
+                      <select
+                        className="erp-select"
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          borderRadius: '6px',
+                          border: '1.5px solid #4f46e5',
+                          backgroundColor: '#ffffff',
+                          color: '#1e293b',
+                          cursor: 'pointer'
+                        }}
+                        value={form.quota || ""}
+                        onChange={(e) => {
+                          const selectedVal = e.target.value;
+                          setForm((prev) => ({
+                            ...prev,
+                            quota: selectedVal,
+                            quotaName: selectedVal,
+                            admissionQuota: selectedVal,
+                          }));
+                        }}
+                      >
+                        <option value="">
+                          Select Admission Quota
+                        </option>
+
+                        {availableQuotas.map((quota) => {
+                          const normal =
+                            Number(
+                              quota.normalFee ||
+                              normalFee ||
+                              form.totalFee ||
+                              0
+                            );
+
+                          let concession = 0;
+
+                          if (
+                            quota.discountAmount !== undefined &&
+                            quota.discountAmount !== null
+                          ) {
+                            concession =
+                              Number(quota.discountAmount) || 0;
+                          } else if (
+                            quota.discountType === "percentage"
+                          ) {
+                            concession =
+                              (normal *
+                                Number(quota.discountValue || 0)) /
+                              100;
+                          } else {
+                            concession =
+                              Number(quota.discountValue || 0);
+                          }
+
+                          concession = Math.min(
+                            Math.max(0, concession),
+                            normal
+                          );
+
+                          const netFee =
+                            Number(
+                              quota.finalFee
+                            ) ||
+                            Math.max(
+                              0,
+                              normal - concession
+                            );
+
+                          const quotaName =
+                            quota.quotaName ||
+                            quota.name ||
+                            "Quota";
+
+                          let displayText = quotaName;
+
+                          if (concession > 0) {
+                            displayText +=
+                              ` (-₹${concession.toLocaleString("en-IN")}` +
+                              ` Concession ➔ Net: ₹${netFee.toLocaleString("en-IN")})`;
+                          } else {
+                            displayText +=
+                              ` (Standard Normal Fee ➔ ₹${normal.toLocaleString("en-IN")})`;
+                          }
+
                           return (
-                            <button
-                              key={q._id || q.quotaName}
-                              type="button"
-                              onClick={() => {
-                                handleChange('admissionQuota', q.quotaName);
-                                handleChange('quotaName', q.quotaName);
-                                if (applicableFee) {
-                                  applyFeeStructure(applicableFee, form.feeType, q.quotaName);
-                                }
-                              }}
-                              style={{
-                                padding: '3px 8px',
-                                borderRadius: '6px',
-                                border: isSel ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
-                                background: isSel ? '#ecfdf5' : '#ffffff',
-                                color: isSel ? '#15803d' : '#334155',
-                                fontSize: '11px',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
+                            <option
+                              key={quota._id || quota.id}
+                              value={quotaName}
                             >
-                              <Award size={12} color={isSel ? '#16a34a' : '#64748b'} />
-                              {q.quotaName}: -₹{Number(q.discountValue || 0).toLocaleString('en-IN')}
-                              {isSel && <Check size={12} color="#16a34a" />}
-                            </button>
+                              {displayText}
+                            </option>
                           );
                         })}
-                    </div>
-                  )}
+                      </select>
+                    );
+                  })()}
                 </div>
 
                 <div className="erp-form-group">
@@ -2931,25 +3138,25 @@ const StudentRegistration = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
                     <div>
                       <span style={{ fontSize: '11.5px', color: '#64748b', display: 'block' }}>Normal Department Fee</span>
-                      <strong style={{ fontSize: '14px', color: '#0f172a' }}>₹{Number(form.normalFee || form.totalFee || 0).toLocaleString('en-IN')}</strong>
+                      <strong style={{ fontSize: '14px', color: '#0f172a' }}>₹{Number(normalFee || form.normalFee || form.totalFee || 0).toLocaleString('en-IN')}</strong>
                     </div>
 
                     <div>
                       <span style={{ fontSize: '11.5px', color: '#64748b', display: 'block' }}>Selected Quota</span>
-                      <strong style={{ fontSize: '14px', color: '#4f46e5' }}>{form.quotaName || form.admissionQuota || 'General Quota'}</strong>
+                      <strong style={{ fontSize: '14px', color: '#4f46e5' }}>{form.quota || form.quotaName || form.admissionQuota || 'General Quota'}</strong>
                     </div>
 
                     <div>
                       <span style={{ fontSize: '11.5px', color: '#64748b', display: 'block' }}>Quota Discount</span>
                       <strong style={{ fontSize: '14px', color: '#dc2626' }}>
-                        - ₹{Number(form.discountAmount || 0).toLocaleString('en-IN')}
+                        - ₹{Number(quotaConcession || form.discountAmount || 0).toLocaleString('en-IN')}
                       </strong>
                     </div>
 
                     <div>
                       <span style={{ fontSize: '11.5px', color: '#64748b', display: 'block' }}>Final Payable Fee</span>
                       <strong style={{ fontSize: '17px', color: '#059669' }}>
-                        ₹{Number(form.finalFee || form.totalFee || 0).toLocaleString('en-IN')}
+                        ₹{Number(finalAssessedFee || form.finalFee || Math.max(0, (Number(normalFee || form.normalFee || form.totalFee || 0) - Number(quotaConcession || form.discountAmount || 0))) || 0).toLocaleString('en-IN')}
                       </strong>
                     </div>
                   </div>
@@ -3360,7 +3567,7 @@ const StudentRegistration = () => {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className={`erp-badge ${form.amountPaid >= form.totalFee && form.totalFee > 0 ? 'erp-badge-success' : form.amountPaid > 0 ? 'erp-badge-warning' : 'erp-badge-danger'}`}>
+              <span className={`erp-badge ${form.paymentStatus === 'Paid' ? 'erp-badge-success' : form.paymentStatus === 'Partial' ? 'erp-badge-warning' : 'erp-badge-danger'}`}>
                 Payment Status: {form.paymentStatus || 'Pending'}
               </span>
             </div>
@@ -3400,25 +3607,25 @@ const StudentRegistration = () => {
               <div>
                 <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Baseline Department Fee</span>
                 <div style={{ fontSize: '16px', fontWeight: '800', color: '#ffffff', marginTop: '3px' }}>
-                  ₹{Number(form.normalFee || form.totalFee || 50000).toLocaleString('en-IN')}
+                  ₹{Number(normalFee || 0).toLocaleString('en-IN')}
                 </div>
                 <span style={{ fontSize: '11px', color: '#94a3b8' }}>Standard Normal Fee</span>
               </div>
 
               <div>
                 <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Quota Concession</span>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: Number(form.discountAmount || 0) > 0 ? '#f87171' : '#94a3b8', marginTop: '3px' }}>
-                  {Number(form.discountAmount || 0) > 0 ? `- ₹${Number(form.discountAmount).toLocaleString('en-IN')}` : '₹0 (None)'}
+                <div style={{ fontSize: '16px', fontWeight: '800', color: Number(quotaConcession || 0) > 0 ? '#f87171' : '#94a3b8', marginTop: '3px' }}>
+                  {Number(quotaConcession || 0) > 0 ? `- ₹${Number(quotaConcession).toLocaleString('en-IN')}` : '₹0 (None)'}
                 </div>
-                <span style={{ fontSize: '11px', color: Number(form.discountAmount || 0) > 0 ? '#34d399' : '#94a3b8' }}>
-                  {Number(form.discountAmount || 0) > 0 ? '✓ Subsidy Applied' : 'Standard Rate'}
+                <span style={{ fontSize: '11px', color: Number(quotaConcession || 0) > 0 ? '#34d399' : '#94a3b8' }}>
+                  {Number(quotaConcession || 0) > 0 ? '✓ Subsidy Applied' : 'Standard Rate'}
                 </span>
               </div>
 
               <div style={{ background: 'rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '10px 14px', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
                 <span style={{ fontSize: '11px', color: '#38bdf8', textTransform: 'uppercase', fontWeight: '800' }}>Final Assessed Fee</span>
                 <div style={{ fontSize: '20px', fontWeight: '900', color: '#34d399', marginTop: '2px' }}>
-                  ₹{Number(form.finalFee || form.totalFee || 50000).toLocaleString('en-IN')}
+                  ₹{Number(finalAssessedFee || 0).toLocaleString('en-IN')}
                 </div>
               </div>
             </div>
@@ -3446,37 +3653,159 @@ const StudentRegistration = () => {
               </div>
 
               <div style={{ minWidth: '280px', flex: '1', maxWidth: '400px' }}>
-                <select
-                  className="erp-select"
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '13px',
-                    fontWeight: '700',
-                    borderRadius: '6px',
-                    border: '1.5px solid #4f46e5',
-                    backgroundColor: '#ffffff',
-                    color: '#1e293b',
-                    cursor: 'pointer'
-                  }}
-                  value={form.quota || form.quotaName || form.admissionQuota || ""}
-                  onChange={(e) => {
-                    const selectedVal = e.target.value;
-                    setForm((prev) => ({
-                      ...prev,
-                      quota: selectedVal,
-                      quotaName: selectedVal,
-                      admissionQuota: selectedVal,
-                    }));
-                  }}
-                >
-                  <option value="">Select Admission Quota</option>
-                  <option value="General / Merit">General / Merit</option>
-                  <option value="Government Quota">Government Quota</option>
-                  <option value="Management Quota">Management Quota</option>
-                  <option value="Sports Quota">Sports Quota</option>
-                  <option value="Ex-Servicemen / Special">Ex-Servicemen / Special</option>
-                </select>
+                {(() => {
+                  const selectedDepartment = String(
+                    form.department || ""
+                  ).trim().toLowerCase();
+
+                  const selectedCourse = String(
+                    form.course || ""
+                  ).trim().toLowerCase();
+
+                  const selectedAcademicYear = String(
+                    form.academicYear || ""
+                  )
+                    .replace(/\s+/g, "")
+                    .toLowerCase();
+
+                  const availableQuotas = (quotaList || []).filter((quota) => {
+                    const quotaDepartment = String(
+                      quota.departmentName ||
+                      quota.department ||
+                      ""
+                    )
+                      .trim()
+                      .toLowerCase();
+
+                    const quotaCourse = String(
+                      quota.courseName ||
+                      quota.course ||
+                      ""
+                    )
+                      .trim()
+                      .toLowerCase();
+
+                    const quotaYear = String(
+                      quota.academicYear || ""
+                    )
+                      .replace(/\s+/g, "")
+                      .toLowerCase();
+
+                    const departmentMatches =
+                      quotaDepartment === selectedDepartment;
+
+                    const courseMatches =
+                      quotaCourse === selectedCourse;
+
+                    const academicYearMatches =
+                      !quotaYear ||
+                      quotaYear === selectedAcademicYear;
+
+                    return (
+                      departmentMatches &&
+                      courseMatches &&
+                      academicYearMatches
+                    );
+                  });
+
+                  return (
+                    <select
+                      className="erp-select"
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        fontSize: '13px',
+                        fontWeight: '700',
+                        borderRadius: '6px',
+                        border: '1.5px solid #4f46e5',
+                        backgroundColor: '#ffffff',
+                        color: '#1e293b',
+                        cursor: 'pointer'
+                      }}
+                      value={form.quota || ""}
+                      onChange={(e) => {
+                        const selectedVal = e.target.value;
+                        setForm((prev) => ({
+                          ...prev,
+                          quota: selectedVal,
+                          quotaName: selectedVal,
+                          admissionQuota: selectedVal,
+                        }));
+                      }}
+                    >
+                      <option value="">Select Admission Quota</option>
+
+                      {availableQuotas.map((quota) => {
+                        const normal =
+                          Number(
+                            quota.normalFee ||
+                            normalFee ||
+                            form.totalFee ||
+                            0
+                          );
+
+                        let concession = 0;
+
+                        if (
+                          quota.discountAmount !== undefined &&
+                          quota.discountAmount !== null
+                        ) {
+                          concession =
+                            Number(quota.discountAmount) || 0;
+                        } else if (
+                          quota.discountType === "percentage"
+                        ) {
+                          concession =
+                            (normal *
+                              Number(quota.discountValue || 0)) /
+                            100;
+                        } else {
+                          concession =
+                            Number(quota.discountValue || 0);
+                        }
+
+                        concession = Math.min(
+                          Math.max(0, concession),
+                          normal
+                        );
+
+                        const netFee =
+                          Number(
+                            quota.finalFee
+                          ) ||
+                          Math.max(
+                            0,
+                            normal - concession
+                          );
+
+                        const quotaName =
+                          quota.quotaName ||
+                          quota.name ||
+                          "Quota";
+
+                        let displayText = quotaName;
+
+                        if (concession > 0) {
+                          displayText +=
+                            ` (-₹${concession.toLocaleString("en-IN")}` +
+                            ` Concession ➔ Net: ₹${netFee.toLocaleString("en-IN")})`;
+                        } else {
+                          displayText +=
+                            ` (Standard Normal Fee ➔ ₹${normal.toLocaleString("en-IN")})`;
+                        }
+
+                        return (
+                          <option
+                            key={quota._id || quota.id}
+                            value={quotaName}
+                          >
+                            {displayText}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  );
+                })()}
               </div>
             </div>
 
@@ -3565,45 +3894,48 @@ const StudentRegistration = () => {
                 </div>
 
                 {/* Subtotal & Concession Summary Section */}
-                <div className="mt-5 space-y-3 border-t pt-4" style={{ marginTop: '20px', paddingTop: '16px', borderTop: '2px dashed #cbd5e1' }}>
-                  <div className="flex justify-between" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', color: '#475569', marginBottom: '8px' }}>
+                <div className="mt-5 space-y-3 border-t pt-4">
+                  <div className="flex justify-between">
                     <span>Normal / Baseline Fee</span>
-                    <strong style={{ color: '#0f172a', fontWeight: '800' }}>
+                    <strong>
                       ₹{Number(normalFee || 0).toLocaleString("en-IN")}
                     </strong>
                   </div>
 
-                  <div className="flex justify-between text-red-600" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', color: '#dc2626', marginBottom: '8px' }}>
+                  <div className="flex justify-between text-red-600">
                     <span>Quota Concession</span>
                     <strong>
                       -₹{Number(quotaConcession || 0).toLocaleString("en-IN")}
                     </strong>
                   </div>
 
-                  <div className="flex justify-between border-t pt-3 text-lg font-bold" style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1.5px solid #e2e8f0', paddingTop: '10px', fontSize: '16px', fontWeight: '900', color: '#15803d', marginBottom: '8px' }}>
+                  <div className="flex justify-between border-t pt-3 text-lg font-bold">
                     <span>Final Assessed Fee</span>
                     <strong>
                       ₹{Number(finalAssessedFee || 0).toLocaleString("en-IN")}
                     </strong>
                   </div>
+                </div>
 
-                  <div className="flex justify-between" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', color: '#475569', marginBottom: '8px' }}>
+                {/* Payment Calculation Section */}
+                <div className="mt-4 space-y-2">
+                  <div className="flex justify-between">
                     <span>Amount Paid</span>
-                    <strong style={{ color: '#16a34a', fontWeight: '800' }}>
+                    <strong>
                       ₹{Number(form.amountPaid || 0).toLocaleString("en-IN")}
                     </strong>
                   </div>
 
-                  <div className="flex justify-between" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', color: '#475569', marginBottom: '8px' }}>
+                  <div className="flex justify-between">
                     <span>Outstanding</span>
-                    <strong style={{ color: form.balanceFee > 0 ? '#dc2626' : '#16a34a', fontWeight: '800' }}>
+                    <strong>
                       ₹{Number(form.balanceFee || 0).toLocaleString("en-IN")}
                     </strong>
                   </div>
 
-                  <div className="flex justify-between" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', color: '#475569' }}>
+                  <div className="flex justify-between">
                     <span>Payment Status</span>
-                    <strong style={{ fontWeight: '800' }}>
+                    <strong>
                       {form.paymentStatus || "Pending"}
                     </strong>
                   </div>

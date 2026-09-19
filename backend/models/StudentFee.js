@@ -124,6 +124,31 @@ const studentFeeSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    payments: {
+      type: [
+        {
+          amount: {
+            type: Number,
+            default: 0,
+            min: 0,
+          },
+          paymentMode: {
+            type: String,
+            default: "Cash",
+          },
+          receiptNo: {
+            type: String,
+            default: "",
+          },
+          paymentDate: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,

@@ -66,8 +66,11 @@ const Sidebar = ({ isOpen, onClose }) => {
       name: 'Fee Management',
       icon: <Wallet size={20} />,
       items: [
+        { name: 'Fee Structure', path: '/admin/fee-structure', icon: <Layers size={20} /> },
         { name: 'Fees & Collections', path: '/admin/fees', icon: <Wallet size={20} /> },
         { name: 'Quota Management', path: '/admin/quota-management', icon: <Award size={20} /> },
+        { name: 'Scholarship Management', path: '/admin/scholarship-management', icon: <Award size={20} /> },
+        { name: 'Student Welfare', path: '/admin/student-welfare', icon: <Heart size={20} /> },
         { name: 'Payroll', path: '/admin/payroll', icon: <FileSpreadsheet size={20} /> }
       ]
     },

@@ -69,6 +69,7 @@ import classSessionRoutes from './routes/classSessionRoutes.js';
 import admissionRoutes from './routes/admissionRoutes.js';
 import quotaRoutes from './routes/quotaRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import scholarshipRoutes from './routes/scholarshipRoutes.js';
 
 // Import Cron Jobs
 import { initCronJobs } from './cron/scheduler.js';
@@ -865,6 +866,7 @@ app.use('/api/fee-plans', feePlanRoutes);
 app.use('/api/fee-structures', feeStructuresRoutes);
 app.use('/api/quotas', quotaRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/scholarships', scholarshipRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/library', libraryRoutes);
 app.use('/api/transport', transportRoutes);
@@ -906,6 +908,22 @@ const startServer = async () => {
     const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/college_erp';
     await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
     console.log('✅ Connected to MongoDB Database');
+
+    // Clean up stale legacy unique indexes on FeeStructure collection
+    try {
+      const feeCol = mongoose.connection.collection('feestructures');
+      if (feeCol) {
+        const indexes = await feeCol.indexes();
+        for (const idx of indexes) {
+          if (idx.name && idx.name !== '_id_') {
+            await feeCol.dropIndex(idx.name);
+            console.log(`🧹 Dropped legacy FeeStructure index: ${idx.name}`);
+          }
+        }
+      }
+    } catch (idxErr) {
+      // ignore if collection or indexes not present
+    }
   } catch (err) {
     console.log('⚠️ MongoDB connection failed. Falling back to In-Memory Database...', err.message);
     const mongoServer = await MongoMemoryServer.create({

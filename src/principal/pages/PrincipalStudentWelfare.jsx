@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../../context/AuthContext';
 import {
   ShieldAlert,
   Users,
@@ -157,6 +158,8 @@ const departmentIncidentData = [
 ];
 
 export default function PrincipalStudentWelfare() {
+  const { user } = useContext(AuthContext);
+  const isAdmin = user?.role === 'Admin';
   const [cases, setCases] = useState([]);
 
   const [anonymousComplaints, setAnonymousComplaints] = useState(() => {
@@ -373,7 +376,7 @@ export default function PrincipalStudentWelfare() {
     e.preventDefault();
     try {
       await approveScholarship(selectedCase.id, {
-        studentId: 'CS2022001', // Fallback
+        studentId: selectedCase.studentId,
         name: scholarshipData.name,
         amount: Number(scholarshipData.amount)
       });
@@ -490,7 +493,9 @@ export default function PrincipalStudentWelfare() {
           <AlertOctagon size={18} style={{ color: '#3730A5' }} />
           <div>
             <span style={{ fontSize: '0.7rem', display: 'block', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Access Level</span>
-            <strong style={{ fontSize: '0.8rem', color: 'var(--text-main)' }}>Principal Account - Executive Officer</strong>
+            <strong style={{ fontSize: '0.8rem', color: 'var(--text-main)' }}>
+              {isAdmin ? 'Admin Account' : 'Principal Account - Executive Officer'}
+            </strong>
           </div>
         </div>
       </div>
@@ -688,6 +693,14 @@ export default function PrincipalStudentWelfare() {
                             >
                               Timeline
                             </button>
+                            {c.issueType === 'Scholarship' && c.status === 'Pending' && (
+                              <button
+                                onClick={() => { setSelectedCase(c); setShowScholarshipModal(true); }}
+                                style={{ padding: '4px 6px', borderRadius: '4px', background: 'rgba(16,185,129,0.1)', color: 'var(--success)', border: 'none', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
+                              >
+                                Approve Scholarship
+                              </button>
+                            )}
                             {c.status !== 'Resolved' && (
                               <button
                                 onClick={() => resolveCaseAction(c)}

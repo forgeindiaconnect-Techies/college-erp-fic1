@@ -52,6 +52,10 @@ router.post("/", async (req, res) => {
       });
     }
 
+    if (semester) {
+      duplicateQuery.$and.push({ semester: Number(semester) || 1 });
+    }
+
     if (quota) {
       duplicateQuery.$and.push({
         quota: new RegExp(`^${String(quota).replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i')
@@ -66,7 +70,7 @@ router.post("/", async (req, res) => {
     if (existingFee) {
       return res.status(400).json({
         success: false,
-        message: "A fee structure already exists for this course. Please edit the existing fee structure instead.",
+        message: "A fee structure already exists for this course and semester. Please edit the existing fee structure instead.",
       });
     }
 
@@ -86,12 +90,47 @@ router.post("/", async (req, res) => {
       collegeId: collegeId || "COL001",
     });
 
+    req.app.get('io')?.emit('dataUpdated', { module: 'feeStructure', action: 'created' });
+
     res.status(201).json({
       success: true,
       message: "Fee structure created successfully",
       data: feeStructure,
     });
   } catch (error) {
+    if (error.code === 11000) {
+      try {
+        const feeCol = FeeStructure.collection;
+        const indexes = await feeCol.indexes();
+        for (const idx of indexes) {
+          if (idx.name && idx.name !== '_id_') {
+            await feeCol.dropIndex(idx.name).catch(() => {});
+          }
+        }
+        const calculatedTotal = Number(req.body.totalFee || req.body.totalAmount) || (Number(req.body.tuitionFee || 0) + Number(req.body.otherFees || 0));
+        const feeStructure = await FeeStructure.create({
+          academicYear: req.body.academicYear,
+          department: req.body.department || "",
+          course: req.body.course,
+          semester: Number(req.body.semester) || 1,
+          quota: req.body.quota || "General / Merit",
+          tuitionFee: Number(req.body.tuitionFee) || 0,
+          otherFees: Number(req.body.otherFees) || 0,
+          fees: Array.isArray(req.body.fees) ? req.body.fees : [],
+          totalFee: calculatedTotal,
+          totalAmount: calculatedTotal,
+          collegeId: req.body.collegeId || "COL001",
+        });
+        req.app.get('io')?.emit('dataUpdated', { module: 'feeStructure', action: 'created' });
+        return res.status(201).json({
+          success: true,
+          message: "Fee structure created successfully",
+          data: feeStructure,
+        });
+      } catch (retryErr) {
+        console.error("Auto-recovery retry failed:", retryErr);
+      }
+    }
     console.error("Failed to create fee structure:", error);
     res.status(500).json({
       success: false,
@@ -118,7 +157,6 @@ router.get("/", async (req, res) => {
     }
 
     let feeStructures = await FeeStructure.find(filter)
-      .populate("course")
       .sort({ createdAt: -1 });
 
     res.json({
@@ -185,6 +223,10 @@ router.put("/:id", async (req, res) => {
       });
     }
 
+    if (semester) {
+      duplicateQuery.$and.push({ semester: Number(semester) || 1 });
+    }
+
     if (quota) {
       duplicateQuery.$and.push({
         quota: new RegExp(`^${String(quota).replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i')
@@ -199,7 +241,7 @@ router.put("/:id", async (req, res) => {
     if (existingFee) {
       return res.status(400).json({
         success: false,
-        message: "A fee structure already exists for this course. Please edit the existing fee structure instead.",
+        message: "A fee structure already exists for this course and semester. Please edit the existing fee structure instead.",
       });
     }
 
@@ -230,6 +272,8 @@ router.put("/:id", async (req, res) => {
       });
     }
 
+    req.app.get('io')?.emit('dataUpdated', { module: 'feeStructure', action: 'updated' });
+
     res.json({
       success: true,
       message: "Fee structure updated successfully",
@@ -250,6 +294,7 @@ router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     await FeeStructure.findByIdAndDelete(id);
+    req.app.get('io')?.emit('dataUpdated', { module: 'feeStructure', action: 'deleted' });
     res.json({
       success: true,
       message: "Fee structure deleted successfully",

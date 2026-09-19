@@ -102,25 +102,160 @@ export const recordAdmissionPayment = async (req, res) => {
 
     // Also persist in Fee collection for unified ledger / receipts / reports
     try {
+      const studentIdentifier = admission.studentId || admission.id || String(admission._id);
+      const existingFee = await Fee.findOne({
+        studentId: studentIdentifier,
+        ...(admission.collegeId || req.collegeId || req.user?.collegeId
+          ? { collegeId: admission.collegeId || req.collegeId || req.user?.collegeId }
+          : {}),
+      }) || await Fee.findOne({
+        studentId: studentIdentifier,
+      });
+
+      if (existingFee) {
+        const newPaidAmount =
+          Number(admission.amountPaid || 0) ||
+          (Number(existingFee.paidAmount || 0) + Number(paymentAmount || 0));
+
+        const finalFee =
+          Number(
+            admission.finalFee ||
+            existingFee.finalFee ||
+            admission.totalFee ||
+            0
+          );
+
+        const remainingFee = Math.max(
+          0,
+          finalFee - newPaidAmount
+        );
+
+        const status =
+          newPaidAmount <= 0
+            ? "Pending"
+            : newPaidAmount >= finalFee
+              ? "Paid"
+              : "Partial";
+
+        existingFee.paidAmount = newPaidAmount;
+        existingFee.finalFee = finalFee;
+        existingFee.remainingFee = remainingFee;
+        existingFee.pendingAmount = remainingFee;
+        existingFee.normalFee = Number(admission.normalFee || existingFee.normalFee || finalFee);
+        existingFee.discountAmount = Number(admission.discountAmount || existingFee.discountAmount || 0);
+        existingFee.status = status;
+
+        existingFee.quota =
+          admission.quota ||
+          existingFee.quota;
+
+        existingFee.quotaName =
+          admission.quotaName ||
+          admission.admissionQuota ||
+          existingFee.quotaName;
+
+        const currentPayment = Number(paymentAmount || admission.amountPaid || 0);
+
+        if (currentPayment > 0) {
+          existingFee.payments = [
+            ...(existingFee.payments || []),
+            {
+              amount: currentPayment,
+              paymentMode: admission.paymentMode || paymentMethod || "Cash",
+              paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+              receiptNo:
+                admission.receiptNumber ||
+                existingFee.receiptNo ||
+                receiptNo ||
+                "",
+            },
+          ];
+        }
+
+        existingFee.receiptNo =
+          admission.receiptNumber ||
+          existingFee.receiptNo ||
+          receiptNo ||
+          "";
+
+        await existingFee.save();
+
+        req.app.get('io')?.emit('dataUpdated', { module: 'fees', action: 'updated', studentId: admission.id });
+        req.app.get('io')?.emit('dataUpdated', { module: 'admissions', action: 'payment_recorded', admissionId: admission._id });
+        req.app.get('io')?.emit('dataUpdated', { module: 'students', action: 'payment_recorded', studentId: admission.id });
+
+        return res.status(200).json({
+          success: true,
+          message: "Payment updated successfully",
+          data: existingFee,
+          admission,
+        });
+      }
+
       await Fee.create({
-        studentId: admission.id || admission._id,
+        studentId: admission.id || admission._id || admission.studentId,
         studentName: admission.name || admission.studentName,
         department: admission.dept || admission.department || admission.course || 'General',
         semester: admission.sem || admission.semester || 'Sem 1',
         feeType: 'Tuition Fee / Admission Fee',
         totalFees: payableFee,
-        paidAmount: paymentAmount,
+        paidAmount: Number(admission.amountPaid || 0),
         paymentMode: paymentMethod || 'Cash',
         receiptNo: receiptNo,
         paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
         collegeId: admission.collegeId || req.collegeId || req.user?.collegeId || 'unassigned_college',
         quota: admission.quota || null,
-        quotaName: admission.quotaName || admission.admissionQuota || 'General Quota'
+        quotaName:
+          admission.quotaName ||
+          admission.admissionQuota ||
+          "General Quota",
+        normalFee:
+          Number(admission.normalFee || 0),
+        discountAmount:
+          Number(admission.discountAmount || 0),
+        finalFee:
+          Number(
+            admission.finalFee ||
+            admission.totalFee ||
+            0
+          ),
+        remainingFee:
+          Math.max(
+            0,
+            Number(
+              admission.finalFee ||
+              admission.totalFee ||
+              0
+            ) -
+              Number(admission.amountPaid || 0)
+          ),
+        pendingAmount:
+          Math.max(
+            0,
+            Number(
+              admission.finalFee ||
+              admission.totalFee ||
+              0
+            ) -
+              Number(admission.amountPaid || 0)
+          ),
+        status:
+          Number(admission.amountPaid || 0) <= 0
+            ? "Pending"
+            : Number(admission.amountPaid || 0) >=
+              Number(
+                admission.finalFee ||
+                admission.totalFee ||
+                0
+              )
+              ? "Paid"
+              : "Partial",
       });
     } catch (feeErr) {
       console.warn('Sync to Fee collection note:', feeErr.message);
     }
 
+    req.app.get('io')?.emit('dataUpdated', { module: 'fees', action: 'created', studentId: admission.id });
     req.app.get('io')?.emit('dataUpdated', { module: 'admissions', action: 'payment_recorded', admissionId: admission._id });
     req.app.get('io')?.emit('dataUpdated', { module: 'students', action: 'payment_recorded', studentId: admission.id });
 
