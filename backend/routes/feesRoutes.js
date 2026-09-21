@@ -497,14 +497,14 @@ router.post('/', protect, authorize('Admin', 'Principal', 'Accounts', 'Student')
       for (const record of newRecords) {
         await notifyFeeUpdate(req, record);
       }
-      req.app.get('io').emit('dataUpdated', { module: 'fees', action: 'created' });
+      req.app.get('io').emit('dataUpdated', { module: 'fees', action: 'created', studentId: newRecord.studentId });
       return res.status(201).json(newRecords);
     } else {
       const fee = new Fee(processFeePayload(req.body));
       const newRecord = await fee.save();
       await updateStudentFeeStatus(newRecord.studentId);
       await notifyFeeUpdate(req, newRecord);
-      req.app.get('io').emit('dataUpdated', { module: 'fees', action: 'created' });
+      req.app.get('io').emit('dataUpdated', { module: 'fees', action: 'created', studentId: newRecord.studentId });
       return res.status(201).json(newRecord);
     }
   } catch (err) {
@@ -524,7 +524,7 @@ router.put('/:id', protect, authorize('Admin', 'Principal', 'Accounts', 'Student
       await updateStudentFeeStatus(updatedFee.studentId);
       await notifyFeeUpdate(req, updatedFee);
     }
-    req.app.get('io').emit('dataUpdated', { module: 'fees', action: 'updated' });
+    req.app.get('io').emit('dataUpdated', { module: 'fees', action: 'updated', studentId: updatedFee.studentId });
     res.json(updatedFee);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -547,3 +547,4 @@ router.delete('/:id', protect, authorize('Admin', 'Principal', 'Accounts'), coll
 });
 
 export default router;
+

@@ -9,7 +9,7 @@ const getStudentSession = () => {
     if (session) return session;
   }
   catch {}
-  return { id: 'CS2022001', name: 'John Doe', department: 'Computer Science Engineering', sem: 'Semester 3', section: 'A' };
+  return { id: '', name: 'Student', department: '', sem: 'Semester 1', section: 'A' };
 };
 
 const StudentExams = () => {
@@ -22,25 +22,32 @@ const StudentExams = () => {
 
   useEffect(() => {
     fetchExams();
-  }, [student.dept, student.sem]);
+  }, [student.dept, student.sem, student.department, student.semester]);
 
   const fetchExams = async () => {
     try {
       setLoading(true);
       const res = await getExams();
       if (res?.data) {
-        const studDept = student.department || student.dept || 'Computer Science Engineering';
-        const studSem = student.sem || student.semester || 'Semester 3';
+        const studDept = (student.department || student.dept || '').toLowerCase();
+        const studSem = (student.sem || student.semester || '').toLowerCase();
         
-        const filtered = res.data.filter(e => 
-          e.dept?.toLowerCase() === studDept.toLowerCase() ||
-          e.department?.toLowerCase() === studDept.toLowerCase() ||
-          !e.dept
-        );
-        setExams(filtered.length > 0 ? filtered : res.data);
+        const filtered = res.data.filter(e => {
+          const eDept = (e.dept || e.department || '').toLowerCase();
+          const eSem = (e.sem || e.semester || '').toLowerCase();
+          if (eDept && studDept && !eDept.includes(studDept) && !studDept.includes(eDept) && eDept !== 'all') {
+            return false;
+          }
+          if (eSem && studSem && !eSem.includes(studSem) && !studSem.includes(eSem) && eSem !== 'all') {
+            return false;
+          }
+          return true;
+        });
+        setExams(filtered);
       }
     } catch (err) {
       console.warn('API error fetching exams:', err);
+      setExams([]);
     } finally {
       setLoading(false);
     }

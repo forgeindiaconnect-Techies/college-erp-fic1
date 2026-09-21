@@ -94,10 +94,12 @@ const StudentMarks = () => {
           };
         });
 
+        const finalRecords = records;
+
         setStudentDetails(student);
 
         const availableSemesters = [
-          ...new Set(records.map(record => record.semester).filter(Boolean))
+          ...new Set(finalRecords.map(record => record.semester).filter(Boolean))
         ];
 
         const activeSemester =
@@ -111,8 +113,8 @@ const StudentMarks = () => {
           name: student.name,
           dept: student.dept || student.department,
           activeSemView: activeSemester,
-          availableSemesters,
-          allRawRecords: records
+          availableSemesters: availableSemesters.length > 0 ? availableSemesters : [activeSemester],
+          allRawRecords: finalRecords
         });
       } catch (err) {
         console.error('Failed to load student marks:', err);
@@ -121,8 +123,8 @@ const StudentMarks = () => {
           id: activeStudent.referenceId || activeStudent.id,
           name: activeStudent.name,
           dept: activeStudent.dept || activeStudent.department,
-          activeSemView: activeStudent.sem || 'Semester 1',
-          availableSemesters: [],
+          activeSemView: activeStudent.sem || activeStudent.semester || 'Semester 1',
+          availableSemesters: [activeStudent.sem || activeStudent.semester || 'Semester 1'],
           allRawRecords: []
         });
       } finally {

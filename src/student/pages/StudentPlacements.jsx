@@ -21,7 +21,7 @@ const StudentPlacements = () => {
     const activeStud = JSON.parse(session);
 
     Promise.all([
-      getStudentById(activeStud.id || activeStud.referenceId).catch(() => ({ data: { ...activeStud, cgpa: 8.6, attendance: 86, arrears: 0 }})),
+      getStudentById(activeStud.id || activeStud.referenceId).catch(() => ({ data: { ...activeStud, cgpa: activeStud.cgpa || 0, attendance: activeStud.attendance || 0, arrears: activeStud.arrears || 0 }})),
       getPlacementJobs().catch(() => ({ data: [] })),
       getPlacementApplications().catch(() => ({ data: [] }))
     ])

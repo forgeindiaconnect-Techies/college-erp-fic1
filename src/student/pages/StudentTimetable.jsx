@@ -5,12 +5,12 @@ import { getTimetable, getPeriodMasters } from '../../api/index';
 import './StudentTimetable.css';
 
 const DEFAULT_STUDENT = {
-  id: 'CS2022001',
+  id: '',
   name: 'Student',
-  dept: 'Computer Science Engineering',
-  sem: 'Semester 6',
+  dept: '',
+  sem: 'Semester 1',
   section: 'A',
-  email: 'student@college.edu'
+  email: ''
 };
 
 const DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

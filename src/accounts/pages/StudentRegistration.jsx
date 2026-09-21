@@ -50,6 +50,7 @@ import {
   deleteStudent,
   purgeAllStudents,
   createFee,
+  createHostelRequest,
   getDepartments,
   getStudents,
   getCourses,
@@ -1815,7 +1816,16 @@ const StudentRegistration = () => {
         await updateStudent(editingStudentId, payload);
         setSuccessMsg(`Student Admission Record Updated Successfully: ${generatedId}`);
       } else {
-        await createStudent(payload);
+        const studentResponse = await createStudent(payload);
+        const createdStudent = studentResponse?.data;
+
+        if (isHostelReq && createdStudent?._id) {
+          try {
+            await createHostelRequest(createdStudent._id);
+          } catch (hostelErr) {
+            console.warn('Hostel request creation note:', hostelErr);
+          }
+        }
         if (Number(form.amountPaid) > 0 || Number(finalAssessedFee) > 0) {
           try {
             await createFee({
@@ -1878,6 +1888,24 @@ const StudentRegistration = () => {
     });
     setActiveStep(1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleAddHostelRequest = async (student) => {
+    if (!student?._id) {
+      alert('Student record ID is missing.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await createHostelRequest(student._id);
+      alert(`Hostel request created for ${student.name || student.id || 'student'}.`);
+    } catch (error) {
+      console.error('Error creating hostel request:', error);
+      alert(error?.response?.data?.message || 'Failed to create hostel request.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDeleteStudent = async (studentId) => {
@@ -4488,6 +4516,16 @@ const StudentRegistration = () => {
                               <button
                                 type="button"
                                 className="erp-btn-header"
+                                style={{ padding: '4px 8px', fontSize: '11.5px', color: '#7c3aed', borderColor: '#ddd6fe' }}
+                                onClick={() => handleAddHostelRequest(s)}
+                                title="Create Hostel Request"
+                              >
+                                🏠 Hostel
+                              </button>
+
+                              <button
+                                type="button"
+                                className="erp-btn-header"
                                 style={{ padding: '4px 8px', fontSize: '11.5px' }}
                                 onClick={() => printReceiptDirect(s)}
                                 title="Print Official Fee Receipt"
@@ -4688,3 +4726,9 @@ const StudentRegistration = () => {
 };
 
 export default StudentRegistration;
+
+
+
+
+
+

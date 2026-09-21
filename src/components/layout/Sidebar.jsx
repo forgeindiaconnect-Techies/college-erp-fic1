@@ -30,6 +30,8 @@ const Sidebar = ({ isOpen, onClose }) => {
       icon: <Users size={20} />,
       items: [
         { name: 'Accounts Officer', path: '/admin/accounts-management', icon: <Wallet size={20} /> },
+    { name: 'Principal', path: '/admin/principal-management', icon: <GraduationCap size={20} /> },
+    { name: 'Hostel', path: '/admin/hostel-management', icon: <Building size={20} /> },
         { name: 'HODs', path: '/admin/hods', icon: <GraduationCap size={20} /> },
         { name: 'Staff', path: '/admin/staff', icon: <GraduationCap size={20} /> },
         { name: 'Students', path: '/admin/students', icon: <Users size={20} /> },
@@ -201,3 +203,8 @@ const Sidebar = ({ isOpen, onClose }) => {
 };
 
 export default Sidebar;
+
+
+
+
+

@@ -24,7 +24,7 @@ const GlobalLockdown = ({ children }) => {
     const allTokenKeys = [
       'superadmin_token', 'admin_token', 'subadmin_token', 'principal_token',
       'hod_token', 'staff_token', 'student_token', 'parent_token',
-      'accounts_token', 'driver_token'
+      'accounts_token', 'driver_token', 'hostel_token', 'watchman_token'
     ];
     const isMockSession = allTokenKeys.some(k => {
       const t = sessionStorage.getItem(k);

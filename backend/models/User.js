@@ -15,7 +15,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Super Admin', 'Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff', 'Student', 'Parent', 'Accounts', 'Driver'],
+    enum: ['Super Admin', 'Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff', 'Student', 'Parent', 'Accounts', 'Hostel', 'Driver', 'Watchman'],
     required: true
   },
   name: {
@@ -32,6 +32,11 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
+    default: null
+  },
+  wardenType: {
+    type: String,
+    enum: ['Boys Warden', 'Girls Warden'],
     default: null
   },
   department: {
@@ -73,3 +78,6 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
 };
 
 export default mongoose.model('User', userSchema);
+
+
+

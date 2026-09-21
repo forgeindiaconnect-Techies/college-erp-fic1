@@ -1,42 +1,45 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  Wallet, Plus, Trash2, Search, RefreshCw, X, ShieldCheck, Mail, Phone,
-  Lock, CheckCircle2, UserCheck, DollarSign, Award, Eye, EyeOff
+  GraduationCap, Plus, Trash2, Search, ShieldCheck, Phone, Mail,
+  Lock, RefreshCw, X, CheckCircle2, UserCheck, Award, Eye, EyeOff
 } from 'lucide-react';
-import { getAccountsOfficers, createAccountsOfficer, deleteAccountsOfficer } from '../../api/index';
+import { getUsers, createUser, deleteUser } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 
 const EMPTY_FORM = {
   name: '',
   email: '',
-  phone: '',
-  password: ''
+  password: '',
+  phone: ''
 };
 
-const AccountsOfficerManagement = () => {
-  const [officers, setOfficers] = useState([]);
+const PrincipalManagement = () => {
+  const [principals, setPrincipals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState(new Date());
 
-  const [search, setSearch] = useState('');
+  const [form, setForm] = useState(EMPTY_FORM);
   const [showModal, setShowModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [search, setSearch] = useState('');
 
-  const fetchOfficers = useCallback(async (isManual = false) => {
+  const loadPrincipals = useCallback(async (isManual = false) => {
     try {
       if (isManual) setRefreshing(true);
 
-      const res = await getAccountsOfficers();
-      if (res?.data) {
-        setOfficers(Array.isArray(res.data) ? res.data : []);
-      }
+      const res = await getUsers();
+      const allUsers = Array.isArray(res?.data) ? res.data : [];
+
+      const list = allUsers.filter(
+        user => user.role?.toLowerCase() === 'principal'
+      );
+      setPrincipals(list);
       setLastSynced(new Date());
     } catch (err) {
-      console.error('Failed to load accounts officers:', err);
-      setOfficers([]);
+      console.error('Failed to load Principals:', err);
+      setPrincipals([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -44,55 +47,62 @@ const AccountsOfficerManagement = () => {
   }, []);
 
   // Real-time synchronization
-  useRealtimeSync(fetchOfficers, ['users', 'staff', 'accounts', 'fees']);
+  useRealtimeSync(loadPrincipals, ['users', 'staff', 'principal']);
 
   useEffect(() => {
-    fetchOfficers();
-  }, [fetchOfficers]);
+    loadPrincipals();
+  }, [loadPrincipals]);
 
-  const handleCreate = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.email.trim() || !formData.password.trim()) {
-      alert('Name, Email, and Password are required.');
+
+    if (!form.name.trim() || !form.email.trim() || !form.password.trim()) {
+      alert('Name, Email and Password are required.');
       return;
     }
 
     try {
       setSubmitting(true);
-      const payload = {
-        ...formData,
-        role: 'Accounts'
-      };
-      await createAccountsOfficer(payload);
-      setShowModal(false);
+
+      await createUser({
+        ...form,
+        role: 'Principal'
+      });
+
+      setForm(EMPTY_FORM);
       setShowPassword(false);
-      setFormData(EMPTY_FORM);
-      await fetchOfficers(true);
+      setShowModal(false);
+      await loadPrincipals(true);
     } catch (err) {
-      alert('Failed to create Accounts Officer: ' + (err.response?.data?.message || err.message));
+      console.error('Create Principal failed:', err);
+      alert(
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to create Principal.'
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this Accounts Officer account?')) {
-      try {
-        await deleteAccountsOfficer(id);
-        await fetchOfficers(true);
-      } catch (err) {
-        alert('Failed to delete: ' + err.message);
-      }
+    if (!window.confirm('Are you sure you want to delete this Principal account?')) return;
+
+    try {
+      await deleteUser(id);
+      await loadPrincipals(true);
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Failed to delete Principal.');
     }
   };
 
   const filtered = useMemo(() => {
-    return officers.filter(o => 
-      o.name.toLowerCase().includes(search.toLowerCase()) || 
-      o.email.toLowerCase().includes(search.toLowerCase()) ||
-      (o.phone || '').toLowerCase().includes(search.toLowerCase())
+    return principals.filter(user =>
+      `${user.name || ''} ${user.email || ''} ${user.phone || ''}`
+        .toLowerCase()
+        .includes(search.toLowerCase())
     );
-  }, [officers, search]);
+  }, [principals, search]);
 
   return (
     <div className="management-page animate-fade-in" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -108,26 +118,26 @@ const AccountsOfficerManagement = () => {
           overflow: 'hidden'
         }}
       >
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #3730a5, #10b981, #06b6d4)' }}></div>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #3730a5, #7c3aed, #06b6d4)' }}></div>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontSize: '0.75rem', fontWeight: 700, padding: '0.25rem 0.65rem', borderRadius: '20px', border: '1px solid rgba(16, 185, 129, 0.2)', marginBottom: '0.4rem' }}>
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981' }}></span>
-              <span>Real-Time Accounts Directory Sync Active</span>
+              <span>Real-Time Principal Directory Sync Active</span>
             </div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: '0 0 0.25rem' }}>
-              Accounts Officer Management
+              Principal Management
             </h1>
             <p style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.85rem', margin: 0 }}>
-              Provision and manage Bursar & Finance Officer login credentials with access to fee ledgers and payroll.
+              Provision and manage administrative login credentials and leadership profiles for the Principal.
             </p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button
               type="button"
-              onClick={() => fetchOfficers(true)}
+              onClick={() => loadPrincipals(true)}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -167,15 +177,15 @@ const AccountsOfficerManagement = () => {
                 boxShadow: '0 4px 12px rgba(55, 48, 165, 0.25)'
               }}
             >
-              <Plus size={16} /> Add Accounts Officer
+              <Plus size={16} /> Add Principal
             </button>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color, #e2e8f0)', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)' }}>
-          <span>Department: <strong>Finance & Bursar Division</strong></span>
+          <span>Campus Module: <strong>Executive Leadership</strong></span>
           <span>•</span>
-          <span>Permission Level: <strong>Full Accounts & Fee Ledger Authority</strong></span>
+          <span>Access Level: <strong>Full Academic & Administrative Authorization</strong></span>
           <span>•</span>
           <span>Last Synced: <strong>{lastSynced.toLocaleTimeString()}</strong></span>
         </div>
@@ -185,31 +195,31 @@ const AccountsOfficerManagement = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
         <div style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '12px', padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(55, 48, 165, 0.1)', color: '#3730a5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Wallet size={22} />
+            <GraduationCap size={22} />
           </div>
           <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Active Officers</span>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0.1rem 0 0', color: 'var(--text-main, #0f172a)' }}>{officers.length}</h3>
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Active Principals</span>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0.1rem 0 0', color: 'var(--text-main, #0f172a)' }}>{principals.length}</h3>
+          </div>
+        </div>
+
+        <div style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '12px', padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(124, 58, 237, 0.1)', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Award size={22} />
+          </div>
+          <div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Role Scope</span>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0.1rem 0 0', color: '#7c3aed' }}>Institutional Head</h3>
           </div>
         </div>
 
         <div style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '12px', padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <DollarSign size={22} />
-          </div>
-          <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Scope of Authority</span>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0.1rem 0 0', color: '#10b981' }}>Fees & Payroll</h3>
-          </div>
-        </div>
-
-        <div style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '12px', padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ShieldCheck size={22} />
           </div>
           <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Audit Compliance</span>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0.1rem 0 0', color: '#06b6d4' }}>100% Verified</h3>
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Security Status</span>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0.1rem 0 0', color: '#10b981' }}>100% Verified</h3>
           </div>
         </div>
       </div>
@@ -229,7 +239,7 @@ const AccountsOfficerManagement = () => {
             <Search size={16} className="text-muted" />
             <input 
               type="text" 
-              placeholder="Search officer name, email, phone..." 
+              placeholder="Search principal name, email, phone..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-main)', width: '240px', fontSize: '0.82rem', fontFamily: 'inherit' }}
@@ -237,7 +247,7 @@ const AccountsOfficerManagement = () => {
           </div>
 
           <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>
-            Showing <strong>{filtered.length}</strong> of <strong>{officers.length}</strong> Accounts Officers
+            Showing <strong>{filtered.length}</strong> of <strong>{principals.length}</strong> Principals
           </span>
         </div>
 
@@ -245,7 +255,7 @@ const AccountsOfficerManagement = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', textAlign: 'left' }}>
-                <th style={{ padding: '0.85rem 1.25rem', color: 'var(--text-muted, #64748b)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Officer Profile</th>
+                <th style={{ padding: '0.85rem 1.25rem', color: 'var(--text-muted, #64748b)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Principal Profile</th>
                 <th style={{ padding: '0.85rem 1.25rem', color: 'var(--text-muted, #64748b)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Login Email / Username</th>
                 <th style={{ padding: '0.85rem 1.25rem', color: 'var(--text-muted, #64748b)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Contact Phone</th>
                 <th style={{ padding: '0.85rem 1.25rem', color: 'var(--text-muted, #64748b)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Role Scope</th>
@@ -257,15 +267,15 @@ const AccountsOfficerManagement = () => {
                 <tr>
                   <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                     <RefreshCw size={24} className="spinning" style={{ margin: '0 auto 8px' }} />
-                    <p style={{ margin: 0, fontWeight: 600 }}>Loading Accounts Officers...</p>
+                    <p style={{ margin: 0, fontWeight: 600 }}>Loading Principal Profiles...</p>
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan="5" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-muted)' }}>
-                    <Wallet size={36} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)' }}>No Accounts Officers Found</p>
-                    <p style={{ margin: '4px 0 0', fontSize: '0.8rem' }}>Click "Add Accounts Officer" to create login credentials for finance & bursar personnel.</p>
+                    <GraduationCap size={36} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)' }}>No Principal Accounts Found</p>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.8rem' }}>Click "Add Principal" to create login credentials for the institutional head.</p>
                   </td>
                 </tr>
               ) : (
@@ -278,7 +288,7 @@ const AccountsOfficerManagement = () => {
                             width: '38px', 
                             height: '38px', 
                             borderRadius: '10px', 
-                            background: 'linear-gradient(135deg, #10b981, #059669)', 
+                            background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', 
                             color: 'white', 
                             display: 'flex', 
                             alignItems: 'center', 
@@ -288,11 +298,11 @@ const AccountsOfficerManagement = () => {
                             fontSize: '15px' 
                           }}
                         >
-                          {(user.name || 'A').charAt(0)}
+                          {(user.name || 'P').charAt(0)}
                         </div>
                         <div>
                           <div style={{ fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>{user.name}</div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)' }}>Bursar & Finance Section</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)' }}>Head of Institution</div>
                         </div>
                       </div>
                     </td>
@@ -309,8 +319,8 @@ const AccountsOfficerManagement = () => {
                       </div>
                     </td>
                     <td style={{ padding: '1rem 1.25rem' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 700, padding: '0.25rem 0.65rem', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981' }}>
-                        Accounts Officer
+                      <span style={{ fontSize: '0.74rem', fontWeight: 700, padding: '0.25rem 0.65rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#7c3aed' }}>
+                        Principal
                       </span>
                     </td>
                     <td style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>
@@ -341,7 +351,7 @@ const AccountsOfficerManagement = () => {
         </div>
       </div>
 
-      {/* ── Add Accounts Officer Modal Overlay ── */}
+      {/* ── Add Principal Modal Overlay ── */}
       {showModal && (
         <div 
           style={{
@@ -376,10 +386,10 @@ const AccountsOfficerManagement = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
-                  Provision Accounts Officer
+                  Provision Principal Account
                 </h3>
                 <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
-                  Create secure login credentials for accounts & finance department personnel.
+                  Create secure login access for the Principal leadership portal.
                 </p>
               </div>
               <button 
@@ -392,7 +402,7 @@ const AccountsOfficerManagement = () => {
             </div>
 
             <form 
-              onSubmit={handleCreate} 
+              onSubmit={handleSubmit} 
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
                   e.preventDefault();
@@ -401,12 +411,12 @@ const AccountsOfficerManagement = () => {
               style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>Officer Full Name</label>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>Principal Full Name</label>
                 <input
                   type="text"
-                  placeholder="e.g. Accounts Officer / Finance Manager"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Dr. Vaideeswari M.E., Ph.D."
+                  value={form.name}
+                  onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
                   required
                   style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', fontSize: '0.85rem', color: 'var(--text-main)', fontFamily: 'inherit', outline: 'none' }}
                 />
@@ -417,9 +427,9 @@ const AccountsOfficerManagement = () => {
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>Login Email</label>
                   <input
                     type="email"
-                    placeholder="e.g. accounts@college.edu"
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="e.g. principal@college.edu"
+                    value={form.email}
+                    onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
                     required
                     style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', fontSize: '0.85rem', color: 'var(--text-main)', fontFamily: 'inherit', outline: 'none' }}
                   />
@@ -431,8 +441,8 @@ const AccountsOfficerManagement = () => {
                     <input
                       type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
-                      value={formData.password}
-                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                      value={form.password}
+                      onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
                       required
                       style={{ width: '100%', padding: '0.65rem 2.5rem 0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', fontSize: '0.85rem', color: 'var(--text-main)', fontFamily: 'inherit', outline: 'none' }}
                     />
@@ -453,8 +463,8 @@ const AccountsOfficerManagement = () => {
                 <input
                   type="text"
                   placeholder="e.g. 9876543210"
-                  value={formData.phone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  value={form.phone}
+                  onChange={(e) => setForm(prev => ({ ...prev, phone: e.target.value }))}
                   style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', fontSize: '0.85rem', color: 'var(--text-main)', fontFamily: 'inherit', outline: 'none' }}
                 />
               </div>
@@ -473,7 +483,7 @@ const AccountsOfficerManagement = () => {
                   disabled={submitting}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.65rem 1.35rem', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #3730a5, #4f46e5)', color: '#ffffff', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 12px rgba(55, 48, 165, 0.25)' }}
                 >
-                  {submitting ? 'Creating...' : 'Create Officer Credential'}
+                  {submitting ? 'Creating...' : 'Create Principal Credential'}
                 </button>
               </div>
             </form>
@@ -484,4 +494,4 @@ const AccountsOfficerManagement = () => {
   );
 };
 
-export default AccountsOfficerManagement;
+export default PrincipalManagement;

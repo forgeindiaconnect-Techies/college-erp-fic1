@@ -71,7 +71,22 @@ const StudentAssignments = () => {
           submission;
       });
 
-      setAssignments(assignmentData);
+      const studentDept = (activeStudent.dept || activeStudent.department || '').toLowerCase();
+      const studentSem = (activeStudent.sem || activeStudent.semester || '').toLowerCase();
+
+      const filteredAssignments = assignmentData.filter(a => {
+        const aDept = (a.department || a.dept || '').toLowerCase();
+        const aSem = (a.class || a.semester || a.sem || '').toLowerCase();
+        if (aDept && studentDept && !aDept.includes(studentDept) && !studentDept.includes(aDept) && aDept !== 'all') {
+          return false;
+        }
+        if (aSem && studentSem && !aSem.includes(studentSem) && !studentSem.includes(aSem) && aSem !== 'all') {
+          return false;
+        }
+        return true;
+      });
+
+      setAssignments(filteredAssignments);
       setSubmittedTasks(submissionMap);
     } catch (error) {
       console.error(

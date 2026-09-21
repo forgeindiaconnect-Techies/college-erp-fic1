@@ -12,12 +12,12 @@ const applySession = (userData) => {
     'super admin': 'Super Admin', 'superadmin': 'Super Admin',
     'admin': 'Admin', 'sub admin': 'Sub Admin', 'subadmin': 'Sub Admin',
     'principal': 'Principal', 'hod': 'HOD', 'staff': 'Staff',
-    'student': 'Student', 'parent': 'Parent', 'accounts': 'Accounts', 'accountant': 'Accounts', 'driver': 'Driver'
+    'student': 'Student', 'parent': 'Parent', 'accounts': 'Accounts', 'accountant': 'Accounts', 'driver': 'Driver', 'hostel': 'Hostel', 'watchman': 'Watchman'
   };
   const role = roleMap[userData.role?.toLowerCase()] || userData.role;
   const roleKey = role.toLowerCase().replace(/\s+/g, '');
-  const allKeys = ['superadmin_token','admin_token','subadmin_token','principal_token','hod_token','staff_token','student_token','parent_token','accounts_token','driver_token',
-                   'superadmin_session','admin_session','subadmin_session','principal_session','hod_session','staff_session','student_session','parent_session','accounts_session','driver_session', 'tenantId'];
+  const allKeys = ['superadmin_token','admin_token','subadmin_token','principal_token','hod_token','staff_token','student_token','parent_token','accounts_token','driver_token','hostel_token','watchman_token',
+                   'superadmin_session','admin_session','subadmin_session','principal_session','hod_session','staff_session','student_session','parent_session','accounts_session','driver_session','hostel_session','watchman_session', 'tenantId'];
   allKeys.forEach(k => sessionStorage.removeItem(k));
 
   sessionStorage.setItem(`${roleKey}_token`, userData.token);
@@ -53,7 +53,7 @@ const applySession = (userData) => {
     'Principal': '/principal/dashboard', 'HOD': '/hod',
     'Staff': '/staff/dashboard', 'Student': '/student/dashboard',
     'Parent': '/parent/dashboard', 'Accounts': '/accounts/dashboard',
-    'Driver': '/driver/dashboard'
+    'Driver': '/driver/dashboard', 'Hostel': '/hostel/dashboard', 'Watchman': '/watchman/dashboard'
   };
   return destinations[role] || null;
 };
@@ -149,7 +149,7 @@ const UnifiedLogin = () => {
         'super admin': 'Super Admin', 'superadmin': 'Super Admin',
         'admin': 'Admin', 'sub admin': 'Sub Admin', 'subadmin': 'Sub Admin',
         'principal': 'Principal', 'hod': 'HOD', 'staff': 'Staff',
-        'student': 'Student', 'parent': 'Parent', 'accounts': 'Accounts', 'accountant': 'Accounts', 'driver': 'Driver'
+        'student': 'Student', 'parent': 'Parent', 'accounts': 'Accounts', 'accountant': 'Accounts', 'driver': 'Driver', 'hostel': 'Hostel', 'watchman': 'Watchman'
       };
       
       const actualRole = roleMap[userData.role?.toLowerCase()] || userData.role;
@@ -252,7 +252,7 @@ const UnifiedLogin = () => {
                     { value: 'Student', label: 'Student' },
                     { value: 'Parent', label: 'Parent' },
                     { value: 'Accounts', label: 'Accounts' },
-                    { value: 'Driver', label: 'Driver' }
+                    { value: 'Driver', label: 'Driver' }, { value: 'Hostel', label: 'Hostel' }, { value: 'Watchman', label: 'Watchman' }
                   ]}
                   placeholder="Select Role"
                   icon={Users}
@@ -331,3 +331,5 @@ const UnifiedLogin = () => {
 };
 
 export default UnifiedLogin;
+
+

@@ -7,6 +7,7 @@ import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import FeeStructure from '../models/FeeStructure.js';
 import StudentFee from '../models/StudentFee.js';
+import HostelRequest from '../models/HostelRequest.js';
 import { sendNotification } from '../utils/notificationHelper.js';
 import { recordAdmissionPayment, updateAdmissionPayment, deleteAdmissionPayment } from '../controllers/admissionController.js';
 
@@ -21,7 +22,7 @@ router.delete('/:id/payment/:paymentId', protect, authorize('Admin', 'Sub Admin'
 
 
 // Get all students
-router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff', 'Accounts'), requirePermission('manage_students'), departmentScope, collegeScope, async (req, res) => {
+router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff', 'Accounts', 'Hostel'), requirePermission('manage_students'), departmentScope, collegeScope, async (req, res) => {
   try {
     const dept = req.dept || req.query.dept;
     const query = { collegeId: req.collegeId || 'unassigned_college' };
@@ -657,15 +658,40 @@ router.delete('/:id/payment/:paymentId', protect, authorize('Admin', 'Sub Admin'
 
 // Update student
 
-router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), requirePermission('manage_students'), collegeScope, checkSubscription, async (req, res) => {
+router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts', 'Hostel'), requirePermission('manage_students'), collegeScope, checkSubscription, async (req, res) => {
   try {
+    const studentId = req.params.id;
+    let query = { id: studentId };
+    if (mongoose.Types.ObjectId.isValid(studentId)) {
+      query = { $or: [{ id: studentId }, { _id: studentId }] };
+    }
     const updatedStudent = await Student.findOneAndUpdate(
-      { id: req.params.id },
+      query,
       req.body,
       { new: true }
     );
     
     if (updatedStudent) {
+      if (req.body.roomNumber) {
+        try {
+          await HostelRequest.updateMany(
+            { $or: [{ studentId: updatedStudent.id }, { student: updatedStudent._id }] },
+            {
+              $set: {
+                status: 'Allocated',
+                room: req.body.roomNumber,
+                block: req.body.blockWing || req.body.hostelName || 'Boys Hostel A',
+                bed: req.body.bedNumber || '1',
+                wardenName: req.body.wardenName || ''
+              }
+            }
+          );
+          req.app.get('io')?.emit('dataUpdated', { module: 'hostel', action: 'allocated' });
+        } catch (hErr) {
+          console.warn('Hostel request sync note:', hErr);
+        }
+      }
+
       const collegeId = req.collegeId || req.user.collegeId || 'unassigned_college';
       const studentUser = await User.findOne({ referenceId: updatedStudent.id });
       if (studentUser) {
@@ -681,7 +707,7 @@ router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 
       }
     }
 
-    req.app.get('io').emit('dataUpdated', { module: 'students', action: 'updated' });
+    req.app.get('io')?.emit('dataUpdated', { module: 'students', action: 'updated' });
     res.json(updatedStudent);
   } catch (err) {
     res.status(400).json({ message: err.message });

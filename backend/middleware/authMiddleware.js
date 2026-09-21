@@ -21,6 +21,7 @@ export const protect = async (req, res, next) => {
         else if (token.includes('-staff')) role = 'Staff';
         else if (token.includes('-parent')) role = 'Parent';
         else if (token.includes('-accounts')) role = 'Accounts';
+        else if (token.includes('-hostel')) role = 'Hostel';
         else if (token.includes('-driver')) role = 'Driver';
         
         let referenceId = null;

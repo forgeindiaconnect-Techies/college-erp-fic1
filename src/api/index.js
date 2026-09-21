@@ -49,6 +49,8 @@ api.interceptors.request.use(
         token = sessionStorage.getItem('accounts_token');
       } else if (path.startsWith('/driver')) {
         token = sessionStorage.getItem('driver_token');
+      } else if (path.startsWith('/hostel')) {
+        token = sessionStorage.getItem('hostel_token');
       } else {
         // Fallback: Check all in priority
         token = sessionStorage.getItem('superadmin_token')
@@ -61,6 +63,7 @@ api.interceptors.request.use(
           || sessionStorage.getItem('parent_token')
           || sessionStorage.getItem('accounts_token')
           || sessionStorage.getItem('driver_token')
+          || sessionStorage.getItem('hostel_token')
           || sessionStorage.getItem('token');
       }
     } catch (e) {
@@ -93,7 +96,7 @@ api.interceptors.response.use(
       }
 
       // Do not redirect if on a public route (not under protected route prefixes)
-      const protectedPrefixes = ['/admin', '/superadmin', '/subadmin', '/principal', '/hod', '/staff', '/student', '/parent', '/accounts', '/driver'];
+      const protectedPrefixes = ['/admin', '/superadmin', '/subadmin', '/principal', '/hod', '/staff', '/student', '/parent', '/accounts', '/driver', '/hostel'];
       const isProtectedRoute = protectedPrefixes.some(prefix => window.location.pathname.startsWith(prefix));
       if (!isProtectedRoute) {
         return Promise.reject(error);
@@ -120,8 +123,8 @@ api.interceptors.response.use(
 
       console.warn('Session expired or unauthorized! Clearing session storage and redirecting to login...');
       const keys = [
-        'superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token',
-        'superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session'
+        'superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token', 'hostel_token', 'watchman_token',
+        'superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session', 'hostel_session', 'watchman_session'
       ];
       keys.forEach(k => {
         sessionStorage.removeItem(k);
@@ -139,8 +142,8 @@ api.interceptors.response.use(
       if (msg.toLowerCase().includes('deactivated')) {
         console.warn('College is deactivated! Clearing session storage and redirecting to login...');
         const keys = [
-          'superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token',
-          'superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session'
+          'superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token', 'hostel_token', 'watchman_token',
+          'superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session', 'hostel_session', 'watchman_session'
         ];
         keys.forEach(k => {
           sessionStorage.removeItem(k);
@@ -381,6 +384,9 @@ export const getTransportNotifications = () => api.get('/transport/notifications
 // Hostel Management
 export const getHostelBlocks = () => api.get('/hostel/blocks');
 export const getHostelRooms = () => api.get('/hostel/rooms');
+export const getHostelRequests = () => api.get('/hostel/requests');
+export const createHostelRequest = (studentId) => api.post('/hostel/requests', { studentId });
+export const allocateHostelRequest = (id, data) => api.put(`/hostel/requests/${id}/allocate`, data);
 export const getHostelStudents = () => api.get('/hostel/students');
 export const getHostelComplaints = () => api.get('/hostel/complaints');
 export const approveHostelComplaint = (id) => api.put(`/hostel/complaints/${id}/approve`);

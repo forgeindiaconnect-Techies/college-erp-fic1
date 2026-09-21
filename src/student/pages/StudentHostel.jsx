@@ -5,11 +5,11 @@ import { getStudentById, getStudentHostelComplaints, createHostelComplaint } fro
 import './StudentDashboard.css';
 
 const DEFAULT_STUDENT = {
-  id: 'CS2022001',
-  name: 'John Doe',
-  dept: 'Cyber Security',
-  sem: 'Semester 6',
-  email: 'john@college.edu'
+  id: '',
+  name: 'Student',
+  dept: '',
+  sem: 'Semester 1',
+  email: ''
 };
 
 const MOCK_MESS_MENU = [

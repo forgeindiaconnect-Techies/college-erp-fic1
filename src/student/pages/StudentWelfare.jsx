@@ -5,10 +5,10 @@ import './StudentDashboard.css';
 
 const getStudentSession = () => {
   return JSON.parse(sessionStorage.getItem('student_session') || 'null') || {
-    id: 'CS2022001',
-    name: 'John Doe',
-    dept: 'Computer Science',
-    sem: 'Sem 6',
+    id: '',
+    name: 'Student',
+    dept: '',
+    sem: 'Semester 1',
   };
 };
 

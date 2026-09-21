@@ -488,7 +488,7 @@ const FeesCollection = () => {
         const feePaymentsSum = studentFees.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
 
         // 30.3 Handle Missing Fee Values
-        const totalFee = Number(admission.totalFee || admission.totalAmount || 0);
+        const totalFee = Number(admission.finalFee ?? admission.totalFee ?? admission.totalAmount ?? 0);
         const paidAmount = Number(admission.paidAmount !== undefined ? admission.paidAmount : (admission.amountPaid !== undefined ? admission.amountPaid : feePaymentsSum));
         const remainingFee = admission.remainingFee ?? (admission.balanceFee !== undefined ? Number(admission.balanceFee) : Math.max(0, totalFee - paidAmount));
 
@@ -1233,7 +1233,7 @@ const FeesCollection = () => {
     payment
   ) => {
     if (!admission || !payment) return;
-    const totalFee = Number(admission.totalFee || admission.totalAmount || 0);
+    const totalFee = Number(admission.finalFee ?? admission.totalFee ?? admission.totalAmount ?? 0);
     const paidAmount = Number(admission.paidAmount || admission.amountPaid || 0);
     const remainingFee = Number(
       admission.remainingFee !== undefined
@@ -4717,6 +4717,7 @@ const FeesCollection = () => {
 };
 
 export default FeesCollection;
+
 
 
 

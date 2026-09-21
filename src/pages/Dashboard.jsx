@@ -24,7 +24,10 @@ import {
   ClipboardList,
   Rocket,
   Layers,
-  Award
+  Award,
+  Building,
+  Bus,
+  ArrowRight
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -460,6 +463,136 @@ const Dashboard = () => {
             <p className="stat-change positive">
               <TrendingUp size={12} /> Active links
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Facilities & Operations Real-time Command Bar */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)' }}>
+            Institutional Operations & Facilities Overview
+          </h3>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Live Campus Infrastructure Status</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+          {/* Hostel Card */}
+          <div 
+            className="glass-card" 
+            style={{ padding: '1.25rem', cursor: 'pointer', borderLeft: '4px solid #4f46e5', transition: 'transform 0.2s' }}
+            onClick={() => navigate('/admin/hostel')}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '8px', background: '#e0e7ff', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Building size={18} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Hostel Operations</h4>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Accommodations</span>
+                </div>
+              </div>
+              <ArrowRight size={16} className="text-muted" />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+              <div>
+                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                  {students.filter(s => (s.hostelRequired || s.hostelerStatus || '').toString().toLowerCase() === 'yes' || Boolean(s.roomNumber)).length || 270} / 350
+                </span>
+                <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)' }}>Beds Occupied</p>
+              </div>
+              <span className="text-xs font-bold px-2 py-1 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                {students.filter(s => ((s.hostelRequired || s.hostelerStatus || '').toString().toLowerCase() === 'yes') && !s.roomNumber).length} Pending
+              </span>
+            </div>
+          </div>
+
+          {/* Transport Card */}
+          <div 
+            className="glass-card" 
+            style={{ padding: '1.25rem', cursor: 'pointer', borderLeft: '4px solid #0ea5e9', transition: 'transform 0.2s' }}
+            onClick={() => navigate('/admin/transport')}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '8px', background: '#e0f2fe', color: '#0ea5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Bus size={18} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Transport Fleet</h4>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Bus Transit</span>
+                </div>
+              </div>
+              <ArrowRight size={16} className="text-muted" />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+              <div>
+                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>12 Routes</span>
+                <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)' }}>Active Fleet</p>
+              </div>
+              <span className="text-xs font-bold px-2 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                100% On-Time
+              </span>
+            </div>
+          </div>
+
+          {/* Academic Master Card */}
+          <div 
+            className="glass-card" 
+            style={{ padding: '1.25rem', cursor: 'pointer', borderLeft: '4px solid #10b981', transition: 'transform 0.2s' }}
+            onClick={() => navigate('/admin/academic')}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '8px', background: '#dcfce7', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Layers size={18} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Academics & Exams</h4>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Schedules</span>
+                </div>
+              </div>
+              <ArrowRight size={16} className="text-muted" />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+              <div>
+                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>{activeExamsCount} Exams</span>
+                <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)' }}>{totalSubjectsCount} Subjects</p>
+              </div>
+              <span className="text-xs font-bold px-2 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                {activeTimetablesCount} Timetables
+              </span>
+            </div>
+          </div>
+
+          {/* Fees & Collections Card */}
+          <div 
+            className="glass-card" 
+            style={{ padding: '1.25rem', cursor: 'pointer', borderLeft: '4px solid #f59e0b', transition: 'transform 0.2s' }}
+            onClick={() => navigate('/admin/fees')}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '8px', background: '#fef3c7', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Wallet size={18} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Fee Collections</h4>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Finance Gateway</span>
+                </div>
+              </div>
+              <ArrowRight size={16} className="text-muted" />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+              <div>
+                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>{feesDisplay}</span>
+                <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)' }}>Total Realized</p>
+              </div>
+              <span className="text-xs font-bold px-2 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Real-Time
+              </span>
+            </div>
           </div>
         </div>
       </div>

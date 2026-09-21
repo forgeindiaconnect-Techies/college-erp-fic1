@@ -5,13 +5,12 @@ import { getAttendanceByStudent, getSubjects } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import './StudentAttendance.css';
 
-// Fallbacks
 const DEFAULT_STUDENT = {
-  id: 'CS2022001',
-  name: 'John Doe',
-  dept: 'Computer Science',
-  sem: 'Sem 6',
-  email: 'john@college.edu'
+  id: '',
+  name: 'Student',
+  dept: '',
+  sem: 'Semester 1',
+  email: ''
 };
 
 const StudentAttendance = () => {
@@ -33,7 +32,7 @@ const StudentAttendance = () => {
 
   const fetchAttendanceData = React.useCallback(async (studentId) => {
     try {
-      if (!studentId || studentId === 'CS2022001') return;
+      if (!studentId) return;
 
       let finalId = studentId;
       if (studentId.length === 24 && /^[0-9a-fA-F]{24}$/.test(studentId)) {
@@ -90,68 +89,77 @@ const StudentAttendance = () => {
         if (r.subject && !/^[0-9a-fA-F]{24}$/.test(r.subject)) return r.subject;
         if (typeof r.subjectId === 'object' && r.subjectId?.subjectName) return r.subjectId.subjectName;
         if (r.subjectId && subjectsMapFromApi[r.subjectId]) return subjectsMapFromApi[r.subjectId];
-        return 'Database Management Systems';
+        return r.subjectCode || 'General Lecture';
       };
 
       if (records.length > 0) {
         // Basic Analytics
         const totalDays = records.length;
         const presentCount = records.filter(r => r.status?.toLowerCase() === 'present').length;
-        const absentCount = records.filter(r => r.status?.toLowerCase() === 'absent').length;
-        const leaveCount = records.filter(r => r.status?.toLowerCase() === 'leave').length;
-        const percentage = Math.round((presentCount / totalDays) * 100);
+        if (records.length > 0) {
+          const totalDays = records.length;
+          const presentCount = records.filter(r => r.status?.toLowerCase() === 'present').length;
+          const absentCount = records.filter(r => r.status?.toLowerCase() === 'absent').length;
+          const leaveCount = records.filter(r => r.status?.toLowerCase() === 'leave').length;
+          const percentage = Math.round((presentCount / totalDays) * 100);
 
-        setAnalytics({
-          total: totalDays,
-          present: presentCount,
-          absent: absentCount,
-          leave: leaveCount,
-          percentage
-        });
+          setAnalytics({
+            total: totalDays,
+            present: presentCount,
+            absent: absentCount,
+            leave: leaveCount,
+            percentage
+          });
 
-        // Daily Logs
-        const logs = records.map(r => ({
-          date: new Date(r.attendanceDate || r.date).toLocaleDateString('en-GB').replace(/\//g, '-'),
-          subject: resolveSubjectName(r),
-          status: r.status?.toLowerCase() || 'present',
-          faculty: r.markedBy || 'System'
-        }));
-        logs.sort((a, b) => new Date(b.date) - new Date(a.date));
-        setAttendanceLogs(logs);
+          // Daily Logs
+          const logs = records.map(r => ({
+            date: new Date(r.attendanceDate || r.date).toLocaleDateString('en-GB').replace(/\//g, '-'),
+            subject: resolveSubjectName(r),
+            status: r.status?.toLowerCase() || 'present',
+            faculty: r.markedBy || 'System'
+          }));
+          logs.sort((a, b) => new Date(b.date) - new Date(a.date));
+          setAttendanceLogs(logs);
 
-        // Subject-Wise Aggregation
-        const subjectsMap = {};
-        records.forEach(r => {
-          const sub = resolveSubjectName(r);
-          if (!subjectsMap[sub]) subjectsMap[sub] = { total: 0, present: 0 };
-          subjectsMap[sub].total += 1;
-          if (r.status?.toLowerCase() === 'present') subjectsMap[sub].present += 1;
-        });
-        
-        const subArray = Object.keys(subjectsMap).map(sub => ({
-          subject: sub,
-          total: subjectsMap[sub].total,
-          present: subjectsMap[sub].present,
-          percent: Math.round((subjectsMap[sub].present / subjectsMap[sub].total) * 100)
-        }));
-        setSubjectWise(subArray.sort((a, b) => b.percent - a.percent));
+          // Subject-Wise Aggregation
+          const subjectsMap = {};
+          records.forEach(r => {
+            const sub = resolveSubjectName(r);
+            if (!subjectsMap[sub]) subjectsMap[sub] = { total: 0, present: 0 };
+            subjectsMap[sub].total += 1;
+            if (r.status?.toLowerCase() === 'present') subjectsMap[sub].present += 1;
+          });
+          
+          const subArray = Object.keys(subjectsMap).map(sub => ({
+            subject: sub,
+            total: subjectsMap[sub].total,
+            present: subjectsMap[sub].present,
+            percent: Math.round((subjectsMap[sub].present / subjectsMap[sub].total) * 100)
+          }));
+          setSubjectWise(subArray.sort((a, b) => b.percent - a.percent));
 
-        // Monthly Aggregation
-        const monthsMap = {};
-        records.forEach(r => {
-          const d = new Date(r.attendanceDate || r.date);
-          const monthStr = d.toLocaleString('default', { month: 'long', year: 'numeric' });
-          if (!monthsMap[monthStr]) monthsMap[monthStr] = { total: 0, present: 0, sortKey: d.getTime() };
-          monthsMap[monthStr].total += 1;
-          if (r.status?.toLowerCase() === 'present') monthsMap[monthStr].present += 1;
-        });
+          // Monthly Aggregation
+          const monthsMap = {};
+          records.forEach(r => {
+            const d = new Date(r.attendanceDate || r.date);
+            const monthStr = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+            if (!monthsMap[monthStr]) monthsMap[monthStr] = { total: 0, present: 0, sortKey: d.getTime() };
+            monthsMap[monthStr].total += 1;
+            if (r.status?.toLowerCase() === 'present') monthsMap[monthStr].present += 1;
+          });
 
-        const monthArray = Object.keys(monthsMap).map(m => ({
-          month: m,
-          sortKey: monthsMap[m].sortKey,
-          percent: Math.round((monthsMap[m].present / monthsMap[m].total) * 100)
-        }));
-        setMonthly(monthArray.sort((a, b) => b.sortKey - a.sortKey));
+          const monthArray = Object.keys(monthsMap).map(m => ({
+            month: m,
+            sortKey: monthsMap[m].sortKey,
+            percent: Math.round((monthsMap[m].present / monthsMap[m].total) * 100)
+          }));
+          setMonthly(monthArray.sort((a, b) => b.sortKey - a.sortKey));
+        } else {
+          setAnalytics({ total: 0, present: 0, absent: 0, leave: 0, percentage: 0 });
+          setAttendanceLogs([]);
+          setSubjectWise([]);
+          setMonthly([]);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch student attendance data:', err);

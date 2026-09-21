@@ -67,7 +67,7 @@ router.put(
     let fee = null;
 
     if (studentId) {
-      fee = await Fee.findOne({ studentId });
+      fee = await Fee.findOne({ $or: [{ studentId }, { registerNo: studentId }], collegeId: req.collegeId });
     }
 
     if (!fee && updated?.studentName) {
@@ -212,4 +212,5 @@ router.delete('/:id', async (req, res) => {
 });
 
 export default router;
+
 

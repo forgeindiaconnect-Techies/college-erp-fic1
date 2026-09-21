@@ -61,6 +61,8 @@ import SystemAnalytics from './pages/analytics/SystemAnalytics';
 import LibraryManagement from './pages/library/LibraryManagement';
 import TransportManagement from './pages/transport/TransportManagement';
 import HostelManagement from './pages/hostel/HostelManagement';
+import HostelDashboard from './pages/hostel/HostelDashboard';
+import HostelLayout from './hostel/components/HostelLayout';
 import PlacementManagement from './pages/placement/PlacementManagement';
 import AdminAssignments from './pages/assignments/AdminAssignments';
 import AccountsOfficerManagement from './pages/accounts-officer/AccountsOfficerManagement';
@@ -76,6 +78,8 @@ import PeriodMaster from './pages/academic/PeriodMaster';
 
 // Super Admin Layout & Pages
 import SuperAdminLayout from './superadmin/components/SuperAdminLayout';
+import PrincipalManagement from './pages/principal/PrincipalManagement';
+import UserManagement from './pages/admin/UserManagement';
 import SuperAdminDashboard from './superadmin/pages/SuperAdminDashboard';
 import SuperAdminColleges from './superadmin/pages/SuperAdminColleges';
 import SuperAdminSubscriptions from './superadmin/pages/SuperAdminSubscriptions';
@@ -217,7 +221,7 @@ export const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {
 export const SettingsContext = createContext({ collegeSettings: null, setCollegeSettings: () => {} });
 
 const hasAnyOtherSession = (excludeKey) => {
-  const keys = ['superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session'];
+  const keys = ['superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session', 'hostel_session', 'watchman_session'];
   return keys.some(key => key !== excludeKey && sessionStorage.getItem(key));
 };
 
@@ -286,13 +290,20 @@ const DriverGuard = ({ children }) => {
   return <Navigate to="/login" replace />;
 };
 
+const HostelGuard = ({ children }) => {
+  const session = sessionStorage.getItem('hostel_session');
+  if (session) return children;
+  if (hasAnyOtherSession('hostel_session')) return <Navigate to="/unauthorized" replace />;
+  return <Navigate to="/login" replace />;
+};
+
 function App() {
   const [theme, setTheme] = useState('light');
   const [collegeSettings, setCollegeSettings] = useState(null);
 
   // Derive the active token to re-trigger settings fetch on login / logout
   const getActiveToken = () => {
-    const keys = ['superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token'];
+    const keys = ['superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token', 'hostel_token', 'watchman_token'];
     for (const key of keys) {
       const val = sessionStorage.getItem(key);
       if (val) return val;
@@ -376,6 +387,7 @@ function App() {
             <Route path="/student/login" element={<Navigate to="/login" replace />} />
             <Route path="/parent/login" element={<Navigate to="/login" replace />} />
             <Route path="/accounts/login" element={<Navigate to="/login" replace />} />
+            <Route path="/hostel/login" element={<Navigate to="/login" replace />} />
             <Route path="/superadmin/login" element={<Navigate to="/login" replace />} />
 
             {/* ── SUPER ADMIN ROUTES ── */}
@@ -394,6 +406,9 @@ function App() {
             <Route path="/admin" element={<AdminGuard><GlobalLockdown><Layout /></GlobalLockdown></AdminGuard>}>
               <Route index element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="dashboard"     element={<Dashboard />} />
+              <Route path="principal-management" element={<PrincipalManagement />} />
+              <Route path="hostel-management" element={<HostelManagement />} />
+              <Route path="user-management" element={<UserManagement />} />
               <Route path="departments"   element={<DepartmentManagement />} />
               <Route path="departments/:id" element={<DepartmentDashboard />} />
               <Route path="hods"          element={<HodManagement />} />
@@ -430,7 +445,8 @@ function App() {
               <Route path="reports"       element={<ReportsManagement />} />
               <Route path="library"       element={<LibraryManagement />} />
               <Route path="transport"     element={<TransportManagement />} />
-              <Route path="hostel"        element={<HostelManagement />} />
+              <Route path="hostel"        element={<HostelDashboard />} />
+              <Route path="hostel-dashboard" element={<HostelDashboard />} />
               <Route path="placement"     element={<PlacementManagement />} />
               <Route path="assignments"   element={<AdminAssignments />} />
               <Route path="accounts-management" element={<AccountsOfficerManagement />} />
@@ -573,6 +589,24 @@ function App() {
               <Route path="notifications" element={<DriverNotifications />} />
               <Route path="attendance" element={<DriverAttendance />} />
             </Route>
+
+            {/* ── HOSTEL WARDEN ROUTES ── */}
+            <Route path="/hostel" element={<HostelGuard><GlobalLockdown><HostelLayout /></GlobalLockdown></HostelGuard>}>
+              <Route index element={<Navigate to="/hostel/dashboard" replace />} />
+              <Route path="dashboard" element={<HostelDashboard />} />
+              <Route path="blocks" element={<HostelDashboard defaultTab="Hostel Blocks" />} />
+              <Route path="rooms" element={<HostelDashboard defaultTab="Rooms" />} />
+              <Route path="allocations" element={<HostelDashboard defaultTab="Student Allocation" />} />
+              <Route path="requests" element={<Navigate to="/hostel/allocations" replace />} />
+              <Route path="gate-passes" element={<HostelDashboard defaultTab="Gate Passes" />} />
+              <Route path="wardens" element={<HostelDashboard defaultTab="Wardens" />} />
+              <Route path="mess-menu" element={<HostelDashboard defaultTab="Mess Menu" />} />
+              <Route path="fees" element={<HostelDashboard defaultTab="Hostel Fees" />} />
+              <Route path="complaints" element={<HostelDashboard defaultTab="Complaints" />} />
+              <Route path="visitors" element={<HostelDashboard defaultTab="Visitors" />} />
+              <Route path="attendance" element={<HostelDashboard defaultTab="Attendance" />} />
+              <Route path="reports" element={<HostelDashboard defaultTab="Reports" />} />
+            </Route>
           </Routes>
         </BrowserRouter>
         </ThemeContext.Provider>
@@ -582,4 +616,13 @@ function App() {
 }
 
 export default App;
+
+
+
+
+
+
+
+
+
 

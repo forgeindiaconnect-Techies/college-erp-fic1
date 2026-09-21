@@ -697,7 +697,7 @@ router.get('/users', protect, collegeScope, async (req, res) => {
 // CREATE a user
 router.post('/users', protect, authorize('Admin', 'Sub Admin', 'Principal'), collegeScope, checkSubscription, async (req, res) => {
   try {
-    const { name, email, password, role, department, referenceId, parentOf, studentId, subjects, phone } = req.body;
+    const { name, email, password, role, department, referenceId, parentOf, studentId, subjects, phone, wardenType } = req.body;
     
     // Check Tenant Limits if applicable
     const tenantId = req.user.tenantId;
@@ -721,7 +721,7 @@ router.post('/users', protect, authorize('Admin', 'Sub Admin', 'Principal'), col
     if (existing) {
       return res.status(400).json({ message: 'User with this email already exists' });
     }
-    const user = new User({ name, email, password, role, department, referenceId, parentOf, studentId, subjects, phone, tenantId });
+    const user = new User({ name, email, password, role, department, referenceId, parentOf, studentId, subjects, phone, wardenType, tenantId });
     const saved = await user.save();
 
     const collegeId = tenantId || req.collegeId || req.user?.collegeId || 'unassigned_college';
@@ -842,3 +842,4 @@ router.delete('/users/:id', protect, authorize('Admin', 'Sub Admin', 'Principal'
 });
 
 export default router;
+
