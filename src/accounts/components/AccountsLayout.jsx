@@ -1,11 +1,11 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import AccountsSidebar from './AccountsSidebar';
 import Navbar from '../../components/layout/Navbar';
 import '../../components/layout/Layout.css';
 
 const AccountsLayout = () => {
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
 
   const toggleSidebar = () => {
     setSidebarOpen(!isSidebarOpen);

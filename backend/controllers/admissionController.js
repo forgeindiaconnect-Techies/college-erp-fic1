@@ -1,5 +1,6 @@
 import Student from '../models/Student.js';
 import Fee from '../models/Fee.js';
+import ScholarshipApplication from '../models/ScholarshipApplication.js';
 import mongoose from 'mongoose';
 
 // Step 32.2: Create the Controller Function
@@ -499,7 +500,34 @@ export const getFeeCollectionRecords = async (req, res) => {
       .skip((page - 1) * limit)
       .limit(limit);
 
-    const studentIds = rawRecords.map(doc => String(doc._id));
+    const studentIds = [];
+    rawRecords.forEach(doc => {
+      if (doc._id) studentIds.push(String(doc._id));
+      if (doc.id) studentIds.push(String(doc.id));
+      if (doc.admissionNumber) studentIds.push(String(doc.admissionNumber));
+      if (doc.admissionNo) studentIds.push(String(doc.admissionNo));
+    });
+
+    const studentObjectIds = rawRecords.map(doc => doc._id).filter(Boolean);
+    const scholarshipApps = await ScholarshipApplication.find({
+      $or: [
+        { student: { $in: studentObjectIds } },
+        { studentId: { $in: studentIds } }
+      ],
+      status: { $in: ['Approved', 'Pending', 'Applied'] }
+    }).sort({ createdAt: -1 }).lean();
+
+    const schByStudent = new Map();
+    scholarshipApps.forEach(sch => {
+      const keys = [
+        sch.student ? String(sch.student) : null,
+        sch.studentId ? String(sch.studentId) : null
+      ].filter(Boolean);
+      keys.forEach(k => {
+        if (!schByStudent.has(k)) schByStudent.set(k, sch);
+      });
+    });
+
     const feeRecords = await Fee.find({ studentId: { $in: studentIds } }).sort({ createdAt: -1 }).lean();
     const feeByStudent = new Map();
     feeRecords.forEach(fee => {
@@ -509,22 +537,39 @@ export const getFeeCollectionRecords = async (req, res) => {
 
     const records = rawRecords.map((doc) => {
       const item = doc.toObject();
-      const normalFee = Number(item.normalFee !== undefined ? item.normalFee : (item.totalFee || 0));
-      const discountAmount = Number(item.discountAmount || 0);
+      const normalFee = Number(item.normalFee !== undefined && item.normalFee !== null && item.normalFee !== "" ? item.normalFee : (item.totalFee || 0));
+      const discountAmount = Number(item.discountAmount || item.quotaConcession || 0);
       const feeRecord = feeByStudent.get(String(item._id)) || feeByStudent.get(String(item.id)) || feeByStudent.get(String(item.admissionNumber)) || feeByStudent.get(String(item.admissionNo));
-      const scholarshipAmount = Number(feeRecord?.scholarshipAmount || 0);
-      const finalFee = feeRecord?.finalFee !== undefined ? Number(feeRecord.finalFee) : Math.max(0, Number(item.finalFee !== undefined ? item.finalFee : (item.totalFee || normalFee)) - scholarshipAmount);
-      const totalFee = finalFee;
-      const paidAmount = Number(item.paidAmount !== undefined ? item.paidAmount : (item.amountPaid || 0));
-      const remainingFee = Number(
-        item.remainingFee !== undefined
-          ? item.remainingFee
-          : Math.max(0, finalFee - paidAmount)
+      const schRecord = schByStudent.get(String(item._id)) || schByStudent.get(String(item.id)) || schByStudent.get(String(item.admissionNumber)) || schByStudent.get(String(item.admissionNo));
+      
+      const scholarshipAmount = Number(
+        item.scholarshipAmount ||
+        item.scholarshipDiscount ||
+        (item.scholarshipDetails?.discountAmount || 0) ||
+        schRecord?.discountAmount ||
+        feeRecord?.scholarshipAmount ||
+        feeRecord?.scholarshipDiscount ||
+        0
       );
+      const scholarshipName = item.scholarship || item.scholarshipName || schRecord?.scholarshipName || feeRecord?.scholarshipName || item.scholarshipDetails?.scholarshipName || (scholarshipAmount > 0 ? "Scholarship Concession" : "");
+      const totalDiscount = discountAmount + scholarshipAmount;
+      
+      const finalFee = (normalFee > 0 && totalDiscount > 0)
+        ? Math.max(0, normalFee - totalDiscount)
+        : (item.finalFee !== undefined && item.finalFee !== null && Number(item.finalFee) > 0 && Number(item.finalFee) < normalFee
+            ? Number(item.finalFee)
+            : Math.max(0, normalFee - totalDiscount));
+            
+      const totalFee = finalFee;
+      const paidAmount = Number(item.paidAmount !== undefined ? item.paidAmount : (item.amountPaid !== undefined ? item.amountPaid : (feeRecord?.paidAmount || 0)));
+      const remainingFee = Math.max(0, finalFee - paidAmount);
       const paymentStatusCalculated =
-        item.paymentStatus ||
-        item.feeStatus ||
-        (remainingFee === 0 && finalFee > 0 ? "Paid" : paidAmount > 0 ? "Partial" : "Pending");
+        (remainingFee === 0 && finalFee > 0) ? "Paid" : (paidAmount > 0 ? "Partial" : "Pending");
+
+      const hostelFee = Number(item.hostelFee !== undefined ? item.hostelFee : (item.hostelFeeAmount || item.feeBreakdown?.hostelFee || 0));
+      const transportFee = Number(item.transportFee !== undefined ? item.transportFee : (item.transportFeeAmount || item.feeBreakdown?.transportFee || 0));
+      const tuitionFee = Number(item.tuitionFee !== undefined ? item.tuitionFee : (item.feeBreakdown?.tuitionFee || (normalFee > 0 ? Math.max(0, normalFee - hostelFee - transportFee - Number(item.otherFee || 0)) : 0)));
+      const otherFee = Number(item.otherFee !== undefined ? item.otherFee : (item.feeBreakdown?.otherFee || item.feeBreakdown?.otherFees || 0));
 
       return {
         ...item,
@@ -536,6 +581,15 @@ export const getFeeCollectionRecords = async (req, res) => {
         quotaName: item.quotaName || item.admissionQuota || "General Quota",
         normalFee,
         discountAmount,
+        scholarship: scholarshipName,
+        scholarshipName,
+        scholarshipAmount,
+        scholarshipDiscount: scholarshipAmount,
+        scholarshipDetails: item.scholarshipDetails || (scholarshipAmount > 0 ? { scholarshipName, discountAmount: scholarshipAmount, status: "Approved" } : null),
+        tuitionFee,
+        hostelFee,
+        transportFee,
+        otherFee,
         finalFee,
         totalFee,
         paidAmount,
@@ -545,7 +599,9 @@ export const getFeeCollectionRecords = async (req, res) => {
     });
 
     res.status(200).json({
+      success: true,
       records,
+      data: records,
       totalRecords,
       currentPage: page,
       totalPages: Math.ceil(totalRecords / limit),

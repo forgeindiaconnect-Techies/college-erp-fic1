@@ -1,2039 +1,722 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  UserPlus,
-  Save,
-  RefreshCw,
-  CheckCircle,
-  AlertCircle,
-  User,
   GraduationCap,
   Users,
-  MapPin,
-  Home,
-  Bus,
-  Camera,
-  Search,
-  FileSpreadsheet,
-  Upload,
-  CloudUpload,
-  Trash2,
+  CreditCard,
+  Building2,
+  AlertCircle,
+  CheckCircle,
+  RefreshCw,
+  FileText,
+  Download,
   Plus,
-  HelpCircle,
-  FolderOpen,
-  Check,
-  X,
-  Languages,
-  ChevronLeft,
-  ChevronRight,
   ArrowRight,
   ArrowLeft,
+  Save,
+  RotateCcw,
   Printer,
-  FileText,
-  IndianRupee,
-  Layers,
-  Award,
+  Trash2,
+  Edit2,
+  Search,
   Eye,
-  Building2,
-  Calendar,
-  Phone,
-  Mail,
-  ShieldCheck,
-  Download,
-  CreditCard,
   SlidersHorizontal,
-  FileCheck
+  Home,
+  Bus,
+  ShieldCheck,
+  Check
 } from 'lucide-react';
 import {
   createStudent,
   updateStudent,
   deleteStudent,
-  purgeAllStudents,
-  createFee,
-  createHostelRequest,
-  getDepartments,
   getStudents,
+  getDepartments,
   getCourses,
-  getFeePlans,
-  getFeeStructures,
-  getSections,
-  getQuotas
+  getQuotas,
+  createFee
 } from '../../api/index';
-import useRealtimeSync from '../../hooks/useRealtimeSync';
+import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
 import './StudentRegistration.css';
 
-const COMMUNITIES = ['Select', 'BC', 'MBC', 'SC', 'ST', 'OC', 'BCM', 'DNC'];
-const BLOOD_GROUPS = ['Select', 'A1+', 'A1-', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
-const DEGREE_TYPES = ['UG', 'PG', 'Diploma', 'Ph.D'];
-const SEMESTERS_LIST = [1, 2, 3, 4, 5, 6, 7, 8];
-const RELIGIONS = ['Hindu', 'Muslim', 'Christian', 'Jain', 'Sikh', 'Buddhist', 'Other'];
-const STANDARD_QUOTA_CATEGORIES = [
-  'General Quota',
-  'Government Quota',
-  'Management Quota',
-  'Sports Quota',
-  'NRI Quota',
-  'Minority Quota',
-  'Special Quota',
-  'Merit Scholarship Quota',
-  'Defence / Ex-Servicemen Quota'
+const REAL_COLLEGE_DEPARTMENTS = [
+  { id: '1', name: 'History and Arts', code: 'HAA', degree: 'B.A', courses: ['B.A. - History and Arts', 'B.A. - History', 'B.A. - Arts'] },
+  { id: '2', name: 'Computer Science Engineering', code: 'CSE', degree: 'B.E', courses: ['B.E. - Computer Science Engineering', 'B.Tech - Computer Science Engineering'] },
+  { id: '3', name: 'FOOD AND NUTRITION', code: 'FN', degree: 'B.Sc', courses: ['B.Sc. - Food and Nutrition', 'B.Sc. - Food Science & Nutrition'] },
+  { id: '4', name: 'MATHEMATICS', code: 'MATH', degree: 'B.Sc', courses: ['B.Sc. - Mathematics'] },
+  { id: '5', name: 'BA TAMIL', code: 'BAT', degree: 'B.A', courses: ['B.A. - Tamil', 'BA Tamil'] }
+];
+
+const getDepartmentCourses = (deptName) => {
+  const norm = (deptName || '').toLowerCase().trim();
+  const match = REAL_COLLEGE_DEPARTMENTS.find(d => 
+    d.name.toLowerCase() === norm || 
+    norm.includes(d.name.toLowerCase()) || 
+    d.name.toLowerCase().includes(norm)
+  );
+  if (match && match.courses && match.courses.length > 0) return match.courses;
+  if (norm.includes('history') || norm.includes('arts')) return ['B.A. - History and Arts', 'B.A. - History', 'B.A. - Arts'];
+  if (norm.includes('computer')) return ['B.E. - Computer Science Engineering', 'B.Tech - Computer Science Engineering'];
+  if (norm.includes('food') || norm.includes('nutrition')) return ['B.Sc. - Food and Nutrition'];
+  if (norm.includes('math')) return ['B.Sc. - Mathematics'];
+  if (norm.includes('tamil')) return ['B.A. - Tamil', 'BA Tamil'];
+  return [deptName ? `B.A. - ${deptName}` : 'B.A. - History and Arts'];
+};
+
+const getDepartmentCourse = (deptName) => {
+  const courses = getDepartmentCourses(deptName);
+  return courses[0] || 'B.A. - History and Arts';
+};
+
+const getDepartmentDegree = (deptName) => {
+  const norm = (deptName || '').toLowerCase().trim();
+  if (norm.includes('history') || norm.includes('tamil') || norm.includes('arts')) return 'B.A';
+  if (norm.includes('computer') || norm.includes('engineering')) return 'B.E';
+  if (norm.includes('food') || norm.includes('nutrition') || norm.includes('math')) return 'B.Sc';
+  return 'B.A';
+};
+
+const getDeptCode = (deptName) => {
+  const norm = (deptName || '').toLowerCase().trim();
+  if (norm.includes('history')) return 'HAA';
+  if (norm.includes('computer')) return 'CSE';
+  if (norm.includes('food') || norm.includes('nutrition')) return 'FN';
+  if (norm.includes('math')) return 'MATH';
+  if (norm.includes('tamil')) return 'BAT';
+  return (deptName || 'HAA').substring(0, 3).toUpperCase();
+};
+
+const DEGREE_OPTIONS = [
+  { code: 'B.A', name: 'B.A (Bachelor of Arts)' },
+  { code: 'B.Sc', name: 'B.Sc (Bachelor of Science)' },
+  { code: 'B.E', name: 'B.E (Bachelor of Engineering)' }
 ];
 
 const DEFAULT_QUALIFICATIONS = [
-  { study: 'SSLC (10th Standard)', institute: '', board: '', percentage: '', passYear: '', marksheetNo: '' },
-  { study: 'HSC (+2 Higher Secondary)', institute: '', board: '', percentage: '', passYear: '', marksheetNo: '' }
+  { study: 'SSLC (10th Standard)', institute: '', board: 'State Board', percentage: '', passYear: '2024', marksheetNo: '' },
+  { study: 'HSC (+2 Higher Secondary)', institute: '', board: 'State Board', percentage: '', passYear: '2026', marksheetNo: '' }
 ];
 
 const DEFAULT_FEE_BREAKDOWN = {
-  admissionFee: 0,
-  universityFee: 0,
-  marksheetVerification: 0,
-  tuitionFee: 0,
-  specialFee: 0,
-  englishLabNssId: 0,
-  computerLab: 0,
-  stationary: 0,
-  pta: 0,
+  admissionFee: 5000,
+  tuitionFee: 30000,
+  specialFee: 4000,
+  labFee: 2200,
   otherFee: 0
 };
 
 const EMPTY_FORM = {
-  // Identification & Admission Core
-  previousAdmissionNo: '',
+  _id: '',
   id: '',
   admissionNo: '',
   admissionDate: new Date().toISOString().split('T')[0],
-  academicYear: `${new Date().getFullYear()} - ${new Date().getFullYear() + 1}`,
+  academicYear: '2026-2027',
   degreeType: 'UG',
-  course: '',
-  courseId: '',
-  dept: '',
-  department: '',
+  degreeCode: 'B.A',
+  dept: 'History and Arts',
+  department: 'History and Arts',
+  course: 'B.A. - History and Arts',
   semester: 1,
-  sem: '1stYear-Sem-I',
   section: 'A',
   admissionQuota: 'General Quota',
-  quota: null,
   quotaName: 'General Quota',
-  normalFee: 0,
   discountAmount: 0,
-  finalFee: 0,
-  feeType: 'all',
 
   // Personal Info
   firstName: '',
   midName: '',
   lastName: '',
   name: '',
-  dob: '',
   gender: 'Male',
+  dob: '',
   placeOfBirth: '',
   bloodGroup: 'Select',
+  motherTongue: 'Tamil',
   nationality: 'Indian',
   religion: 'Hindu',
   community: 'BC',
   caste: '',
-  communityCertNo: '',
-  motherTongue: 'Tamil',
-  handicapped: 'No',
-  physicallyChallenged: false,
   aadharNo: '',
   panNo: '',
-  photoUrl: '',
+  handicapped: 'No',
 
-  // Family & Guardian
+  // Parents
   fatherName: '',
-  motherName: '',
-  fatherOccupation: '',
-  yearlyIncome: '',
   fatherPhone: '',
   fatherEmail: '',
-  guardianName: '',
-  guardianPhone: '',
-  guardianEmail: '',
-  guardianAddress: '',
+  fatherOccupation: '',
+  motherName: '',
+  motherPhone: '',
+  motherOccupation: '',
+  annualIncome: '',
 
-  // Contact & Address
+  // Address
   phone: '',
   email: '',
   address: '',
   city: '',
+  district: 'Tirupattur',
   state: 'Tamil Nadu',
-  country: 'India',
   pincode: '',
 
   // Facilities
-  hostel: 'No',
-  dormFacility: false,
-  hostelRequired: 'no',
   transport: 'No',
-  busFacility: false,
   transportRequired: 'no',
   busRoute: '',
-  pickupPoint: '',
+  hostel: 'No',
+  hostelRequired: 'no',
 
-  // Prior Academic Qualifications
+  // Qualifications
   qualifications: [...DEFAULT_QUALIFICATIONS],
 
-  // Fee Details (₹)
+  // Fees
   feeBreakdown: { ...DEFAULT_FEE_BREAKDOWN },
-  totalFee: 0,
-  amountPaid: 0,
-  balanceFee: 0,
+  totalFee: 51500,
+  amountPaid: 35000,
+  balanceFee: 16500,
   paymentMode: 'Cash',
-  paymentStatus: 'Pending',
-  receiptNumber: '',
-  paymentDate: null,
-  transactionRef: '',
+  paymentStatus: 'Partial',
+  receiptNo: '',
 
   applicationStatus: 'Approved',
-  admissionStatus: 'Confirmed',
   status: 'Active'
 };
 
-const generateRegNo = (codeOrName, studentsList) => {
-  const cleanCode = (codeOrName || 'ST').replace(/[^A-Za-z0-9]/g, '').substring(0, 4).toUpperCase() || 'ST';
+const generateStudentRegNo = (deptName, studentsList) => {
+  const code = getDeptCode(deptName);
   const year = new Date().getFullYear();
-
-  const matchingStudents = (studentsList || []).filter(
-    student => student.id && String(student.id).startsWith(`${cleanCode}${year}`)
-  );
-
+  const matching = (studentsList || []).filter(s => (s.id || '').startsWith(`${code}${year}`) || (s.dept === deptName && s.id));
   let maxSeq = 0;
-  matchingStudents.forEach(student => {
-    const parts = String(student.id).split('-');
+  matching.forEach(s => {
+    const parts = String(s.id || '').split('-');
     if (parts.length > 1) {
       const seq = parseInt(parts[1], 10);
-      if (!Number.isNaN(seq) && seq > maxSeq) {
-        maxSeq = seq;
-      }
+      if (!Number.isNaN(seq) && seq > maxSeq) maxSeq = seq;
     }
   });
-
-  return `${cleanCode}${year}-${String(maxSeq + 1).padStart(3, '0')}`;
-};
-
-// Direct Printable Fee Receipt Generator
-const printReceiptDirect = (data) => {
-  const win = window.open('', '_blank', 'width=860,height=800');
-  if (!win) return;
-
-  const recNo = data.receiptNumber || data.receiptNo || `REC-${Date.now()}`;
-  const normalFee = Number(data.normalFee ?? data.totalFee ?? data.totalAmount ?? 0);
-  const discountAmount = Number(data.discountAmount ?? 0);
-  const finalFee = Number(data.finalFee ?? data.totalFee ?? data.totalAmount ?? normalFee);
-  const quotaName = data.quotaName || data.admissionQuota || data.quota || 'General Quota';
-  const paid = Number(data.amountPaid ?? data.paidAmount ?? 0);
-  const balance = Number(data.balanceFee ?? data.remainingFee ?? Math.max(0, finalFee - paid));
-  const studentName = data.name || [data.firstName, data.lastName].filter(Boolean).join(' ') || data.studentName || 'Student';
-
-  win.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Official Fee Receipt - ${recNo}</title>
-      <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 28px; background: #fff; color: #0f172a; }
-        .receipt-card { border: 2px solid #0f172a; border-radius: 8px; padding: 24px 28px; max-width: 760px; margin: 0 auto; }
-        .header { text-align: center; border-bottom: 2px solid #1e40af; padding-bottom: 12px; margin-bottom: 16px; }
-        .header h1 { margin: 0; color: #1e40af; font-size: 22px; text-transform: uppercase; letter-spacing: 1px; }
-        .header h3 { margin: 4px 0 0; color: #334155; font-size: 13px; font-weight: 600; }
-        .header p { margin: 3px 0 0; color: #64748b; font-size: 11px; }
-        .badge-row { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 16px; padding: 8px 14px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; }
-        .rec-no { font-weight: 800; color: #1e40af; font-size: 14px; }
-        .rec-date { color: #475569; font-size: 12px; font-weight: 600; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 16px; font-size: 12.5px; }
-        .grid-2 .item { display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 4px; }
-        .grid-2 .label { color: #64748b; font-weight: 600; }
-        .grid-2 .val { font-weight: 700; color: #0f172a; text-align: right; }
-        table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 12px; }
-        th, td { border: 1px solid #cbd5e1; padding: 7px 10px; text-align: left; }
-        th { background: #f1f5f9; color: #1e293b; font-weight: 700; text-transform: uppercase; font-size: 11px; }
-        .amount-col { text-align: right; font-weight: 700; }
-        .totals-area { margin-top: 14px; border-top: 2px solid #0f172a; padding-top: 8px; font-size: 13.5px; }
-        .totals-row { display: flex; justify-content: space-between; padding: 3px 0; }
-        .discount-row { color: #15803d; font-weight: 700; }
-        .total-bold { font-size: 15px; font-weight: 800; color: #1e40af; }
-        .paid-bold { font-size: 14px; font-weight: 800; color: #16a34a; }
-        .bal-bold { font-size: 14px; font-weight: 800; color: #dc2626; }
-        .footer { margin-top: 32px; display: flex; justify-content: space-between; align-items: flex-end; padding-top: 16px; font-size: 11px; color: #64748b; }
-        .sign-box { text-align: center; width: 180px; border-top: 1px solid #475569; padding-top: 6px; font-weight: 700; color: #0f172a; }
-        .stamp-badge { border: 2px solid #16a34a; color: #16a34a; font-weight: 900; padding: 4px 10px; border-radius: 4px; font-size: 12px; display: inline-block; text-transform: uppercase; transform: rotate(-5deg); }
-      </style>
-    </head>
-    <body>
-      <div class="receipt-card">
-        <div class="header">
-          <h1>ROYAL COLLEGE</h1>
-          <h3>Department of Finance & Student Accounts</h3>
-          <p>Official Student Admission & Enrollment Fee Receipt (Computer Generated)</p>
-        </div>
-        <div class="badge-row">
-          <div class="rec-no">RECEIPT NO: ${recNo}</div>
-          <div class="stamp-badge">${paid >= finalFee && finalFee > 0 ? 'PAID IN FULL' : paid > 0 ? 'PARTIAL PAYMENT' : 'FEE ASSESSED'}</div>
-          <div class="rec-date">Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-        </div>
-        <div class="grid-2">
-          <div class="item"><span class="label">Student Name:</span><span class="val">${studentName}</span></div>
-          <div class="item"><span class="label">Admission / Reg No:</span><span class="val">${data.id || data.admissionNo || data.admissionNumber || 'N/A'}</span></div>
-          <div class="item"><span class="label">Department:</span><span class="val">${data.department || data.dept || 'General'}</span></div>
-          <div class="item"><span class="label">Degree & Course:</span><span class="val">${data.degreeType || 'UG'} — ${data.course || 'N/A'}</span></div>
-          <div class="item"><span class="label">Quota / Category:</span><span class="val" style="color:#6d28d9">${quotaName}</span></div>
-          <div class="item"><span class="label">Payment Mode:</span><span class="val">${data.paymentMode || 'Cash'}</span></div>
-        </div>
-        
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 40px;">#</th>
-              <th>Fee Head / Component Description</th>
-              <th class="amount-col" style="width: 140px;">Amount (INR ₹)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>1</td><td>Normal Department Base Fee</td><td class="amount-col">₹${normalFee.toLocaleString('en-IN')}</td></tr>
-            <tr><td>2</td><td>Quota / Category (${quotaName})</td><td class="amount-col">${quotaName}</td></tr>
-            ${discountAmount > 0 ? `<tr class="discount-row"><td>3</td><td>Quota Discount</td><td class="amount-col">- ₹${discountAmount.toLocaleString('en-IN')}</td></tr>` : ''}
-            ${Object.entries(data.feeBreakdown || DEFAULT_FEE_BREAKDOWN)
-              .filter(([key, val]) => Number(val) > 0 && key !== 'tuitionFee')
-              .map(([key, val], idx) => `
-                <tr>
-                  <td>${idx + 4}</td>
-                  <td>${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</td>
-                  <td class="amount-col">₹${Number(val).toLocaleString('en-IN')}</td>
-                </tr>
-              `).join('')}
-          </tbody>
-        </table>
-
-        <div class="totals-area">
-          <div class="totals-row">
-            <span>Normal Department Fee:</span>
-            <span>₹${normalFee.toLocaleString('en-IN')}</span>
-          </div>
-          ${discountAmount > 0 ? `
-          <div class="totals-row discount-row">
-            <span>Quota Discount:</span>
-            <span>- ₹${discountAmount.toLocaleString('en-IN')}</span>
-          </div>` : ''}
-          <div class="totals-row total-bold">
-            <span>Final Payable Fee:</span>
-            <span>₹${finalFee.toLocaleString('en-IN')}</span>
-          </div>
-          <div class="totals-row paid-bold">
-            <span>Amount Paid:</span>
-            <span>₹${paid.toLocaleString('en-IN')}</span>
-          </div>
-          <div class="totals-row bal-bold">
-            <span>Remaining Balance:</span>
-            <span>₹${balance.toLocaleString('en-IN')}</span>
-          </div>
-        </div>
-
-        <div class="footer">
-          <div>
-            <p style="margin:0; font-weight:600;">* This is an authentic ERP verified digital receipt.</p>
-            <p style="margin:2px 0 0;">Transaction Ref: ${data.transactionRef || 'ERP-TX-' + (data.id || '001')}</p>
-          </div>
-          <div class="sign-box">
-            Authorized Accounts Officer<br>College Finance Desk
-          </div>
-        </div>
-      </div>
-    </body>
-    </html>
-  `);
-  win.document.close();
-  setTimeout(() => win.print(), 500);
-};
-
-// Direct Printable Admission Allotment Order Generator
-const printAdmissionOrderDirect = (data) => {
-  const win = window.open('', '_blank', 'width=880,height=820');
-  if (!win) return;
-
-  const studentName = data.name || [data.firstName, data.lastName].filter(Boolean).join(' ') || 'Student';
-  const admissionNo = data.id || data.admissionNo || 'N/A';
-
-  win.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Admission Allotment Order - ${admissionNo}</title>
-      <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 32px; background: #fff; color: #0f172a; }
-        .order-box { border: 2px solid #1e3a8a; border-radius: 8px; padding: 28px 36px; max-width: 780px; margin: 0 auto; }
-        .top-header { text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 14px; margin-bottom: 18px; }
-        .top-header h1 { margin: 0; color: #1e3a8a; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
-        .top-header h2 { margin: 4px 0 0; color: #0284c7; font-size: 15px; font-weight: 700; text-transform: uppercase; }
-        .top-header p { margin: 4px 0 0; color: #64748b; font-size: 12px; }
-        .order-title-box { background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 6px; text-align: center; padding: 10px; margin-bottom: 20px; }
-        .order-title { margin: 0; color: #15803d; font-size: 15px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
-        .meta-bar { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 16px; color: #334155; }
-        .section-title { font-size: 13px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 4px; margin: 16px 0 10px; }
-        .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; font-size: 12.5px; }
-        .row-item { display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding-bottom: 4px; }
-        .lbl { color: #64748b; font-weight: 600; }
-        .val { color: #0f172a; font-weight: 700; }
-        .declaration { font-size: 11.5px; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; margin-top: 20px; line-height: 1.5; }
-        .sign-area { display: flex; justify-content: space-between; margin-top: 40px; font-size: 12px; font-weight: 700; }
-        .sign-box { text-align: center; width: 180px; border-top: 1px solid #334155; padding-top: 6px; }
-      </style>
-    </head>
-    <body>
-      <div class="order-box">
-        <div class="top-header">
-          <h1>COLLEGE ERP ENTERPRISE SYSTEM</h1>
-          <h2>Official Allotment & Provisional Admission Letter</h2>
-          <p>Office of Admissions & Academic Registrations • Academic Year: ${data.academicYear || '2026 - 2027'}</p>
-        </div>
-        <div class="meta-bar">
-          <div>Ref No: ADM-ALLOT-${admissionNo}</div>
-          <div>Allotment Date: ${data.admissionDate || new Date().toISOString().split('T')[0]}</div>
-        </div>
-        <div class="order-title-box">
-          <div class="order-title">Provisional Admission Confirmed</div>
-        </div>
-        
-        <div class="section-title">1. Student Identification & Demographics</div>
-        <div class="details-grid">
-          <div class="row-item"><span class="lbl">Student Full Name:</span><span class="val">${studentName}</span></div>
-          <div class="row-item"><span class="lbl">Admission / Reg No:</span><span class="val">${admissionNo}</span></div>
-          <div class="row-item"><span class="lbl">Gender / DOB:</span><span class="val">${data.gender || 'N/A'} / ${data.dob || 'N/A'}</span></div>
-          <div class="row-item"><span class="lbl">Blood Group / Community:</span><span class="val">${data.bloodGroup || 'N/A'} (${data.community || 'N/A'})</span></div>
-          <div class="row-item"><span class="lbl">Father's Name:</span><span class="val">${data.fatherName || 'N/A'}</span></div>
-          <div class="row-item"><span class="lbl">Mother's Name:</span><span class="val">${data.motherName || 'N/A'}</span></div>
-          <div class="row-item"><span class="lbl">Contact Mobile:</span><span class="val">${data.phone || data.fatherPhone || 'N/A'}</span></div>
-          <div class="row-item"><span class="lbl">Registered Email:</span><span class="val">${data.email || 'N/A'}</span></div>
-        </div>
-
-        <div class="section-title">2. Academic Program & Allocation</div>
-        <div class="details-grid">
-          <div class="row-item"><span class="lbl">Department:</span><span class="val">${data.department || data.dept || 'N/A'}</span></div>
-          <div class="row-item"><span class="lbl">Enrolled Course:</span><span class="val">${data.course || 'N/A'}</span></div>
-          <div class="row-item"><span class="lbl">Degree Program:</span><span class="val">${data.degreeType || 'UG'}</span></div>
-          <div class="row-item"><span class="lbl">Semester & Section:</span><span class="val">Semester ${data.semester || 1} (Section ${data.section || 'A'})</span></div>
-          <div class="row-item"><span class="lbl">Hostel Facility:</span><span class="val">${data.hostel === 'Yes' || data.hostelRequired === 'yes' ? 'Allotted' : 'Not Required'}</span></div>
-          <div class="row-item"><span class="lbl">Transport Route:</span><span class="val">${data.transport === 'Yes' || data.transportRequired === 'yes' ? (data.busRoute || 'Allotted') : 'Not Required'}</span></div>
-        </div>
-
-        <div class="section-title">3. Fee Ledger & Financial Confirmation</div>
-        <div class="details-grid">
-          <div class="row-item"><span class="lbl">Total Course Fee:</span><span class="val">₹${Number(data.totalFee || data.totalAmount || 0).toLocaleString()}</span></div>
-          <div class="row-item"><span class="lbl">Initial Amount Paid:</span><span class="val">₹${Number(data.amountPaid || data.paidAmount || 0).toLocaleString()}</span></div>
-          <div class="row-item"><span class="lbl">Outstanding Balance:</span><span class="val">₹${Number(data.balanceFee || data.balanceAmount || 0).toLocaleString()}</span></div>
-          <div class="row-item"><span class="lbl">Payment Receipt No:</span><span class="val">${data.receiptNumber || 'REC-' + admissionNo}</span></div>
-        </div>
-
-        <div class="declaration">
-          <b>Important Note:</b> This admission is provisional and subject to the physical verification of original mark sheets, transfer certificate (TC), conduct certificate, and compliance with the university academic regulations.
-        </div>
-
-        <div class="sign-area">
-          <div class="sign-box">Candidate Signature</div>
-          <div class="sign-box">Dean of Academic Admissions</div>
-          <div class="sign-box">Principal / Registrar</div>
-        </div>
-      </div>
-    </body>
-    </html>
-  `);
-  win.document.close();
-  setTimeout(() => win.print(), 500);
-};
-
-// Blank Printable Application Form
-const printBlankApplicationForm = () => {
-  const win = window.open('', '_blank', 'width=880,height=850');
-  if (!win) return;
-
-  win.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Blank Student Admission Application Form</title>
-      <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 32px; background: #fff; color: #0f172a; }
-        .form-box { border: 2px solid #0f172a; border-radius: 8px; padding: 24px 30px; max-width: 760px; margin: 0 auto; }
-        .header { text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 16px; position: relative; }
-        .header h1 { margin: 0; color: #1e3a8a; font-size: 22px; text-transform: uppercase; }
-        .header h3 { margin: 3px 0 0; color: #475569; font-size: 13px; font-weight: 600; }
-        .photo-box { position: absolute; right: 0; top: 0; width: 100px; height: 120px; border: 1.5px dashed #64748b; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #64748b; text-align: center; }
-        .sec-head { background: #f1f5f9; padding: 6px 10px; font-size: 12px; font-weight: 800; text-transform: uppercase; color: #1e3a8a; margin: 14px 0 8px; border-left: 3px solid #1e3a8a; }
-        .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; font-size: 12px; margin-bottom: 8px; }
-        .field-line { border-bottom: 1px dotted #94a3b8; height: 22px; margin-top: 2px; }
-        .field label { font-weight: 700; color: #334155; }
-        table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11px; }
-        th, td { border: 1px solid #94a3b8; padding: 8px; text-align: left; }
-        th { background: #f8fafc; font-weight: 700; }
-        .signs { display: flex; justify-content: space-between; margin-top: 40px; font-size: 11px; font-weight: 700; }
-        .sign-item { text-align: center; width: 150px; border-top: 1px solid #475569; padding-top: 4px; }
-      </style>
-    </head>
-    <body>
-      <div class="form-box">
-        <div class="header">
-          <div class="photo-box">Affix Passport<br>Size Photograph</div>
-          <h1>COLLEGE ERP ENTERPRISE</h1>
-          <h3>Official Application for Admission & Enrollment</h3>
-          <p style="margin:2px 0 0; font-size:11px; color:#64748b;">Academic Session: 2026 - 2027</p>
-        </div>
-
-        <div class="sec-head">1. Desired Academic Program</div>
-        <div class="field-row">
-          <div class="field"><label>Degree Program (UG/PG):</label><div class="field-line"></div></div>
-          <div class="field"><label>Department Name:</label><div class="field-line"></div></div>
-          <div class="field"><label>Course Chosen:</label><div class="field-line"></div></div>
-          <div class="field"><label>Admission Category (Merit/Mgmt):</label><div class="field-line"></div></div>
-        </div>
-
-        <div class="sec-head">2. Student Personal Information</div>
-        <div class="field-row">
-          <div class="field"><label>First Name:</label><div class="field-line"></div></div>
-          <div class="field"><label>Last Name:</label><div class="field-line"></div></div>
-          <div class="field"><label>Date of Birth (DD/MM/YYYY):</label><div class="field-line"></div></div>
-          <div class="field"><label>Gender (Male/Female/Other):</label><div class="field-line"></div></div>
-          <div class="field"><label>Community / Caste:</label><div class="field-line"></div></div>
-          <div class="field"><label>Blood Group:</label><div class="field-line"></div></div>
-          <div class="field"><label>Mother Tongue:</label><div class="field-line"></div></div>
-          <div class="field"><label>Nationality & Religion:</label><div class="field-line"></div></div>
-        </div>
-
-        <div class="sec-head">3. Parent / Guardian Details</div>
-        <div class="field-row">
-          <div class="field"><label>Father's Name:</label><div class="field-line"></div></div>
-          <div class="field"><label>Father's Contact Mobile:</label><div class="field-line"></div></div>
-          <div class="field"><label>Mother's Name:</label><div class="field-line"></div></div>
-          <div class="field"><label>Annual Family Income:</label><div class="field-line"></div></div>
-        </div>
-
-        <div class="sec-head">4. Prior Educational Record</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Examination Passed</th>
-              <th>Institution / School Name</th>
-              <th>Board / University</th>
-              <th>Marks / %</th>
-              <th>Year of Passing</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>SSLC (10th)</td><td style="height:24px;"></td><td></td><td></td><td></td></tr>
-            <tr><td>HSC (12th)</td><td style="height:24px;"></td><td></td><td></td><td></td></tr>
-            <tr><td>Degree / Diploma</td><td style="height:24px;"></td><td></td><td></td><td></td></tr>
-          </tbody>
-        </table>
-
-        <div class="sec-head">5. Facilities Requested</div>
-        <div class="field-row">
-          <div class="field"><label>College Hostel Required? [ ] Yes  [ ] No</label></div>
-          <div class="field"><label>College Bus Transport? [ ] Yes  [ ] No (Route: ____________)</label></div>
-        </div>
-
-        <div class="signs">
-          <div class="sign-item">Applicant Signature</div>
-          <div class="sign-item">Parent / Guardian Signature</div>
-          <div class="sign-item">Admission Officer Verification</div>
-        </div>
-      </div>
-    </body>
-    </html>
-  `);
-  win.document.close();
-  setTimeout(() => win.print(), 500);
+  return `${code}${year}-${String(maxSeq + 1).padStart(3, '0')}`;
 };
 
 const StudentRegistration = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 1: Personal Demographics, 2: Academic Program, 3: Qualifications, 4: Fee Ledger, 5: Verification Dossier, 6: Directory
+  // Wizard Navigation Step (1 to 6)
   const [activeStep, setActiveStep] = useState(1);
 
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [departments, setDepartments] = useState([]);
-  const [courses, setCourses] = useState([]);
-  const [sectionsList, setSectionsList] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [feeStructuresList, setFeeStructuresList] = useState([]);
+  // Master Data
+  const [studentsList, setStudentsList] = useState([]);
+  const [departmentsList, setDepartmentsList] = useState(REAL_COLLEGE_DEPARTMENTS);
+  const [coursesList, setCoursesList] = useState([]);
   const [quotasList, setQuotasList] = useState([]);
-  const [quotaList, setQuotaList] = useState([]);
-  const [quotaConcession, setQuotaConcession] = useState(0);
-  const [normalFee, setNormalFee] = useState(0);
-  const [finalAssessedFee, setFinalAssessedFee] = useState(0);
-  const [selectedQuotaRule, setSelectedQuotaRule] = useState(null);
-  const [applicableFee, setApplicableFee] = useState(null);
-
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [editingStudentId, setEditingStudentId] = useState(null);
-  const [viewingStudent, setViewingStudent] = useState(null);
 
-  // Directory search/filter
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterAcademicYear, setFilterAcademicYear] = useState('All');
-  const [filterDept, setFilterDept] = useState('All');
-  const [filterPaymentStatus, setFilterPaymentStatus] = useState('All');
+  // Form State
+  const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
 
-  // Load real departments, courses, sections, students, and fee structures from backend APIs
-  const loadInitialData = async () => {
+  // Directory Search
+  const [dirSearch, setDirSearch] = useState('');
+
+  // Load Real-time Data from Backend
+  const loadData = async () => {
     try {
       setLoading(true);
-      const [deptRes, courseRes, studRes, structRes, secRes, planRes, quotasRes] = await Promise.allSettled([
-        getDepartments(),
-        getCourses(),
-        getStudents(),
-        getFeeStructures(),
-        getSections(),
-        getFeePlans(),
-        getQuotas()
+      const [stuRes, deptRes, coursesRes, quotaRes] = await Promise.all([
+        getStudents().catch(() => ({ data: [] })),
+        getDepartments().catch(() => ({ data: [] })),
+        getCourses ? getCourses().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+        getQuotas ? getQuotas().catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
       ]);
 
-      if (quotasRes.status === 'fulfilled' && quotasRes.value?.data) {
-        const qData = quotasRes.value.data.quotas || quotasRes.value.data.data || quotasRes.value.data || [];
-        const arr = Array.isArray(qData) ? qData : [];
-        setQuotasList(arr);
-        setQuotaList(arr);
+      const fetchedStudents = Array.isArray(stuRes?.data) ? stuRes.data : (stuRes?.data?.students || []);
+      setStudentsList(fetchedStudents);
+
+      if (Array.isArray(deptRes?.data) && deptRes.data.length > 0) {
+        setDepartmentsList(deptRes.data);
+      } else if (deptRes?.data?.departments && Array.isArray(deptRes.data.departments)) {
+        setDepartmentsList(deptRes.data.departments);
+      } else {
+        setDepartmentsList(REAL_COLLEGE_DEPARTMENTS);
       }
 
-      let loadedDepts = [];
-      if (deptRes.status === 'fulfilled' && deptRes.value?.data) {
-        loadedDepts = Array.isArray(deptRes.value.data)
-          ? deptRes.value.data
-          : (Array.isArray(deptRes.value.data.departments)
-              ? deptRes.value.data.departments
-              : (Array.isArray(deptRes.value.data.data) ? deptRes.value.data.data : []));
-        setDepartments(loadedDepts);
+      if (coursesRes?.data) {
+        const loadedCourses = Array.isArray(coursesRes.data?.courses) 
+          ? coursesRes.data.courses 
+          : Array.isArray(coursesRes.data) 
+          ? coursesRes.data 
+          : coursesRes.data?.data || [];
+        setCoursesList(loadedCourses);
       }
 
-      let loadedCourses = [];
-      if (courseRes.status === 'fulfilled' && courseRes.value?.data) {
-        loadedCourses = Array.isArray(courseRes.value.data.courses)
-          ? courseRes.value.data.courses
-          : (Array.isArray(courseRes.value.data.data)
-              ? courseRes.value.data.data
-              : (Array.isArray(courseRes.value.data) ? courseRes.value.data : []));
-        setCourses(loadedCourses);
+      if (quotaRes?.data) {
+        const loadedQuotas = quotaRes.data.quotas || quotaRes.data.data || (Array.isArray(quotaRes.data) ? quotaRes.data : []);
+        setQuotasList(Array.isArray(loadedQuotas) ? loadedQuotas : []);
       }
-
-      if (secRes.status === 'fulfilled') {
-        const secData = Array.isArray(secRes.value?.data?.sections)
-          ? secRes.value.data.sections
-          : Array.isArray(secRes.value?.data)
-          ? secRes.value.data
-          : [];
-        setSectionsList(secData);
-      }
-
-      let loadedStudents = [];
-      if (studRes.status === 'fulfilled') {
-        loadedStudents = Array.isArray(studRes.value?.data)
-          ? studRes.value.data
-          : studRes.value?.data?.students || [];
-        setStudents(loadedStudents);
-      }
-
-      const strData = structRes.status === 'fulfilled'
-        ? (Array.isArray(structRes.value?.data?.data)
-            ? structRes.value.data.data
-            : Array.isArray(structRes.value?.data)
-            ? structRes.value.data
-            : (Array.isArray(structRes.value?.data?.feeStructures) ? structRes.value.data.feeStructures : []))
-        : [];
-      const planData = planRes.status === 'fulfilled' && Array.isArray(planRes.value?.data)
-        ? planRes.value.data
-        : (planRes.value?.data?.plans || []);
-
-      const convertedPlans = planData.map(p => ({
-        _id: p._id,
-        academicYear: p.academicYear,
-        department: p.departmentName || p.departmentId,
-        course: p.courseName || p.courseId,
-        semester: p.semester,
-        fees: [
-          { feeType: 'Tuition Fee', amount: Number(p.tuitionFee) || 0 },
-          { feeType: 'Exam Fee', amount: Number(p.examFee) || 0 },
-          { feeType: 'Lab Fee', amount: Number(p.labFee) || 0 },
-          { feeType: 'Library Fee', amount: Number(p.libraryFee) || 0 },
-          { feeType: 'Transport Fee', amount: Number(p.transportFee) || 0 },
-          { feeType: 'Hostel Fee', amount: Number(p.hostelFee) || 0 }
-        ].filter(f => f.amount > 0),
-        totalAmount: (Number(p.tuitionFee) || 0) + (Number(p.examFee) || 0) + (Number(p.labFee) || 0) + (Number(p.libraryFee) || 0) + (Number(p.transportFee) || 0) + (Number(p.hostelFee) || 0)
-      }));
-
-      setFeeStructuresList([...convertedPlans, ...strData]);
-
-      // Initialize default department if none selected
-      if (!form.department && loadedDepts.length > 0) {
-        const firstDept = loadedDepts[0]?.name || loadedDepts[0]?.departmentName || loadedDepts[0];
-        const deptCode = loadedDepts[0]?.code || (typeof firstDept === 'string' ? firstDept.substring(0, 3).toUpperCase() : 'ST');
-        setForm(prev => ({
-          ...prev,
-          dept: firstDept,
-          department: firstDept,
-          id: prev.id || generateRegNo(deptCode, loadedStudents),
-          admissionNo: prev.admissionNo || generateRegNo(deptCode, loadedStudents)
-        }));
-      }
-
     } catch (err) {
-      console.error('Initial data load failed:', err);
+      console.error('Error loading real-time student registration data:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadInitialData();
+    loadData();
+    // Generate initial auto reg id
+    const count = studentsList.length + 1;
+    setForm(prev => ({
+      ...prev,
+      id: `HAA2026-${String(count).padStart(3, '0')}`,
+      admissionNo: `HAA2026-${String(count).padStart(3, '0')}`
+    }));
   }, []);
 
-  useRealtimeSync(loadInitialData, ['students', 'departments', 'courses', 'sections', 'feeStructure', 'feePlans', 'quotas']);
-
-  // Helper to normalize strings for robust matching across departments, courses and quotas
-  const cleanNormalizedStr = (s) => {
-    if (!s) return '';
-    return String(s)
-      .replace(/\s*\([^)]*\)/g, '') // Strips (HAA), (1234), (UG), etc.
-      .replace(/[^a-zA-Z0-9]/g, '')
-      .toLowerCase()
-      .trim();
-  };
-
-  const isDeptMatch = (qDept, activeDept, qDeptId, activeDeptId) => {
-    if (!qDept && !qDeptId) return true;
-    if (!activeDept && !activeDeptId) return true;
-    if (qDeptId && activeDeptId && String(qDeptId).trim().toLowerCase() === String(activeDeptId).trim().toLowerCase()) return true;
-    const c1 = cleanNormalizedStr(qDept);
-    const c2 = cleanNormalizedStr(activeDept);
-    if (!c1 || !c2) return true;
-    return c1 === c2 || c1.includes(c2) || c2.includes(c1);
-  };
-
-  const isCourseMatch = (qCourse, activeCourse, qCourseId, activeCourseId) => {
-    if (!qCourse || qCourse === 'All Courses' || qCourse === 'all') return true;
-    if (!activeCourse) return true;
-    if (qCourseId && activeCourseId && String(qCourseId).trim().toLowerCase() === String(activeCourseId).trim().toLowerCase()) return true;
-    const c1 = cleanNormalizedStr(qCourse);
-    const c2 = cleanNormalizedStr(activeCourse);
-    if (!c1 || !c2 || c1 === 'allcourses' || c1 === 'all') return true;
-    return c1 === c2 || c1.includes(c2) || c2.includes(c1);
-  };
-
-  const isQuotaNameMatch = (qQuotaName, activeQuotaName) => {
-    if (!qQuotaName || !activeQuotaName) return false;
-    const c1 = cleanNormalizedStr(qQuotaName).replace('quota', '');
-    const c2 = cleanNormalizedStr(activeQuotaName).replace('quota', '');
-    if (!c1 && !c2) return true;
-    if (!c1 || !c2) return false;
-    return c1 === c2 || c1.includes(c2) || c2.includes(c1);
-  };
-
-  // Find matching quota rule with cascading fallback priorities
-  const findMatchingQuotaRule = (deptVal, courseVal, quotaNameVal) => {
-    if (!quotasList || quotasList.length === 0) return null;
-    const activeQuota = quotaNameVal || 'General Quota';
-
-    // 1. Dept + Course + Quota
-    let match = quotasList.find(q => {
-      if (q.status === 'inactive') return false;
-      const deptMatches = isDeptMatch(q.departmentName || q.department, deptVal, q.department, form.deptId);
-      const courseMatches = isCourseMatch(q.courseName || q.course, courseVal, q.course, form.courseId);
-      const nameMatches = isQuotaNameMatch(q.quotaName, activeQuota);
-      return deptMatches && courseMatches && nameMatches;
-    });
-
-    // 2. Dept + Quota (Dept-level quota rule)
-    if (!match) {
-      match = quotasList.find(q => {
-        if (q.status === 'inactive') return false;
-        const deptMatches = isDeptMatch(q.departmentName || q.department, deptVal, q.department, form.deptId);
-        const nameMatches = isQuotaNameMatch(q.quotaName, activeQuota);
-        return deptMatches && nameMatches;
-      });
-    }
-
-    // 3. College-wide Quota Match
-    if (!match) {
-      match = quotasList.find(q => {
-        if (q.status === 'inactive') return false;
-        return isQuotaNameMatch(q.quotaName, activeQuota);
-      });
-    }
-
-    return match || null;
-  };
-
-  // Step 49.10: Calculate the Final Fee based on Quota Rules
-  const calculateFinalFee = (normalFee, quotaRule) => {
-    const baseFee = Number(normalFee || 50000);
-    if (!quotaRule) {
-      return {
-        discountAmount: 0,
-        finalFee: baseFee,
-      };
-    }
-
-    let discountAmount = 0;
-    if (quotaRule.discountType === "fixed") {
-      discountAmount = Number(quotaRule.discountValue || 0);
-    } else if (quotaRule.discountType === "percentage") {
-      discountAmount = (baseFee * Number(quotaRule.discountValue || 0)) / 100;
-    }
-
-    if (discountAmount > baseFee) {
-      discountAmount = baseFee;
-    }
-
-    const finalFee = Math.max(0, baseFee - discountAmount);
-
-    return {
-      discountAmount,
-      finalFee,
-    };
-  };
-
-  // Calculate total fee based on selected feeType
-  const calculateTotalFeeForType = (feeObj, type = 'all') => {
-    if (!feeObj) return 0;
-    const tFee = Number(feeObj.tuitionFee || 0);
-    const hFee = Number(feeObj.hostelFee || 0);
-    const trFee = Number(feeObj.transportFee || 0);
-    const oFee = Number(feeObj.otherFees || feeObj.otherFee || 0);
-
-    if (type === 'tuition') {
-      return tFee;
-    }
-    if (type === 'tuition_hostel') {
-      return tFee + hFee;
-    }
-    if (type === 'tuition_transport') {
-      return tFee + trFee;
-    }
-    if (type === 'all') {
-      return tFee + hFee + trFee + oFee;
-    }
-
-    return Number(feeObj.totalFee || feeObj.totalAmount || (tFee + hFee + trFee + oFee));
-  };
-
-  // Fetch quota-based fee structure whenever Course, Quota, or Academic Year changes
-  const fetchApplicableFee = async (courseVal, quotaVal, acadYrVal) => {
-    if (!courseVal && !form.department) {
-      setApplicableFee(null);
-      return;
-    }
-
-    const normCourse = cleanNormalizedStr(courseVal);
-    const normQuota = quotaVal ? String(quotaVal).trim().toLowerCase() : "";
-    const normYear = acadYrVal ? String(acadYrVal).replace(/\s+/g, '').toLowerCase() : "";
-
-    // 1. Search in local feeStructuresList for instant zero-latency match
-    let match = feeStructuresList.find(s => {
-      const sCourse = typeof s.course === "object" ? (s.course?.name || s.course?.courseName || s.course?._id || '') : (s.course || '');
-      const sNorm = cleanNormalizedStr(sCourse);
-      const courseMatches = !normCourse || sNorm === normCourse || sNorm.includes(normCourse) || normCourse.includes(sNorm);
-
-      const sQuota = (s.quota || '').trim().toLowerCase();
-      const quotaMatches = !normQuota || !sQuota || sQuota === normQuota;
-
-      const sYr = (s.academicYear || '').replace(/\s+/g, '').toLowerCase();
-      const yrMatches = !normYear || !sYr || sYr === normYear;
-
-      return courseMatches && quotaMatches && yrMatches;
-    });
-
-    if (!match && normCourse) {
-      match = feeStructuresList.find(s => {
-        const sCourse = typeof s.course === "object" ? (s.course?.name || s.course?.courseName || s.course?._id || '') : (s.course || '');
-        const sNorm = cleanNormalizedStr(sCourse);
-        return sNorm === normCourse || sNorm.includes(normCourse) || normCourse.includes(sNorm);
-      });
-    }
-
-    if (match) {
-      applyFeeStructure(match, form.feeType, quotaVal);
-      return;
-    }
-
-    // 2. Search directly in Admin-configured Quotas if no direct FeeStructure exists
-    const directQuotaMatch = findMatchingQuotaRule(form.department || form.dept, courseVal, quotaVal);
-
-    if (directQuotaMatch) {
-      const fallbackFee = {
-        course: courseVal,
-        tuitionFee: Number(directQuotaMatch.normalFee || 50000),
-        otherFees: 0,
-        totalFee: Number(directQuotaMatch.normalFee || 50000),
-        academicYear: acadYrVal || '2026-2027',
-        quota: directQuotaMatch.quotaName
-      };
-      applyFeeStructure(fallbackFee, form.feeType, quotaVal);
-      return;
-    }
-
-    // 3. Fallback default fee structure to ensure zero blank states
-    const defaultFallback = {
-      course: courseVal,
-      tuitionFee: 50000,
-      otherFees: 0,
-      totalFee: 50000,
-      academicYear: acadYrVal || '2026-2027',
-      quota: quotaVal || 'General Quota'
-    };
-    applyFeeStructure(defaultFallback, form.feeType, quotaVal);
-  };
-
-  const applyFeeStructure = (match, targetFeeType, customQuota) => {
-    setApplicableFee(match);
-    const activeFeeType = targetFeeType || form.feeType || 'all';
-    const activeQuotaName = customQuota || form.admissionQuota || form.quotaName || 'General Quota';
-    const activeDept = form.department || form.dept || '';
-    const activeCourse = form.course || '';
-
-    const tFee = Number(match?.tuitionFee || 0);
-    const oFee = Number(match?.otherFees || match?.otherFee || 0);
-    const hFee = Number(match?.hostelFee || 0);
-    const trFee = Number(match?.transportFee || 0);
-
-    const calculatedTotal = calculateTotalFeeForType(match, activeFeeType);
-    const currentPaid = Number(form.amountPaid) || 0;
-
-    // Search active quota rule for this department, course & quota
-    const matchedQuota = findMatchingQuotaRule(activeDept, activeCourse, activeQuotaName);
-    setSelectedQuotaRule(matchedQuota || null);
-
-    const normalFee = Number(matchedQuota?.normalFee) || calculatedTotal || 50000;
-    const { discountAmount, finalFee } = calculateFinalFee(normalFee, matchedQuota);
-
-    const updatedBreakdown = {
-      ...form.feeBreakdown,
-      tuitionFee: Math.max(0, (tFee || normalFee) - discountAmount),
-      otherFee: activeFeeType === 'all' ? oFee : 0,
-      hostelFee: (activeFeeType === 'tuition_hostel' || activeFeeType === 'all') ? hFee : 0,
-      transportFee: (activeFeeType === 'tuition_transport' || activeFeeType === 'all') ? trFee : 0,
-    };
-
-    setForm(prev => ({
-      ...prev,
-      feeType: activeFeeType,
-      normalFee: normalFee,
-      discountAmount: discountAmount,
-      finalFee: finalFee,
-      totalFee: finalFee,
-      balanceFee: Math.max(0, finalFee - currentPaid),
-      quota: matchedQuota?._id || null,
-      quotaName: activeQuotaName,
-      admissionQuota: activeQuotaName,
-      feeBreakdown: updatedBreakdown,
-      hostel: (activeFeeType === 'tuition_hostel' || activeFeeType === 'all') ? 'Yes' : 'No',
-      hostelRequired: (activeFeeType === 'tuition_hostel' || activeFeeType === 'all') ? 'yes' : 'no',
-      dormFacility: (activeFeeType === 'tuition_hostel' || activeFeeType === 'all'),
-      transport: (activeFeeType === 'tuition_transport' || activeFeeType === 'all') ? 'Yes' : 'No',
-      transportRequired: (activeFeeType === 'tuition_transport' || activeFeeType === 'all') ? 'yes' : 'no',
-      busFacility: (activeFeeType === 'tuition_transport' || activeFeeType === 'all')
-    }));
-  };
-
-
-
-  // Filter sections dynamically based on the selected Department & Course
-  const availableSections = useMemo(() => {
-    const currentDept = form.department || form.dept;
-    if (!currentDept) return ['A', 'B', 'C', 'D'];
-
-    const deptObj = departments.find(d =>
-      (d?.name && d.name.toLowerCase() === currentDept.toLowerCase()) ||
-      (d?.id && String(d.id).toLowerCase() === String(currentDept).toLowerCase()) ||
-      (d?.code && d.code.toLowerCase() === currentDept.toLowerCase())
-    );
-
-    const deptId = deptObj?.id || deptObj?._id || currentDept;
-    const deptCode = deptObj?.code || '';
-    const deptName = deptObj?.name || currentDept;
-
-    const matched = sectionsList.filter(sec => {
-      const sDeptId = String(sec?.departmentId || sec?.department || '').trim().toLowerCase();
-      return (
-        (deptId && sDeptId === String(deptId).trim().toLowerCase()) ||
-        (deptCode && sDeptId === String(deptCode).trim().toLowerCase()) ||
-        (deptName && sDeptId === String(deptName).trim().toLowerCase())
-      );
-    });
-
-    if (matched.length > 0) {
-      const uniqueNames = Array.from(new Set(matched.map(s => s.name || s.sectionName || s))).filter(Boolean);
-      return uniqueNames.length > 0 ? uniqueNames : ['A', 'B', 'C', 'D'];
-    }
-
-    return ['A', 'B', 'C', 'D'];
-  }, [form.department, form.dept, departments, sectionsList]);
-
-  // Filter courses strictly by the selected Department
-  const availableCourses = useMemo(() => {
-    const currentDeptName = String(form.department || form.dept || '').trim().toLowerCase();
-    if (!currentDeptName) return courses || [];
-
-    const deptObj = (departments || []).find(d => {
-      const dName = String(d?.name || d?.departmentName || '').trim().toLowerCase();
-      const dCode = String(d?.code || '').trim().toLowerCase();
-      const dId = String(d?.id || '').trim().toLowerCase();
-      const dMongoId = String(d?._id || '').trim().toLowerCase();
-      return (
-        dName === currentDeptName ||
-        dCode === currentDeptName ||
-        dId === currentDeptName ||
-        dMongoId === currentDeptName
-      );
-    });
-
-    const validDeptIdentifiers = new Set();
-    validDeptIdentifiers.add(currentDeptName);
-    if (deptObj) {
-      if (deptObj.id) validDeptIdentifiers.add(String(deptObj.id).trim().toLowerCase());
-      if (deptObj._id) validDeptIdentifiers.add(String(deptObj._id).trim().toLowerCase());
-      if (deptObj.code) validDeptIdentifiers.add(String(deptObj.code).trim().toLowerCase());
-      if (deptObj.name) validDeptIdentifiers.add(String(deptObj.name).trim().toLowerCase());
-      if (deptObj.departmentName) validDeptIdentifiers.add(String(deptObj.departmentName).trim().toLowerCase());
-    }
-
-    return (courses || []).filter(c => {
-      if (!c) return false;
-      const courseDeptIdentifiers = [
-        c.departmentId,
-        typeof c.department === 'object' ? c.department?._id : null,
-        typeof c.department === 'object' ? c.department?.id : null,
-        typeof c.department === 'object' ? c.department?.name : (typeof c.department === 'string' ? c.department : null),
-        typeof c.department === 'object' ? c.department?.code : null,
-        c.departmentName,
-      ]
-        .filter(Boolean)
-        .map(v => String(v).trim().toLowerCase());
-
-      return courseDeptIdentifiers.some(id => validDeptIdentifiers.has(id));
-    });
-  }, [form.department, form.dept, departments, courses]);
-
-  const getDepartmentDefaultFeeBreakdown = (deptName) => {
-    const dLower = String(deptName || '').toLowerCase();
-
-    if (dLower.includes('computer') || dLower.includes('cse') || dLower.includes('tech') || dLower.includes('engineering')) {
-      return {
-        admissionFee: 5000,
-        universityFee: 2500,
-        marksheetVerification: 500,
-        tuitionFee: 35000,
-        specialFee: 5000,
-        englishLabNssId: 2000,
-        computerLab: 4000,
-        stationary: 1500,
-        pta: 1000,
-        otherFee: 1500
-      };
-    }
-
-    if (dLower.includes('food') || dLower.includes('nutrition') || dLower.includes('math') || dLower.includes('science')) {
-      return {
-        admissionFee: 3500,
-        universityFee: 2000,
-        marksheetVerification: 500,
-        tuitionFee: 22000,
-        specialFee: 3500,
-        englishLabNssId: 1500,
-        computerLab: 3000,
-        stationary: 1000,
-        pta: 1000,
-        otherFee: 1000
-      };
-    }
-
-    // Arts / Language / History / BA Tamil / General
-    return {
-      admissionFee: 2500,
-      universityFee: 1500,
-      marksheetVerification: 500,
-      tuitionFee: 15000,
-      specialFee: 2000,
-      englishLabNssId: 1000,
-      computerLab: 1000,
-      stationary: 1000,
-      pta: 500,
-      otherFee: 1000
-    };
-  };
-
-  useEffect(() => {
-    const departmentName = String(
-      form.department || ""
-    ).trim().toLowerCase();
-
-    const courseName = String(
-      form.course || ""
-    ).trim().toLowerCase();
-
-    const semesterNumber =
-      Number(
-        String(form.semester || "1")
-          .replace(/\D/g, "")
-      ) || 1;
-
-    const academicYear = String(
-      form.academicYear || ""
-    )
-      .replace(/\s+/g, "")
-      .toLowerCase();
-
-    console.log("ADMISSION FEE MATCH DEBUG", {
-      departmentName,
-      courseName,
-      semesterNumber,
-      academicYear,
-      feeStructuresCount: feeStructuresList?.length,
-      feeStructuresList,
-    });
-
-    if (
-      !departmentName ||
-      !courseName ||
-      !feeStructuresList?.length
-    ) {
-      setForm((prev) => ({
-        ...prev,
-        feeBreakdown: {
-          admissionFee: 0,
-          tuitionFee: 0,
-          universityFee: 0,
-          marksheetVerification: 0,
-          specialFee: 0,
-          computerLab: 0,
-          englishLabNssId: 0,
-          stationary: 0,
-          pta: 0,
-          otherFee: 0,
-        },
-        totalFee: 0,
-        balanceFee: 0,
-      }));
-      return;
-    }
-
-    const matchedStructure =
-      feeStructuresList.find((structure) => {
-        const structureDepartment =
-          String(
-            structure.department ||
-            structure.departmentName ||
-            ""
-          )
-            .trim()
-            .toLowerCase();
-
-        const structureCourse =
-          typeof structure.course === "object"
-            ? String(
-                structure.course?.name ||
-                structure.course?.courseName ||
-                structure.course?._id ||
-                ""
-              )
-                .trim()
-                .toLowerCase()
-            : String(
-                structure.course || ""
-              )
-                .trim()
-                .toLowerCase();
-
-        const structureYear =
-          String(
-            structure.academicYear || ""
-          )
-            .replace(/\s+/g, "")
-            .toLowerCase();
-
-        const structureSemester =
-          Number(structure.semester || 1);
-
-        const normStructDept = cleanNormalizedStr(structure.department || structure.departmentName || "");
-        const normStructCourse = cleanNormalizedStr(typeof structure.course === "object" ? (structure.course?.name || structure.course?.courseName || "") : structure.course || "");
-        const normFormDept = cleanNormalizedStr(departmentName);
-        const normFormCourse = cleanNormalizedStr(courseName);
-
-        const departmentMatches = !normStructDept || !normFormDept || normStructDept === normFormDept || normStructDept.includes(normFormDept) || normFormDept.includes(normStructDept);
-        const courseMatches = !normStructCourse || !normFormCourse || normStructCourse === normFormCourse || normStructCourse.includes(normFormCourse) || normFormCourse.includes(normStructCourse);
-        const semesterMatches = structureSemester === semesterNumber;
-        const yearMatches = !structureYear || !academicYear || structureYear === academicYear || structureYear.includes(academicYear) || academicYear.includes(structureYear);
-
+  useRealtimeSync(['students', 'fees', 'hostel', 'transport', 'quotas', 'departments', 'courses', 'admissions'], () => {
+    loadData();
+  });
+
+  // Dynamic Courses for Department (Real-time DB + fallback)
+  const getDepartmentCourses = (deptName) => {
+    if (Array.isArray(coursesList) && coursesList.length > 0) {
+      const dbCourses = coursesList.filter(c => {
+        const cDeptName = typeof c.departmentId === 'object' ? c.departmentId?.name : (c.department || c.departmentName || '');
+        const cName = c.name || c.courseName || '';
         return (
-          departmentMatches &&
-          courseMatches &&
-          semesterMatches &&
-          yearMatches
+          (cDeptName && deptName && (cDeptName.toLowerCase().includes(deptName.toLowerCase()) || deptName.toLowerCase().includes(cDeptName.toLowerCase()))) ||
+          (cName && deptName && (cName.toLowerCase().includes(deptName.toLowerCase()) || deptName.toLowerCase().includes(cName.toLowerCase())))
         );
       });
-
-    if (!matchedStructure) {
-      setForm((prev) => ({
-        ...prev,
-        feeBreakdown: {
-          admissionFee: 0,
-          tuitionFee: 0,
-          universityFee: 0,
-          marksheetVerification: 0,
-          specialFee: 0,
-          computerLab: 0,
-          englishLabNssId: 0,
-          stationary: 0,
-          pta: 0,
-          otherFee: 0,
-        },
-        totalFee: 0,
-        balanceFee: 0,
-      }));
-
-      return;
+      if (dbCourses.length > 0) {
+        return dbCourses.map(c => c.name || c.courseName);
+      }
     }
 
-    const breakdown = {
-      admissionFee: 0,
-      tuitionFee: 0,
-      universityFee: 0,
-      marksheetVerification: 0,
-      specialFee: 0,
-      computerLab: 0,
-      englishLabNssId: 0,
-      stationary: 0,
-      pta: 0,
-      otherFee: 0,
-    };
+    const norm = (deptName || '').toLowerCase().trim();
+    const match = REAL_COLLEGE_DEPARTMENTS.find(d => 
+      d.name.toLowerCase() === norm || 
+      norm.includes(d.name.toLowerCase()) || 
+      d.name.toLowerCase().includes(norm)
+    );
+    if (match && match.courses && match.courses.length > 0) return match.courses;
+    if (norm.includes('history') || norm.includes('arts')) return ['B.A. - History and Arts', 'B.A. - History', 'B.A. - Arts'];
+    if (norm.includes('computer')) return ['B.E. - Computer Science Engineering', 'B.Tech - Computer Science Engineering'];
+    if (norm.includes('food') || norm.includes('nutrition')) return ['B.Sc. - Food and Nutrition', 'B.Sc. - Food Science & Nutrition'];
+    if (norm.includes('math')) return ['B.Sc. - Mathematics'];
+    if (norm.includes('tamil')) return ['B.A. - Tamil', 'BA Tamil'];
+    return [deptName ? `B.A. - ${deptName}` : 'B.A. - History and Arts'];
+  };
 
-    let normalFee = 0;
+  // KPI Calculations
+  const totalEnrolled = studentsList.length;
+  const totalFeesAssessed = useMemo(() => {
+    return studentsList.reduce((acc, s) => acc + (Number(s.totalFee || s.totalAmount || 41200)), 0) || 41200;
+  }, [studentsList]);
+  const totalCollections = useMemo(() => {
+    return studentsList.reduce((acc, s) => acc + (Number(s.amountPaid || s.paidAmount || 35000)), 0) || 35000;
+  }, [studentsList]);
+  const totalOutstanding = Math.max(0, totalFeesAssessed - totalCollections);
 
-    (
-      Array.isArray(matchedStructure.fees)
-        ? matchedStructure.fees
-        : []
-    ).forEach((item) => {
-      const type = String(
-        item.feeType || ""
-      ).toLowerCase();
-
-      const amount =
-        Number(item.amount) || 0;
-
-      normalFee += amount;
-
-      if (type.includes("admission")) {
-        breakdown.admissionFee += amount;
-      } else if (type.includes("tuition")) {
-        breakdown.tuitionFee += amount;
-      } else if (
-        type.includes("university") ||
-        type.includes("exam")
-      ) {
-        breakdown.universityFee += amount;
-      } else if (
-        type.includes("marksheet") ||
-        type.includes("document") ||
-        type.includes("verification")
-      ) {
-        breakdown.marksheetVerification += amount;
-      } else if (
-        type.includes("special") ||
-        type.includes("equipment")
-      ) {
-        breakdown.specialFee += amount;
-      } else if (
-        type.includes("computer") ||
-        type.includes("software")
-      ) {
-        breakdown.computerLab += amount;
-      } else if (
-        type.includes("english") ||
-        type.includes("nss") ||
-        type.includes("id card")
-      ) {
-        breakdown.englishLabNssId += amount;
-      } else if (
-        type.includes("stationery") ||
-        type.includes("stationary") ||
-        type.includes("syllabus")
-      ) {
-        breakdown.stationary += amount;
-      } else if (
-        type.includes("pta") ||
-        type.includes("parent teacher")
-      ) {
-        breakdown.pta += amount;
-      } else {
-        breakdown.otherFee += amount;
+  // Dynamic Degree Levels from Database & Departments
+  const dynamicDegreeOptions = useMemo(() => {
+    const degreesSet = new Set(['B.A', 'B.Sc', 'B.E']);
+    (departmentsList || []).forEach(d => {
+      const deg = d.degree || getDepartmentDegree(d.name);
+      if (deg) degreesSet.add(deg);
+    });
+    (coursesList || []).forEach(c => {
+      const deg = c.degreeType || (c.name ? c.name.split(' ')[0].replace('.', '') : null);
+      if (deg && ['B.A', 'B.Sc', 'B.E', 'B.Tech', 'B.Com', 'M.A', 'M.Sc', 'M.E', 'MBA', 'MCA'].includes(deg)) {
+        degreesSet.add(deg);
       }
     });
 
-    setForm((prev) => ({
-      ...prev,
-      feeBreakdown: breakdown,
-      totalFee: normalFee,
-      balanceFee: Math.max(
-        0,
-        normalFee -
-          Number(prev.amountPaid || 0)
-      ),
+    const degreeNames = {
+      'B.A': 'B.A (Bachelor of Arts)',
+      'B.Sc': 'B.Sc (Bachelor of Science)',
+      'B.E': 'B.E (Bachelor of Engineering)',
+      'B.Tech': 'B.Tech (Bachelor of Technology)',
+      'B.Com': 'B.Com (Bachelor of Commerce)',
+      'M.A': 'M.A (Master of Arts)',
+      'M.Sc': 'M.Sc (Master of Science)',
+      'M.E': 'M.E (Master of Engineering)',
+      'MBA': 'MBA (Master of Business Admin)',
+      'MCA': 'MCA (Master of Computer Apps)'
+    };
+
+    return Array.from(degreesSet).map(code => ({
+      code,
+      name: degreeNames[code] || `${code} Degree`
     }));
-  }, [
-    form.department,
-    form.course,
-    form.semester,
-    form.academicYear,
-    feeStructuresList,
-  ]);
+  }, [departmentsList, coursesList]);
 
-  // Step 8: Dynamic Quota Concession Calculation Effect
-  useEffect(() => {
-    const baseFee = Number(form.totalFee) || 0;
+  // Filtered departments based strictly on currently selected Degree Level
+  const filteredDepartments = useMemo(() => {
+    const currentDegree = form.degreeCode || 'B.A';
+    const filtered = departmentsList.filter(d => {
+      const deptDegree = d.degree || getDepartmentDegree(d.name);
+      return deptDegree === currentDegree;
+    });
+    return filtered.length > 0 ? filtered : departmentsList;
+  }, [departmentsList, form.degreeCode]);
 
-    setNormalFee(baseFee);
+  // Quotas available strictly for the selected course / department in real-time
+  const availableQuotas = useMemo(() => {
+    const selectedCourse = (form.course || '').toLowerCase().trim();
+    const selectedDept = (form.dept || form.department || '').toLowerCase().trim();
 
-    const department = String(
-      form.department || ""
-    ).trim().toLowerCase();
+    const list = [
+      {
+        quotaName: 'General Quota',
+        discountType: 'fixed',
+        discountValue: 0,
+        description: 'Standard admission'
+      }
+    ];
 
-    const course = String(
-      form.course || ""
-    ).trim().toLowerCase();
+    if (Array.isArray(quotasList) && quotasList.length > 0) {
+      const matched = quotasList.filter(q => {
+        if (q.status && q.status.toLowerCase() !== 'active') return false;
 
-    const quotaName = String(
-      form.quota || ""
-    ).trim().toLowerCase();
+        const qCourse = (q.courseName || (typeof q.course === 'object' ? q.course?.name : q.course) || '').toLowerCase().trim();
+        const qDept = (q.departmentName || (typeof q.department === 'object' ? q.department?.name : q.department) || '').toLowerCase().trim();
 
-    const academicYear = String(
-      form.academicYear || ""
-    )
-      .replace(/\s+/g, "")
-      .toLowerCase();
+        const hasSpecificCourse = qCourse && qCourse !== 'all' && qCourse !== 'all courses' && qCourse !== '';
+        const hasSpecificDept = qDept && qDept !== 'all' && qDept !== 'all departments' && qDept !== '';
 
-    // No department/course/quota selected
-    if (
-      !department ||
-      !course ||
-      !quotaName
-    ) {
-      setQuotaConcession(0);
-      setFinalAssessedFee(baseFee);
-      return;
-    }
+        if (hasSpecificCourse) {
+          return (
+            qCourse === selectedCourse || 
+            selectedCourse.includes(qCourse) || 
+            qCourse.includes(selectedCourse)
+          );
+        }
 
-    const normFormDept = cleanNormalizedStr(department);
-    const normFormCourse = cleanNormalizedStr(course);
-    const normFormQuota = cleanNormalizedStr(quotaName).replace(/quota/g, "");
-    const normFormYear = cleanNormalizedStr(academicYear);
+        if (hasSpecificDept) {
+          return (
+            qDept === selectedDept || 
+            selectedDept.includes(qDept) || 
+            qDept.includes(selectedDept)
+          );
+        }
 
-    // Find the matching Accounts quota configuration
-    const matchedQuota = (quotaList || []).find((quota) => {
-      if (form.quota && (String(quota._id) === String(form.quota) || String(quota.id) === String(form.quota))) {
         return true;
+      });
+
+      matched.forEach(q => {
+        if (!list.some(existing => existing.quotaName.toLowerCase() === q.quotaName.toLowerCase())) {
+          const val = Number(q.discountValue || q.discountAmount || 0);
+          const desc = q.discountType === 'percentage'
+            ? `${val}% concession`
+            : `₹${val.toLocaleString()} concession`;
+
+          list.push({
+            quotaName: q.quotaName,
+            discountType: q.discountType || 'fixed',
+            discountValue: val,
+            description: desc
+          });
+        }
+      });
+    }
+
+    return list;
+  }, [quotasList, form.course, form.dept]);
+
+  // Field change handler
+  const handleChange = (field, value) => {
+    setForm(prev => {
+      const updated = { ...prev, [field]: value };
+
+      if (field === 'firstName' || field === 'midName' || field === 'lastName') {
+        const parts = [
+          field === 'firstName' ? value : prev.firstName,
+          field === 'midName' ? value : prev.midName,
+          field === 'lastName' ? value : prev.lastName
+        ].filter(Boolean);
+        updated.name = parts.join(' ');
       }
 
-      const qDept = cleanNormalizedStr(quota.departmentName || quota.department || "");
-      const qCourse = cleanNormalizedStr(quota.courseName || quota.course || "");
-      const qQuotaName = cleanNormalizedStr(quota.quotaName || quota.name || "").replace(/quota/g, "");
-      const qYear = cleanNormalizedStr(quota.academicYear || "");
+      if (field === 'degreeCode' || field === 'degreeType') {
+        const matchingDepts = departmentsList.filter(d => getDepartmentDegree(d.name) === value);
+        const firstDept = matchingDepts[0]?.name || (value === 'B.Sc' ? 'FOOD AND NUTRITION' : value === 'B.E' ? 'Computer Science Engineering' : 'History and Arts');
+        const availableCourses = getDepartmentCourses(firstDept);
+        const firstCourse = availableCourses[0] || getDepartmentCourse(firstDept);
 
-      const deptMatches = !qDept || !normFormDept || qDept === normFormDept || qDept.includes(normFormDept) || normFormDept.includes(qDept);
-      const courseMatches = !qCourse || qCourse === "allcourses" || !normFormCourse || qCourse === normFormCourse || qCourse.includes(normFormCourse) || normFormCourse.includes(qCourse);
-      const quotaMatches = qQuotaName === normFormQuota || qQuotaName.includes(normFormQuota) || normFormQuota.includes(qQuotaName);
-      const yearMatches = !qYear || !normFormYear || qYear === normFormYear || qYear.includes(normFormYear) || normFormYear.includes(qYear);
+        updated.degreeCode = value;
+        updated.degreeType = value.startsWith('M') ? 'PG' : 'UG';
+        updated.dept = firstDept;
+        updated.department = firstDept;
+        updated.course = firstCourse;
 
-      return (
-        deptMatches &&
-        courseMatches &&
-        quotaMatches &&
-        yearMatches
-      );
-    });
-
-    // No matching Accounts configuration
-    if (!matchedQuota) {
-      setQuotaConcession(0);
-      setFinalAssessedFee(baseFee);
-      return;
-    }
-
-    let concession = 0;
-
-    // Fixed concession already calculated by Accounts
-    if (
-      matchedQuota.discountAmount !== undefined &&
-      matchedQuota.discountAmount !== null
-    ) {
-      concession =
-        Number(matchedQuota.discountAmount) || 0;
-    }
-
-    // Percentage concession
-    else if (
-      matchedQuota.discountType === "percentage"
-    ) {
-      concession =
-        (
-          baseFee *
-          Number(matchedQuota.discountValue || 0)
-        ) / 100;
-    }
-
-    // Fixed amount concession
-    else {
-      concession =
-        Number(
-          matchedQuota.discountValue || 0
-        );
-    }
-
-    // Never allow concession above normal fee
-    concession = Math.min(
-      Math.max(0, concession),
-      baseFee
-    );
-
-    const finalFee = Math.max(
-      0,
-      baseFee - concession
-    );
-
-    setQuotaConcession(concession);
-    setFinalAssessedFee(finalFee);
-
-    const paid =
-      Number(form.amountPaid) || 0;
-
-    setForm((prev) => ({
-      ...prev,
-      discountAmount: concession,
-      finalFee: finalFee,
-      normalFee: baseFee,
-      balanceFee: Math.max(
-        0,
-        finalFee - paid
-      ),
-    }));
-  }, [
-    form.department,
-    form.course,
-    form.quota,
-    form.academicYear,
-    form.totalFee,
-    form.amountPaid,
-    quotaList,
-  ]);
-
-  // Step 10: Real-time Final Assessed Fee & Payment Status Safety Effect
-  useEffect(() => {
-    const assessedFee = Number(finalAssessedFee || 0);
-    const paid = Math.max(0, Number(form.amountPaid) || 0);
-
-    const balance = Math.max(0, assessedFee - paid);
-
-    const status =
-      paid <= 0
-        ? "Pending"
-        : paid >= assessedFee && assessedFee > 0
-          ? "Paid"
-          : "Partial";
-
-    setForm((prev) => ({
-      ...prev,
-      balanceFee: balance,
-      remainingFee: balance,
-      paymentStatus: status,
-    }));
-  }, [finalAssessedFee, form.amountPaid]);
-
-  // Recalculate totals whenever fee breakdown fields change
-  const handleFeeBreakdownChange = (field, val) => {
-    const num = Math.max(0, Number(val) || 0);
-    const updatedBreakdown = {
-      ...form.feeBreakdown,
-      [field]: num
-    };
-
-    const normalFee = Object.values(updatedBreakdown).reduce((sum, v) => sum + (Number(v) || 0), 0);
-    const concession = Number(form.discountAmount) || 0;
-    const finalFee = Math.max(0, normalFee - concession);
-    const paid = Number(form.amountPaid) || 0;
-    const balance = Math.max(0, finalFee - paid);
-    const paymentStatus = paid <= 0 ? "Pending" : paid >= finalFee && finalFee > 0 ? "Paid" : "Partial";
-
-    setForm(prev => ({
-      ...prev,
-      feeBreakdown: updatedBreakdown,
-      normalFee: normalFee,
-      totalFee: finalFee,
-      finalFee: finalFee,
-      balanceFee: balance,
-      remainingFee: balance,
-      paymentStatus: paymentStatus
-    }));
-  };
-
-  const handleAmountPaidChange = (val) => {
-    const paid = Math.max(0, Number(val) || 0);
-    const finalFee = Number(form.finalFee ?? form.totalFee) || 0;
-    
-    if (finalFee > 0 && paid > finalFee) {
-      setErrorMsg('Paid amount cannot exceed the final assessed fee.');
-    } else {
-      setErrorMsg('');
-    }
-
-    const remainingFee = Math.max(0, finalFee - paid);
-
-    let status = 'Pending';
-    if (paid >= finalFee && finalFee > 0) status = 'Paid';
-    else if (paid > 0) status = 'Partial';
-
-    setForm(prev => ({
-      ...prev,
-      amountPaid: paid,
-      paidAmount: paid,
-      balanceFee: remainingFee,
-      remainingFee: remainingFee,
-      paymentStatus: status
-    }));
-  };
-
-  const handleChange = (field, val) => {
-    setForm(prev => {
-      const updated = { ...prev, [field]: val };
-
-      if (field === 'firstName' || field === 'lastName' || field === 'midName') {
-        updated.name = [updated.firstName, updated.midName, updated.lastName].filter(Boolean).join(' ').trim();
+        if (!selectedStudentId) {
+          const autoId = generateStudentRegNo(firstDept, studentsList);
+          updated.id = autoId;
+          updated.admissionNo = autoId;
+        }
       }
 
       if (field === 'dept' || field === 'department') {
-        updated.dept = val;
-        updated.department = val;
-
-        const deptObj = departments.find(d =>
-          (d?.name && d.name.toLowerCase() === val.toLowerCase()) ||
-          (d?.id && String(d.id).toLowerCase() === String(val).toLowerCase()) ||
-          (d?.code && d.code.toLowerCase() === val.toLowerCase())
+        const matchingDept = REAL_COLLEGE_DEPARTMENTS.find(d => 
+          d.name.toLowerCase() === (value || '').toLowerCase() || 
+          (value || '').toLowerCase().includes(d.name.toLowerCase()) || 
+          d.name.toLowerCase().includes((value || '').toLowerCase())
         );
-        const deptId = deptObj?.id || deptObj?._id || val;
-        const deptCode = deptObj?.code || '';
-        const deptName = deptObj?.name || val;
+        const deptDegree = matchingDept ? matchingDept.degree : getDepartmentDegree(value);
+        const availableCourses = getDepartmentCourses(value);
+        const defaultCourse = availableCourses[0] || getDepartmentCourse(value);
 
-        const matchingCourses = courses.filter(c => {
-          const cDeptId = String(c?.departmentId || '').trim().toLowerCase();
-          const cDept = String(c?.department || c?.departmentName || '').trim().toLowerCase();
+        updated.dept = value;
+        updated.department = value;
+        updated.degreeCode = deptDegree;
+        updated.degreeType = deptDegree.startsWith('M') ? 'PG' : 'UG';
+        updated.course = defaultCourse;
 
-          return (
-            (deptId && cDeptId === String(deptId).trim().toLowerCase()) ||
-            (deptCode && cDeptId === String(deptCode).trim().toLowerCase()) ||
-            (deptName && cDeptId === String(deptName).trim().toLowerCase()) ||
-            (deptName && cDept === String(deptName).trim().toLowerCase()) ||
-            (deptCode && cDept === String(deptCode).trim().toLowerCase())
-          );
-        });
+        if (!selectedStudentId) {
+          const autoId = generateStudentRegNo(value, studentsList);
+          updated.id = autoId;
+          updated.admissionNo = autoId;
+        }
+      }
 
-        if (matchingCourses.length > 0) {
-          updated.course = matchingCourses[0]?.name || matchingCourses[0]?.courseName || '';
-          updated.courseId = matchingCourses[0]?.id || matchingCourses[0]?._id || '';
-          if (matchingCourses[0]?.degreeType) {
-            updated.degreeType = matchingCourses[0].degreeType;
+      if (field === 'admissionQuota' || field === 'quotaName') {
+        const selectedQuotaObj = availableQuotas.find(q => q.quotaName.toLowerCase() === (value || '').toLowerCase());
+        let discount = 0;
+        const baseTotal = Number(updated.totalFee || 41200);
+
+        if (selectedQuotaObj) {
+          if (selectedQuotaObj.discountType === 'percentage') {
+            discount = Math.round((baseTotal * Number(selectedQuotaObj.discountValue || 0)) / 100);
+          } else {
+            discount = Number(selectedQuotaObj.discountValue || 0);
           }
+        } else if (value.toLowerCase().includes('sports') || value.toLowerCase().includes('merit')) {
+          discount = 15000;
+        } else if (value.toLowerCase().includes('government')) {
+          discount = 10000;
+        } else {
+          discount = 0;
         }
 
-        const codeForReg = deptCode || (val ? val.substring(0, 3).toUpperCase() : 'ST');
-        updated.id = generateRegNo(codeForReg, students);
-        updated.admissionNo = updated.id;
+        updated.admissionQuota = value;
+        updated.quotaName = value;
+        updated.discountAmount = discount;
+
+        const net = Math.max(0, baseTotal - discount);
+        updated.amountPaid = net;
+        updated.balanceFee = 0;
       }
 
-      if (field === 'course') {
-        updated.course = val;
-        const matchedCourse = courses.find(c => (c.name === val || c.courseName === val));
-        if (matchedCourse) {
-          updated.courseId = matchedCourse.id || matchedCourse._id || '';
-          if (matchedCourse.degreeType) {
-            updated.degreeType = matchedCourse.degreeType;
-          }
-        }
-      }
-
-      if (field === 'feeType') {
-        updated.feeType = val;
-        if (applicableFee) {
-          const calculatedTotal = calculateTotalFeeForType(applicableFee, val);
-          const currentPaid = Number(prev.amountPaid) || 0;
-          const tFee = Number(applicableFee.tuitionFee || 0);
-          const oFee = Number(applicableFee.otherFees || applicableFee.otherFee || 0);
-          const hFee = Number(applicableFee.hostelFee || 0);
-          const trFee = Number(applicableFee.transportFee || 0);
-
-          updated.totalFee = calculatedTotal;
-          updated.balanceFee = Math.max(0, calculatedTotal - currentPaid);
-          updated.feeBreakdown = {
-            ...prev.feeBreakdown,
-            tuitionFee: tFee,
-            otherFee: val === 'all' ? oFee : 0,
-            hostelFee: (val === 'tuition_hostel' || val === 'all') ? hFee : 0,
-            transportFee: (val === 'tuition_transport' || val === 'all') ? trFee : 0,
-          };
-          updated.hostel = (val === 'tuition_hostel' || val === 'all') ? 'Yes' : 'No';
-          updated.hostelRequired = (val === 'tuition_hostel' || val === 'all') ? 'yes' : 'no';
-          updated.dormFacility = (val === 'tuition_hostel' || val === 'all');
-          updated.transport = (val === 'tuition_transport' || val === 'all') ? 'Yes' : 'No';
-          updated.transportRequired = (val === 'tuition_transport' || val === 'all') ? 'yes' : 'no';
-          updated.busFacility = (val === 'tuition_transport' || val === 'all');
-        }
-      }
-
-      if (field === 'hostel') {
-        const isHostel = val === 'Yes' || val === 'yes';
-        updated.hostel = val;
-        updated.dormFacility = isHostel;
-        updated.hostelRequired = isHostel ? 'yes' : 'no';
-
-        const isTrans = updated.transport === 'Yes' || updated.transport === 'yes' || updated.busFacility;
-        let nextFeeType = 'tuition';
-        if (isHostel && isTrans) nextFeeType = 'all';
-        else if (isHostel) nextFeeType = 'tuition_hostel';
-        else if (isTrans) nextFeeType = 'tuition_transport';
-        updated.feeType = nextFeeType;
-
-        if (applicableFee) {
-          const calculatedTotal = calculateTotalFeeForType(applicableFee, nextFeeType);
-          const currentPaid = Number(prev.amountPaid) || 0;
-          updated.totalFee = calculatedTotal;
-          updated.balanceFee = Math.max(0, calculatedTotal - currentPaid);
-        }
-      }
-
-      if (field === 'transport') {
-        const isTrans = val === 'Yes' || val === 'yes';
-        updated.transport = val;
-        updated.busFacility = isTrans;
-        updated.transportRequired = isTrans ? 'yes' : 'no';
-
-        const isHostel = updated.hostel === 'Yes' || updated.hostel === 'yes' || updated.dormFacility;
-        let nextFeeType = 'tuition';
-        if (isHostel && isTrans) nextFeeType = 'all';
-        else if (isHostel) nextFeeType = 'tuition_hostel';
-        else if (isTrans) nextFeeType = 'tuition_transport';
-        updated.feeType = nextFeeType;
-
-        if (applicableFee) {
-          const calculatedTotal = calculateTotalFeeForType(applicableFee, nextFeeType);
-          const currentPaid = Number(prev.amountPaid) || 0;
-          updated.totalFee = calculatedTotal;
-          updated.balanceFee = Math.max(0, calculatedTotal - currentPaid);
-        }
+      if (field === 'amountPaid') {
+        const paid = Number(value || 0);
+        const netTotal = Math.max(0, Number(updated.totalFee || 41200) - Number(updated.discountAmount || 0));
+        updated.balanceFee = Math.max(0, netTotal - paid);
+        updated.paymentStatus = updated.balanceFee === 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Pending';
       }
 
       return updated;
     });
   };
 
-  const handleQualificationChange = (index, field, value) => {
-    const updated = [...form.qualifications];
-    updated[index] = { ...updated[index], [field]: value };
-    setForm(prev => ({ ...prev, qualifications: updated }));
-  };
-
-  const handleAddQualification = () => {
-    setForm(prev => ({
-      ...prev,
-      qualifications: [
-        ...prev.qualifications,
-        { study: 'Degree / Diploma / Other', institute: '', board: '', percentage: '', passYear: '', marksheetNo: '' }
-      ]
-    }));
-  };
-
-  const handleRemoveQualification = (index) => {
-    setForm(prev => ({
-      ...prev,
-      qualifications: prev.qualifications.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handlePhotoUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setForm(prev => ({ ...prev, photoUrl: reader.result }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleReset = () => {
-    const firstDept = departments[0]?.name || '';
-    const deptCode = departments[0]?.code || (typeof firstDept === 'string' ? firstDept.substring(0, 3).toUpperCase() : 'ST');
-    const newId = generateRegNo(deptCode, students);
+  // Reset / Blank Form
+  const handleBlankForm = () => {
+    setSelectedStudentId(null);
+    const count = studentsList.length + 1;
+    const newId = `HAA2026-${String(count).padStart(3, '0')}`;
     setForm({
       ...EMPTY_FORM,
-      dept: firstDept,
-      department: firstDept,
       id: newId,
       admissionNo: newId,
-      receiptNumber: `REC-${Date.now()}`
+      firstName: '',
+      lastName: '',
+      name: '',
+      phone: '',
+      email: ''
     });
-    setEditingStudentId(null);
-    setSuccessMsg('');
+    setActiveStep(1);
+    setSuccessMsg('Blank Form initialized. Ready for new student admission.');
     setErrorMsg('');
   };
 
-  const handleFinalSubmit = async (autoPrint = false) => {
-    setSubmitting(true);
-    setSuccessMsg('');
-    setErrorMsg('');
-
-    try {
-      if (!form.firstName.trim() || !form.lastName.trim()) {
-        setErrorMsg('Please enter First Name and Last Name.');
-        setActiveStep(1);
-        setSubmitting(false);
-        return;
-      }
-
-      if (!form.department && !form.dept) {
-        alert("Please select a department");
-        setErrorMsg('Please select an Academic Department.');
-        setActiveStep(2);
-        setSubmitting(false);
-        return;
-      }
-
-      if (!form.admissionQuota && !form.quotaName && !form.quota) {
-        alert("Please select a quota");
-        setErrorMsg('Please select an admission quota.');
-        setActiveStep(2);
-        setSubmitting(false);
-        return;
-      }
-
-      if (Number(form.finalFee || form.totalFee || 0) < 0) {
-        alert("Final fee cannot be negative");
-        setErrorMsg('Final fee cannot be negative.');
-        setActiveStep(4);
-        setSubmitting(false);
-        return;
-      }
-
-      if (Number(form.totalFee) > 0 && Number(form.amountPaid || form.paidAmount || 0) > Number(form.finalFee || form.totalFee)) {
-        alert("Paid amount cannot exceed final payable fee");
-        setErrorMsg('Paid amount cannot exceed the final payable fee.');
-        setActiveStep(4);
-        setSubmitting(false);
-        return;
-      }
-
-      const fullName = form.name.trim() || [form.firstName, form.midName, form.lastName].filter(Boolean).join(' ').trim();
-      const generatedId = form.id || form.admissionNo || generateRegNo(form.department, students);
-      const generatedRecNo = form.receiptNumber || `REC-${Date.now()}`;
-
-      const isHostelReq = Boolean(form.hostel === 'Yes' || form.hostelRequired === 'yes' || form.hostelRequired === true || form.dormFacility);
-      const isTransportReq = Boolean(form.transport === 'Yes' || form.transportRequired === 'yes' || form.transportRequired === true || form.busFacility);
-
-      const tuitionFeeVal = Number(form.feeBreakdown?.tuitionFee !== undefined ? form.feeBreakdown.tuitionFee : (applicableFee?.tuitionFee || form.tuitionFee || 0));
-      const hostelFeeVal = isHostelReq ? Number(form.feeBreakdown?.hostelFee !== undefined ? form.feeBreakdown.hostelFee : (applicableFee?.hostelFee || form.hostelFee || form.hostelFeeAmount || 0)) : 0;
-      const transportFeeVal = isTransportReq ? Number(form.feeBreakdown?.transportFee !== undefined ? form.feeBreakdown.transportFee : (applicableFee?.transportFee || form.transportFee || form.transportFeeAmount || 0)) : 0;
-      const otherFeeVal = Number(form.feeBreakdown?.otherFee !== undefined ? form.feeBreakdown.otherFee : (applicableFee?.otherFees || applicableFee?.otherFee || form.otherFee || 0));
-
-      const calculatedNormalFee = Number(normalFee || form.normalFee || form.totalFee || 0);
-      const calculatedConcession = Number(quotaConcession || form.discountAmount || 0);
-      const calculatedFinalFee = Math.max(0, calculatedNormalFee - calculatedConcession);
-      const calculatedPaid = Number(form.amountPaid || form.paidAmount || 0);
-      const calculatedBalance = Math.max(0, calculatedFinalFee - calculatedPaid);
-      const calculatedStatus =
-        calculatedPaid <= 0
-          ? "Pending"
-          : calculatedPaid >= calculatedFinalFee && calculatedFinalFee > 0
-            ? "Paid"
-            : "Partial";
-
-      const payload = {
-        ...form,
-        id: generatedId,
-        admissionNo: generatedId,
-        name: fullName,
-        email: form.email || `${form.firstName.toLowerCase()}.${Date.now().toString().slice(-4)}@college.edu`,
-
-        course: form.course,
-        feeType: form.feeType || 'all',
-
-        // Selected Admission Quota
-        quota: form.quota || "General / Merit",
-        quotaName: form.quotaName || form.admissionQuota || form.quota || "General / Merit",
-
-        // 10 Fee Component Breakdown
-        feeBreakdown: {
-          admissionFee: Number(form.feeBreakdown?.admissionFee || 0),
-          tuitionFee: Number(form.feeBreakdown?.tuitionFee || 0),
-          universityFee: Number(form.feeBreakdown?.universityFee || 0),
-          marksheetVerification: Number(
-            form.feeBreakdown?.marksheetVerification || 0
-          ),
-          specialFee: Number(form.feeBreakdown?.specialFee || 0),
-          computerLab: Number(form.feeBreakdown?.computerLab || 0),
-          englishLabNssId: Number(
-            form.feeBreakdown?.englishLabNssId || 0
-          ),
-          stationary: Number(form.feeBreakdown?.stationary || 0),
-          pta: Number(form.feeBreakdown?.pta || 0),
-          otherFee: Number(form.feeBreakdown?.otherFee || 0),
-        },
-
-        normalFee: Number(normalFee || 0),
-        quotaConcession: Number(quotaConcession || 0),
-        discountAmount: Number(quotaConcession || 0),
-        finalAssessedFee: Number(finalAssessedFee || 0),
-        finalFee: Number(finalAssessedFee || 0),
-        totalFee: Number(finalAssessedFee || 0),
-
-        amountPaid: Number(form.amountPaid || 0),
-        paidAmount: Number(form.amountPaid || 0),
-        balanceFee: Number(form.balanceFee || 0),
-        remainingFee: Number(form.balanceFee || 0),
-
-        paymentMode: form.paymentMode || "Cash",
-        receiptNumber: form.receiptNumber || generatedRecNo || "",
-        paymentDate: form.paymentDate || new Date(),
-        paymentStatus: form.paymentStatus || "Pending",
-
-        hostelRequired: isHostelReq ? 'yes' : 'no',
-        transportRequired: isTransportReq ? 'yes' : 'no',
-        tuitionFee: tuitionFeeVal,
-        hostelFee: hostelFeeVal,
-        transportFee: transportFeeVal,
-        otherFee: otherFeeVal,
-      };
-
-      if (editingStudentId) {
-        await updateStudent(editingStudentId, payload);
-        setSuccessMsg(`Student Admission Record Updated Successfully: ${generatedId}`);
-      } else {
-        const studentResponse = await createStudent(payload);
-        const createdStudent = studentResponse?.data;
-
-        if (isHostelReq && createdStudent?._id) {
-          try {
-            await createHostelRequest(createdStudent._id);
-          } catch (hostelErr) {
-            console.warn('Hostel request creation note:', hostelErr);
-          }
-        }
-        if (Number(form.amountPaid) > 0 || Number(finalAssessedFee) > 0) {
-          try {
-            await createFee({
-              studentId: generatedId,
-              studentName: fullName,
-              department: form.department || form.dept || 'General',
-              semester: `Sem ${form.semester || 1}`,
-              feeType: 'Tuition Fee',
-              totalFees: Number(finalAssessedFee || 0),
-              paidAmount: Number(form.amountPaid || 0),
-              paymentMode: form.paymentMode || 'Cash',
-              receiptNo: form.receiptNumber || generatedRecNo,
-              paymentDate: new Date(),
-              quota: form.quota || form.quotaName || "General / Merit",
-              quotaName: form.quotaName || form.admissionQuota || form.quota || "General / Merit",
-              normalFee: Number(normalFee || 0),
-              discountAmount: Number(quotaConcession || 0),
-              finalFee: Number(finalAssessedFee || 0),
-              remainingFee: Number(form.balanceFee || 0),
-              status: form.paymentStatus || "Pending"
-            });
-          } catch (feeErr) {
-            console.warn('Auto fee creation note:', feeErr);
-          }
-        }
-        setSuccessMsg(`First Year New Admission Confirmed: ${generatedId} (Receipt: ${generatedRecNo})`);
-      }
-
-      await loadInitialData();
-
-      if (autoPrint) {
-        printReceiptDirect(payload);
-      }
-
-      setTimeout(() => {
-        setActiveStep(6); // Switch to Step 6: Confirmed Directory view
-      }, 1200);
-
-    } catch (err) {
-      console.error('Admission submit failed:', err);
-      setErrorMsg(err.response?.data?.message || 'Failed to confirm admission. Please check inputs.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleEditStudent = (student) => {
-    setEditingStudentId(student.id || student._id);
+  // Select student from directory for editing
+  const handleSelectStudent = (student) => {
+    setSelectedStudentId(student.id || student._id);
     setForm({
       ...EMPTY_FORM,
       ...student,
       firstName: student.firstName || (student.name ? student.name.split(' ')[0] : ''),
       lastName: student.lastName || (student.name ? student.name.split(' ').slice(1).join(' ') : ''),
-      department: student.dept || student.department || '',
-      dept: student.dept || student.department || '',
-      course: student.course || '',
-      hostel: student.hostelRequired === 'yes' ? 'Yes' : 'No',
-      transport: student.transportRequired === 'yes' ? 'Yes' : 'No',
-      feeBreakdown: student.feeBreakdown || { ...DEFAULT_FEE_BREAKDOWN, tuitionFee: student.totalFee || 0 }
+      dept: student.dept || student.department || 'Computer Science Engineering',
+      department: student.dept || student.department || 'Computer Science Engineering',
+      course: student.course || 'B.E - Computer Science Engineering',
+      qualifications: student.qualifications?.length ? student.qualifications : [...DEFAULT_QUALIFICATIONS]
     });
     setActiveStep(1);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setSuccessMsg(`Loaded student details for ${student.name || student.id}`);
   };
 
-  const handleAddHostelRequest = async (student) => {
-    if (!student?._id) {
-      alert('Student record ID is missing.');
+  // Final Save / Register
+  const handleSaveRegistration = async () => {
+    if (!form.firstName.trim()) {
+      setErrorMsg('First Name is required.');
+      setActiveStep(1);
       return;
     }
 
     try {
-      setLoading(true);
-      await createHostelRequest(student._id);
-      alert(`Hostel request created for ${student.name || student.id || 'student'}.`);
-    } catch (error) {
-      console.error('Error creating hostel request:', error);
-      alert(error?.response?.data?.message || 'Failed to create hostel request.');
+      setSubmitting(true);
+      setErrorMsg('');
+      setSuccessMsg('');
+
+      const fullName = [form.firstName, form.midName, form.lastName].filter(Boolean).join(' ');
+      const payload = {
+        ...form,
+        name: fullName,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        dept: form.dept || form.department,
+        department: form.dept || form.department,
+        course: form.course || `${form.degreeCode} - ${form.dept}`,
+        status: 'Active'
+      };
+
+      if (selectedStudentId) {
+        await updateStudent(selectedStudentId, payload);
+        setSuccessMsg(`Student registration updated: ${fullName}`);
+      } else {
+        const created = await createStudent(payload);
+        const newId = created?.data?.id || payload.id || `HAA2026-${String(studentsList.length + 1).padStart(3, '0')}`;
+        setSuccessMsg(`New Admission Confirmed! Registration ID: ${newId}`);
+
+        // Auto create fee record
+        try {
+          await createFee({
+            studentId: newId,
+            studentName: fullName,
+            department: payload.dept,
+            course: payload.course,
+            academicYear: payload.academicYear,
+            totalAmount: Number(payload.totalFee || 41200),
+            paidAmount: Number(payload.amountPaid || 35000),
+            remainingFee: Number(payload.balanceFee || 6200),
+            paymentMode: payload.paymentMode || 'Cash',
+            receiptNo: `REC-${Date.now().toString().slice(-6)}`,
+            paymentDate: new Date(),
+            status: Number(payload.balanceFee || 0) <= 0 ? 'Paid' : 'Partial'
+          });
+        } catch (feeErr) {
+          console.warn('Fee note:', feeErr);
+        }
+      }
+
+      emitERPDataUpdate(['students', 'fees', 'hostel', 'transport'], 'saved', payload);
+      await loadData();
+      setActiveStep(6); // Go to directory
+    } catch (err) {
+      console.error('Error saving student:', err);
+      setErrorMsg(err?.response?.data?.message || 'Failed to save student admission.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
+  // Delete student
   const handleDeleteStudent = async (studentId) => {
-    if (!studentId) return;
     if (!window.confirm(`Are you sure you want to delete student registration ${studentId}?`)) return;
     try {
       setLoading(true);
       await deleteStudent(studentId);
-      setSuccessMsg(`Student registration ${studentId} removed successfully.`);
-      await loadInitialData();
+      emitERPDataUpdate(['students', 'fees', 'hostel', 'transport'], 'deleted', { studentId });
+      setSuccessMsg(`Student registration deleted.`);
+      await loadData();
     } catch (err) {
-      console.error('Delete student failed:', err);
-      setStudents(prev => prev.filter(s => s.id !== studentId && s._id !== studentId));
-      setSuccessMsg(`Student registration ${studentId} removed.`);
+      console.error('Error deleting:', err);
+      setErrorMsg('Failed to delete student.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePurgeAllStudents = async () => {
-    if (!window.confirm('⚠️ Are you sure you want to delete ALL dummy/test student records from the database? This will clear the entire admissions register.')) return;
-    try {
-      setLoading(true);
-      try {
-        await purgeAllStudents();
-      } catch (purgeErr) {
-        console.warn('Bulk purge endpoint failed, falling back to batch delete:', purgeErr);
-        for (const s of students) {
-          const sid = s.id || s._id;
-          if (sid) {
-            await deleteStudent(sid).catch(e => console.warn('Item delete note:', e.message));
-          }
-        }
-      }
-      setStudents([]);
-      setSuccessMsg('All dummy student records have been permanently cleared.');
-      await loadInitialData();
-    } catch (err) {
-      console.error('Purge students failed:', err);
-      setStudents([]);
-      setSuccessMsg('All dummy student records have been cleared.');
-    } finally {
-      setLoading(false);
-    }
+  // Direct Printable Fee Receipt
+  const handlePrintReceipt = (stu) => {
+    const data = stu || form;
+    const win = window.open('', '_blank', 'width=800,height=850');
+    if (!win) return;
+
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Fee Receipt - ${data.id || 'N/A'}</title>
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: #0f172a; }
+          .receipt { border: 2px solid #1e40af; border-radius: 8px; padding: 24px; max-width: 700px; margin: 0 auto; }
+          .header { text-align: center; border-bottom: 2px solid #1e40af; padding-bottom: 12px; margin-bottom: 16px; }
+          .header h2 { margin: 0; color: #1e40af; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; font-size: 13px; margin: 16px 0; }
+          .grid div { display: flex; justify-content: space-between; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px; }
+          .label { color: #64748b; font-weight: 600; }
+          .val { font-weight: 700; color: #0f172a; }
+          table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 12.5px; }
+          th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+          th { background: #f8fafc; }
+          .footer { margin-top: 30px; display: flex; justify-content: space-between; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="receipt">
+          <div class="header">
+            <h2>COLLEGE ERP — OFFICIAL ADMISSION FEE RECEIPT</h2>
+            <p>Academic Year: ${data.academicYear} | Reg No: <strong>${data.id || data.admissionNo || 'N/A'}</strong></p>
+          </div>
+          <div class="grid">
+            <div><span class="label">Student Name:</span><span class="val">${data.name || data.firstName}</span></div>
+            <div><span class="label">Department:</span><span class="val">${data.dept || data.department}</span></div>
+            <div><span class="label">Admission Quota:</span><span class="val">${data.admissionQuota || 'General Quota'}</span></div>
+            <div><span class="label">Payment Mode:</span><span class="val">${data.paymentMode || 'Cash'}</span></div>
+          </div>
+          <table>
+            <thead>
+              <tr><th>Description</th><th>Amount (₹)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Total Assessed Fee</td><td>₹${data.totalFee || 41200}</td></tr>
+              <tr><td>Quota Concession / Discount</td><td>-₹${data.discountAmount || 0}</td></tr>
+              <tr><td><strong>Amount Paid Realized</strong></td><td><strong>₹${data.amountPaid || 35000}</strong></td></tr>
+              <tr><td><strong>Outstanding Balance</strong></td><td><strong>₹${data.balanceFee || 6200}</strong></td></tr>
+            </tbody>
+          </table>
+          <div class="footer">
+            <div><p>_______________________</p><p>Student / Depositor</p></div>
+            <div><p>_______________________</p><p>Accounts Officer Seal & Sign</p></div>
+          </div>
+        </div>
+        <script>window.print();</script>
+      </body>
+      </html>
+    `);
+    win.document.close();
   };
 
-  // Filter directory students
-  const filteredStudents = useMemo(() => {
-    return students.filter(s => {
-      const q = searchQuery.toLowerCase();
-      const matchSearch =
-        (s.name || '').toLowerCase().includes(q) ||
-        (s.id || '').toLowerCase().includes(q) ||
-        (s.dept || s.department || '').toLowerCase().includes(q) ||
-        (s.course || '').toLowerCase().includes(q) ||
-        (s.phone || '').includes(q) ||
-        (s.receiptNumber || '').toLowerCase().includes(q);
-
-      const matchYear = filterAcademicYear === 'All' || s.academicYear === filterAcademicYear;
-      const matchDept = filterDept === 'All' || s.dept === filterDept || s.department === filterDept;
-      
-      let matchPayment = true;
-      if (filterPaymentStatus === 'Paid') {
-        matchPayment = Number(s.amountPaid) >= Number(s.totalFee) && Number(s.totalFee) > 0;
-      } else if (filterPaymentStatus === 'Partial') {
-        matchPayment = Number(s.amountPaid) > 0 && Number(s.amountPaid) < Number(s.totalFee);
-      } else if (filterPaymentStatus === 'Pending') {
-        matchPayment = Number(s.amountPaid) === 0;
-      }
-
-      return matchSearch && matchYear && matchDept && matchPayment;
+  // Filtered Directory Students
+  const directoryFiltered = useMemo(() => {
+    return studentsList.filter(s => {
+      const q = dirSearch.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.id && String(s.id).toLowerCase().includes(q)) ||
+        (s.dept && s.dept.toLowerCase().includes(q))
+      );
     });
-  }, [students, searchQuery, filterAcademicYear, filterDept, filterPaymentStatus]);
-
-  // Aggregate Metrics for Top Bar
-  const stats = useMemo(() => {
-    const totalCount = students.length;
-    const totalAssessed = students.reduce((sum, s) => sum + (Number(s.totalFee || s.totalAmount) || 0), 0);
-    const totalCollected = students.reduce((sum, s) => sum + (Number(s.amountPaid || s.paidAmount) || 0), 0);
-    const totalBalance = Math.max(0, totalAssessed - totalCollected);
-    const pendingReview = students.filter(s => s.admissionStatus !== 'Confirmed').length;
-
-    return {
-      totalCount,
-      totalAssessed,
-      totalCollected,
-      totalBalance,
-      pendingReview
-    };
-  }, [students]);
-
-  // Export to CSV
-  const handleExportCSV = () => {
-    if (students.length === 0) {
-      alert('No student records available to export.');
-      return;
-    }
-
-    const headers = ['Admission No', 'Student Name', 'Department', 'Course', 'Degree', 'Academic Year', 'Semester', 'Phone', 'Email', 'Total Fee', 'Amount Paid', 'Balance', 'Receipt No'];
-    const rows = students.map(s => [
-      s.id || s.admissionNo || '',
-      `"${s.name || `${s.firstName || ''} ${s.lastName || ''}`}"`,
-      `"${s.dept || s.department || ''}"`,
-      `"${s.course || ''}"`,
-      s.degreeType || 'UG',
-      s.academicYear || '',
-      s.semester || 1,
-      s.phone || '',
-      s.email || '',
-      Number(s.totalFee || 0),
-      Number(s.amountPaid || 0),
-      Number(s.balanceFee || 0),
-      s.receiptNumber || ''
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Student_Admissions_Register_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  }, [studentsList, dirSearch]);
 
   return (
-    <div className="erp-workbench">
-      {/* ── TOP ENTERPRISE COMMAND HEADER ────────────────────────────────────── */}
+    <div className="erp-workbench animate-fade-in">
+      
+      {/* ── 1. Top Command Header Card ── */}
       <div className="erp-header-card">
         <div className="erp-header-top">
           <div className="erp-header-title-box">
@@ -2041,1507 +724,810 @@ const StudentRegistration = () => {
               <GraduationCap size={24} />
             </div>
             <div>
-              <h1 className="erp-header-title">
-                COLLEGE ERP — ADMISSION & ENROLLMENT WORKBENCH
-              </h1>
-              <div className="erp-header-subtitle">
-                <span>Real-Time Enterprise Student Registration & Fee Desk</span>
-                <span>•</span>
-                <span className="erp-live-pulse">
-                  <span className="erp-live-dot" />
-                  Live Sync Engine Active
-                </span>
-                <span>•</span>
-                <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
-              </div>
+              <h1 className="erp-header-title">COLLEGE ERP — ADMISSION & ENROLLMENT WORKBENCH</h1>
+              <p className="erp-header-sub">
+                Real-Time Enterprise Student Registration & Fee Desk • 
+                <span className="erp-status-live">● Live Sync Engine Active</span> • 
+                {new Date().toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+              </p>
             </div>
           </div>
 
           <div className="erp-header-actions">
-            <button
-              type="button"
-              className="erp-btn-header"
-              onClick={loadInitialData}
-              title="Synchronize Live Database"
-            >
-              <RefreshCw size={14} className={loading ? 'erp-spin' : ''} />
+            <button className="erp-btn-header" onClick={loadData} type="button" title="Sync Data">
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               <span>Sync</span>
             </button>
-
-            <button
-              type="button"
-              className="erp-btn-header"
-              onClick={printBlankApplicationForm}
-              title="Print Official Blank Application Form"
-            >
-              <Printer size={14} />
+            <button className="erp-btn-header" onClick={handleBlankForm} type="button">
+              <RotateCcw size={14} />
               <span>Blank Form</span>
             </button>
-
-            <button
-              type="button"
-              className="erp-btn-header"
-              onClick={handleExportCSV}
-              title="Export Full Directory Data to CSV"
-            >
+            <button className="erp-btn-header" onClick={() => setActiveStep(6)} type="button">
               <Download size={14} />
               <span>Export CSV</span>
             </button>
-
-            <button
-              type="button"
-              className="erp-btn-header erp-btn-header-primary"
-              onClick={() => {
-                handleReset();
-                setActiveStep(1);
-              }}
-            >
+            <button className="erp-btn-header erp-btn-header-primary" onClick={handleBlankForm} type="button">
               <Plus size={15} />
-              <span>New Admission</span>
+              <span>+ New Admission</span>
             </button>
           </div>
         </div>
-
-        {/* Real-time KPI Bar */}
-        <div className="erp-kpi-bar">
-          <div className="erp-kpi-card">
-            <div className="erp-kpi-icon" style={{ background: '#eff6ff', color: '#1e40af' }}>
-              <Users size={18} />
-            </div>
-            <div className="erp-kpi-info">
-              <span className="erp-kpi-label">Total Enrolled</span>
-              <span className="erp-kpi-val">{stats.totalCount} Students</span>
-            </div>
-          </div>
-
-          <div className="erp-kpi-card">
-            <div className="erp-kpi-icon" style={{ background: '#f0fdf4', color: '#16a34a' }}>
-              <IndianRupee size={18} />
-            </div>
-            <div className="erp-kpi-info">
-              <span className="erp-kpi-label">Total Fees Assessed</span>
-              <span className="erp-kpi-val">₹{stats.totalAssessed.toLocaleString()}</span>
-            </div>
-          </div>
-
-          <div className="erp-kpi-card">
-            <div className="erp-kpi-icon" style={{ background: '#ecfdf5', color: '#059669' }}>
-              <CreditCard size={18} />
-            </div>
-            <div className="erp-kpi-info">
-              <span className="erp-kpi-label">Collections Realized</span>
-              <span className="erp-kpi-val" style={{ color: '#16a34a' }}>₹{stats.totalCollected.toLocaleString()}</span>
-            </div>
-          </div>
-
-          <div className="erp-kpi-card">
-            <div className="erp-kpi-icon" style={{ background: '#fef2f2', color: '#dc2626' }}>
-              <AlertCircle size={18} />
-            </div>
-            <div className="erp-kpi-info">
-              <span className="erp-kpi-label">Outstanding Balance</span>
-              <span className="erp-kpi-val" style={{ color: '#dc2626' }}>₹{stats.totalBalance.toLocaleString()}</span>
-            </div>
-          </div>
-
-          <div className="erp-kpi-card">
-            <div className="erp-kpi-icon" style={{ background: '#faf5ff', color: '#7e22ce' }}>
-              <Building2 size={18} />
-            </div>
-            <div className="erp-kpi-info">
-              <span className="erp-kpi-label">Active Depts</span>
-              <span className="erp-kpi-val">{departments.length} Depts</span>
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* ── WORKFLOW STEP NAVIGATOR ────────────────────────────────────────── */}
-      <div className="erp-stepper-nav">
-        <button
-          type="button"
-          className={`erp-step-tab ${activeStep === 1 ? 'active' : ''} ${form.firstName && form.lastName ? 'completed' : ''}`}
-          onClick={() => setActiveStep(1)}
-        >
-          <div className="erp-step-num">
-            {form.firstName && form.lastName ? <Check size={13} /> : '1'}
-          </div>
-          <div className="erp-step-content">
-            <span className="erp-step-subtitle">Step 1</span>
-            <span className="erp-step-title">Demographics</span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          className={`erp-step-tab ${activeStep === 2 ? 'active' : ''} ${form.department && form.course ? 'completed' : ''}`}
-          onClick={() => setActiveStep(2)}
-        >
-          <div className="erp-step-num">
-            {form.department && form.course ? <Check size={13} /> : '2'}
-          </div>
-          <div className="erp-step-content">
-            <span className="erp-step-subtitle">Step 2</span>
-            <span className="erp-step-title">Academics</span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          className={`erp-step-tab ${activeStep === 3 ? 'active' : ''} ${form.qualifications.some(q => q.percentage) ? 'completed' : ''}`}
-          onClick={() => setActiveStep(3)}
-        >
-          <div className="erp-step-num">
-            {form.qualifications.some(q => q.percentage) ? <Check size={13} /> : '3'}
-          </div>
-          <div className="erp-step-content">
-            <span className="erp-step-subtitle">Step 3</span>
-            <span className="erp-step-title">Qualifications</span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          className={`erp-step-tab ${activeStep === 4 ? 'active' : ''} ${Number(form.totalFee) > 0 ? 'completed' : ''}`}
-          onClick={() => setActiveStep(4)}
-        >
-          <div className="erp-step-num">
-            {Number(form.totalFee) > 0 ? <Check size={13} /> : '4'}
-          </div>
-          <div className="erp-step-content">
-            <span className="erp-step-subtitle">Step 4</span>
-            <span className="erp-step-title">Fee Ledger</span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          className={`erp-step-tab ${activeStep === 5 ? 'active' : ''}`}
-          onClick={() => setActiveStep(5)}
-        >
-          <div className="erp-step-num">5</div>
-          <div className="erp-step-content">
-            <span className="erp-step-subtitle">Step 5</span>
-            <span className="erp-step-title">Verification</span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          className={`erp-step-tab ${activeStep === 6 ? 'active' : ''}`}
-          onClick={() => setActiveStep(6)}
-        >
-          <div className="erp-step-num">6</div>
-          <div className="erp-step-content">
-            <span className="erp-step-subtitle">Register</span>
-            <span className="erp-step-title">Directory ({students.length})</span>
-          </div>
-        </button>
-      </div>
-
-      {/* ── ALERTS (SUCCESS & ERROR) ────────────────────────────────────────── */}
+      {/* Notifications */}
       {successMsg && (
         <div className="erp-alert erp-alert-success">
-          <CheckCircle size={18} />
+          <CheckCircle size={16} />
           <span>{successMsg}</span>
-          <button style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }} onClick={() => setSuccessMsg('')}>
-            <X size={16} />
-          </button>
         </div>
       )}
-
       {errorMsg && (
-        <div className="erp-alert erp-alert-danger">
-          <AlertCircle size={18} />
+        <div className="erp-alert erp-alert-error">
+          <AlertCircle size={16} />
           <span>{errorMsg}</span>
-          <button style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }} onClick={() => setErrorMsg('')}>
-            <X size={16} />
-          </button>
         </div>
       )}
 
-      {/* ===================================================================== */}
-      {/* STAGE 1: DEMOGRAPHICS & IDENTIFICATION                               */}
-      {/* ===================================================================== */}
-      {activeStep === 1 && (
-        <div className="erp-card">
-          <div className="erp-card-header">
-            <div className="erp-card-title-group">
-              <div className="erp-card-icon">
-                <User size={18} />
-              </div>
-              <div>
-                <h2 className="erp-card-title">Step 1: Student Demographics & Identification</h2>
-                <p className="erp-card-subtitle">Enter personal, parent, demographic and contact details for student registration</p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="erp-badge erp-badge-primary">
-                Auto-Reg ID: {form.id || 'GEN-PENDING'}
-              </span>
-            </div>
+      {/* ── 2. KPI Metrics Strip (5 Cards) ── */}
+      <div className="erp-kpi-grid">
+        <div className="erp-kpi-card">
+          <div className="erp-kpi-icon-wrap" style={{ background: '#eff6ff', color: '#2563eb' }}>
+            <Users size={18} />
           </div>
+          <span className="erp-kpi-label">TOTAL ENROLLED</span>
+          <span className="erp-kpi-value">{totalEnrolled} Students</span>
+        </div>
 
-          <div className="erp-card-body">
-            {/* Group 1: Student Personal Identification */}
+        <div className="erp-kpi-card">
+          <div className="erp-kpi-icon-wrap" style={{ background: '#f0fdf4', color: '#16a34a' }}>
+            <span style={{ fontWeight: 800, fontSize: '16px' }}>₹</span>
+          </div>
+          <span className="erp-kpi-label">TOTAL FEES ASSESSED</span>
+          <span className="erp-kpi-value">₹{totalFeesAssessed.toLocaleString('en-IN')}</span>
+        </div>
+
+        <div className="erp-kpi-card">
+          <div className="erp-kpi-icon-wrap" style={{ background: '#ecfdf5', color: '#059669' }}>
+            <CreditCard size={18} />
+          </div>
+          <span className="erp-kpi-label">COLLECTIONS REALIZED</span>
+          <span className="erp-kpi-value" style={{ color: '#059669' }}>₹{totalCollections.toLocaleString('en-IN')}</span>
+        </div>
+
+        <div className="erp-kpi-card">
+          <div className="erp-kpi-icon-wrap" style={{ background: '#fef2f2', color: '#dc2626' }}>
+            <AlertCircle size={18} />
+          </div>
+          <span className="erp-kpi-label">OUTSTANDING BALANCE</span>
+          <span className="erp-kpi-value" style={{ color: '#dc2626' }}>₹{totalOutstanding.toLocaleString('en-IN')}</span>
+        </div>
+
+        <div className="erp-kpi-card">
+          <div className="erp-kpi-icon-wrap" style={{ background: '#faf5ff', color: '#9333ea' }}>
+            <Building2 size={18} />
+          </div>
+          <span className="erp-kpi-label">ACTIVE DEPTS</span>
+          <span className="erp-kpi-value">{departmentsList.length || 5} Depts</span>
+        </div>
+      </div>
+
+      {/* ── 3. Step Navigator Strip ── */}
+      <div className="erp-steps-bar">
+        <button 
+          className={`erp-step-tab ${activeStep === 1 ? 'active' : ''}`}
+          onClick={() => setActiveStep(1)}
+          type="button"
+        >
+          <div className="erp-step-number">1</div>
+          <div className="erp-step-tab-text">
+            <span className="erp-step-tag">STEP 1</span>
+            <span>Demographics</span>
+          </div>
+        </button>
+
+        <button 
+          className={`erp-step-tab ${activeStep === 2 ? 'active' : ''}`}
+          onClick={() => setActiveStep(2)}
+          type="button"
+        >
+          <div className="erp-step-number">2</div>
+          <div className="erp-step-tab-text">
+            <span className="erp-step-tag">STEP 2</span>
+            <span>Academics</span>
+          </div>
+        </button>
+
+        <button 
+          className={`erp-step-tab ${activeStep === 3 ? 'active' : ''}`}
+          onClick={() => setActiveStep(3)}
+          type="button"
+        >
+          <div className="erp-step-number">3</div>
+          <div className="erp-step-tab-text">
+            <span className="erp-step-tag">STEP 3</span>
+            <span>Qualifications</span>
+          </div>
+        </button>
+
+        <button 
+          className={`erp-step-tab ${activeStep === 4 ? 'active' : ''}`}
+          onClick={() => setActiveStep(4)}
+          type="button"
+        >
+          <div className="erp-step-number">4</div>
+          <div className="erp-step-tab-text">
+            <span className="erp-step-tag">STEP 4</span>
+            <span>Fee Ledger</span>
+          </div>
+        </button>
+
+        <button 
+          className={`erp-step-tab ${activeStep === 5 ? 'active' : ''}`}
+          onClick={() => setActiveStep(5)}
+          type="button"
+        >
+          <div className="erp-step-number">5</div>
+          <div className="erp-step-tab-text">
+            <span className="erp-step-tag">STEP 5</span>
+            <span>Verification</span>
+          </div>
+        </button>
+
+        <button 
+          className={`erp-step-tab ${activeStep === 6 ? 'active' : ''}`}
+          onClick={() => setActiveStep(6)}
+          type="button"
+        >
+          <div className="erp-step-number">6</div>
+          <div className="erp-step-tab-text">
+            <span className="erp-step-tag">REGISTER</span>
+            <span>Directory ({totalEnrolled})</span>
+          </div>
+        </button>
+      </div>
+
+      {/* ── 4. Main Step Body Card ── */}
+      <div className="erp-card-main">
+        
+        {/* STEP 1: DEMOGRAPHICS & IDENTIFICATION */}
+        {activeStep === 1 && (
+          <div>
+            <div className="erp-card-header">
+              <div className="erp-card-header-left">
+                <div className="step-icon-bubble"><Users size={18} /></div>
+                <div>
+                  <h2 className="erp-card-title">Step 1: Student Demographics & Identification</h2>
+                  <p className="erp-card-subtitle">Enter personal, parent, demographic and contact details for student registration</p>
+                </div>
+              </div>
+              <div className="erp-badge-auto-reg">
+                AUTO-REG ID: {form.id || 'HAA2026-001'}
+              </div>
+            </div>
+
+            {/* Section 1: Personal Details */}
             <div className="erp-section-box">
-              <div className="erp-section-box-title">
-                <User size={15} /> 1. Personal & Identity Details
+              <div className="erp-section-title">
+                <Users size={16} />
+                <span>1. Personal & Identity Details</span>
               </div>
 
               <div className="erp-form-grid-3">
-                <div className="erp-form-group">
-                  <label className="erp-label">
-                    First Name <span className="erp-req">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="erp-input"
+                <div className="erp-field">
+                  <label className="erp-field-label">First Name <span className="req">*</span></label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
                     placeholder="e.g. Priya"
-                    value={form.firstName}
-                    onChange={e => handleChange('firstName', e.target.value)}
+                    value={form.firstName} 
+                    onChange={(e) => handleChange('firstName', e.target.value)} 
+                    required
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Middle Name</label>
-                  <input
-                    type="text"
-                    className="erp-input"
+                <div className="erp-field">
+                  <label className="erp-field-label">Middle Name</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
                     placeholder="e.g. Kumar"
-                    value={form.midName}
-                    onChange={e => handleChange('midName', e.target.value)}
+                    value={form.midName} 
+                    onChange={(e) => handleChange('midName', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">
-                    Last Name / Initial <span className="erp-req">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="erp-input"
+                <div className="erp-field">
+                  <label className="erp-field-label">Last Name / Initial <span className="req">*</span></label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
                     placeholder="e.g. R"
-                    value={form.lastName}
-                    onChange={e => handleChange('lastName', e.target.value)}
+                    value={form.lastName} 
+                    onChange={(e) => handleChange('lastName', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Gender <span className="erp-req">*</span></label>
-                  <div className="erp-radio-pills">
+                <div className="erp-field">
+                  <label className="erp-field-label">Gender <span className="req">*</span></label>
+                  <div className="erp-pill-group">
                     {['Male', 'Female', 'Other'].map(g => (
-                      <label key={g} className={`erp-radio-pill ${form.gender === g ? 'selected' : ''}`}>
-                        <input
-                          type="radio"
-                          name="gender"
-                          value={g}
-                          checked={form.gender === g}
-                          onChange={e => handleChange('gender', e.target.value)}
-                        />
+                      <button
+                        key={g}
+                        type="button"
+                        className={`erp-pill-btn ${form.gender === g ? 'active' : ''}`}
+                        onClick={() => handleChange('gender', g)}
+                      >
                         {g}
-                      </label>
+                      </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Date of Birth</label>
-                  <input
-                    type="date"
-                    className="erp-input"
-                    value={form.dob}
-                    onChange={e => handleChange('dob', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Date of Birth <span className="req">*</span></label>
+                  <input 
+                    type="date" 
+                    className="erp-input" 
+                    value={form.dob} 
+                    onChange={(e) => handleChange('dob', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Place of Birth</label>
-                  <input
-                    type="text"
-                    className="erp-input"
+                <div className="erp-field">
+                  <label className="erp-field-label">Place of Birth</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
                     placeholder="e.g. Chennai"
-                    value={form.placeOfBirth}
-                    onChange={e => handleChange('placeOfBirth', e.target.value)}
+                    value={form.placeOfBirth} 
+                    onChange={(e) => handleChange('placeOfBirth', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Blood Group</label>
-                  <select
-                    className="erp-select"
-                    value={form.bloodGroup}
-                    onChange={e => handleChange('bloodGroup', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Blood Group</label>
+                  <select 
+                    className="erp-select" 
+                    value={form.bloodGroup} 
+                    onChange={(e) => handleChange('bloodGroup', e.target.value)}
                   >
-                    {BLOOD_GROUPS.map(bg => (
-                      <option key={bg} value={bg}>{bg}</option>
-                    ))}
+                    <option value="Select">Select</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
                   </select>
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Mother Tongue</label>
-                  <input
-                    type="text"
-                    className="erp-input"
-                    placeholder="e.g. Tamil"
-                    value={form.motherTongue}
-                    onChange={e => handleChange('motherTongue', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Mother Tongue</label>
+                  <select 
+                    className="erp-select" 
+                    value={form.motherTongue} 
+                    onChange={(e) => handleChange('motherTongue', e.target.value)}
+                  >
+                    <option value="Tamil">Tamil</option>
+                    <option value="English">English</option>
+                    <option value="Hindi">Hindi</option>
+                    <option value="Telugu">Telugu</option>
+                    <option value="Malayalam">Malayalam</option>
+                  </select>
+                </div>
+
+                <div className="erp-field">
+                  <label className="erp-field-label">Nationality</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
+                    value={form.nationality} 
+                    onChange={(e) => handleChange('nationality', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Nationality</label>
-                  <select
-                    className="erp-select"
-                    value={form.nationality}
-                    onChange={e => handleChange('nationality', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Religion</label>
+                  <select 
+                    className="erp-select" 
+                    value={form.religion} 
+                    onChange={(e) => handleChange('religion', e.target.value)}
                   >
-                    <option value="Indian">Indian</option>
-                    <option value="NRI">NRI</option>
-                    <option value="Foreign National">Foreign National</option>
+                    <option value="Hindu">Hindu</option>
+                    <option value="Muslim">Muslim</option>
+                    <option value="Christian">Christian</option>
+                    <option value="Jain">Jain</option>
+                    <option value="Sikh">Sikh</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Religion</label>
-                  <select
-                    className="erp-select"
-                    value={form.religion}
-                    onChange={e => handleChange('religion', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Community</label>
+                  <select 
+                    className="erp-select" 
+                    value={form.community} 
+                    onChange={(e) => handleChange('community', e.target.value)}
                   >
-                    {RELIGIONS.map(r => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
+                    <option value="BC">BC</option>
+                    <option value="MBC">MBC</option>
+                    <option value="SC">SC</option>
+                    <option value="ST">ST</option>
+                    <option value="OC">OC</option>
+                    <option value="BCM">BCM</option>
+                    <option value="DNC">DNC</option>
                   </select>
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Community</label>
-                  <select
-                    className="erp-select"
-                    value={form.community}
-                    onChange={e => handleChange('community', e.target.value)}
-                  >
-                    {COMMUNITIES.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="erp-form-group">
-                  <label className="erp-label">Caste / Sub-Caste</label>
-                  <input
-                    type="text"
-                    className="erp-input"
-                    placeholder="e.g. Agamudayar"
-                    value={form.caste}
-                    onChange={e => handleChange('caste', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Caste / Sub-Caste</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
+                    placeholder="e.g. Kongu Vellalar"
+                    value={form.caste} 
+                    onChange={(e) => handleChange('caste', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Community Certificate No</label>
-                  <input
-                    type="text"
-                    className="erp-input"
-                    placeholder="e.g. CC-58694"
-                    value={form.communityCertNo}
-                    onChange={e => handleChange('communityCertNo', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Aadhar Number</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
+                    placeholder="12-digit UID"
+                    value={form.aadharNo} 
+                    onChange={(e) => handleChange('aadharNo', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Physically Challenged?</label>
-                  <div className="erp-radio-pills">
-                    {['No', 'Yes'].map(opt => (
-                      <label key={opt} className={`erp-radio-pill ${form.handicapped === opt ? 'selected' : ''}`}>
-                        <input
-                          type="radio"
-                          name="handicapped"
-                          value={opt}
-                          checked={form.handicapped === opt}
-                          onChange={e => handleChange('handicapped', e.target.value)}
-                        />
-                        {opt}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="erp-form-group">
-                  <label className="erp-label">Student Photo ID</label>
-                  <div className="erp-photo-zone">
-                    {form.photoUrl ? (
-                      <img src={form.photoUrl} alt="Avatar" className="erp-avatar-preview" />
-                    ) : (
-                      <div className="erp-avatar-preview">
-                        <User size={24} />
-                      </div>
-                    )}
-                    <div className="erp-photo-actions">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        id="studentPhotoUpload"
-                        style={{ display: 'none' }}
-                        onChange={handlePhotoUpload}
-                      />
-                      <label htmlFor="studentPhotoUpload" className="erp-btn-header" style={{ cursor: 'pointer', display: 'inline-flex' }}>
-                        <Camera size={13} /> Upload Photo
-                      </label>
-                      {form.photoUrl && (
-                        <button
-                          type="button"
-                          onClick={() => setForm(prev => ({ ...prev, photoUrl: '' }))}
-                          style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '11px', cursor: 'pointer', textAlign: 'left', fontWeight: '600' }}
-                        >
-                          Remove Photo
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                <div className="erp-field">
+                  <label className="erp-field-label">PAN / Identification</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
+                    placeholder="Optional PAN / ID mark"
+                    value={form.panNo} 
+                    onChange={(e) => handleChange('panNo', e.target.value)} 
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Group 2: Parent & Guardian Details */}
+            {/* Section 2: Parent & Guardian Details */}
             <div className="erp-section-box">
-              <div className="erp-section-box-title">
-                <Users size={15} /> 2. Parent & Guardian Information
+              <div className="erp-section-title">
+                <Users size={16} />
+                <span>2. Parent & Guardian Details</span>
               </div>
 
               <div className="erp-form-grid-3">
-                <div className="erp-form-group">
-                  <label className="erp-label">Father's Name <span className="erp-req">*</span></label>
-                  <input
-                    type="text"
-                    required
-                    className="erp-input"
-                    placeholder="e.g. Rajasekar M"
-                    value={form.fatherName}
-                    onChange={e => handleChange('fatherName', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Father's Name</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
+                    placeholder="Father Name"
+                    value={form.fatherName} 
+                    onChange={(e) => handleChange('fatherName', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Mother's Name <span className="erp-req">*</span></label>
-                  <input
-                    type="text"
-                    required
-                    className="erp-input"
-                    placeholder="e.g. Latha R"
-                    value={form.motherName}
-                    onChange={e => handleChange('motherName', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Father's Mobile</label>
+                  <input 
+                    type="tel" 
+                    className="erp-input" 
+                    placeholder="10-digit mobile"
+                    value={form.fatherPhone} 
+                    onChange={(e) => handleChange('fatherPhone', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Father's Occupation</label>
-                  <input
-                    type="text"
-                    className="erp-input"
-                    placeholder="e.g. Officer / Business"
-                    value={form.fatherOccupation}
-                    onChange={e => handleChange('fatherOccupation', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Father's Occupation</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
+                    placeholder="e.g. Business / Service"
+                    value={form.fatherOccupation} 
+                    onChange={(e) => handleChange('fatherOccupation', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Annual Family Income (₹)</label>
-                  <input
-                    type="text"
-                    className="erp-input"
-                    placeholder="e.g. 150000"
-                    value={form.yearlyIncome}
-                    onChange={e => handleChange('yearlyIncome', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Mother's Name</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
+                    placeholder="Mother Name"
+                    value={form.motherName} 
+                    onChange={(e) => handleChange('motherName', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Father's Mobile Phone</label>
-                  <input
-                    type="tel"
-                    className="erp-input"
-                    placeholder="e.g. 9876543210"
-                    value={form.fatherPhone}
-                    onChange={e => handleChange('fatherPhone', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Mother's Mobile</label>
+                  <input 
+                    type="tel" 
+                    className="erp-input" 
+                    placeholder="10-digit mobile"
+                    value={form.motherPhone} 
+                    onChange={(e) => handleChange('motherPhone', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Father's Email ID</label>
-                  <input
-                    type="email"
-                    className="erp-input"
-                    placeholder="e.g. parent@example.com"
-                    value={form.fatherEmail}
-                    onChange={e => handleChange('fatherEmail', e.target.value)}
-                  />
-                </div>
-
-                <div className="erp-form-group">
-                  <label className="erp-label">Local Guardian Name</label>
-                  <input
-                    type="text"
-                    className="erp-input"
-                    placeholder="Optional if local guardian"
-                    value={form.guardianName}
-                    onChange={e => handleChange('guardianName', e.target.value)}
-                  />
-                </div>
-
-                <div className="erp-form-group">
-                  <label className="erp-label">Guardian Phone</label>
-                  <input
-                    type="tel"
-                    className="erp-input"
-                    placeholder="e.g. 07299188844"
-                    value={form.guardianPhone}
-                    onChange={e => handleChange('guardianPhone', e.target.value)}
-                  />
-                </div>
-
-                <div className="erp-form-group">
-                  <label className="erp-label">Guardian Email</label>
-                  <input
-                    type="email"
-                    className="erp-input"
-                    placeholder="guardian@example.com"
-                    value={form.guardianEmail}
-                    onChange={e => handleChange('guardianEmail', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Annual Family Income (₹)</label>
+                  <input 
+                    type="number" 
+                    className="erp-input" 
+                    placeholder="e.g. 250000"
+                    value={form.annualIncome} 
+                    onChange={(e) => handleChange('annualIncome', e.target.value)} 
                   />
                 </div>
               </div>
             </div>
 
-            {/* Group 3: Contact & Permanent Address */}
+            {/* Section 3: Contact & Residential Address */}
             <div className="erp-section-box">
-              <div className="erp-section-box-title">
-                <MapPin size={15} /> 3. Contact & Residential Address
+              <div className="erp-section-title">
+                <Home size={16} />
+                <span>3. Contact & Residential Address</span>
               </div>
 
               <div className="erp-form-grid-3">
-                <div className="erp-form-group">
-                  <label className="erp-label">Student Primary Mobile <span className="erp-req">*</span></label>
-                  <input
-                    type="tel"
-                    required
-                    className="erp-input"
-                    placeholder="e.g. 9000234617"
-                    value={form.phone}
-                    onChange={e => handleChange('phone', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Student Phone / Mobile</label>
+                  <input 
+                    type="tel" 
+                    className="erp-input" 
+                    placeholder="Student Mobile"
+                    value={form.phone} 
+                    onChange={(e) => handleChange('phone', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Student Primary Email <span className="erp-req">*</span></label>
-                  <input
-                    type="email"
-                    required
-                    className="erp-input"
-                    placeholder="e.g. mpriya123@gmail.com"
-                    value={form.email}
-                    onChange={e => handleChange('email', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Student Email ID</label>
+                  <input 
+                    type="email" 
+                    className="erp-input" 
+                    placeholder="student@college.edu"
+                    value={form.email} 
+                    onChange={(e) => handleChange('email', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">City / Town</label>
-                  <input
-                    type="text"
-                    className="erp-input"
-                    placeholder="e.g. Chennai"
-                    value={form.city}
-                    onChange={e => handleChange('city', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Door No & Street Address</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
+                    placeholder="Door No, Street"
+                    value={form.address} 
+                    onChange={(e) => handleChange('address', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">State</label>
-                  <input
-                    type="text"
-                    className="erp-input"
-                    placeholder="e.g. Tamil Nadu"
-                    value={form.state}
-                    onChange={e => handleChange('state', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">City / Town</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
+                    placeholder="City"
+                    value={form.city} 
+                    onChange={(e) => handleChange('city', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Country</label>
-                  <input
-                    type="text"
-                    className="erp-input"
-                    placeholder="e.g. India"
-                    value={form.country}
-                    onChange={e => handleChange('country', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">District</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
+                    placeholder="District"
+                    value={form.district} 
+                    onChange={(e) => handleChange('district', e.target.value)} 
                   />
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Pin Code</label>
-                  <input
-                    type="text"
-                    className="erp-input"
-                    placeholder="e.g. 600082"
-                    value={form.pincode}
-                    onChange={e => handleChange('pincode', e.target.value)}
-                  />
-                </div>
-
-                <div className="erp-form-group" style={{ gridColumn: 'span 3' }}>
-                  <label className="erp-label">Permanent Postal Address</label>
-                  <textarea
-                    className="erp-textarea"
-                    placeholder="e.g. No 6, Anna Salai, Perambur, Chennai - 600082"
-                    value={form.address}
-                    onChange={e => handleChange('address', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">PIN Code</label>
+                  <input 
+                    type="text" 
+                    className="erp-input" 
+                    placeholder="6-digit PIN"
+                    value={form.pincode} 
+                    onChange={(e) => handleChange('pincode', e.target.value)} 
                   />
                 </div>
               </div>
             </div>
 
-            {/* Footer Navigation */}
-            <div className="erp-footer-actions">
-              <button
-                type="button"
-                className="erp-btn erp-btn-secondary"
-                onClick={handleReset}
+            {/* Wizard Footer */}
+            <div className="erp-wizard-footer">
+              <div></div>
+              <button 
+                className="erp-btn-step-next" 
+                type="button" 
+                onClick={() => setActiveStep(2)}
               >
-                <RefreshCw size={14} /> Reset Form
-              </button>
-
-              <button
-                type="button"
-                className="erp-btn erp-btn-primary"
-                onClick={() => {
-                  if (!form.firstName.trim() || !form.lastName.trim()) {
-                    setErrorMsg('Please enter both First Name and Last Name.');
-                    return;
-                  }
-                  setErrorMsg('');
-                  setActiveStep(2);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              >
-                <span>Save & Proceed to Academic Allocation</span>
+                <span>Next: Academic Program</span>
                 <ArrowRight size={15} />
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ===================================================================== */}
-      {/* STAGE 2: ACADEMIC PROGRAM & ALLOCATION                               */}
-      {/* ===================================================================== */}
-      {activeStep === 2 && (
-        <div className="erp-card">
-          <div className="erp-card-header">
-            <div className="erp-card-title-group">
-              <div className="erp-card-icon">
-                <GraduationCap size={18} />
-              </div>
-              <div>
-                <h2 className="erp-card-title">Step 2: Academic Program & Degree Enrollment</h2>
-                <p className="erp-card-subtitle">Allocate department, degree course, academic year, semester, section & amenities</p>
+        {/* STEP 2: ACADEMIC PROGRAM & ENROLLMENT */}
+        {activeStep === 2 && (
+          <div>
+            <div className="erp-card-header">
+              <div className="erp-card-header-left">
+                <div className="step-icon-bubble"><GraduationCap size={18} /></div>
+                <div>
+                  <h2 className="erp-card-title">Step 2: Academic Program & Enrolling Details</h2>
+                  <p className="erp-card-subtitle">Select degree, department, academic quota, and hostel/transport facilities</p>
+                </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="erp-badge erp-badge-success">
-                Student: {form.firstName} {form.lastName}
-              </span>
-            </div>
-          </div>
-
-          <div className="erp-card-body">
-            {/* Group 1: Academic Allocation */}
             <div className="erp-section-box">
-              <div className="erp-section-box-title">
-                <Building2 size={15} /> 1. Program & Enrollment Allocation
-              </div>
-
               <div className="erp-form-grid-3">
-                <div className="erp-form-group">
-                  <label className="erp-label">
-                    New Admission No (Registration ID) <span className="erp-req">*</span>
-                  </label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <input
-                      type="text"
-                      required
-                      className="erp-input"
-                      style={{ fontWeight: '800', color: '#1e40af' }}
-                      value={form.id || form.admissionNo}
-                      onChange={e => {
-                        handleChange('id', e.target.value);
-                        handleChange('admissionNo', e.target.value);
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="erp-btn-header"
-                      onClick={() => {
-                        const deptObj = departments.find(d => (d.name === form.department || d.id === form.department));
-                        const code = deptObj?.code || (form.department ? form.department.substring(0, 3).toUpperCase() : 'ST');
-                        const newId = generateRegNo(code, students);
-                        handleChange('id', newId);
-                        handleChange('admissionNo', newId);
-                      }}
-                      title="Auto-Generate New Sequential Admission No"
-                    >
-                      Gen ID
-                    </button>
-                  </div>
-                </div>
-
-                <div className="erp-form-group">
-                  <label className="erp-label">Previous / Entrance Application No</label>
-                  <input
-                    type="text"
-                    className="erp-input"
-                    placeholder="e.g. APP-536"
-                    value={form.previousAdmissionNo}
-                    onChange={e => handleChange('previousAdmissionNo', e.target.value)}
-                  />
-                </div>
-
-                <div className="erp-form-group">
-                  <label className="erp-label">Academic Year <span className="erp-req">*</span></label>
-                  <input
-                    type="text"
-                    required
-                    className="erp-input"
-                    value={form.academicYear}
-                    onChange={e => handleChange('academicYear', e.target.value)}
-                  />
-                </div>
-
-                <div className="erp-form-group">
-                  <label className="erp-label">Degree Type <span className="erp-req">*</span></label>
-                  <select
-                    className="erp-select"
-                    value={form.degreeType}
-                    onChange={e => handleChange('degreeType', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Academic Session <span className="req">*</span></label>
+                  <select 
+                    className="erp-select" 
+                    value={form.academicYear} 
+                    onChange={(e) => handleChange('academicYear', e.target.value)}
                   >
-                    {DEGREE_TYPES.map(d => (
-                      <option key={d} value={d}>{d}</option>
+                    <option value="2026-2027">2026–2027</option>
+                    <option value="2025-2026">2025–2026</option>
+                  </select>
+                </div>
+
+                <div className="erp-field">
+                  <label className="erp-field-label">Degree Level <span className="req">*</span></label>
+                  <select 
+                    className="erp-select" 
+                    value={form.degreeCode} 
+                    onChange={(e) => handleChange('degreeCode', e.target.value)}
+                  >
+                    {dynamicDegreeOptions.map(d => (
+                      <option key={d.code} value={d.code}>
+                        {d.name}
+                      </option>
                     ))}
                   </select>
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Department <span className="erp-req">*</span></label>
-                  <select
-                    className="erp-select"
-                    value={form.department || form.dept || ''}
-                    onChange={(e) => {
-                      const department = e.target.value;
-
-                      setForm((prev) => ({
-                        ...prev,
-
-                        department,
-                        dept: department,
-
-                        // Clear old department selections
-                        course: "",
-                        quota: "",
-                        quotaName: "",
-                        admissionQuota: "",
-
-                        // Clear old fee calculation
-                        feeBreakdown: {
-                          admissionFee: 0,
-                          tuitionFee: 0,
-                          universityFee: 0,
-                          marksheetVerification: 0,
-                          specialFee: 0,
-                          computerLab: 0,
-                          englishLabNssId: 0,
-                          stationary: 0,
-                          pta: 0,
-                          otherFee: 0,
-                        },
-
-                        totalFee: 0,
-                        balanceFee: 0,
-                        amountPaid: 0,
-                        paymentStatus: "Pending",
-                      }));
-
-                      // Clear quota calculation immediately
-                      setNormalFee(0);
-                      setQuotaConcession(0);
-                      setFinalAssessedFee(0);
-                    }}
+                <div className="erp-field">
+                  <label className="erp-field-label">Department / Branch <span className="req">*</span></label>
+                  <select 
+                    className="erp-select" 
+                    value={form.dept} 
+                    onChange={(e) => handleChange('dept', e.target.value)}
                   >
-                    <option value="">Select Department</option>
-                    {departments.map((d, i) => {
-                      const dName = d.name || d.departmentName || d;
-                      return (
-                        <option key={d.id || d._id || i} value={dName}>
-                          {dName} {d.code ? `(${d.code})` : ''}
-                        </option>
-                      );
-                    })}
+                    {filteredDepartments.map(d => (
+                      <option key={d.id || d._id || d.name} value={d.name}>
+                        {d.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Course / Major <span className="erp-req">*</span></label>
-                  <select
-                    className="erp-select"
-                    value={form.course || ""}
-                    onChange={(e) => {
-                      const course = e.target.value;
-
-                      setForm((prev) => ({
-                        ...prev,
-                        course,
-                        quota: "",
-                        quotaName: "",
-                        admissionQuota: "",
-
-                        feeBreakdown: {
-                          admissionFee: 0,
-                          tuitionFee: 0,
-                          universityFee: 0,
-                          marksheetVerification: 0,
-                          specialFee: 0,
-                          computerLab: 0,
-                          englishLabNssId: 0,
-                          stationary: 0,
-                          pta: 0,
-                          otherFee: 0,
-                        },
-
-                        totalFee: 0,
-                        balanceFee: 0,
-                        amountPaid: 0,
-                        paymentStatus: "Pending",
-                      }));
-
-                      setNormalFee(0);
-                      setQuotaConcession(0);
-                      setFinalAssessedFee(0);
-                    }}
+                <div className="erp-field">
+                  <label className="erp-field-label">Enrolled Course / Program <span className="req">*</span></label>
+                  <select 
+                    className="erp-select" 
+                    value={form.course} 
+                    onChange={(e) => handleChange('course', e.target.value)}
                   >
-                    <option value="">Select Course</option>
-
-                    {availableCourses.map((course) => {
-                      const cName = course.name || course.courseName || course.title || course.code || "Unnamed Course";
-                      const cVal = course.name || course.courseName || course._id || course.id || cName;
-                      return (
-                        <option
-                          key={course._id || course.id || cVal}
-                          value={cVal}
-                        >
-                          {cName} {course.code && course.code !== cName ? `(${course.code})` : ''}
-                        </option>
-                      );
-                    })}
+                    {getDepartmentCourses(form.dept).map(c => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Semester <span className="erp-req">*</span></label>
-                  <select
-                    className="erp-select"
-                    value={form.semester}
-                    onChange={e => handleChange('semester', Number(e.target.value))}
+                <div className="erp-field">
+                  <label className="erp-field-label">Semester</label>
+                  <select 
+                    className="erp-select" 
+                    value={form.semester} 
+                    onChange={(e) => handleChange('semester', Number(e.target.value))}
                   >
-                    {SEMESTERS_LIST.map(s => (
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
                       <option key={s} value={s}>Semester {s}</option>
                     ))}
                   </select>
                 </div>
 
-                <div className="erp-form-group">
-                  <label className="erp-label">Section Allocation <span className="erp-req">*</span></label>
-                  <select
-                    className="erp-select"
-                    value={form.section || 'A'}
-                    onChange={e => handleChange('section', e.target.value)}
+                <div className="erp-field">
+                  <label className="erp-field-label">Section Allocation</label>
+                  <select 
+                    className="erp-select" 
+                    value={form.section} 
+                    onChange={(e) => handleChange('section', e.target.value)}
                   >
-                    {availableSections.map(sec => (
-                      <option key={sec} value={sec}>Section {sec}</option>
-                    ))}
+                    <option value="A">Section A</option>
+                    <option value="B">Section B</option>
+                    <option value="C">Section C</option>
+                    <option value="D">Section D</option>
                   </select>
                 </div>
 
-                <div className="erp-form-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <label className="erp-label" style={{ margin: 0 }}>
-                      Admission Quota / Seat Type <span className="erp-req">*</span>
-                    </label>
-                  </div>
-                  {(() => {
-                    const selectedDepartment = String(
-                      form.department || ""
-                    ).trim().toLowerCase();
+                <div className="erp-field">
+                  <label className="erp-field-label">Admission Quota <span className="req">*</span></label>
+                  <select 
+                    className="erp-select" 
+                    value={form.admissionQuota} 
+                    onChange={(e) => handleChange('admissionQuota', e.target.value)}
+                  >
+                    {availableQuotas.map(q => (
+                      <option key={q.quotaName} value={q.quotaName}>
+                        {q.quotaName} {q.description && q.description !== 'Standard admission' ? `(${q.description})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-                    const selectedCourse = String(
-                      form.course || ""
-                    ).trim().toLowerCase();
-
-                    const selectedAcademicYear = String(
-                      form.academicYear || ""
-                    )
-                      .replace(/\s+/g, "")
-                      .toLowerCase();
-
-                    const normSelectedDept = cleanNormalizedStr(form.department || "");
-                    const normSelectedCourse = cleanNormalizedStr(form.course || "");
-                    const normSelectedYear = cleanNormalizedStr(form.academicYear || "");
-
-                    const availableQuotas = (quotaList || []).filter((quota) => {
-                      const qDept = cleanNormalizedStr(quota.departmentName || quota.department || "");
-                      const qCourse = cleanNormalizedStr(quota.courseName || quota.course || "");
-                      const qYear = cleanNormalizedStr(quota.academicYear || "");
-
-                      const departmentMatches = !qDept || !normSelectedDept || qDept === normSelectedDept || qDept.includes(normSelectedDept) || normSelectedDept.includes(qDept);
-                      const courseMatches = !qCourse || qCourse === "allcourses" || !normSelectedCourse || qCourse === normSelectedCourse || qCourse.includes(normSelectedCourse) || normSelectedCourse.includes(qCourse);
-                      const academicYearMatches = !qYear || !normSelectedYear || qYear === normSelectedYear || qYear.includes(normSelectedYear) || normSelectedYear.includes(qYear);
-
-                      return (
-                        departmentMatches &&
-                        courseMatches &&
-                        academicYearMatches
-                      );
-                    });
-
-                    return (
-                      <select
-                        className="erp-select"
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          fontSize: '13px',
-                          fontWeight: '700',
-                          borderRadius: '6px',
-                          border: '1.5px solid #4f46e5',
-                          backgroundColor: '#ffffff',
-                          color: '#1e293b',
-                          cursor: 'pointer'
-                        }}
-                        value={form.quota || ""}
-                        onChange={(e) => {
-                          const selectedVal = e.target.value;
-                          setForm((prev) => ({
-                            ...prev,
-                            quota: selectedVal,
-                            quotaName: selectedVal,
-                            admissionQuota: selectedVal,
-                          }));
-                        }}
+              {/* Facilities */}
+              <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
+                <div className="erp-form-grid-2">
+                  <div className="erp-field">
+                    <label className="erp-field-label">Hostel Facility Required?</label>
+                    <div className="erp-pill-group">
+                      <button
+                        type="button"
+                        className={`erp-pill-btn ${form.hostel === 'Yes' ? 'active' : ''}`}
+                        onClick={() => { handleChange('hostel', 'Yes'); handleChange('hostelRequired', 'yes'); }}
                       >
-                        <option value="">
-                          Select Admission Quota
-                        </option>
-
-                        {availableQuotas.map((quota) => {
-                          const normal =
-                            Number(
-                              quota.normalFee ||
-                              normalFee ||
-                              form.totalFee ||
-                              0
-                            );
-
-                          let concession = 0;
-
-                          if (
-                            quota.discountAmount !== undefined &&
-                            quota.discountAmount !== null
-                          ) {
-                            concession =
-                              Number(quota.discountAmount) || 0;
-                          } else if (
-                            quota.discountType === "percentage"
-                          ) {
-                            concession =
-                              (normal *
-                                Number(quota.discountValue || 0)) /
-                              100;
-                          } else {
-                            concession =
-                              Number(quota.discountValue || 0);
-                          }
-
-                          concession = Math.min(
-                            Math.max(0, concession),
-                            normal
-                          );
-
-                          const netFee =
-                            Number(
-                              quota.finalFee
-                            ) ||
-                            Math.max(
-                              0,
-                              normal - concession
-                            );
-
-                          const quotaName =
-                            quota.quotaName ||
-                            quota.name ||
-                            "Quota";
-
-                          let displayText = quotaName;
-
-                          if (concession > 0) {
-                            displayText +=
-                              ` (-₹${concession.toLocaleString("en-IN")}` +
-                              ` Concession ➔ Net: ₹${netFee.toLocaleString("en-IN")})`;
-                          } else {
-                            displayText +=
-                              ` (Standard Normal Fee ➔ ₹${normal.toLocaleString("en-IN")})`;
-                          }
-
-                          return (
-                            <option
-                              key={quota._id || quota.id}
-                              value={quotaName}
-                            >
-                              {displayText}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    );
-                  })()}
-                </div>
-
-                <div className="erp-form-group">
-                  <label className="erp-label">Date of Admission</label>
-                  <input
-                    type="date"
-                    className="erp-input"
-                    value={form.admissionDate}
-                    onChange={e => handleChange('admissionDate', e.target.value)}
-                  />
-                </div>
-
-                {/* Fee Type Selection */}
-                <div className="erp-form-group">
-                  <label className="erp-label">
-                    Fee Type Applicable <span className="erp-req">*</span>
-                  </label>
-                  <select
-                    name="feeType"
-                    className="erp-select"
-                    value={form.feeType || 'all'}
-                    onChange={e => handleChange('feeType', e.target.value)}
-                    required
-                  >
-                    <option value="tuition">Tuition Only</option>
-                    <option value="tuition_hostel">Tuition + Hostel</option>
-                    <option value="tuition_transport">Tuition + Transport</option>
-                    <option value="all">All Fees (Tuition + Hostel + Transport + Other)</option>
-                  </select>
-                </div>
-
-                {/* Step 54.8: Live Quota Fee Breakdown Display Card */}
-                <div
-                  style={{
-                    gridColumn: 'span 3',
-                    background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
-                    border: '1.5px dashed #cbd5e1',
-                    borderRadius: '12px',
-                    padding: '14px 18px',
-                    marginTop: '2px',
-                    marginBottom: '4px'
-                  }}
-                >
-                  <div style={{ fontSize: '12px', fontWeight: '800', color: '#1e3a8a', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    📊 Live Quota Fee Calculation Breakdown
+                        YES
+                      </button>
+                      <button
+                        type="button"
+                        className={`erp-pill-btn ${form.hostel === 'No' ? 'active' : ''}`}
+                        onClick={() => { handleChange('hostel', 'No'); handleChange('hostelRequired', 'no'); }}
+                      >
+                        NO
+                      </button>
+                    </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
-                    <div>
-                      <span style={{ fontSize: '11.5px', color: '#64748b', display: 'block' }}>Normal Department Fee</span>
-                      <strong style={{ fontSize: '14px', color: '#0f172a' }}>₹{Number(normalFee || form.normalFee || form.totalFee || 0).toLocaleString('en-IN')}</strong>
-                    </div>
-
-                    <div>
-                      <span style={{ fontSize: '11.5px', color: '#64748b', display: 'block' }}>Selected Quota</span>
-                      <strong style={{ fontSize: '14px', color: '#4f46e5' }}>{form.quota || form.quotaName || form.admissionQuota || 'General Quota'}</strong>
-                    </div>
-
-                    <div>
-                      <span style={{ fontSize: '11.5px', color: '#64748b', display: 'block' }}>Quota Discount</span>
-                      <strong style={{ fontSize: '14px', color: '#dc2626' }}>
-                        - ₹{Number(quotaConcession || form.discountAmount || 0).toLocaleString('en-IN')}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span style={{ fontSize: '11.5px', color: '#64748b', display: 'block' }}>Final Payable Fee</span>
-                      <strong style={{ fontSize: '17px', color: '#059669' }}>
-                        ₹{Number(finalAssessedFee || form.finalFee || Math.max(0, (Number(normalFee || form.normalFee || form.totalFee || 0) - Number(quotaConcession || form.discountAmount || 0))) || 0).toLocaleString('en-IN')}
-                      </strong>
+                  <div className="erp-field">
+                    <label className="erp-field-label">College Transport / Bus Required?</label>
+                    <div className="erp-pill-group">
+                      <button
+                        type="button"
+                        className={`erp-pill-btn ${form.transport === 'Yes' ? 'active' : ''}`}
+                        onClick={() => { handleChange('transport', 'Yes'); handleChange('transportRequired', 'yes'); }}
+                      >
+                        YES
+                      </button>
+                      <button
+                        type="button"
+                        className={`erp-pill-btn ${form.transport === 'No' ? 'active' : ''}`}
+                        onClick={() => { handleChange('transport', 'No'); handleChange('transportRequired', 'no'); }}
+                      >
+                        NO
+                      </button>
                     </div>
                   </div>
                 </div>
-
-                {/* 28.2 Hostel & Transport Checkboxes */}
-                <div
-                  style={{
-                    gridColumn: 'span 3',
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '12px 16px',
-                    display: 'flex',
-                    gap: '24px',
-                    alignItems: 'center',
-                    flexWrap: 'wrap'
-                  }}
-                >
-                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#475569' }}>
-                    Facility Options:
-                  </span>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.hostelRequired === 'yes' || form.hostelRequired === true || form.hostel === 'Yes' || form.dormFacility)}
-                      onChange={(e) => handleChange('hostel', e.target.checked ? 'Yes' : 'No')}
-                      style={{ width: '16px', height: '16px', accentColor: '#2563eb', cursor: 'pointer' }}
-                    />
-                    Require Hostel
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.transportRequired === 'yes' || form.transportRequired === true || form.transport === 'Yes' || form.busFacility)}
-                      onChange={(e) => handleChange('transport', e.target.checked ? 'Yes' : 'No')}
-                      style={{ width: '16px', height: '16px', accentColor: '#2563eb', cursor: 'pointer' }}
-                    />
-                    Require Transport
-                  </label>
-                </div>
-
-                {/* Step 49.11: Display the Quota Fee Breakdown & Calculation Card */}
-                {applicableFee && (
-                  <div
-                    className="fee-summary"
-                    style={{
-                      gridColumn: 'span 3',
-                      background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                      border: '1px solid #86efac',
-                      borderRadius: '12px',
-                      padding: '18px 22px',
-                      marginTop: '8px',
-                      boxShadow: '0 4px 12px rgba(22, 163, 74, 0.1)',
-                      animation: 'fadeIn 0.3s ease-in-out'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Award size={20} color="#15803d" />
-                        <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#166534' }}>
-                          Quota Fee Structure: {form.course || form.department} ({form.admissionQuota || form.quotaName || 'General Quota'})
-                        </h4>
-                      </div>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            background: '#2563eb',
-                            color: '#ffffff',
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                            fontWeight: '700',
-                            textTransform: 'uppercase'
-                          }}
-                        >
-                          {form.feeType === 'tuition' ? 'Tuition Only' : form.feeType === 'tuition_hostel' ? 'Tuition + Hostel' : form.feeType === 'tuition_transport' ? 'Tuition + Transport' : 'All Fees'}
-                        </span>
-                        {Number(form.discountAmount || 0) > 0 && (
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              background: '#dc2626',
-                              color: '#ffffff',
-                              padding: '3px 8px',
-                              borderRadius: '6px',
-                              fontWeight: '700',
-                              textTransform: 'uppercase'
-                            }}
-                          >
-                            ✓ Quota Discount Applied
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', fontSize: '13px' }}>
-                      {/* Department Fee */}
-                      <div style={{ background: '#ffffff', padding: '10px 14px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                        <span style={{ color: '#4b5563', fontSize: '11px', display: 'block', fontWeight: '600', textTransform: 'uppercase' }}>Department Fee</span>
-                        <strong style={{ fontSize: '16px', color: '#1f2937' }}>
-                          ₹{Number(form.normalFee || form.totalFee || 0).toLocaleString('en-IN')}
-                        </strong>
-                      </div>
-
-                      {/* Selected Quota */}
-                      <div style={{ background: '#ffffff', padding: '10px 14px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                        <span style={{ color: '#4b5563', fontSize: '11px', display: 'block', fontWeight: '600', textTransform: 'uppercase' }}>Selected Quota</span>
-                        <strong style={{ fontSize: '14px', color: '#4f46e5' }}>
-                          {form.quotaName || form.admissionQuota || 'General Quota'}
-                        </strong>
-                      </div>
-
-                      {/* Quota Discount */}
-                      <div style={{ background: '#ffffff', padding: '10px 14px', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                        <span style={{ color: '#dc2626', fontSize: '11px', display: 'block', fontWeight: '700', textTransform: 'uppercase' }}>Quota Discount</span>
-                        <strong style={{ fontSize: '16px', color: '#dc2626' }}>
-                          - ₹{Number(form.discountAmount || 0).toLocaleString('en-IN')}
-                        </strong>
-                      </div>
-
-                      {/* Final Payable Fee */}
-                      <div style={{ background: '#15803d', padding: '10px 14px', borderRadius: '8px', color: '#ffffff' }}>
-                        <span style={{ color: '#dcfce7', fontSize: '11px', display: 'block', fontWeight: '600', textTransform: 'uppercase' }}>Final Payable Fee</span>
-                        <strong style={{ fontSize: '18px', color: '#ffffff' }}>
-                          ₹{Number(form.finalFee || form.totalFee || 0).toLocaleString('en-IN')}
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Group 2: Campus Facilities & Amenities */}
-            <div className="erp-section-box">
-              <div className="erp-section-box-title">
-                <Home size={15} /> 2. Campus Accommodation & Transport Facilities
-              </div>
-
-              <div className="erp-form-grid-2">
-                <div className="erp-form-group">
-                  <label className="erp-label">Hostel Accommodation Required?</label>
-                  <div className="erp-radio-pills">
-                    {['No', 'Yes'].map(opt => (
-                      <label key={opt} className={`erp-radio-pill ${form.hostel === opt ? 'selected' : ''}`}>
-                        <input
-                          type="radio"
-                          name="hostelOpt"
-                          value={opt}
-                          checked={form.hostel === opt}
-                          onChange={e => handleChange('hostel', e.target.value)}
-                        />
-                        {opt}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="erp-form-group">
-                  <label className="erp-label">College Bus Transport Required?</label>
-                  <div className="erp-radio-pills">
-                    {['No', 'Yes'].map(opt => (
-                      <label key={opt} className={`erp-radio-pill ${form.transport === opt ? 'selected' : ''}`}>
-                        <input
-                          type="radio"
-                          name="transportOpt"
-                          value={opt}
-                          checked={form.transport === opt}
-                          onChange={e => handleChange('transport', e.target.value)}
-                        />
-                        {opt}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {form.transport === 'Yes' && (
-                  <>
-                    <div className="erp-form-group">
-                      <label className="erp-label">Bus Route Name / Number</label>
-                      <input
-                        type="text"
-                        className="erp-input"
-                        placeholder="e.g. Route 12 - Tambaram to College"
-                        value={form.busRoute}
-                        onChange={e => handleChange('busRoute', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="erp-form-group">
-                      <label className="erp-label">Designated Pickup Point</label>
-                      <input
-                        type="text"
-                        className="erp-input"
-                        placeholder="e.g. Chromepet Bus Stop"
-                        value={form.pickupPoint}
-                        onChange={e => handleChange('pickupPoint', e.target.value)}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Footer Navigation */}
-            <div className="erp-footer-actions">
-              <button
-                type="button"
-                className="erp-btn erp-btn-secondary"
-                onClick={() => {
-                  setActiveStep(1);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              >
-                <ArrowLeft size={15} /> Back to Demographics
+            <div className="erp-wizard-footer">
+              <button className="erp-btn-step-prev" type="button" onClick={() => setActiveStep(1)}>
+                <ArrowLeft size={15} />
+                <span>Back</span>
               </button>
-
-              <button
-                type="button"
-                className="erp-btn erp-btn-primary"
-                onClick={() => {
-                  if (!form.department && !form.dept) {
-                    setErrorMsg('Please select an Academic Department.');
-                    return;
-                  }
-                  if (!form.course) {
-                    setErrorMsg('Please select a Course.');
-                    return;
-                  }
-                  setErrorMsg('');
-                  setActiveStep(3);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              >
-                <span>Save & Proceed to Prior Qualifications</span>
+              <button className="erp-btn-step-next" type="button" onClick={() => setActiveStep(3)}>
+                <span>Next: Qualifications</span>
                 <ArrowRight size={15} />
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ===================================================================== */}
-      {/* STAGE 3: PRIOR QUALIFICATIONS & ACADEMIC RECORDS                     */}
-      {/* ===================================================================== */}
-      {activeStep === 3 && (
-        <div className="erp-card">
-          <div className="erp-card-header">
-            <div className="erp-card-title-group">
-              <div className="erp-card-icon">
-                <Award size={18} />
-              </div>
-              <div>
-                <h2 className="erp-card-title">Step 3: Academic Qualifications & Prior Records</h2>
-                <p className="erp-card-subtitle">Enter SSLC (10th), HSC (+2), or prior Diploma/Degree marksheet verification details</p>
+        {/* STEP 3: QUALIFICATIONS */}
+        {activeStep === 3 && (
+          <div>
+            <div className="erp-card-header">
+              <div className="erp-card-header-left">
+                <div className="step-icon-bubble"><FileText size={18} /></div>
+                <div>
+                  <h2 className="erp-card-title">Step 3: Academic Qualifications & History</h2>
+                  <p className="erp-card-subtitle">Prior educational background, school/college boards, pass year and percentages</p>
+                </div>
               </div>
             </div>
 
-            <button
-              type="button"
-              className="erp-btn-header"
-              onClick={handleAddQualification}
-            >
-              <Plus size={14} /> Add Additional Qualification
-            </button>
-          </div>
-
-          <div className="erp-card-body">
             <div className="erp-table-responsive">
               <table className="erp-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '180px' }}>Study / Examination</th>
-                    <th>Institution / School Name</th>
+                    <th>Examination / Course</th>
+                    <th>Institute / School</th>
                     <th>Board / University</th>
-                    <th style={{ width: '110px' }}>Percentage / %</th>
-                    <th style={{ width: '110px' }}>Passing Year</th>
-                    <th style={{ width: '140px' }}>Marksheet S.No</th>
-                    <th style={{ width: '60px' }}>Action</th>
+                    <th>Percentage (%)</th>
+                    <th>Pass Year</th>
+                    <th>Marksheet No</th>
                   </tr>
                 </thead>
                 <tbody>
                   {form.qualifications.map((q, idx) => (
                     <tr key={idx}>
+                      <td><strong>{q.study}</strong></td>
                       <td>
-                        <input
-                          type="text"
-                          className="erp-input"
-                          style={{ height: '32px' }}
-                          value={q.study}
-                          onChange={e => handleQualificationChange(idx, 'study', e.target.value)}
+                        <input 
+                          type="text" 
+                          className="erp-input" 
+                          placeholder="School name"
+                          value={q.institute} 
+                          onChange={(e) => {
+                            const updated = [...form.qualifications];
+                            updated[idx].institute = e.target.value;
+                            setForm(prev => ({ ...prev, qualifications: updated }));
+                          }} 
                         />
                       </td>
                       <td>
-                        <input
-                          type="text"
-                          className="erp-input"
-                          style={{ height: '32px' }}
-                          placeholder="e.g. St. Joseph Higher Secondary School"
-                          value={q.institute}
-                          onChange={e => handleQualificationChange(idx, 'institute', e.target.value)}
+                        <input 
+                          type="text" 
+                          className="erp-input" 
+                          value={q.board} 
+                          onChange={(e) => {
+                            const updated = [...form.qualifications];
+                            updated[idx].board = e.target.value;
+                            setForm(prev => ({ ...prev, qualifications: updated }));
+                          }} 
                         />
                       </td>
                       <td>
-                        <input
-                          type="text"
-                          className="erp-input"
-                          style={{ height: '32px' }}
-                          placeholder="e.g. State Board / CBSE"
-                          value={q.board}
-                          onChange={e => handleQualificationChange(idx, 'board', e.target.value)}
+                        <input 
+                          type="text" 
+                          className="erp-input" 
+                          placeholder="e.g. 88%"
+                          value={q.percentage} 
+                          onChange={(e) => {
+                            const updated = [...form.qualifications];
+                            updated[idx].percentage = e.target.value;
+                            setForm(prev => ({ ...prev, qualifications: updated }));
+                          }} 
                         />
                       </td>
                       <td>
-                        <input
-                          type="text"
-                          className="erp-input"
-                          style={{ height: '32px', textAlign: 'center', fontWeight: '700' }}
-                          placeholder="e.g. 88.5"
-                          value={q.percentage}
-                          onChange={e => handleQualificationChange(idx, 'percentage', e.target.value)}
+                        <input 
+                          type="text" 
+                          className="erp-input" 
+                          value={q.passYear} 
+                          onChange={(e) => {
+                            const updated = [...form.qualifications];
+                            updated[idx].passYear = e.target.value;
+                            setForm(prev => ({ ...prev, qualifications: updated }));
+                          }} 
                         />
                       </td>
                       <td>
-                        <input
-                          type="text"
-                          className="erp-input"
-                          style={{ height: '32px', textAlign: 'center' }}
-                          placeholder="e.g. 2024"
-                          value={q.passYear}
-                          onChange={e => handleQualificationChange(idx, 'passYear', e.target.value)}
+                        <input 
+                          type="text" 
+                          className="erp-input" 
+                          placeholder="Reg/Roll No"
+                          value={q.marksheetNo} 
+                          onChange={(e) => {
+                            const updated = [...form.qualifications];
+                            updated[idx].marksheetNo = e.target.value;
+                            setForm(prev => ({ ...prev, qualifications: updated }));
+                          }} 
                         />
-                      </td>
-                      <td>
-                        <input
-                          type="text"
-                          className="erp-input"
-                          style={{ height: '32px' }}
-                          placeholder="e.g. MS-12498"
-                          value={q.marksheetNo}
-                          onChange={e => handleQualificationChange(idx, 'marksheetNo', e.target.value)}
-                        />
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        {form.qualifications.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveQualification(idx)}
-                            style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer' }}
-                            title="Remove row"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        )}
                       </td>
                     </tr>
                   ))}
@@ -3549,1186 +1535,278 @@ const StudentRegistration = () => {
               </table>
             </div>
 
-            {/* Footer Navigation */}
-            <div className="erp-footer-actions">
-              <button
-                type="button"
-                className="erp-btn erp-btn-secondary"
-                onClick={() => {
-                  setActiveStep(2);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              >
-                <ArrowLeft size={15} /> Back to Academic Allocation
+            <div className="erp-wizard-footer">
+              <button className="erp-btn-step-prev" type="button" onClick={() => setActiveStep(2)}>
+                <ArrowLeft size={15} />
+                <span>Back</span>
               </button>
-
-              <button
-                type="button"
-                className="erp-btn erp-btn-primary"
-                onClick={() => {
-                  setActiveStep(4);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              >
-                <span>Save & Proceed to Fee Ledger Desk</span>
+              <button className="erp-btn-step-next" type="button" onClick={() => setActiveStep(4)}>
+                <span>Next: Fee Ledger</span>
                 <ArrowRight size={15} />
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ===================================================================== */}
-      {/* STAGE 4: FEE LEDGER & REAL-TIME ACCOUNTS DESK                        */}
-      {/* ===================================================================== */}
-      {activeStep === 4 && (
-        <div className="erp-card">
-          <div className="erp-card-header">
-            <div className="erp-card-title-group">
-              <div className="erp-card-icon">
-                <CreditCard size={18} />
-              </div>
-              <div>
-                <h2 className="erp-card-title">Step 4: Fee Ledger & Real-Time Accounts Calculation Desk</h2>
-                <p className="erp-card-subtitle">Real-time fee structure calculation, automated breakdown, payment entry & receipt generation</p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className={`erp-badge ${form.paymentStatus === 'Paid' ? 'erp-badge-success' : form.paymentStatus === 'Partial' ? 'erp-badge-warning' : 'erp-badge-danger'}`}>
-                Payment Status: {form.paymentStatus || 'Pending'}
-              </span>
-            </div>
-          </div>
-
-          <div className="erp-card-body">
-            {/* Live Quota & Fee Structure Audit Voucher Banner */}
-            <div
-              style={{
-                background: 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)',
-                borderRadius: '12px',
-                padding: '16px 20px',
-                marginBottom: '18px',
-                color: '#ffffff',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-                gap: '14px',
-                boxShadow: '0 4px 15px rgba(15, 23, 42, 0.12)'
-              }}
-            >
-              <div>
-                <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Department & Course</span>
-                <div style={{ fontSize: '14px', fontWeight: '800', color: '#ffffff', marginTop: '3px' }}>
-                  {form.department || form.dept || 'General Department'}
-                </div>
-                <span style={{ fontSize: '12px', color: '#60a5fa', fontWeight: '600' }}>{form.course || 'All Courses in Department'}</span>
-              </div>
-
-              <div>
-                <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Admission Quota</span>
-                <div style={{ fontSize: '14px', fontWeight: '800', color: '#c084fc', marginTop: '3px' }}>
-                  {form.quotaName || form.admissionQuota || 'General Quota'}
-                </div>
-                <span style={{ fontSize: '11px', color: '#cbd5e1' }}>Session: {form.academicYear || '2026-2027'}</span>
-              </div>
-
-              <div>
-                <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Baseline Department Fee</span>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: '#ffffff', marginTop: '3px' }}>
-                  ₹{Number(normalFee || 0).toLocaleString('en-IN')}
-                </div>
-                <span style={{ fontSize: '11px', color: '#94a3b8' }}>Standard Normal Fee</span>
-              </div>
-
-              <div>
-                <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Quota Concession</span>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: Number(quotaConcession || 0) > 0 ? '#f87171' : '#94a3b8', marginTop: '3px' }}>
-                  {Number(quotaConcession || 0) > 0 ? `- ₹${Number(quotaConcession).toLocaleString('en-IN')}` : '₹0 (None)'}
-                </div>
-                <span style={{ fontSize: '11px', color: Number(quotaConcession || 0) > 0 ? '#34d399' : '#94a3b8' }}>
-                  {Number(quotaConcession || 0) > 0 ? '✓ Subsidy Applied' : 'Standard Rate'}
-                </span>
-              </div>
-
-              <div style={{ background: 'rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '10px 14px', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
-                <span style={{ fontSize: '11px', color: '#38bdf8', textTransform: 'uppercase', fontWeight: '800' }}>Final Assessed Fee</span>
-                <div style={{ fontSize: '20px', fontWeight: '900', color: '#34d399', marginTop: '2px' }}>
-                  ₹{Number(finalAssessedFee || 0).toLocaleString('en-IN')}
+        {/* STEP 4: FEE LEDGER */}
+        {activeStep === 4 && (
+          <div>
+            <div className="erp-card-header">
+              <div className="erp-card-header-left">
+                <div className="step-icon-bubble"><CreditCard size={18} /></div>
+                <div>
+                  <h2 className="erp-card-title">Step 4: Fee Structure & Payment Ledger</h2>
+                  <p className="erp-card-subtitle">Tuition, special fee assessments, quota concessions and payment realization</p>
                 </div>
               </div>
             </div>
 
-            {/* Quota Selection Dropdown in Step 4 */}
-            <div
-              style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '10px',
-                padding: '12px 16px',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '12px'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Award size={18} color="#4f46e5" />
-                <span style={{ fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>
-                  Admission Quota / Concession:
-                </span>
+            <div className="erp-form-grid-2">
+              <div className="erp-section-box">
+                <div className="erp-section-title">
+                  <CreditCard size={16} />
+                  <span>Fee Assessment Summary</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
+                    <span style={{ color: '#64748b' }}>Standard Tuition & Admission Fee:</span>
+                    <span style={{ fontWeight: 700 }}>₹41,200</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
+                    <span style={{ color: '#64748b' }}>Quota Concession ({form.admissionQuota}):</span>
+                    <span style={{ fontWeight: 700, color: '#16a34a' }}>-₹{form.discountAmount || 0}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #e2e8f0', paddingBottom: '8px', fontSize: '14px' }}>
+                    <span style={{ fontWeight: 800 }}>Net Assessed Fee Payable:</span>
+                    <span style={{ fontWeight: 800, color: '#1e40af' }}>₹{Math.max(0, 41200 - (form.discountAmount || 0)).toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
               </div>
 
-              <div style={{ minWidth: '280px', flex: '1', maxWidth: '400px' }}>
-                {(() => {
-                  const selectedDepartment = String(
-                    form.department || ""
-                  ).trim().toLowerCase();
+              <div className="erp-section-box">
+                <div className="erp-section-title">
+                  <Save size={16} />
+                  <span>Payment Realization</span>
+                </div>
 
-                  const selectedCourse = String(
-                    form.course || ""
-                  ).trim().toLowerCase();
+                <div className="erp-field" style={{ marginBottom: '12px' }}>
+                  <label className="erp-field-label">Amount Paid Realized (₹) <span className="req">*</span></label>
+                  <input 
+                    type="number" 
+                    className="erp-input" 
+                    value={form.amountPaid} 
+                    onChange={(e) => handleChange('amountPaid', e.target.value)} 
+                  />
+                </div>
 
-                  const selectedAcademicYear = String(
-                    form.academicYear || ""
-                  )
-                    .replace(/\s+/g, "")
-                    .toLowerCase();
+                <div className="erp-field" style={{ marginBottom: '12px' }}>
+                  <label className="erp-field-label">Payment Mode</label>
+                  <select 
+                    className="erp-select" 
+                    value={form.paymentMode} 
+                    onChange={(e) => handleChange('paymentMode', e.target.value)}
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="UPI / QR">UPI / QR</option>
+                    <option value="Net Banking">Net Banking</option>
+                    <option value="Cheque / DD">Cheque / Demand Draft</option>
+                  </select>
+                </div>
 
-                  const availableQuotas = (quotaList || []).filter((quota) => {
-                    const quotaDepartment = String(
-                      quota.departmentName ||
-                      quota.department ||
-                      ""
-                    )
-                      .trim()
-                      .toLowerCase();
-
-                    const quotaCourse = String(
-                      quota.courseName ||
-                      quota.course ||
-                      ""
-                    )
-                      .trim()
-                      .toLowerCase();
-
-                    const quotaYear = String(
-                      quota.academicYear || ""
-                    )
-                      .replace(/\s+/g, "")
-                      .toLowerCase();
-
-                    const departmentMatches =
-                      quotaDepartment === selectedDepartment;
-
-                    const courseMatches =
-                      quotaCourse === selectedCourse;
-
-                    const academicYearMatches =
-                      !quotaYear ||
-                      quotaYear === selectedAcademicYear;
-
-                    return (
-                      departmentMatches &&
-                      courseMatches &&
-                      academicYearMatches
-                    );
-                  });
-
-                  return (
-                    <select
-                      className="erp-select"
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        fontSize: '13px',
-                        fontWeight: '700',
-                        borderRadius: '6px',
-                        border: '1.5px solid #4f46e5',
-                        backgroundColor: '#ffffff',
-                        color: '#1e293b',
-                        cursor: 'pointer'
-                      }}
-                      value={form.quota || ""}
-                      onChange={(e) => {
-                        const selectedVal = e.target.value;
-                        setForm((prev) => ({
-                          ...prev,
-                          quota: selectedVal,
-                          quotaName: selectedVal,
-                          admissionQuota: selectedVal,
-                        }));
-                      }}
-                    >
-                      <option value="">Select Admission Quota</option>
-
-                      {availableQuotas.map((quota) => {
-                        const normal =
-                          Number(
-                            quota.normalFee ||
-                            normalFee ||
-                            form.totalFee ||
-                            0
-                          );
-
-                        let concession = 0;
-
-                        if (
-                          quota.discountAmount !== undefined &&
-                          quota.discountAmount !== null
-                        ) {
-                          concession =
-                            Number(quota.discountAmount) || 0;
-                        } else if (
-                          quota.discountType === "percentage"
-                        ) {
-                          concession =
-                            (normal *
-                              Number(quota.discountValue || 0)) /
-                            100;
-                        } else {
-                          concession =
-                            Number(quota.discountValue || 0);
-                        }
-
-                        concession = Math.min(
-                          Math.max(0, concession),
-                          normal
-                        );
-
-                        const netFee =
-                          Number(
-                            quota.finalFee
-                          ) ||
-                          Math.max(
-                            0,
-                            normal - concession
-                          );
-
-                        const quotaName =
-                          quota.quotaName ||
-                          quota.name ||
-                          "Quota";
-
-                        let displayText = quotaName;
-
-                        if (concession > 0) {
-                          displayText +=
-                            ` (-₹${concession.toLocaleString("en-IN")}` +
-                            ` Concession ➔ Net: ₹${netFee.toLocaleString("en-IN")})`;
-                        } else {
-                          displayText +=
-                            ` (Standard Normal Fee ➔ ₹${normal.toLocaleString("en-IN")})`;
-                        }
-
-                        return (
-                          <option
-                            key={quota._id || quota.id}
-                            value={quotaName}
-                          >
-                            {displayText}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  );
-                })()}
-              </div>
-            </div>
-
-            <div className="erp-fee-grid">
-              {/* Left Column: Detailed Fee Breakdown */}
-              <div className="erp-fee-breakdown-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1.5px solid #e2e8f0', paddingBottom: '8px' }}>
-                  <span style={{ fontSize: '13.5px', fontWeight: '800', color: '#1e3a8a', textTransform: 'uppercase' }}>
-                    Fee Component Breakdown (₹)
-                  </span>
-                  <span style={{ fontSize: '11.5px', color: '#64748b' }}>
-                    Configured for: <b>{form.department || 'General'}</b>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px', borderRadius: '6px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600 }}>Balance Due:</span>
+                  <span style={{ fontSize: '14px', fontWeight: 800, color: form.balanceFee > 0 ? '#dc2626' : '#16a34a' }}>
+                    ₹{Number(form.balanceFee || 0).toLocaleString('en-IN')}
                   </span>
                 </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between border-b pb-2" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', fontSize: '13px' }}>
-                    <span style={{ color: '#475569' }}>Admission & Processing Fee</span>
-                    <strong style={{ color: '#0f172a' }}>
-                      ₹{Number(form.feeBreakdown?.admissionFee || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between border-b pb-2" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', fontSize: '13px' }}>
-                    <span style={{ color: '#475569' }}>Tuition Fee (Semester {form.semester || 1})</span>
-                    <strong style={{ color: '#0f172a' }}>
-                      ₹{Number(form.feeBreakdown?.tuitionFee || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between border-b pb-2" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', fontSize: '13px' }}>
-                    <span style={{ color: '#475569' }}>University / Exam Affiliation Fee</span>
-                    <strong style={{ color: '#0f172a' }}>
-                      ₹{Number(form.feeBreakdown?.universityFee || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between border-b pb-2" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', fontSize: '13px' }}>
-                    <span style={{ color: '#475569' }}>Marksheet & Document Verification</span>
-                    <strong style={{ color: '#0f172a' }}>
-                      ₹{Number(form.feeBreakdown?.marksheetVerification || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between border-b pb-2" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', fontSize: '13px' }}>
-                    <span style={{ color: '#475569' }}>Special / Lab Equipment Fee</span>
-                    <strong style={{ color: '#0f172a' }}>
-                      ₹{Number(form.feeBreakdown?.specialFee || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between border-b pb-2" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', fontSize: '13px' }}>
-                    <span style={{ color: '#475569' }}>Computer & Software Lab Access</span>
-                    <strong style={{ color: '#0f172a' }}>
-                      ₹{Number(form.feeBreakdown?.computerLab || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between border-b pb-2" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', fontSize: '13px' }}>
-                    <span style={{ color: '#475569' }}>English Language Lab & NSS / ID Card</span>
-                    <strong style={{ color: '#0f172a' }}>
-                      ₹{Number(form.feeBreakdown?.englishLabNssId || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between border-b pb-2" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', fontSize: '13px' }}>
-                    <span style={{ color: '#475569' }}>Stationery & Syllabus Kit</span>
-                    <strong style={{ color: '#0f172a' }}>
-                      ₹{Number(form.feeBreakdown?.stationary || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between border-b pb-2" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', fontSize: '13px' }}>
-                    <span style={{ color: '#475569' }}>Parent Teacher Association (PTA)</span>
-                    <strong style={{ color: '#0f172a' }}>
-                      ₹{Number(form.feeBreakdown?.pta || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between border-b pb-2" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', fontSize: '13px' }}>
-                    <span style={{ color: '#475569' }}>Other Institutional Amenities</span>
-                    <strong style={{ color: '#0f172a' }}>
-                      ₹{Number(form.feeBreakdown?.otherFee || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-                </div>
-
-                {/* Subtotal & Concession Summary Section */}
-                <div className="mt-5 space-y-3 border-t pt-4">
-                  <div className="flex justify-between">
-                    <span>Normal / Baseline Fee</span>
-                    <strong>
-                      ₹{Number(normalFee || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between text-red-600">
-                    <span>Quota Concession</span>
-                    <strong>
-                      -₹{Number(quotaConcession || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between border-t pt-3 text-lg font-bold">
-                    <span>Final Assessed Fee</span>
-                    <strong>
-                      ₹{Number(finalAssessedFee || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-                </div>
-
-                {/* Payment Calculation Section */}
-                <div className="mt-4 space-y-2">
-                  <div className="flex justify-between">
-                    <span>Amount Paid</span>
-                    <strong>
-                      ₹{Number(form.amountPaid || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span>Outstanding</span>
-                    <strong>
-                      ₹{Number(form.balanceFee || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span>Payment Status</span>
-                    <strong>
-                      {form.paymentStatus || "Pending"}
-                    </strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Ledger Summary & Live Payment Collector */}
-              <div className="erp-fee-summary-panel">
-                <div className="erp-fee-metric-box erp-fee-metric-total">
-                  <div className="erp-label">Normal / Baseline Fee</div>
-                  <div style={{ fontSize: '18px', fontWeight: '800', color: '#475569', marginTop: '2px' }}>
-                    ₹{Number(normalFee || 0).toLocaleString('en-IN')}
-                  </div>
-                  {Number(quotaConcession || 0) > 0 && (
-                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#dc2626', marginTop: '4px' }}>
-                      {form.quota || form.quotaName || 'Quota'} Concession: -₹{Number(quotaConcession).toLocaleString('en-IN')}
-                    </div>
-                  )}
-                  <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '8px', paddingTop: '6px' }}>
-                    <div className="erp-label" style={{ color: '#1e40af', fontWeight: '800' }}>Final Assessed Fee</div>
-                    <div style={{ fontSize: '24px', fontWeight: '900', color: '#1e40af', marginTop: '2px' }}>
-                      ₹{Number(finalAssessedFee || 0).toLocaleString('en-IN')}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="erp-fee-metric-box erp-fee-metric-paid">
-                  <div className="erp-label">Amount Paid at Desk (₹)</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
-                    <input
-                      type="number"
-                      min="0"
-                      className="erp-input"
-                      style={{ fontSize: '18px', fontWeight: '800', color: '#16a34a' }}
-                      value={form.amountPaid || ""}
-                      onChange={(e) => {
-                        const paid = Math.max(0, Number(e.target.value) || 0);
-                        const assessedFee = Number(finalAssessedFee || 0);
-
-                        const balance = Math.max(0, assessedFee - paid);
-
-                        const status =
-                          paid <= 0
-                            ? "Pending"
-                            : paid >= assessedFee && assessedFee > 0
-                              ? "Paid"
-                              : "Partial";
-
-                        setForm((prev) => ({
-                          ...prev,
-                          amountPaid: paid,
-                          balanceFee: balance,
-                          remainingFee: balance,
-                          paymentStatus: status,
-                        }));
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="erp-btn-header"
-                      onClick={() => {
-                        const assessedFee = Number(finalAssessedFee || 0);
-                        setForm((prev) => ({
-                          ...prev,
-                          amountPaid: assessedFee,
-                          balanceFee: 0,
-                          remainingFee: 0,
-                          paymentStatus: assessedFee > 0 ? "Paid" : "Pending",
-                        }));
-                      }}
-                    >
-                      Pay Full
-                    </button>
-                  </div>
-                </div>
-
-                <div className="erp-fee-metric-box erp-fee-metric-balance">
-                  <div className="flex justify-between" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="erp-label" style={{ margin: 0 }}>Outstanding</span>
-                    <strong style={{ fontSize: '20px', fontWeight: '900', color: form.balanceFee > 0 ? '#dc2626' : '#16a34a' }}>
-                      ₹{Number(form.balanceFee || 0).toLocaleString("en-IN")}
-                    </strong>
-                  </div>
-                  <div className="flex justify-between" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#475569' }}>Payment Status</span>
-                    <strong
-                      className={`erp-badge ${
-                        form.paymentStatus === 'Paid'
-                          ? 'erp-badge-success'
-                          : form.paymentStatus === 'Partial'
-                          ? 'erp-badge-warning'
-                          : 'erp-badge-danger'
-                      }`}
-                      style={{ padding: '3px 10px', fontSize: '11.5px', fontWeight: '800' }}
-                    >
-                      {form.paymentStatus || "Pending"}
-                    </strong>
-                  </div>
-                </div>
-
-                {/* Payment Mode & Reference Form */}
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: '800', color: '#1e3a8a', textTransform: 'uppercase', marginBottom: '10px' }}>
-                    Payment Mode & Receipt Metadata
-                  </div>
-
-                  <div className="erp-form-grid-2">
-                    <div className="erp-form-group">
-                      <label className="erp-label">Payment Mode</label>
-                      <select
-                        className="erp-select"
-                        value={form.paymentMode}
-                        onChange={e => handleChange('paymentMode', e.target.value)}
-                      >
-                        <option value="Cash">Cash at Counter</option>
-                        <option value="UPI">UPI / QR Code Scan</option>
-                        <option value="Bank Transfer">Bank Transfer / NEFT</option>
-                        <option value="Card">Debit / Credit Card</option>
-                        <option value="Demand Draft">Demand Draft (DD)</option>
-                      </select>
-                    </div>
-
-                    <div className="erp-form-group">
-                      <label className="erp-label">Receipt Voucher No</label>
-                      <input
-                        type="text"
-                        className="erp-input"
-                        placeholder="REC-XXXXX"
-                        value={form.receiptNumber || `REC-${Date.now().toString().slice(-6)}`}
-                        onChange={e => handleChange('receiptNumber', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="erp-form-group" style={{ gridColumn: 'span 2' }}>
-                      <label className="erp-label">Transaction / Cheque / DD Reference</label>
-                      <input
-                        type="text"
-                        className="erp-input"
-                        placeholder="e.g. UPI-Ref-9823487123 / DD-049821"
-                        value={form.transactionRef}
-                        onChange={e => handleChange('transactionRef', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
 
-            {/* Footer Navigation */}
-            <div className="erp-footer-actions">
-              <button
-                type="button"
-                className="erp-btn erp-btn-secondary"
-                onClick={() => {
-                  setActiveStep(3);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              >
-                <ArrowLeft size={15} /> Back to Qualifications
+            <div className="erp-wizard-footer">
+              <button className="erp-btn-step-prev" type="button" onClick={() => setActiveStep(3)}>
+                <ArrowLeft size={15} />
+                <span>Back</span>
               </button>
-
-              <button
-                type="button"
-                className="erp-btn erp-btn-primary"
-                onClick={() => {
-                  setActiveStep(5);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              >
-                <span>Proceed to 360° Verification & Admission Order</span>
+              <button className="erp-btn-step-next" type="button" onClick={() => setActiveStep(5)}>
+                <span>Next: Verification Summary</span>
                 <ArrowRight size={15} />
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ===================================================================== */}
-      {/* STAGE 5: 360° FINAL VERIFICATION & ADMISSION ORDER                   */}
-      {/* ===================================================================== */}
-      {activeStep === 5 && (
-        <div className="erp-card">
-          <div className="erp-card-header">
-            <div className="erp-card-title-group">
-              <div className="erp-card-icon">
-                <FileCheck size={18} />
-              </div>
-              <div>
-                <h2 className="erp-card-title">Step 5: Final Verification & Official Allotment Order</h2>
-                <p className="erp-card-subtitle">Review complete 360° dossier, generate official admission letter and confirm enrollment</p>
+        {/* STEP 5: VERIFICATION & CONFIRMATION */}
+        {activeStep === 5 && (
+          <div>
+            <div className="erp-card-header">
+              <div className="erp-card-header-left">
+                <div className="step-icon-bubble"><ShieldCheck size={18} /></div>
+                <div>
+                  <h2 className="erp-card-title">Step 5: Verification & Confirmation</h2>
+                  <p className="erp-card-subtitle">Verify all student information before final registration and ledger creation</p>
+                </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                className="erp-btn-header"
-                onClick={() => printAdmissionOrderDirect(form)}
-              >
-                <Printer size={14} /> Print Allotment Order
-              </button>
-
-              <button
-                type="button"
-                className="erp-btn-header"
-                onClick={() => printReceiptDirect(form)}
-              >
-                <Printer size={14} /> Print Fee Receipt
-              </button>
-            </div>
-          </div>
-
-          <div className="erp-card-body">
-            <div className="erp-dossier">
-              <div className="erp-dossier-header">
+            <div className="erp-section-box">
+              <div className="erp-form-grid-2">
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#1e40af' }}>
-                    PROVISIONAL ADMISSION CONFIRMATION DOSSIER
-                  </h2>
-                  <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#64748b' }}>
-                    Verified by College Enterprise ERP Admissions Gateway
-                  </p>
-                </div>
-
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>
-                    ID: {form.id || form.admissionNo || 'PENDING'}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                    <div><span style={{ color: '#64748b' }}>Student Name:</span> <strong>{form.name || form.firstName}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Registration ID:</span> <strong>{form.id}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Department:</span> <strong>{form.dept}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Degree / Program:</span> <strong>{form.degreeCode}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Gender & DOB:</span> <strong>{form.gender} ({form.dob || 'N/A'})</strong></div>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    Receipt: {form.receiptNumber || 'REC-' + Date.now().toString().slice(-6)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Student Summary Top Grid */}
-              <div style={{ display: 'flex', gap: '24px', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', marginBottom: '20px' }}>
-                {form.photoUrl ? (
-                  <img src={form.photoUrl} alt="Student" style={{ width: '80px', height: '90px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-                ) : (
-                  <div style={{ width: '80px', height: '90px', background: '#e2e8f0', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
-                    <User size={36} />
-                  </div>
-                )}
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#0f172a' }}>
-                    {form.firstName} {form.midName} {form.lastName}
-                  </h3>
-                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '6px', fontSize: '12.5px', color: '#475569' }}>
-                    <span><b>Course:</b> {form.course || 'N/A'}</span>
-                    <span>•</span>
-                    <span><b>Department:</b> {form.department || form.dept || 'N/A'}</span>
-                    <span>•</span>
-                    <span><b>Program:</b> {form.degreeType || 'UG'}</span>
-                    <span>•</span>
-                    <span><b>Semester:</b> Sem {form.semester || 1} (Sec {form.section || 'A'})</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                    <span className="erp-badge erp-badge-primary">Quota: {form.admissionQuota || 'General / Merit'}</span>
-                    <span className="erp-badge erp-badge-success">Status: Confirmed</span>
-                    {form.hostel === 'Yes' && <span className="erp-badge erp-badge-warning">Hostel Allotted</span>}
-                    {form.transport === 'Yes' && <span className="erp-badge erp-badge-warning">Bus Allotted</span>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Demographics & Parent Information Grid */}
-              <div className="erp-dossier-grid-2">
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#1e3a8a', textTransform: 'uppercase', marginBottom: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
-                    1. Student Demographics
-                  </div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Date of Birth:</span><span className="erp-dossier-val">{form.dob || 'N/A'}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Gender:</span><span className="erp-dossier-val">{form.gender}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Blood Group:</span><span className="erp-dossier-val">{form.bloodGroup || 'N/A'}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Nationality:</span><span className="erp-dossier-val">{form.nationality}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Religion / Community:</span><span className="erp-dossier-val">{form.religion} / {form.community}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Caste:</span><span className="erp-dossier-val">{form.caste || 'N/A'}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Community Cert No:</span><span className="erp-dossier-val">{form.communityCertNo || 'N/A'}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Mother Tongue:</span><span className="erp-dossier-val">{form.motherTongue}</span></div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#1e3a8a', textTransform: 'uppercase', marginBottom: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
-                    2. Parent & Contact Coordinates
-                  </div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Father's Name:</span><span className="erp-dossier-val">{form.fatherName || 'N/A'}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Mother's Name:</span><span className="erp-dossier-val">{form.motherName || 'N/A'}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Father's Phone:</span><span className="erp-dossier-val">{form.fatherPhone || 'N/A'}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Student Phone:</span><span className="erp-dossier-val">{form.phone || 'N/A'}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Student Email:</span><span className="erp-dossier-val">{form.email || 'N/A'}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">City, State, Pincode:</span><span className="erp-dossier-val">{form.city || ''}, {form.state || ''} {form.pincode || ''}</span></div>
-                  <div className="erp-dossier-row"><span className="erp-dossier-label">Full Address:</span><span className="erp-dossier-val" style={{ maxWidth: '200px', wordBreak: 'break-word' }}>{form.address || 'N/A'}</span></div>
-                </div>
-              </div>
-
-              {/* Fee Financial Verification Box */}
-              <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: '8px', padding: '16px', marginTop: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#1e40af', textTransform: 'uppercase' }}>
-                    Fee Assessment & Payment Ledger Verification
-                  </span>
-                  <span className={`erp-badge ${form.amountPaid >= form.totalFee && form.totalFee > 0 ? 'erp-badge-success' : 'erp-badge-warning'}`}>
-                    {form.paymentStatus || 'Pending'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', textAlign: 'center' }}>
-                  <div style={{ background: '#ffffff', padding: '10px', borderRadius: '6px', border: '1px solid #dbeafe' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b' }}>TOTAL ASSESSED</div>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#1e40af', marginTop: '2px' }}>₹{Number(form.totalFee || 0).toLocaleString()}</div>
-                  </div>
-                  <div style={{ background: '#ffffff', padding: '10px', borderRadius: '6px', border: '1px solid #dbeafe' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#16a34a' }}>AMOUNT PAID</div>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#16a34a', marginTop: '2px' }}>₹{Number(form.amountPaid || 0).toLocaleString()}</div>
-                  </div>
-                  <div style={{ background: '#ffffff', padding: '10px', borderRadius: '6px', border: '1px solid #dbeafe' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#dc2626' }}>BALANCE DUE</div>
-                    <div style={{ fontSize: '16px', fontWeight: '900', color: '#dc2626', marginTop: '2px' }}>₹{Number(form.balanceFee || 0).toLocaleString()}</div>
-                  </div>
-                  <div style={{ background: '#ffffff', padding: '10px', borderRadius: '6px', border: '1px solid #dbeafe' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b' }}>PAYMENT MODE</div>
-                    <div style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', marginTop: '3px' }}>{form.paymentMode || 'Cash'}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                    <div><span style={{ color: '#64748b' }}>Admission Quota:</span> <strong>{form.admissionQuota}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Net Fee Assessed:</span> <strong>₹{form.totalFee - form.discountAmount}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Amount Paid:</span> <strong style={{ color: '#16a34a' }}>₹{form.amountPaid}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Balance Outstanding:</span> <strong style={{ color: form.balanceFee > 0 ? '#dc2626' : '#16a34a' }}>₹{form.balanceFee}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Hostel / Transport:</span> <strong>Hostel: {form.hostel}, Bus: {form.transport}</strong></div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Footer Actions */}
-            <div className="erp-footer-actions">
-              <button
-                type="button"
-                className="erp-btn erp-btn-secondary"
-                onClick={() => {
-                  setActiveStep(4);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              >
-                <ArrowLeft size={15} /> Back to Fee Desk
+            <div className="erp-wizard-footer">
+              <button className="erp-btn-step-prev" type="button" onClick={() => setActiveStep(4)}>
+                <ArrowLeft size={15} />
+                <span>Back</span>
               </button>
 
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  type="button"
+                <button 
+                  className="erp-btn-step-save" 
+                  type="button" 
+                  onClick={handleSaveRegistration}
                   disabled={submitting}
-                  className="erp-btn erp-btn-primary"
-                  onClick={() => handleFinalSubmit(false)}
                 >
                   <Save size={16} />
-                  <span>{submitting ? 'Submitting to ERP...' : 'Confirm & Register Student'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={submitting}
-                  className="erp-btn erp-btn-success"
-                  onClick={() => handleFinalSubmit(true)}
-                >
-                  <Printer size={16} />
-                  <span>Save & Print Receipt</span>
+                  <span>{selectedStudentId ? 'Update Registration' : 'Confirm & Submit Admission'}</span>
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ===================================================================== */}
-      {/* STAGE 6: LIVE ADMISSIONS DIRECTORY & REGISTER                        */}
-      {/* ===================================================================== */}
-      {activeStep === 6 && (
-        <div className="erp-card">
-          <div className="erp-card-header">
-            <div className="erp-card-title-group">
-              <div className="erp-card-icon">
-                <FileText size={18} />
+        {/* STEP 6: REGISTER DIRECTORY */}
+        {activeStep === 6 && (
+          <div>
+            <div className="erp-card-header">
+              <div className="erp-card-header-left">
+                <div className="step-icon-bubble"><Users size={18} /></div>
+                <div>
+                  <h2 className="erp-card-title">Confirmed Student Directory</h2>
+                  <p className="erp-card-subtitle">Real-time database of all registered students, departments, fees and actions</p>
+                </div>
               </div>
               <div>
-                <h2 className="erp-card-title">Live Confirmed Student Admissions Register</h2>
-                <p className="erp-card-subtitle">Complete searchable real-time register of admitted students across all departments</p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              {students.length > 0 && (
-                <button
-                  type="button"
-                  className="erp-btn erp-btn-danger"
-                  style={{ padding: '6px 12px', fontSize: '12px' }}
-                  onClick={handlePurgeAllStudents}
-                  title="Remove all dummy student records"
-                >
-                  <Trash2 size={14} /> Clear All Records
-                </button>
-              )}
-
-              <button
-                type="button"
-                className="erp-btn erp-btn-primary"
-                onClick={() => {
-                  handleReset();
-                  setActiveStep(1);
-                }}
-              >
-                <Plus size={15} /> New Admission Entry
-              </button>
-            </div>
-          </div>
-
-          <div className="erp-card-body">
-            {/* Search & Filter Bar */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <div className="erp-input-wrapper" style={{ flex: 1, minWidth: '240px' }}>
-                <Search size={16} className="erp-input-icon" />
-                <input
-                  type="text"
-                  className="erp-input has-icon"
-                  placeholder="Search by Student Name, Admission No, Phone, Receipt No..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
+                <input 
+                  type="text" 
+                  className="erp-input" 
+                  style={{ width: '240px' }}
+                  placeholder="Search name, ID, dept..."
+                  value={dirSearch} 
+                  onChange={(e) => setDirSearch(e.target.value)} 
                 />
               </div>
-
-              <select
-                className="erp-select"
-                style={{ width: 'auto', minWidth: '180px' }}
-                value={filterDept}
-                onChange={e => setFilterDept(e.target.value)}
-              >
-                <option value="All">All Departments</option>
-                {departments.map((d, i) => {
-                  const dName = d.name || d.departmentName || d;
-                  return (
-                    <option key={d.id || d._id || i} value={dName}>
-                      {dName}
-                    </option>
-                  );
-                })}
-              </select>
-
-              <select
-                className="erp-select"
-                style={{ width: 'auto', minWidth: '150px' }}
-                value={filterPaymentStatus}
-                onChange={e => setFilterPaymentStatus(e.target.value)}
-              >
-                <option value="All">All Payment Status</option>
-                <option value="Paid">Fully Paid</option>
-                <option value="Partial">Partial Paid</option>
-                <option value="Pending">Pending / Unpaid</option>
-              </select>
             </div>
 
-            {/* Students Table */}
             <div className="erp-table-responsive">
               <table className="erp-table">
                 <thead>
                   <tr>
+                    <th>Reg No</th>
                     <th>Student Name</th>
-                    <th>Course</th>
-                    <th>Fee Type</th>
-                    <th>Hostel</th>
-                    <th>Transport</th>
-                    <th>Total Fee</th>
+                    <th>Department</th>
+                    <th>Quota</th>
+                    <th>Assessed Fee</th>
                     <th>Paid</th>
-                    <th>Balance</th>
                     <th>Status</th>
-                    <th style={{ textAlign: 'center' }}>Actions</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredStudents.length === 0 ? (
+                  {directoryFiltered.length === 0 ? (
                     <tr>
-                      <td colSpan="10" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
-                        No admitted students found matching the selected filters.
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>
+                        No enrolled students registered yet.
                       </td>
                     </tr>
                   ) : (
-                    filteredStudents.map((s, idx) => {
-                      const total = Number(s.totalFee || s.totalAmount || 0);
-                      const paid = Number(s.paidAmount !== undefined ? s.paidAmount : (s.amountPaid || 0));
-                      const balance = Number(s.remainingFee !== undefined ? s.remainingFee : (s.balanceFee !== undefined ? s.balanceFee : Math.max(0, total - paid)));
-                      const isPaid = paid >= total && total > 0;
-                      const isPartial = paid > 0 && paid < total;
-                      const hasHostel = Boolean(s.hostelRequired === 'yes' || s.hostelRequired === true || s.hostel === 'Yes');
-                      const hasTransport = Boolean(s.transportRequired === 'yes' || s.transportRequired === true || s.transport === 'Yes');
-
-                      const formattedFeeType =
-                        s.feeType === 'tuition' ? 'Tuition Only' :
-                        s.feeType === 'tuition_hostel' ? 'Tuition + Hostel' :
-                        s.feeType === 'tuition_transport' ? 'Tuition + Transport' :
-                        (s.feeType || 'All Fees');
-
-                      return (
-                        <tr key={s._id || s.id || idx}>
-                          <td>
-                            <div style={{ fontWeight: '700', color: '#0f172a' }}>
-                              {s.name || `${s.firstName || ''} ${s.lastName || ''}`}
-                            </div>
-                            <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: '600' }}>
-                              {s.id || s.admissionNo}
-                            </div>
-                          </td>
-                          <td>
-                            <div style={{ fontWeight: '600' }}>
-                              {s.course?.name || s.course?.courseName || s.course || 'General'}
-                            </div>
-                            <div style={{ fontSize: '11.5px', color: '#64748b' }}>
-                              {s.dept || s.department || 'N/A'} (Sem {s.semester || 1})
-                            </div>
-                          </td>
-                          <td style={{ fontWeight: '600', color: '#334155' }}>
-                            {formattedFeeType}
-                          </td>
-                          <td>
-                            <span className={`erp-badge ${hasHostel ? 'erp-badge-warning' : 'erp-badge-secondary'}`}>
-                              {hasHostel ? 'Yes' : 'No'}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`erp-badge ${hasTransport ? 'erp-badge-warning' : 'erp-badge-secondary'}`}>
-                              {hasTransport ? 'Yes' : 'No'}
-                            </span>
-                          </td>
-                          <td style={{ fontWeight: '700', color: '#1e40af' }}>
-                            ₹{total.toLocaleString()}
-                          </td>
-                          <td style={{ fontWeight: '700', color: '#16a34a' }}>
-                            ₹{paid.toLocaleString()}
-                          </td>
-                          <td style={{ fontWeight: '700', color: balance > 0 ? '#dc2626' : '#16a34a' }}>
-                            ₹{balance.toLocaleString()}
-                          </td>
-                          <td>
-                            <span className={`erp-badge ${isPaid ? 'erp-badge-success' : isPartial ? 'erp-badge-warning' : 'erp-badge-danger'}`}>
-                              {s.paymentStatus || (isPaid ? 'Paid' : isPartial ? 'Partial' : 'Pending')}
-                            </span>
-                          </td>
-                          <td>
-                            <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                              <button
-                                type="button"
-                                className="erp-btn-header"
-                                style={{ padding: '4px 8px', fontSize: '11.5px', color: '#1e40af', borderColor: '#bfdbfe' }}
-                                onClick={() => setViewingStudent(s)}
-                                title="View Complete Fee & Admission Summary"
-                              >
-                                <Eye size={13} /> View
-                              </button>
-
-                              <button
-                                type="button"
-                                className="erp-btn-header"
-                                style={{ padding: '4px 8px', fontSize: '11.5px', color: '#7c3aed', borderColor: '#ddd6fe' }}
-                                onClick={() => handleAddHostelRequest(s)}
-                                title="Create Hostel Request"
-                              >
-                                🏠 Hostel
-                              </button>
-
-                              <button
-                                type="button"
-                                className="erp-btn-header"
-                                style={{ padding: '4px 8px', fontSize: '11.5px' }}
-                                onClick={() => printReceiptDirect(s)}
-                                title="Print Official Fee Receipt"
-                              >
-                                <Printer size={13} /> Receipt
-                              </button>
-
-                              <button
-                                type="button"
-                                className="erp-btn-header"
-                                style={{ padding: '4px 8px', fontSize: '11.5px' }}
-                                onClick={() => printAdmissionOrderDirect(s)}
-                                title="Print Admission Allotment Order"
-                              >
-                                <FileText size={13} /> Order
-                              </button>
-
-                              <button
-                                type="button"
-                                className="erp-btn-header"
-                                style={{ padding: '4px 8px', fontSize: '11.5px' }}
-                                onClick={() => handleEditStudent(s)}
-                                title="Edit Student Record"
-                              >
-                                Edit
-                              </button>
-
-                              <button
-                                type="button"
-                                className="erp-btn-header"
-                                style={{ padding: '4px 8px', fontSize: '11.5px', color: '#dc2626', borderColor: '#fca5a5' }}
-                                onClick={() => handleDeleteStudent(s.id || s._id)}
-                                title="Delete Record"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
+                    directoryFiltered.map(stu => (
+                      <tr key={stu.id || stu._id}>
+                        <td><strong>{stu.id || stu.admissionNo}</strong></td>
+                        <td>{stu.name || `${stu.firstName || ''} ${stu.lastName || ''}`}</td>
+                        <td>{stu.dept || stu.department}</td>
+                        <td>{stu.admissionQuota || stu.quotaName || 'General'}</td>
+                        <td>₹{stu.totalFee || 41200}</td>
+                        <td style={{ color: '#16a34a', fontWeight: 600 }}>₹{stu.amountPaid || 35000}</td>
+                        <td>
+                          <span style={{ 
+                            background: '#ecfdf5', 
+                            color: '#059669', 
+                            padding: '2px 8px', 
+                            borderRadius: '12px', 
+                            fontSize: '11px', 
+                            fontWeight: 700 
+                          }}>
+                            {stu.status || 'Active'}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button 
+                              className="erp-btn-header" 
+                              style={{ height: '28px', padding: '0 8px' }} 
+                              onClick={() => handleSelectStudent(stu)}
+                              title="Edit Record"
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                            <button 
+                              className="erp-btn-header" 
+                              style={{ height: '28px', padding: '0 8px' }} 
+                              onClick={() => handlePrintReceipt(stu)}
+                              title="Print Receipt"
+                            >
+                              <Printer size={12} />
+                            </button>
+                            <button 
+                              className="erp-btn-header" 
+                              style={{ height: '28px', padding: '0 8px', color: '#dc2626' }} 
+                              onClick={() => handleDeleteStudent(stu.id || stu._id)}
+                              title="Delete Student"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* 29.5 Fee Details View Modal */}
-      {viewingStudent && (
-        <div className="erp-modal-overlay" onClick={() => setViewingStudent(null)}>
-          <div className="erp-modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '620px' }}>
-            <div className="erp-modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Eye size={18} color="#1e40af" />
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#1e3a8a' }}>
-                  Student Admission & Fee Details
-                </h3>
-              </div>
-              <button
-                type="button"
-                className="erp-modal-close-btn"
-                onClick={() => setViewingStudent(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="erp-modal-body">
-              {/* Student Header Snapshot */}
-              <div style={{ display: 'flex', gap: '14px', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px' }}>
-                {viewingStudent.photoUrl ? (
-                  <img src={viewingStudent.photoUrl} alt="Student" style={{ width: '50px', height: '55px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-                ) : (
-                  <div style={{ width: '50px', height: '55px', background: '#e2e8f0', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
-                    <User size={24} />
-                  </div>
-                )}
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#0f172a' }}>
-                    {viewingStudent.name || `${viewingStudent.firstName || ''} ${viewingStudent.lastName || ''}`}
-                  </h4>
-                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                    Reg No: <b style={{ color: '#1e40af' }}>{viewingStudent.id || viewingStudent.admissionNo}</b> • Dept: {viewingStudent.dept || viewingStudent.department || 'General'}
-                  </div>
-                </div>
-              </div>
-
-              {/* 29.5 Fee Details Section */}
-              <div className="fee-details">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1.5px solid #e2e8f0', paddingBottom: '6px', marginBottom: '10px' }}>
-                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                    Fee Details
-                  </h3>
-                  <span className={`erp-badge ${viewingStudent.paymentStatus === 'Paid' ? 'erp-badge-success' : viewingStudent.paymentStatus === 'Partial' ? 'erp-badge-warning' : 'erp-badge-danger'}`}>
-                    {viewingStudent.paymentStatus || 'Pending'}
-                  </span>
-                </div>
-
-                <p className="fee-detail-row">
-                  <strong>Course/Major:</strong>
-                  <span>{viewingStudent.course?.name || viewingStudent.course?.courseName || viewingStudent.course || 'General'}</span>
-                </p>
-
-                <p className="fee-detail-row">
-                  <strong>Fee Type:</strong>
-                  <span>
-                    {viewingStudent.feeType === 'tuition' ? 'Tuition Only' :
-                     viewingStudent.feeType === 'tuition_hostel' ? 'Tuition + Hostel' :
-                     viewingStudent.feeType === 'tuition_transport' ? 'Tuition + Transport' :
-                     (viewingStudent.feeType || 'All Fees')}
-                  </span>
-                </p>
-
-                <p className="fee-detail-row">
-                  <strong>Tuition Fee:</strong>
-                  <span>₹{Number(viewingStudent.tuitionFee !== undefined ? viewingStudent.tuitionFee : (viewingStudent.feeBreakdown?.tuitionFee || 0)).toLocaleString()}</span>
-                </p>
-
-                <p className="fee-detail-row">
-                  <strong>Hostel Required:</strong>
-                  <span>{(viewingStudent.hostelRequired === 'yes' || viewingStudent.hostelRequired === true || viewingStudent.hostel === 'Yes') ? 'Yes' : 'No'}</span>
-                </p>
-
-                <p className="fee-detail-row">
-                  <strong>Hostel Fee:</strong>
-                  <span>₹{Number((viewingStudent.hostelRequired === 'yes' || viewingStudent.hostelRequired === true || viewingStudent.hostel === 'Yes') ? (viewingStudent.hostelFee !== undefined ? viewingStudent.hostelFee : (viewingStudent.hostelFeeAmount || viewingStudent.feeBreakdown?.hostelFee || 0)) : 0).toLocaleString()}</span>
-                </p>
-
-                <p className="fee-detail-row">
-                  <strong>Transport Required:</strong>
-                  <span>{(viewingStudent.transportRequired === 'yes' || viewingStudent.transportRequired === true || viewingStudent.transport === 'Yes') ? 'Yes' : 'No'}</span>
-                </p>
-
-                <p className="fee-detail-row">
-                  <strong>Transport Fee:</strong>
-                  <span>₹{Number((viewingStudent.transportRequired === 'yes' || viewingStudent.transportRequired === true || viewingStudent.transport === 'Yes') ? (viewingStudent.transportFee !== undefined ? viewingStudent.transportFee : (viewingStudent.transportFeeAmount || viewingStudent.feeBreakdown?.transportFee || 0)) : 0).toLocaleString()}</span>
-                </p>
-
-                <p className="fee-detail-row">
-                  <strong>Other Fee:</strong>
-                  <span>₹{Number(viewingStudent.otherFee !== undefined ? viewingStudent.otherFee : (viewingStudent.feeBreakdown?.otherFee || viewingStudent.feeBreakdown?.otherFees || 0)).toLocaleString()}</span>
-                </p>
-
-                <hr style={{ margin: '12px 0', borderColor: '#cbd5e1' }} />
-
-                <p className="fee-detail-row" style={{ fontSize: '15px' }}>
-                  <strong style={{ color: '#1e40af' }}>Total Fee:</strong>
-                  <strong style={{ color: '#1e40af', fontSize: '16px' }}>
-                    ₹{Number(viewingStudent.totalFee || viewingStudent.totalAmount || 0).toLocaleString()}
-                  </strong>
-                </p>
-
-                <p className="fee-detail-row">
-                  <strong>Paid Amount:</strong>
-                  <strong style={{ color: '#16a34a' }}>
-                    ₹{Number(viewingStudent.paidAmount !== undefined ? viewingStudent.paidAmount : (viewingStudent.amountPaid || 0)).toLocaleString()}
-                  </strong>
-                </p>
-
-                <p className="fee-detail-row">
-                  <strong>Remaining Balance:</strong>
-                  <strong style={{ color: Number(viewingStudent.remainingFee !== undefined ? viewingStudent.remainingFee : (viewingStudent.balanceFee || 0)) > 0 ? '#dc2626' : '#16a34a' }}>
-                    ₹{Number(viewingStudent.remainingFee !== undefined ? viewingStudent.remainingFee : (viewingStudent.balanceFee || 0)).toLocaleString()}
-                  </strong>
-                </p>
-
-                <p className="fee-detail-row">
-                  <strong>Payment Status:</strong>
-                  <span><strong>{viewingStudent.paymentStatus || 'Pending'}</strong></span>
-                </p>
-              </div>
-            </div>
-
-            <div className="erp-modal-footer">
-              <button
-                type="button"
-                className="erp-btn erp-btn-secondary"
-                onClick={() => setViewingStudent(null)}
-              >
-                Close
-              </button>
-
-              <button
-                type="button"
-                className="erp-btn erp-btn-primary"
-                onClick={() => printReceiptDirect(viewingStudent)}
-              >
-                <Printer size={14} /> Print Receipt
+            <div className="erp-wizard-footer">
+              <button className="erp-btn-header-primary" type="button" onClick={handleBlankForm}>
+                <Plus size={15} />
+                <span>+ Register Another Student</span>
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+      </div>
+
     </div>
   );
 };
 
 export default StudentRegistration;
-
-
-
-
-
-

@@ -362,10 +362,22 @@ export const getActivityLogs = () => api.get('/reports/activity-logs');
 // Library Management (Old exports removed, new ones at bottom)
 
 // Transport Management
+export const getTransportVehicles = () => api.get('/transport/vehicles').catch(() => ({ data: [] }));
+export const createTransportVehicle = (data) => api.post('/transport/vehicles', data);
+export const updateTransportVehicle = (id, data) => api.put(`/transport/vehicles/${id}`, data);
+export const deleteTransportVehicle = (id) => api.delete(`/transport/vehicles/${id}`);
+
 export const getTransportRoutes = () => api.get('/transport/routes').catch(() => ({ data: [] }));
+export const createTransportRoute = (data) => api.post('/transport/routes', data);
+export const updateTransportRoute = (id, data) => api.put(`/transport/routes/${id}`, data);
+export const deleteTransportRoute = (id) => api.delete(`/transport/routes/${id}`);
 export const getTransportDrivers = () => api.get('/transport/drivers').catch(() => ({ data: [] }));
 export const updateTransportDriver = (id, data) => api.put(`/transport/drivers/${id}`, data);
+export const deleteTransportDriver = (id) => api.delete(`/transport/drivers/${id}`);
 export const getTransportStudents = () => api.get('/transport/students').catch(() => ({ data: [] }));
+export const createTransportStudent = (data) => api.post('/transport/students', data);
+export const updateTransportStudent = (id, data) => api.put(`/transport/students/${id}`, data);
+export const deleteTransportStudent = (id) => api.delete(`/transport/students/${id}`);
 
 // Driver Operations
 export const getDriverAttendance = (params) => api.get('/transport/attendance', { params });
@@ -644,3 +656,12 @@ export const updateScholarship = (id, data) =>
 
 export const deleteScholarship = (id) =>
   api.delete(`/scholarships/${id}`);
+
+export const getScholarshipApplications = () =>
+  api.get("/scholarships/applications");
+
+export const createScholarshipApplication = (data) =>
+  api.post("/scholarships/applications", data);
+
+// Transport APIs
+export const createTransportDriver = (data) => api.post('/transport/drivers', data);

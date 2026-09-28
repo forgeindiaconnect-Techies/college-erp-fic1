@@ -169,13 +169,18 @@ router.put('/requests/:id/allocate', protect, authorize('Admin', 'Sub Admin', 'P
       student.bedNumber = assignedBed;
       student.wardenName = assignedWarden;
       if (wardenContact) student.wardenContact = wardenContact;
-      if (hostelFeeAmount !== undefined) student.hostelFee = Number(hostelFeeAmount);
+      if (hostelFeeAmount !== undefined) {
+        student.hostelFee = Number(hostelFeeAmount);
+        student.hostelFeeAmount = Number(hostelFeeAmount);
+      }
       if (hostelFeeStatus) student.hostelFeeStatus = hostelFeeStatus;
       await student.save();
     }
 
     req.app.get('io')?.emit('dataUpdated', { module: 'hostel', action: 'allocated' });
     req.app.get('io')?.emit('dataUpdated', { module: 'students', action: 'updated' });
+    req.app.get('io')?.emit('dataUpdated', { module: 'fees', action: 'updated' });
+    req.app.get('io')?.emit('dataUpdated', { module: 'admissions', action: 'updated' });
 
     res.json({ message: 'Room allocated successfully', request: hostelReq, student });
   } catch (error) {

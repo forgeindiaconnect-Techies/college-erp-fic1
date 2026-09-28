@@ -69,23 +69,21 @@ const EmployeeAttendanceCard = () => {
   return (
     <div style={{
       background: 'white',
-      borderRadius: '16px',
-      padding: '1.25rem 1.5rem',
-      boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
-      border: '1px solid #E3E5EC',
+      borderRadius: '8px',
+      padding: '0.85rem 1rem',
+      border: '1px solid #e2e8f0',
       display: 'flex',
       flexDirection: 'column',
-      gap: '1rem',
-      width: '100%',
-      maxWidth: '380px'
+      gap: '0.75rem',
+      width: '100%'
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-        <Clock size={18} style={{ color: '#6366f1', marginTop: '3px' }} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+        <Clock size={16} style={{ color: '#2563eb', marginTop: '2px' }} />
         <div>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '0 0 4px 0', color: '#1e293b' }}>
-            My Attendance
+          <h3 style={{ fontSize: '0.88rem', fontWeight: 800, margin: '0 0 2px 0', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+            Duty Attendance
           </h3>
-          <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
+          <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
           </p>
         </div>
@@ -109,29 +107,29 @@ const EmployeeAttendanceCard = () => {
       <div style={{ marginTop: '0.5rem' }}>
         {!isCheckedIn ? (
           new Date().getHours() >= 9 ? (
-            <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '12px', fontWeight: 700, fontSize: '0.9rem' }}>
-              <span style={{ fontSize: '1rem', fontWeight: 800 }}>LOP</span> - Late Check-In Blocked
+            <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '0.45rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.78rem' }}>
+              <span>LOP • Shift Late Check-In Blocked</span>
             </div>
           ) : (
             <button 
               onClick={handleCheckIn}
               disabled={actionLoading}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', gap: '8px', background: '#6366f1', color: 'white', border: 'none', padding: '10px', borderRadius: '12px', fontWeight: 700, fontSize: '0.9rem', cursor: actionLoading ? 'wait' : 'pointer' }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#2563eb', color: 'white', border: 'none', padding: '0.5rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.82rem', cursor: actionLoading ? 'wait' : 'pointer' }}
             >
-              <LogIn size={18} /> {actionLoading ? 'Loading...' : 'Check In Now'}
+              <LogIn size={15} /> {actionLoading ? 'Loading...' : 'Punch Check In'}
             </button>
           )
         ) : !isCheckedOut ? (
           <button 
             onClick={handleCheckOut}
             disabled={actionLoading}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: '#f59e0b', color: 'white', border: 'none', padding: '10px', borderRadius: '12px', fontWeight: 700, fontSize: '0.9rem', cursor: actionLoading ? 'wait' : 'pointer' }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#d97706', color: 'white', border: 'none', padding: '0.5rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.82rem', cursor: actionLoading ? 'wait' : 'pointer' }}
           >
-            <LogOut size={18} /> {actionLoading ? 'Loading...' : 'Check Out Now'}
+            <LogOut size={15} /> {actionLoading ? 'Loading...' : 'Punch Check Out'}
           </button>
         ) : (
-          <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: '#f1f5f9', color: '#64748b', padding: '10px', borderRadius: '12px', fontWeight: 700, fontSize: '0.9rem' }}>
-            <CheckCircle size={18} /> Shift Completed
+          <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', padding: '0.45rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.78rem' }}>
+            <CheckCircle size={15} style={{ color: '#16a34a' }} /> Shift Concluded
           </div>
         )}
       </div>

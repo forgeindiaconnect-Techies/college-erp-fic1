@@ -89,56 +89,8 @@ const UnifiedLogin = () => {
     }
 
     try {
-      // Driver Intercept
-      if (selectedRole === 'Driver') {
-        const cleanStr = (str) => (str || '').toString().replace(/\s+/g, '');
-        const cleanEmail = cleanStr(email);
-        const cleanPass = cleanStr(password);
-        
-        let matchedDriver = null;
-        let foundTenantId = 'mock_college_id';
 
-        // Search across all tenant storage keys since user is logged out and tenantId is unknown
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('erp_transport_drivers_')) {
-            try {
-              const driversInTenant = JSON.parse(localStorage.getItem(key) || '[]');
-              const found = driversInTenant.find(d => cleanStr(d.phone) === cleanEmail && cleanPass === cleanEmail);
-              if (found) {
-                matchedDriver = found;
-                foundTenantId = key.replace('erp_transport_drivers_', '');
-                break;
-              }
-            } catch (e) {
-              console.error('Error parsing driver data', e);
-            }
-          }
-        }
-        
-        if (!matchedDriver) {
-          setError('Invalid Driver Credentials. Use registered Phone Number as both Username and Password.');
-          setLoading(false);
-          return;
-        }
-        
-        if (matchedDriver.status !== 'Active') {
-          setError('Driver account is inactive.');
-          setLoading(false);
-          return;
-        }
 
-        const dest = applySession({
-          _id: matchedDriver.driverId,
-          referenceId: matchedDriver.driverId,
-          name: matchedDriver.name,
-          email: matchedDriver.phone,
-          role: 'Driver',
-          tenantId: foundTenantId,
-          token: 'mock-driver-tenant-' + foundTenantId
-        });
-        if (dest) { navigate(dest); return; }
-      }
 
       // Try backend first
       const res = await loginUser({ email, password });
@@ -262,12 +214,12 @@ const UnifiedLogin = () => {
             )}
 
             <div className="input-group">
-              <label>{selectedRole === 'Driver' ? 'Phone Number' : 'Username'}</label>
+              <label>Username / Email</label>
               <div className="input-wrapper">
                 <Mail size={18} className="form-icon" />
                 <input
                   type="text"
-                  placeholder={selectedRole === 'Driver' ? 'Enter registered phone number' : 'Enter your email/username'}
+                  placeholder="Enter your email or username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

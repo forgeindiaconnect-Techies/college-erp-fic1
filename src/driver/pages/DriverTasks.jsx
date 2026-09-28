@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Wrench, ShieldCheck, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { CheckSquare, Wrench, ShieldCheck, Clock, CheckCircle, AlertTriangle, ChevronRight, Check } from 'lucide-react';
 import { getTransportMaintenance, updateTransportMaintenance, getTransportComplaints, updateTransportComplaint, getTransportRoutes } from '../../api/index';
 
 const DriverTasks = () => {
@@ -38,7 +38,6 @@ const DriverTasks = () => {
         ...(routesRes.data || []).filter(r => !localRoutes.find(l => l.routeId === r.routeId))
       ];
 
-      // Find driver's actual vehicle via route assignment (fallback to session)
       const cleanStr = (str) => (str || '').toString().trim().toLowerCase();
       const myRoute = allRoutes.find(r => {
         const rDriver = cleanStr(r.driver);
@@ -52,26 +51,21 @@ const DriverTasks = () => {
                (session.routeId && (cleanStr(r.routeId) === cleanStr(session.routeId) || cleanStr(r.name) === cleanStr(session.routeId)));
       });
       const myVehicleId = myRoute ? myRoute.vehicle : (session.vehicleId || session.vehicle);
-      
       const myVehicleClean = myVehicleId ? String(myVehicleId).trim().toLowerCase() : '';
       
-      // Filter maintenance for my vehicle
       const myMaintenance = allMaintenance.filter(m => 
         m.vehicleNumber && String(m.vehicleNumber).trim().toLowerCase() === myVehicleClean
       );
       
-      // Filter complaints assigned to me
       const myNameClean = session.name ? String(session.name).trim().toLowerCase() : '';
       const myIdClean = session.referenceId ? String(session.referenceId).trim().toLowerCase() : '';
       const myRouteClean = myRoute ? String(myRoute.routeId).trim().toLowerCase() : '';
       
       const myComplaints = allComplaints.filter(c => {
-        // Hide sensitive complaints related to driver behavior or safety
         const typeClean = (c.complaintType || c.category || '').toLowerCase();
         const descClean = (c.description || '').toLowerCase();
         const sensitiveKeywords = ['driver behavior', 'behavior', 'overspeed', 'speed', 'harassment', 'safety', 'rash', 'misbehave', 'rude'];
         const isSensitive = sensitiveKeywords.some(keyword => typeClean.includes(keyword) || descClean.includes(keyword));
-        
         if (isSensitive) return false;
 
         const assignedClean = c.assignedTo ? String(c.assignedTo).trim().toLowerCase() : '';
@@ -120,9 +114,9 @@ const DriverTasks = () => {
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '4rem 0', color: '#6b7280', fontSize: '1.125rem', fontFamily: 'Inter, sans-serif' }}>
-        <div style={{ width: '3rem', height: '3rem', border: '4px solid #eff6ff', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1rem auto' }}></div>
-        Loading tasks...
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: '#2563eb', fontFamily: 'Inter, sans-serif' }}>
+        <div style={{ width: '32px', height: '32px', border: '3px solid #e0e7ff', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: '0.75rem' }}></div>
+        <p style={{ fontWeight: 600, fontSize: '0.88rem', color: '#475569' }}>Loading assigned operational tasks...</p>
       </div>
     );
   }
@@ -131,90 +125,75 @@ const DriverTasks = () => {
   const pendingComplaintCount = complaintTasks.filter(c => c.status !== 'Resolved').length;
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ padding: '1.25rem 1.5rem', maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
       
-      {/* Header Area */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2.5rem' }}>
+      {/* ── Breadcrumb & ERP Header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
         <div>
-          <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#111827', margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ padding: '0.5rem', backgroundColor: '#eff6ff', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CheckSquare size={24} style={{ color: '#2563eb' }} />
-            </div>
-            My Tasks
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
+            <span>Operations & Compliance</span>
+            <ChevronRight size={12} />
+            <span style={{ color: '#0f172a' }}>Assigned Maintenance & Tasks</span>
+          </div>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.01em' }}>
+            Driver Work Orders & Task Register
           </h1>
-          <p style={{ color: '#6b7280', margin: 0, fontSize: '1rem' }}>View and complete tasks assigned to you by the Transport Admin.</p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600, background: '#f1f5f9', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+            {pendingMaintenanceCount + pendingComplaintCount} Total Open Actions
+          </span>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2rem' }}>
+      {/* ── Two Column Task List Grid ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem' }}>
         
         {/* Maintenance Tasks Column */}
-        <div style={{ backgroundColor: 'white', borderRadius: '1rem', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f9fafb' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1f2937' }}>
-              <Wrench size={20} style={{ color: '#6b7280' }} /> Vehicle Maintenance
-            </h2>
-            <span style={{ backgroundColor: '#dbeafe', color: '#1d4ed8', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 'bold' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Wrench size={15} style={{ color: '#2563eb' }} /> Scheduled Vehicle Services
+            </h3>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', background: pendingMaintenanceCount > 0 ? '#eff6ff' : '#f1f5f9', color: pendingMaintenanceCount > 0 ? '#1d4ed8' : '#64748b' }}>
               {pendingMaintenanceCount} Pending
             </span>
           </div>
-          
-          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1 }}>
+
+          <div style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {maintenanceTasks.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem 0', color: '#9ca3af' }}>
-                <CheckCircle size={32} style={{ margin: '0 auto 1rem auto', opacity: 0.5 }} />
-                <p style={{ margin: 0 }}>No maintenance tasks assigned to your vehicle.</p>
+              <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#94a3b8' }}>
+                <CheckCircle size={28} style={{ margin: '0 auto 0.4rem', color: '#16a34a' }} />
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#334155' }}>No Service Work Orders Pending</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Vehicle maintenance schedule is up-to-date.</div>
               </div>
             ) : (
               maintenanceTasks.map(task => {
                 const isCompleted = task.status === 'Completed';
-                const isInProgress = task.status === 'In Progress';
-                
                 return (
-                  <div key={task._id} style={{ border: '1px solid #f3f4f6', borderRadius: '0.75rem', padding: '1.25rem', backgroundColor: isCompleted ? '#f0fdf4' : '#fff', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                      <div>
-                        <h3 style={{ fontWeight: 'bold', fontSize: '1.125rem', color: '#111827', margin: '0 0 0.25rem 0' }}>{task.serviceType}</h3>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <Clock size={14} /> Scheduled: {new Date(task.serviceDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <span style={{ 
-                        padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em',
-                        backgroundColor: isCompleted ? '#dcfce7' : isInProgress ? '#fef3c7' : '#f3f4f6',
-                        color: isCompleted ? '#16a34a' : isInProgress ? '#b45309' : '#4b5563'
-                      }}>
+                  <div key={task._id} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.75rem', background: isCompleted ? '#f0fdf4' : '#ffffff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>{task.serviceType}</div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '4px', background: isCompleted ? '#dcfce7' : '#fef3c7', color: isCompleted ? '#166534' : '#b45309' }}>
                         {task.status}
                       </span>
                     </div>
-                    
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.4rem' }}>
+                      Scheduled Date: {new Date(task.serviceDate).toLocaleDateString()}
+                    </div>
                     {task.remarks && (
-                      <p style={{ fontSize: '0.875rem', color: '#4b5563', margin: '1rem 0 0 0', padding: '0.75rem', backgroundColor: '#f9fafb', borderRadius: '0.5rem', border: '1px solid #e5e7eb', fontStyle: 'italic' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#334155', fontStyle: 'italic', background: '#f8fafc', padding: '0.4rem', borderRadius: '4px', border: '1px solid #f1f5f9', marginBottom: '0.5rem' }}>
                         "{task.remarks}"
-                      </p>
-                    )}
-                    
-                    {!isCompleted && (
-                      <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem' }}>
-                        {task.status === 'Scheduled' && (
-                          <button 
-                            onClick={() => handleUpdateMaintenance(task._id, 'In Progress')} 
-                            style={{ flex: 1, padding: '0.625rem', backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', borderRadius: '0.5rem', fontSize: '0.875rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}
-                            onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#fde68a'; }}
-                            onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#fef3c7'; }}
-                          >
-                            Start Service
-                          </button>
-                        )}
-                        <button 
-                          onClick={() => handleUpdateMaintenance(task._id, 'Completed')} 
-                          style={{ flex: 1, padding: '0.625rem', backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: '0.5rem', fontSize: '0.875rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}
-                          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#15803d'; }}
-                          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#16a34a'; }}
-                        >
-                          <CheckCircle size={16} /> Mark Completed
-                        </button>
                       </div>
+                    )}
+                    {!isCompleted && (
+                      <button 
+                        onClick={() => handleUpdateMaintenance(task._id, 'Completed')}
+                        style={{ width: '100%', padding: '0.35rem', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                      >
+                        <Check size={12} /> Mark Service Done
+                      </button>
                     )}
                   </div>
                 );
@@ -223,62 +202,45 @@ const DriverTasks = () => {
           </div>
         </div>
 
-        {/* Complaints/Issues Column */}
-        <div style={{ backgroundColor: 'white', borderRadius: '1rem', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FCEBEB' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#991b1b' }}>
-              <ShieldCheck size={20} style={{ color: '#ef4444' }} /> Assigned Complaints
-            </h2>
-            <span style={{ backgroundColor: '#fee2e2', color: '#b91c1c', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 'bold' }}>
-              {pendingComplaintCount} Pending
+        {/* Assigned Grievances Column */}
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <ShieldCheck size={15} style={{ color: '#dc2626' }} /> Assigned Defect & Issue Tickets
+            </h3>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', background: pendingComplaintCount > 0 ? '#fee2e2' : '#f1f5f9', color: pendingComplaintCount > 0 ? '#b91c1c' : '#64748b' }}>
+              {pendingComplaintCount} Open
             </span>
           </div>
-          
-          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1 }}>
+
+          <div style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {complaintTasks.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem 0', color: '#9ca3af' }}>
-                <CheckCircle size={32} style={{ margin: '0 auto 1rem auto', opacity: 0.5 }} />
-                <p style={{ margin: 0 }}>No complaints assigned to you.</p>
+              <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#94a3b8' }}>
+                <CheckCircle size={28} style={{ margin: '0 auto 0.4rem', color: '#16a34a' }} />
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#334155' }}>No Defect Tickets Assigned</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>All passenger and route tasks resolved.</div>
               </div>
             ) : (
               complaintTasks.map(task => {
                 const isResolved = task.status === 'Resolved';
-                
                 return (
-                  <div key={task._id} style={{ border: '1px solid #fee2e2', borderRadius: '0.75rem', padding: '1.25rem', backgroundColor: isResolved ? '#f0fdf4' : '#fff', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                      <div>
-                        <h3 style={{ fontWeight: 'bold', fontSize: '1.125rem', color: '#b91c1c', margin: '0 0 0.25rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <AlertTriangle size={18} /> {task.category || 'General Issue'}
-                        </h3>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                          Reported on: {new Date(task.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <span style={{ 
-                        padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em',
-                        backgroundColor: isResolved ? '#dcfce7' : '#fee2e2',
-                        color: isResolved ? '#16a34a' : '#b91c1c'
-                      }}>
+                  <div key={task._id} style={{ border: '1px solid #fee2e2', borderRadius: '6px', padding: '0.75rem', background: isResolved ? '#f0fdf4' : '#ffffff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#b91c1c' }}>{task.category || 'Vehicle Issue'}</div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '4px', background: isResolved ? '#dcfce7' : '#fee2e2', color: isResolved ? '#166534' : '#b91c1c' }}>
                         {task.status}
                       </span>
                     </div>
-                    
-                    <p style={{ fontSize: '0.9rem', color: '#374151', margin: '1rem 0 0 0', lineHeight: 1.5 }}>
+                    <div style={{ fontSize: '0.75rem', color: '#334155', marginBottom: '0.5rem' }}>
                       "{task.description}"
-                    </p>
-                    
+                    </div>
                     {!isResolved && (
-                      <div style={{ marginTop: '1.25rem' }}>
-                        <button 
-                          onClick={() => handleUpdateComplaint(task._id, 'Resolved')} 
-                          style={{ width: '100%', padding: '0.75rem', backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: '0.5rem', fontSize: '0.875rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}
-                          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#15803d'; }}
-                          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#16a34a'; }}
-                        >
-                          <CheckCircle size={18} /> Mark Resolved
-                        </button>
-                      </div>
+                      <button 
+                        onClick={() => handleUpdateComplaint(task._id, 'Resolved')}
+                        style={{ width: '100%', padding: '0.35rem', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                      >
+                        <Check size={12} /> Mark Defect Resolved
+                      </button>
                     )}
                   </div>
                 );
@@ -288,6 +250,7 @@ const DriverTasks = () => {
         </div>
 
       </div>
+
     </div>
   );
 };

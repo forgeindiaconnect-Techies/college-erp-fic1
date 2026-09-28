@@ -1,359 +1,583 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  GraduationCap, BookOpen, Bus, Building, Briefcase, Users,
-  BarChart2, Shield, Bot, Bell, Star, ChevronRight, ChevronDown,
-  Mail, Phone, MapPin, ExternalLink, Menu, X,
-  Cpu, Zap, Globe, Award, TrendingUp, Calendar
+  GraduationCap,
+  Users,
+  CreditCard,
+  Building,
+  Bus,
+  BarChart2,
+  BookOpen,
+  Briefcase,
+  Shield,
+  Bot,
+  Play,
+  ArrowRight,
+  ChevronRight,
+  CheckCircle,
+  Menu,
+  X,
+  Plus,
+  TrendingUp,
+  Award,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 import './LandingPage.css';
 
-
-
-const FEATURES = [
-  { icon: <Users size={28} />,      title: 'Student Management',      desc: 'Complete student lifecycle from admission to alumni.', color: '#3b82f6' },
-  { icon: <BarChart2 size={28} />,  title: 'Smart Analytics',         desc: 'AI-powered institutional performance insights.', color: '#6366F1' },
-  { icon: <Bus size={28} />,        title: 'Live Bus Tracking',        desc: 'Real-time GPS tracking of all college buses.', color: '#f59e0b' },
-  { icon: <Building size={28} />,   title: 'Hostel Management',        desc: 'Room allocation, mess, complaints in one place.', color: '#10b981' },
-  { icon: <BookOpen size={28} />,   title: 'Library System',           desc: 'Digital catalog, issue tracking, fine management.', color: '#ec4899' },
-  { icon: <Briefcase size={28} />,  title: 'Placement Portal',         desc: 'Company drives, eligibility, offer letters all tracked.', color: '#06b6d4' },
-  { icon: <Bot size={28} />,        title: 'AI ERP Assistant',         desc: 'Ask questions, generate reports with natural language.', color: '#a855f7' },
-  { icon: <Shield size={28} />,     title: 'Role-Based Security',      desc: 'Admin → HOD → Staff → Student hierarchy enforced.', color: '#ef4444' },
+const MODULES_STRIP = [
+  {
+    icon: <Users size={24} />,
+    title: 'Admission & Enrollment',
+    desc: 'Manage the complete admission process with ease.',
+    color: '#2563eb',
+    bg: '#eff6ff'
+  },
+  {
+    icon: <GraduationCap size={24} />,
+    title: 'Academics',
+    desc: 'Handle courses, departments, exams and results.',
+    color: '#8b5cf6',
+    bg: '#faf5ff'
+  },
+  {
+    icon: <CreditCard size={24} />,
+    title: 'Fees & Accounts',
+    desc: 'Track fees, scholarships and payments.',
+    color: '#10b981',
+    bg: '#ecfdf5'
+  },
+  {
+    icon: <Building size={24} />,
+    title: 'Hostel Management',
+    desc: 'Allot rooms, track occupancy and manage hostel fees.',
+    color: '#f97316',
+    bg: '#fff7ed'
+  },
+  {
+    icon: <Bus size={24} />,
+    title: 'Transport Management',
+    desc: 'Manage routes, vehicles, drivers and student allocation.',
+    color: '#06b6d4',
+    bg: '#ecfeff'
+  },
+  {
+    icon: <BarChart2 size={24} />,
+    title: 'Reports & Analytics',
+    desc: 'Get real-time insights for better decision making.',
+    color: '#6366f1',
+    bg: '#eef2ff'
+  }
 ];
 
-const STATS = [
-  { value: '3,240+', label: 'Students Enrolled', icon: <Users size={22} /> },
-  { value: '180+',   label: 'Faculty Members',   icon: <GraduationCap size={22} /> },
-  { value: '92%',    label: 'Placement Rate',    icon: <TrendingUp size={22} /> },
-  { value: '6',      label: 'Departments',       icon: <Building size={22} /> },
+const DETAILED_FEATURES = [
+  {
+    icon: <Users size={24} />,
+    title: 'End-to-End Student Admissions',
+    desc: 'Automated application verification, quota concessions, document management, and live enrollment registers.',
+    color: '#2563eb',
+    bg: '#eff6ff'
+  },
+  {
+    icon: <GraduationCap size={24} />,
+    title: 'Curriculum & Academic Structure',
+    desc: 'Syllabus master, faculty-to-subject allocation, daily timetable scheduling, and semester course catalogs.',
+    color: '#8b5cf6',
+    bg: '#faf5ff'
+  },
+  {
+    icon: <CreditCard size={24} />,
+    title: 'Enterprise Fee & Finance Desk',
+    desc: 'Dynamic fee structures, real-time fee collection, online receipts, expense logs, and staff payroll generation.',
+    color: '#10b981',
+    bg: '#ecfdf5'
+  },
+  {
+    icon: <Building size={24} />,
+    title: 'Hostel & Mess Administration',
+    desc: 'Block-wise bed allotment, room occupancy tracking, maintenance requests, and warden communication desk.',
+    color: '#f97316',
+    bg: '#fff7ed'
+  },
+  {
+    icon: <Bus size={24} />,
+    title: 'Smart Fleet & GPS Transport',
+    desc: 'Live vehicle tracking, driver allocation, stage-wise route stops, and student transport passes.',
+    color: '#06b6d4',
+    bg: '#ecfeff'
+  },
+  {
+    icon: <BarChart2 size={24} />,
+    title: 'Institutional Intelligence & Reports',
+    desc: 'Visual fee realization dashboards, attendance heatmaps, examination analytics, and regulatory exports.',
+    color: '#6366f1',
+    bg: '#eef2ff'
+  }
 ];
 
-const LOGIN_PORTALS = [
-  { role: 'Super Admin', path: '/login?role=Super Admin', icon: '👑', color: '#10b981', desc: 'Global SaaS management' },
-  { role: 'Admin',      path: '/login?role=Admin', icon: '🔑', color: 'var(--primary)', desc: 'Full system access' },
-  { role: 'Principal',  path: '/login?role=Principal', icon: '🏛️', color: '#8b5cf6', desc: 'Institution head' },
-  { role: 'HOD',        path: '/login?role=HOD', icon: '👨‍🏫', color: '#4F46E5', desc: 'Department control' },
-  { role: 'Staff',      path: '/login?role=Staff', icon: '📚', color: '#2563eb', desc: 'Class management' },
-  { role: 'Student',    path: '/login?role=Student', icon: '🎓', color: '#059669', desc: 'Academic portal' },
-  { role: 'Parent',     path: '/login?role=Parent', icon: '👨‍👩‍👧', color: '#d97706', desc: 'Track ward progress' },
-  { role: 'Accounts',   path: '/login?role=Accounts', icon: '💰', color: '#dc2626', desc: 'Finance & fees' },
-  { role: 'Driver',     path: '/login?role=Driver', icon: '🚌', color: '#f59e0b', desc: 'Transport portal' },
+const ROLE_PORTALS = [
+  { role: 'Super Admin', path: '/login?role=Super Admin', emoji: '👑', color: '#10b981', desc: 'Central multi-campus SaaS controller' },
+  { role: 'Admin', path: '/login?role=Admin', emoji: '🔑', color: '#2563eb', desc: 'Complete institution operations & setup' },
+  { role: 'Principal', path: '/login?role=Principal', emoji: '🏛️', color: '#8b5cf6', desc: 'Academic oversight & institution governance' },
+  { role: 'HOD', path: '/login?role=HOD', emoji: '👨‍🏫', color: '#4f46e5', desc: 'Department faculties & curriculum monitoring' },
+  { role: 'Staff / Faculty', path: '/login?role=Staff', emoji: '📚', color: '#06b6d4', desc: 'Attendance, marks, assignments & LMS' },
+  { role: 'Student', path: '/login?role=Student', emoji: '🎓', color: '#059669', desc: 'Timetables, grades, receipts & leaves' },
+  { role: 'Parent', path: '/login?role=Parent', emoji: '👨‍👩‍👧', color: '#d97706', desc: 'Ward attendance, academic reports & fees' },
+  { role: 'Accounts Officer', path: '/login?role=Accounts', emoji: '💰', color: '#dc2626', desc: 'Finance collections & staff payroll' },
+  { role: 'Driver', path: '/login?role=Driver', emoji: '🚌', color: '#f59e0b', desc: 'Trip routes, attendance & vehicle logs' }
 ];
-
-
-
-// Animated counter hook
-const useCounter = (target, isVisible) => {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    if (!isVisible) return;
-    const numericTarget = parseInt(target.replace(/\D/g, ''));
-    let current = 0;
-    const step = Math.ceil(numericTarget / 60);
-    const timer = setInterval(() => {
-      current = Math.min(current + step, numericTarget);
-      setCount(current);
-      if (current >= numericTarget) clearInterval(timer);
-    }, 30);
-    return () => clearInterval(timer);
-  }, [isVisible, target]);
-  return count;
-};
-
-const StatCard = ({ value, label, icon, isVisible }) => {
-  const count = useCounter(value, isVisible);
-  const suffix = value.replace(/[\d,]/g, '');
-  return (
-    <div className="stat-card">
-      <div className="stat-icon">{icon}</div>
-      <div className="stat-value">{count.toLocaleString()}{suffix}</div>
-      <div className="stat-label">{label}</div>
-    </div>
-  );
-};
 
 const LandingPage = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [statsVisible, setStatsVisible] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
-  const statsRef = useRef(null);
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setStatsVisible(true); },
-      { threshold: 0.3 }
-    );
-    if (statsRef.current) observer.observe(statsRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const sections = ['home', 'features', 'contact'];
-      for (const sec of sections) {
-        const el = document.getElementById(sec);
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          if (rect.top <= 80 && rect.bottom > 80) { setActiveSection(sec); break; }
-        }
-      }
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const scrollTo = (id) => {
+  const scrollToSection = (id) => {
+    setActiveSection(id);
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
     setMobileMenuOpen(false);
   };
 
-  const NAV_LINKS = ['home', 'features', 'contact'];
-
   return (
     <div className="landing-root">
-
-      {/* ──── NAVBAR ──── */}
+      
+      {/* ─────────────────────────────────────────────────────────────
+         1. NAVBAR
+         ───────────────────────────────────────────────────────────── */}
       <nav className="landing-nav">
         <div className="landing-nav-inner">
-          <div className="landing-logo">
-            <div className="landing-logo-icon">F</div>
-            <span>FIC <strong>ERP</strong></span>
+          
+          {/* Logo */}
+          <div className="landing-logo" onClick={() => scrollToSection('home')}>
+            <div className="landing-logo-icon">
+              <GraduationCap size={22} />
+            </div>
+            <div className="landing-logo-text">
+              <span className="landing-brand-name">College<span>ERP</span></span>
+              <span className="landing-brand-tagline">Smarter Campus. Brighter Future.</span>
+            </div>
           </div>
 
+          {/* Navigation Links */}
           <ul className="landing-nav-links">
-            {NAV_LINKS.map(link => (
-              <li key={link}>
-                <button
-                  className={`landing-nav-link ${activeSection === link ? 'active' : ''}`}
-                  onClick={() => scrollTo(link)}
-                >
-                  {link.charAt(0).toUpperCase() + link.slice(1)}
-                </button>
-              </li>
-            ))}
+            <li>
+              <button 
+                className={`landing-nav-link ${activeSection === 'home' ? 'active' : ''}`}
+                onClick={() => scrollToSection('home')}
+              >
+                Home
+              </button>
+            </li>
+            <li>
+              <button 
+                className={`landing-nav-link ${activeSection === 'features' ? 'active' : ''}`}
+                onClick={() => scrollToSection('features')}
+              >
+                Features
+              </button>
+            </li>
+            <li>
+              <button 
+                className={`landing-nav-link ${activeSection === 'modules' ? 'active' : ''}`}
+                onClick={() => scrollToSection('modules')}
+              >
+                Modules
+              </button>
+            </li>
+            <li>
+              <button 
+                className={`landing-nav-link ${activeSection === 'portals' ? 'active' : ''}`}
+                onClick={() => scrollToSection('portals')}
+              >
+                Portals
+              </button>
+            </li>
+            <li>
+              <button 
+                className={`landing-nav-link ${activeSection === 'contact' ? 'active' : ''}`}
+                onClick={() => scrollToSection('contact')}
+              >
+                Contact
+              </button>
+            </li>
           </ul>
 
+          {/* Nav Actions */}
           <div className="landing-nav-actions">
-            <button className="landing-btn-outline" onClick={() => navigate('/login')}>Login</button>
-            <button className="landing-btn-primary" onClick={() => navigate('/get-access')}>
-              Get Access <ChevronRight size={16} />
+            <button className="landing-btn-login" onClick={() => navigate('/login')}>
+              Log In
             </button>
-            <button className="landing-hamburger" onClick={() => setMobileMenuOpen(o => !o)}>
-              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            <button className="landing-btn-get-started" onClick={() => navigate('/login')}>
+              Get Started
+            </button>
+            <button 
+              className="landing-hamburger" 
+              onClick={() => setMobileMenuOpen(o => !o)}
+              aria-label="Toggle Navigation"
+            >
+              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
-        </div>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="landing-mobile-menu">
-            {NAV_LINKS.map(link => (
-              <button key={link} className="mobile-nav-link" onClick={() => scrollTo(link)}>
-                {link.charAt(0).toUpperCase() + link.slice(1)}
-              </button>
-            ))}
-            <button className="landing-btn-outline w-full mt-2" onClick={() => navigate('/login')}>Login to ERP</button>
-            <button className="landing-btn-primary w-full mt-2" onClick={() => navigate('/get-access')}>Get Access</button>
-          </div>
-        )}
+        </div>
       </nav>
 
-      {/* ──── HERO ──── */}
-      <section id="home" className="hero-section">
-        {/* Floating orbs */}
-        <div className="hero-orb orb-1"></div>
-        <div className="hero-orb orb-2"></div>
-        <div className="hero-orb orb-3"></div>
-
-        <div className="hero-content">
-          <div className="hero-badge">
-            <Zap size={14} /> Next-Generation College ERP System
-          </div>
-          <h1 className="hero-title">
-            Manage Your College<br />
-            <span className="hero-gradient-text">Smarter with AI</span>
-          </h1>
-          <p className="hero-subtitle">
-            A complete, role-based digital campus solution powering academics, attendance, fees,
-            placements, hostel, library, and transport — all in one unified platform.
-          </p>
-          <div className="hero-cta">
-            <button className="landing-btn-primary hero-btn" onClick={() => navigate('/get-access')}>
-              <GraduationCap size={18} /> Get Access
-            </button>
-            <button className="landing-btn-outline hero-btn" onClick={() => navigate('/login')}>
-              Launch ERP Portal <ChevronRight size={16} />
-            </button>
-          </div>
-
-          {/* Mini role tags */}
-          <div className="hero-roles">
-            {['Admin', 'HOD', 'Staff', 'Student', 'Parent', 'Accounts'].map(r => (
-              <span key={r} className="role-tag-badge">{r}</span>
-            ))}
-          </div>
-        </div>
-
-        {/* Hero Dashboard Preview */}
-        <div className="hero-preview">
-          <div className="preview-card glass-preview">
-            <div className="preview-header">
-              <div className="preview-dot red"></div>
-              <div className="preview-dot yellow"></div>
-              <div className="preview-dot green"></div>
-              <span className="preview-title">ERP Dashboard</span>
+      {/* ─────────────────────────────────────────────────────────────
+         2. HERO SECTION
+         ───────────────────────────────────────────────────────────── */}
+      <section className="landing-hero" id="home">
+        <div className="landing-hero-inner">
+          
+          {/* Left Hero Content */}
+          <div className="landing-hero-left">
+            <div className="landing-pill-badge">
+              <Sparkles size={13} />
+              <span>COLLEGE ERP SOLUTION</span>
             </div>
-            <div className="preview-kpis">
-              {[{l:'Students',v:'3,240',c:'#3b82f6'},{l:'Staff',v:'180',c:'#6366F1'},{l:'Attendance',v:'94%',c:'#10b981'},{l:'Revenue',v:'₹4.2Cr',c:'#f59e0b'}].map(k => (
-                <div key={k.l} className="preview-kpi" style={{borderTopColor:k.c}}>
-                  <span className="preview-kpi-val" style={{color:k.c}}>{k.v}</span>
-                  <span className="preview-kpi-lbl">{k.l}</span>
+
+            <h1 className="landing-hero-title">
+              Simplify Campus Management, Empower Education
+            </h1>
+
+            <p className="landing-hero-subtitle">
+              An all-in-one College ERP system designed to streamline admissions, academics, fees, hostel, transport and more. Built for modern institutions, ready for the future.
+            </p>
+
+            <div className="landing-hero-ctas">
+              <button className="landing-hero-btn-primary" onClick={() => navigate('/login')}>
+                <span>Get Started</span>
+                <ArrowRight size={16} />
+              </button>
+
+              <button className="landing-hero-btn-demo" onClick={() => scrollToSection('modules')}>
+                <Play size={15} fill="#1e293b" />
+                <span>Watch Demo</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Right Hero Visual (Campus Frame + Interactive Laptop Mockup + 4 Orbit Badges) */}
+          <div className="landing-hero-right">
+            
+            <div className="landing-campus-backdrop">
+              
+              {/* Floating Badge 1: Admissions */}
+              <div className="landing-floating-badge landing-badge-admissions">
+                <div className="landing-badge-icon-wrap" style={{ background: '#eff6ff', color: '#2563eb' }}>
+                  <Users size={16} />
                 </div>
-              ))}
-            </div>
-            <div className="preview-chart-bars">
-              {[70,85,60,90,75,95,80].map((h, i) => (
-                <div key={i} className="preview-bar" style={{height:`${h}%`, animationDelay:`${i*0.1}s`}}></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ──── STATS ──── */}
-      <section className="stats-section" ref={statsRef}>
-        <div className="stats-inner">
-          {STATS.map((s, i) => (
-            <StatCard key={i} {...s} isVisible={statsVisible} />
-          ))}
-        </div>
-      </section>
-
-      {/* ──── FEATURES ──── */}
-      <section id="features" className="features-section">
-        <div className="section-header">
-          <div className="section-badge"><Cpu size={14} /> Powerful Features</div>
-          <h2 className="section-title">Everything Your Campus Needs</h2>
-          <p className="section-subtitle">A full-suite ERP designed for modern institutions, with built-in AI assistance and real-time data.</p>
-        </div>
-        <div className="features-grid">
-          {FEATURES.map((f, i) => (
-            <div key={i} className="feature-card" style={{'--accent': f.color}}>
-              <div className="feature-icon-wrap" style={{background:`${f.color}18`, color:f.color}}>
-                {f.icon}
+                <span>Admissions</span>
               </div>
-              <h3 className="feature-title">{f.title}</h3>
-              <p className="feature-desc">{f.desc}</p>
-              <div className="feature-arrow"><ChevronRight size={16} style={{color:f.color}} /></div>
+
+              {/* Floating Badge 2: Fees & Accounts */}
+              <div className="landing-floating-badge landing-badge-fees">
+                <div className="landing-badge-icon-wrap" style={{ background: '#ecfdf5', color: '#10b981' }}>
+                  <CreditCard size={16} />
+                </div>
+                <span>Fees & Accounts</span>
+              </div>
+
+              {/* Floating Badge 3: Hostel */}
+              <div className="landing-floating-badge landing-badge-hostel">
+                <div className="landing-badge-icon-wrap" style={{ background: '#fff7ed', color: '#f97316' }}>
+                  <Building size={16} />
+                </div>
+                <span>Hostel</span>
+              </div>
+
+              {/* Floating Badge 4: Transport */}
+              <div className="landing-floating-badge landing-badge-transport">
+                <div className="landing-badge-icon-wrap" style={{ background: '#ecfeff', color: '#06b6d4' }}>
+                  <Bus size={16} />
+                </div>
+                <span>Transport</span>
+              </div>
+
+              {/* Central Laptop Device Mockup */}
+              <div className="landing-laptop-frame">
+                
+                <div className="landing-laptop-screen">
+                  
+                  {/* Mock Sidebar */}
+                  <div className="landing-mock-sidebar">
+                    <div className="landing-mock-brand">
+                      <GraduationCap size={13} />
+                      <span>CollegeERP</span>
+                    </div>
+
+                    <div className="landing-mock-link active">
+                      <span>Dashboard</span>
+                    </div>
+                    <div className="landing-mock-link">
+                      <span>Admissions</span>
+                    </div>
+                    <div className="landing-mock-link">
+                      <span>Students</span>
+                    </div>
+                    <div className="landing-mock-link">
+                      <span>Academics</span>
+                    </div>
+                    <div className="landing-mock-link">
+                      <span>Fees & Accounts</span>
+                    </div>
+                    <div className="landing-mock-link">
+                      <span>Hostel</span>
+                    </div>
+                    <div className="landing-mock-link">
+                      <span>Transport</span>
+                    </div>
+                    <div className="landing-mock-link">
+                      <span>Reports</span>
+                    </div>
+                    <div className="landing-mock-link">
+                      <span>Settings</span>
+                    </div>
+                  </div>
+
+                  {/* Mock Content */}
+                  <div className="landing-mock-content">
+                    
+                    <div className="landing-mock-header">
+                      <div className="landing-mock-greeting">
+                        <h4>Welcome Back, Admin</h4>
+                        <span>Real-time Institutional Portal</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '8px', color: '#64748b' }}>
+                        <span>Today • 28 Sep 2026</span>
+                      </div>
+                    </div>
+
+                    {/* KPI 3 Cards */}
+                    <div className="landing-mock-kpi-grid">
+                      <div className="landing-mock-kpi-card">
+                        <span className="landing-mock-kpi-label">Total Students</span>
+                        <span className="landing-mock-kpi-val">1,248</span>
+                        <span className="landing-mock-kpi-badge">▲ 12%</span>
+                      </div>
+                      <div className="landing-mock-kpi-card">
+                        <span className="landing-mock-kpi-label">Total Admissions</span>
+                        <span className="landing-mock-kpi-val">326</span>
+                        <span className="landing-mock-kpi-badge">▲ 8%</span>
+                      </div>
+                      <div className="landing-mock-kpi-card">
+                        <span className="landing-mock-kpi-label">Fees Collected</span>
+                        <span className="landing-mock-kpi-val">₹18,45,000</span>
+                        <span className="landing-mock-kpi-badge">▲ 15%</span>
+                      </div>
+                    </div>
+
+                    {/* Bottom Split: Chart & Quick Actions */}
+                    <div className="landing-mock-bottom-grid">
+                      
+                      {/* Trend Curve SVG */}
+                      <div className="landing-mock-chart-box">
+                        <span style={{ fontSize: '8px', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
+                          Student Admission Trend
+                        </span>
+                        <svg viewBox="0 0 100 40" style={{ width: '100%', height: '50px', overflow: 'visible' }}>
+                          <defs>
+                            <linearGradient id="gradMock" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
+                              <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+                            </linearGradient>
+                          </defs>
+                          <path
+                            d="M 5,32 Q 25,28 40,18 T 75,12 T 95,6 L 95,38 L 5,38 Z"
+                            fill="url(#gradMock)"
+                          />
+                          <path
+                            d="M 5,32 Q 25,28 40,18 T 75,12 T 95,6"
+                            fill="none"
+                            stroke="#2563eb"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6.5px', color: '#94a3b8' }}>
+                          <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
+                        </div>
+                      </div>
+
+                      {/* Quick Actions */}
+                      <div className="landing-mock-actions-box">
+                        <span style={{ fontSize: '8px', fontWeight: 700, color: '#0f172a' }}>Quick Actions</span>
+                        <div className="landing-mock-action-item">
+                          <Plus size={8} color="#2563eb" />
+                          <span>Add Student</span>
+                        </div>
+                        <div className="landing-mock-action-item">
+                          <CreditCard size={8} color="#10b981" />
+                          <span>Collect Fees</span>
+                        </div>
+                        <div className="landing-mock-action-item">
+                          <Building size={8} color="#f97316" />
+                          <span>Hostel Allotment</span>
+                        </div>
+                        <div className="landing-mock-action-item">
+                          <Bus size={8} color="#06b6d4" />
+                          <span>Transport Route</span>
+                        </div>
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+                {/* Laptop Base & Notch */}
+                <div className="landing-laptop-base">
+                  <div className="landing-laptop-notch"></div>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* ─────────────────────────────────────────────────────────────
+         3. 6 MODULES QUICK STRIP (Below Hero)
+         ───────────────────────────────────────────────────────────── */}
+      <section className="landing-modules-strip" id="features">
+        <div className="landing-modules-strip-inner">
+          {MODULES_STRIP.map((mod, i) => (
+            <div key={i} className="landing-module-mini-item" onClick={() => navigate('/login')}>
+              <div 
+                className="landing-module-circle-icon" 
+                style={{ background: mod.bg, color: mod.color }}
+              >
+                {mod.icon}
+              </div>
+              <h4 className="landing-module-mini-title">{mod.title}</h4>
+              <p className="landing-module-mini-desc">{mod.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ──── LOGIN PORTALS ──── */}
-      <section className="portals-section">
-        <div className="section-header">
-          <div className="section-badge"><Shield size={14} /> Secure Access</div>
-          <h2 className="section-title">Login Portals</h2>
-          <p className="section-subtitle">Role-specific dashboards with granular access control for every stakeholder.</p>
+      {/* ─────────────────────────────────────────────────────────────
+         4. "EVERYTHING YOU NEED IN ONE PLACE" DETAILED MODULES
+         ───────────────────────────────────────────────────────────── */}
+      <section className="landing-detailed-section" id="modules">
+        <div className="landing-section-header">
+          <span className="landing-section-pill">MODULES</span>
+          <h2 className="landing-section-heading">Everything You Need in One Place</h2>
+          <p className="landing-section-subtext">
+            Comprehensive, interconnected modules designed for modern universities, engineering colleges, and educational institutions.
+          </p>
         </div>
-        <div className="portals-grid">
-          {LOGIN_PORTALS.map((p, i) => (
-            <button
-              key={i}
-              className="portal-card"
-              style={{'--portal-color': p.color}}
-              onClick={() => navigate(p.path)}
+
+        <div className="landing-features-grid">
+          {DETAILED_FEATURES.map((feat, idx) => (
+            <div 
+              key={idx} 
+              className="landing-feature-card"
+              onClick={() => navigate('/login')}
             >
-              <div className="portal-icon">{p.icon}</div>
-              <div className="portal-info">
-                <h3>{p.role}</h3>
-                <p>{p.desc}</p>
+              <div 
+                className="landing-card-icon-box"
+                style={{ background: feat.bg, color: feat.color }}
+              >
+                {feat.icon}
               </div>
-              <ExternalLink size={16} className="portal-arrow" />
-            </button>
+              <h3 className="landing-card-title">{feat.title}</h3>
+              <p className="landing-card-desc">{feat.desc}</p>
+            </div>
           ))}
         </div>
       </section>
 
+      {/* ─────────────────────────────────────────────────────────────
+         5. MULTI-ROLE PORTALS SECTION
+         ───────────────────────────────────────────────────────────── */}
+      <section className="landing-portals-section" id="portals">
+        <div className="landing-section-header">
+          <span className="landing-section-pill">ROLE-BASED WORKBENCHES</span>
+          <h2 className="landing-section-heading">Dedicated Portals for Every Stakeholder</h2>
+          <p className="landing-section-subtext">
+            Tailored interfaces with strict permissions and role-based data isolation.
+          </p>
+        </div>
 
-
-      {/* ──── CONTACT ──── */}
-      <section id="contact" className="contact-section">
-        <div className="contact-inner">
-          <div className="contact-info">
-            <div className="section-badge"><Globe size={14} /> Contact Us</div>
-            <h2 className="section-title" style={{textAlign:'left'}}>Get in Touch</h2>
-            <p className="section-subtitle" style={{textAlign:'left'}}>Have questions about admissions, facilities, or the ERP system? Reach out to us.</p>
-            <div className="contact-items">
-              <div className="contact-item"><MapPin size={18} /> 123, College Road, Tech City, Tamil Nadu — 600001</div>
-              <div className="contact-item"><Phone size={18} /> +91 98765 43210</div>
-              <div className="contact-item"><Mail size={18} /> info@ficerp.edu.in</div>
+        <div className="landing-portals-grid">
+          {ROLE_PORTALS.map(portal => (
+            <div 
+              key={portal.role} 
+              className="landing-portal-card"
+              onClick={() => navigate(portal.path)}
+            >
+              <div className="landing-portal-left">
+                <span className="landing-portal-emoji">{portal.emoji}</span>
+                <div>
+                  <h4 className="landing-portal-name">{portal.role} Portal</h4>
+                  <p className="landing-portal-desc">{portal.desc}</p>
+                </div>
+              </div>
+              <ChevronRight size={18} color="#94a3b8" />
             </div>
-          </div>
-          <form className="contact-form glass-preview" onSubmit={e => e.preventDefault()}>
-            <h3 className="font-bold text-lg mb-4">Send a Message</h3>
-            <div className="form-row">
-              <input type="text" placeholder="Your Name" className="contact-input" />
-              <input type="email" placeholder="Email Address" className="contact-input" />
-            </div>
-            <select className="contact-input w-full">
-              <option>Select Subject</option>
-              <option>General Inquiry</option>
-              <option>Admissions</option>
-              <option>Fees & Finance</option>
-              <option>Technical Support</option>
-            </select>
-            <textarea className="contact-input w-full" rows={4} placeholder="Your message..."></textarea>
-            <button type="submit" className="landing-btn-primary w-full justify-center">
-              Send Message <ChevronRight size={16} />
-            </button>
-          </form>
+          ))}
         </div>
       </section>
 
-      {/* ──── FOOTER ──── */}
-      <footer className="landing-footer">
-        <div className="footer-inner">
-          <div className="footer-brand">
-            <div className="landing-logo">
-              <div className="landing-logo-icon">F</div>
-              <span>FIC <strong>ERP</strong></span>
+      {/* ─────────────────────────────────────────────────────────────
+         6. FOOTER
+         ───────────────────────────────────────────────────────────── */}
+      <footer className="landing-footer" id="contact">
+        <div className="landing-footer-inner">
+          
+          <div className="landing-footer-top">
+            <div className="landing-footer-brand">
+              <h3>CollegeERP</h3>
+              <p>
+                Empowering colleges with real-time academic workflows, automated finance desks, live fleet tracking, and student welfare systems.
+              </p>
             </div>
-            <p className="footer-tagline">Next-Generation College Management System powered by AI & modern web technologies.</p>
+
+            <div className="landing-footer-links">
+              <div className="landing-footer-col">
+                <h4>Platform</h4>
+                <ul>
+                  <li><a href="#home" onClick={(e) => { e.preventDefault(); scrollToSection('home'); }}>Home</a></li>
+                  <li><a href="#features" onClick={(e) => { e.preventDefault(); scrollToSection('features'); }}>Features</a></li>
+                  <li><a href="#modules" onClick={(e) => { e.preventDefault(); scrollToSection('modules'); }}>Modules</a></li>
+                  <li><a href="#portals" onClick={(e) => { e.preventDefault(); scrollToSection('portals'); }}>Portals</a></li>
+                </ul>
+              </div>
+
+              <div className="landing-footer-col">
+                <h4>Portals</h4>
+                <ul>
+                  <li><a href="/login?role=Admin">Admin Portal</a></li>
+                  <li><a href="/login?role=Accounts">Accounts Desk</a></li>
+                  <li><a href="/login?role=HOD">HOD Portal</a></li>
+                  <li><a href="/login?role=Student">Student Login</a></li>
+                </ul>
+              </div>
+
+              <div className="landing-footer-col">
+                <h4>Support & Security</h4>
+                <ul>
+                  <li><a href="#">24/7 Support Desk</a></li>
+                  <li><a href="#">Security & Privacy</a></li>
+                  <li><a href="#">Terms of Service</a></li>
+                  <li><a href="#">Release Notes</a></li>
+                </ul>
+              </div>
+            </div>
           </div>
-          <div className="footer-links">
-            <h4>Quick Links</h4>
-            <ul>
-              {NAV_LINKS.map(l => <li key={l}><button onClick={() => scrollTo(l)}>{l.charAt(0).toUpperCase()+l.slice(1)}</button></li>)}
-            </ul>
+
+          <div className="landing-footer-bottom">
+            <span>© {new Date().getFullYear()} CollegeERP Inc. All rights reserved.</span>
+            <span>Enterprise Grade Cloud Academic ERP System</span>
           </div>
-          <div className="footer-links">
-            <h4>Portals</h4>
-            <ul>
-              {LOGIN_PORTALS.map(p => <li key={p.role}><button onClick={() => navigate(p.path)}>{p.role} Login</button></li>)}
-            </ul>
-          </div>
-          <div className="footer-links">
-            <h4>Contact</h4>
-            <ul>
-              <li><span>📍 Tamil Nadu, India</span></li>
-              <li><span>📞 +91 98765 43210</span></li>
-              <li><span>✉️ info@ficerp.edu.in</span></li>
-            </ul>
-          </div>
-        </div>
-        <div className="footer-bottom">
-          <p>© 2026 FIC College of Engineering. All rights reserved. Built with ❤️ using MERN Stack.</p>
-          <div className="footer-badges">
-            <span className="tech-badge">React</span>
-            <span className="tech-badge">MongoDB</span>
-            <span className="tech-badge">Node.js</span>
-            <span className="tech-badge">AI-Powered</span>
-          </div>
+
         </div>
       </footer>
+
     </div>
   );
 };

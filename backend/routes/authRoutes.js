@@ -45,7 +45,8 @@ router.post('/login', async (req, res) => {
     // 1. Find User
     const user = await User.findOne({ email: { $regex: new RegExp(`^${email.trim()}$`, 'i') } });
     if (!user) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      console.error(`[auth/login] Login failed: User not found for email: ${email.trim()}`);
+      return res.status(401).json({ message: `[DEBUG] User not found in database for email: ${email.trim()}` });
     }
 
     // 2. Check College isActive Status for non-SuperAdmin users BEFORE password check / JWT issue
@@ -117,7 +118,8 @@ router.post('/login', async (req, res) => {
         token: generateToken(user._id),
       });
     } else {
-      res.status(401).json({ message: 'Invalid email or password' });
+      console.error(`[auth/login] Login failed: Password mismatch for user: ${email.trim()}`);
+      res.status(401).json({ message: `[DEBUG] Password mismatch for user: ${email.trim()}` });
     }
   } catch (error) {
     console.error('[auth/login] Error:', error);

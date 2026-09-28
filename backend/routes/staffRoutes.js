@@ -2,6 +2,8 @@ import express from 'express';
 import Staff from '../models/Staff.js';
 import { protect, authorize, departmentScope, requirePermission, collegeScope, checkSubscription } from '../middleware/authMiddleware.js';
 import User from '../models/User.js';
+import TransportDriver from '../models/TransportDriver.js';
+import HostelBlock from '../models/HostelBlock.js';
 import Approval from '../models/Approval.js';
 import Notification from '../models/Notification.js';
 import bcrypt from 'bcryptjs';
@@ -25,11 +27,141 @@ router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), re
   }
 });
 
-// Get staff for payroll (Basic Info)
+// Get staff for payroll (Comprehensive Personnel Roster: HOD, Staff, Drivers, Hostel, Accounts)
 router.get('/payroll-list', protect, authorize('Admin', 'Principal', 'Accounts'), collegeScope, async (req, res) => {
   try {
-    const staff = await Staff.find({ collegeId: req.collegeId || 'unassigned_college',  });
-    res.json(staff);
+    const collegeId = req.collegeId || 'unassigned_college';
+    const flexCollegeFilter = { 
+      $or: [{ collegeId }, { collegeId: { $exists: false } }, { collegeId: null }, { collegeId: '' }] 
+    };
+    
+    // 1. Fetch from Staff collection
+    const staffList = await Staff.find(flexCollegeFilter).lean();
+    
+    // 2. Fetch from TransportDriver collection
+    const driverList = await TransportDriver.find(flexCollegeFilter).lean();
+
+    // 3. Fetch from HostelBlock collection (Wardens)
+    const hostelList = await HostelBlock.find(flexCollegeFilter).lean();
+
+    // 4. Fetch from User collection (HOD, Staff, Driver, Hostel, Accounts, Principal, Sub Admin, Watchman)
+    const userList = await User.find({
+      ...flexCollegeFilter,
+      role: { $in: ['HOD', 'Staff', 'Driver', 'Hostel', 'Accounts', 'Sub Admin', 'Watchman', 'Principal'] }
+    }).select('-password').lean();
+
+    const unifiedMap = new Map();
+
+    // Add Staff records
+    staffList.forEach(s => {
+      const id = s.id || s.staffId || s._id.toString();
+      unifiedMap.set(id, {
+        _id: s._id,
+        id: id,
+        staffId: id,
+        name: s.name,
+        staffName: s.name,
+        designation: s.designation || 'Faculty',
+        department: s.department || s.dept || 'Academic Faculty',
+        category: (s.designation === 'HOD' || (s.role && s.role.toLowerCase() === 'hod')) ? 'HOD' : 'Staff',
+        email: s.email || '',
+        phone: s.phone || '',
+        joinDate: s.joinDate || s.createdAt
+      });
+    });
+
+    // Add Drivers
+    driverList.forEach(d => {
+      const id = d.driverId || d.employeeId || `DRV-${d._id.toString().slice(-4)}`;
+      if (!unifiedMap.has(id)) {
+        unifiedMap.set(id, {
+          _id: d._id,
+          id: id,
+          staffId: id,
+          name: d.name,
+          staffName: d.name,
+          designation: 'Transport Driver',
+          department: 'Transport',
+          category: 'Driver',
+          email: d.email || '',
+          phone: d.phone || '',
+          joinDate: d.joiningDate || d.createdAt
+        });
+      }
+    });
+
+    // Add Hostel Wardens from HostelBlock
+    hostelList.forEach((h, idx) => {
+      if (h.warden) {
+        const id = `HST-${h.blockId || ('00' + (idx + 1))}`;
+        if (!unifiedMap.has(id)) {
+          unifiedMap.set(id, {
+            _id: h._id,
+            id: id,
+            staffId: id,
+            name: h.warden,
+            staffName: h.warden,
+            designation: `Hostel Warden (${h.name || 'Block'})`,
+            department: 'Hostel Administration',
+            category: 'Hostel',
+            email: `${h.warden.toLowerCase().replace(/[^a-z0-9]/g, '')}@college.edu`,
+            phone: '9876543210',
+            joinDate: h.createdAt || new Date()
+          });
+        }
+      }
+    });
+
+    // Add Users (Hostel Wardens, Accounts Officers, HODs, etc.)
+    userList.forEach(u => {
+      const id = u.referenceId || `USR-${u._id.toString().slice(-4)}`;
+      const existingByEmail = Array.from(unifiedMap.values()).find(item => item.email && u.email && item.email.toLowerCase() === u.email.toLowerCase());
+      
+      if (!unifiedMap.has(id) && !existingByEmail) {
+        let desig = u.role;
+        let dept = u.department || 'General Administration';
+        let cat = u.role;
+
+        if (u.role === 'Hostel') {
+          desig = u.wardenType || 'Hostel Warden / Staff';
+          dept = 'Hostel Administration';
+          cat = 'Hostel';
+        } else if (u.role === 'Accounts') {
+          desig = 'Accounts Officer';
+          dept = 'Finance & Accounts';
+          cat = 'Accounts';
+        } else if (u.role === 'Driver') {
+          desig = 'Transport Driver';
+          dept = 'Transport';
+          cat = 'Driver';
+        } else if (u.role === 'HOD') {
+          desig = 'Head of Department (HOD)';
+          dept = u.department || 'Academic Department';
+          cat = 'HOD';
+        } else if (u.role === 'Principal') {
+          desig = 'Principal';
+          dept = 'Executive Leadership';
+          cat = 'Administration';
+        }
+
+        unifiedMap.set(id, {
+          _id: u._id,
+          id: id,
+          staffId: id,
+          name: u.name,
+          staffName: u.name,
+          designation: desig,
+          department: dept,
+          category: cat,
+          email: u.email || '',
+          phone: u.phone || '',
+          joinDate: u.createdAt
+        });
+      }
+    });
+
+    const result = Array.from(unifiedMap.values());
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

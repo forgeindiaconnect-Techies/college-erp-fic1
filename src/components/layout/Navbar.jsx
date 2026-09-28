@@ -87,7 +87,13 @@ const Navbar = ({ role = 'Admin', onMenuToggle }) => {
     <header className="navbar glass-card">
       <div className="navbar-left" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         {onMenuToggle && (
-          <button className="icon-btn hamburger-btn" onClick={onMenuToggle}>
+          <button 
+            type="button"
+            className="icon-btn hamburger-btn" 
+            onClick={onMenuToggle}
+            title="Toggle Menu"
+            aria-label="Toggle Menu"
+          >
             <Menu size={20} />
           </button>
         )}

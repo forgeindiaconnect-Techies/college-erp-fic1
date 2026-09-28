@@ -23,6 +23,22 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: `${__dirname}/.env` });
 console.log('✅ Loaded JWT secret:', process.env.JWT_SECRET ? 'YES (loaded)' : '❌ MISSING!');
 
+import fs from 'fs';
+import path from 'path';
+
+try {
+  const genHeroPath = 'C:/Users/Forgeindiaconnect/.gemini/antigravity-ide/brain/a676ced8-bbcc-45dd-b602-ab05875a55ea/college_hero_campus_bg_1790596775073.jpg';
+  const publicDest = path.join(__dirname, '../public/campus_hero_bg.jpg');
+  const publicDestPng = path.join(__dirname, '../public/campus_bg.png');
+  if (fs.existsSync(genHeroPath)) {
+    fs.copyFileSync(genHeroPath, publicDest);
+    fs.copyFileSync(genHeroPath, publicDestPng);
+    console.log('✅ Real daylight campus hero image synced to public/campus_bg.png and public/campus_hero_bg.jpg!');
+  }
+} catch (e) {
+  console.warn('Campus image sync:', e.message);
+}
+
 // Import Routes
 import studentRoutes from './routes/studentRoutes.js';
 import staffRoutes from './routes/staffRoutes.js';
@@ -314,18 +330,30 @@ const autoSeedIfEmpty = async () => {
       }
 
       if (defaultTenantId) {
-        await User.updateMany(
-          { role: { $in: ['Accounts', 'Staff', 'HOD', 'Student', 'Parent'] } },
-          { $set: { tenantId: defaultTenantId, collegeId: defaultTenantId } }
-        );
-        await Department.updateMany(
-          { collegeId: { $in: ['COL001', 'unassigned_college', null] } },
-          { $set: { collegeId: defaultTenantId } }
-        );
-        await Course.updateMany(
-          { collegeId: { $in: ['COL001', 'unassigned_college', null] } },
-          { $set: { collegeId: defaultTenantId } }
-        );
+        try {
+          await User.updateMany(
+            { role: { $in: ['Accounts', 'Staff', 'HOD', 'Student', 'Parent'] } },
+            { $set: { tenantId: defaultTenantId, collegeId: defaultTenantId } }
+          );
+        } catch (e) {
+          console.warn('User multi-tenant update warning:', e.message);
+        }
+        try {
+          await Department.updateMany(
+            { collegeId: { $in: ['COL001', 'unassigned_college', null] } },
+            { $set: { collegeId: defaultTenantId } }
+          );
+        } catch (e) {
+          console.warn('Department multi-tenant note (duplicate skipped):', e.message);
+        }
+        try {
+          await Course.updateMany(
+            { collegeId: { $in: ['COL001', 'unassigned_college', null] } },
+            { $set: { collegeId: defaultTenantId } }
+          );
+        } catch (e) {
+          console.warn('Course multi-tenant note:', e.message);
+        }
       }
 
       // Incremental patch: inject Principal if missing by checking email
@@ -483,6 +511,58 @@ const autoSeedIfEmpty = async () => {
           { studentName: 'Vikram Joshi', department: 'Electrical & Electronics', issueType: 'Complaint', reportedBy: 'Junior Student', priority: 'High', date: '2026-05-26', status: 'Pending', description: 'Altercation in college cafeteria.', timeline: [{date: '2026-05-26', text: 'Complaint registered'}] }
         ]);
         console.log('✅ WelfareRecords seeded successfully.');
+      }
+
+      // Incremental patch for missing HostelBlocks & Hostel Users
+      const hostelBlockCount = await HostelBlock.countDocuments();
+      if (hostelBlockCount === 0) {
+        console.log('🌱 Patching database: missing HostelBlocks detected. Injecting them now...');
+        await HostelBlock.insertMany([
+          { blockId: 'B-Boys-01', name: 'Boys Block A', capacity: 100, occupied: 90, warden: 'Mr. Ramesh' },
+          { blockId: 'B-Girls-01', name: 'Girls Block A', capacity: 80, occupied: 76, warden: 'Mrs. Sita' },
+        ]);
+        console.log('✅ HostelBlocks seeded successfully.');
+      }
+
+      const hostelRoomCount = await HostelRoom.countDocuments();
+      if (hostelRoomCount === 0) {
+        await HostelRoom.insertMany([
+          { roomId: 'R-101', block: 'Boys Block A', capacity: 2, occupied: 2, type: 'Non-AC' },
+          { roomId: 'R-102', block: 'Boys Block A', capacity: 2, occupied: 1, type: 'AC' },
+          { roomId: 'R-G-201', block: 'Girls Block A', capacity: 3, occupied: 3, type: 'Non-AC' },
+        ]);
+      }
+
+      const hostelComplaintCount = await HostelComplaint.countDocuments();
+      if (hostelComplaintCount === 0) {
+        await HostelComplaint.insertMany([
+          { complaintId: 'C001', studentId: 'CS2022001', studentName: 'John Doe', room: '101', category: 'Maintenance', description: 'Fan not working properly', status: 'Pending Review', date: new Date('2026-05-25') },
+          { complaintId: 'C002', studentId: 'EE2022001', studentName: 'Alice Smith', room: 'G-101', category: 'Plumbing', description: 'Water leakage in bathroom', status: 'Resolved', date: new Date('2026-05-20') },
+        ]);
+      }
+
+      // Incremental patch for missing Hostel Users
+      const hostelUserCount = await User.countDocuments({ role: 'Hostel' });
+      if (hostelUserCount === 0) {
+        console.log('🌱 Patching database: missing Hostel Warden users detected. Injecting them now...');
+        await User.create([
+          { name: 'Mr. Ramesh (Boys Warden)', email: 'ramesh.hostel@college.edu', password: 'password123', role: 'Hostel', wardenType: 'Boys Warden', phone: '9789012345', department: 'Hostel Administration', referenceId: 'HST001', tenantId: defaultTenantId, collegeId: defaultTenantId },
+          { name: 'Mrs. Sita (Girls Warden)', email: 'sita.hostel@college.edu', password: 'password123', role: 'Hostel', wardenType: 'Girls Warden', phone: '9789012346', department: 'Hostel Administration', referenceId: 'HST002', tenantId: defaultTenantId, collegeId: defaultTenantId },
+          { name: 'Hostel Warden', email: 'hostel@college.edu', password: 'password123', role: 'Hostel', wardenType: 'Chief Warden', phone: '9789012347', department: 'Hostel Administration', referenceId: 'HST003', tenantId: defaultTenantId, collegeId: defaultTenantId }
+        ]);
+        console.log('✅ Hostel Warden users created successfully.');
+      }
+
+      // Incremental patch for missing Transport Drivers
+      const driverCount = await TransportDriver.countDocuments();
+      if (driverCount === 0) {
+        console.log('🌱 Patching database: missing TransportDrivers detected. Injecting them now...');
+        await TransportDriver.insertMany([
+          { driverId: 'D001', name: 'Rajesh Kumar', license: 'DL-123456', experience: '8 Years', phone: '9876543210', status: 'Active', tenantId: defaultTenantId, collegeId: defaultTenantId },
+          { driverId: 'D002', name: 'Suresh Singh', license: 'DL-987654', experience: '5 Years', phone: '9988776655', status: 'Active', tenantId: defaultTenantId, collegeId: defaultTenantId },
+          { driverId: 'D003', name: 'Murugan T.', license: 'DL-456123', experience: '12 Years', phone: '9123456780', status: 'On Leave', tenantId: defaultTenantId, collegeId: defaultTenantId },
+        ]);
+        console.log('✅ TransportDrivers seeded successfully.');
       }
 
       return;

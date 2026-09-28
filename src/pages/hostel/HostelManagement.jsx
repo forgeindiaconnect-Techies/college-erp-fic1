@@ -4,7 +4,7 @@ import {
   Lock, RefreshCw, X, CheckCircle2, AlertCircle, Filter, UserCheck,
   Eye, EyeOff
 } from 'lucide-react';
-import { getUsers, createUser, deleteUser } from '../../api/index';
+import { getUsers, createUser, deleteUser, getHostelBlocks } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 
 const EMPTY_FORM = {
@@ -34,13 +34,41 @@ const HostelManagement = () => {
         setRefreshing(true);
       }
 
-      const res = await getUsers();
-      const allUsers = Array.isArray(res?.data) ? res.data : [];
+      const [res, blockRes] = await Promise.all([
+        getUsers().catch(() => ({ data: [] })),
+        getHostelBlocks().catch(() => ({ data: [] }))
+      ]);
 
+      const allUsers = Array.isArray(res?.data) ? res.data : [];
       const wardens = allUsers.filter(
         user => user.role?.toLowerCase() === 'hostel'
       );
-      setHostelUsers(wardens);
+
+      const combined = [...wardens];
+      const seenNames = new Set(wardens.map(w => (w.name || '').toLowerCase().trim()));
+
+      if (blockRes?.data && Array.isArray(blockRes.data)) {
+        blockRes.data.forEach((b, idx) => {
+          if (b.warden && b.warden.trim()) {
+            const nameKey = b.warden.toLowerCase().trim();
+            if (!seenNames.has(nameKey)) {
+              seenNames.add(nameKey);
+              combined.push({
+                _id: b._id || `block-warden-${idx}`,
+                name: b.warden,
+                email: `${b.warden.toLowerCase().replace(/[^a-z0-9]/g, '')}@college.edu`,
+                phone: b.wardenContact || '9789012345',
+                wardenType: b.name ? (b.name.toLowerCase().includes('girl') ? 'Girls Warden' : 'Boys Warden') : 'Hostel Warden',
+                role: 'Hostel',
+                allocatedBlock: b.name || b.blockId,
+                createdAt: b.createdAt || new Date()
+              });
+            }
+          }
+        });
+      }
+
+      setHostelUsers(combined);
       setLastSynced(new Date());
     } catch (err) {
       console.error('Failed to load Hostel users:', err);

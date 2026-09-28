@@ -22,32 +22,36 @@
 }
 
 .accounts-welcome-banner {
-  background: linear-gradient(135deg, #4F46E5, #7C3AED);
-  border-radius: var(--border-radius-lg);
+  background: var(--bg-card, #ffffff);
+  border-radius: var(--border-radius-lg, 12px);
   padding: 1.25rem 1.5rem;
-  color: white;
+  color: var(--text-main, #1e293b);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: var(--shadow-glow);
-  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color, #e2e8f0);
 }
 
 .banner-left h1 {
-  margin: 0 0 8px 0;
-  font-size: 1.8rem;
+  margin: 0 0 4px 0;
+  font-size: 1.4rem;
+  color: var(--text-main, #0f172a);
+  font-weight: 700;
 }
 
 .banner-left p {
   margin: 0;
-  opacity: 0.9;
+  color: var(--text-muted, #64748b);
+  font-size: 0.88rem;
 }
 
 .accounts-badge-number {
-  background: rgba(255, 255, 255, 0.2);
-  padding: 10px 20px;
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
+  background: var(--bg-subtle, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  color: var(--text-muted, #475569);
+  padding: 8px 16px;
+  border-radius: 8px;
 }
 
 .accounts-metrics-grid {

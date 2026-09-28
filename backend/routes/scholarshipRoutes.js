@@ -9,6 +9,15 @@ import {
   deleteScholarship,
 } from "../controllers/scholarshipController.js";
 
+import {
+  getScholarshipApplications,
+  createScholarshipApplication,
+} from "../controllers/scholarshipApplicationController.js";
+
+// Scholarship applications
+router.get("/applications", getScholarshipApplications);
+router.post("/applications", createScholarshipApplication);
+
 // Get all scholarships
 router.get("/", getScholarships);
 

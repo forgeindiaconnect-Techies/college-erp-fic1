@@ -40,7 +40,8 @@ import {
   getFeeStructures,
   getCourses
 } from "../../api/index";
-import useRealtimeSync from "../../hooks/useRealtimeSync";
+import useRealtimeSync, { emitERPDataUpdate } from "../../hooks/useRealtimeSync";
+
 
 const PRESET_QUOTAS = [
   { name: "General Quota", icon: GraduationCap, color: "#4f46e5", bg: "#eef2ff", border: "#c7d2fe", tag: "General" },
@@ -460,6 +461,7 @@ const QuotaManagement = () => {
         setSuccessMsg(`Quota "${form.quotaName}" added.`);
       }
 
+      emitERPDataUpdate(['quotas', 'admissions', 'students', 'fees'], 'saved', quotaPayload);
       setDrawerOpen(false);
       setEditingQuota(null);
       await loadData();
@@ -501,6 +503,7 @@ const QuotaManagement = () => {
       action: async () => {
         try {
           await deleteQuota(quota._id);
+          emitERPDataUpdate(['quotas', 'admissions', 'students', 'fees'], 'deleted', { id: quota._id });
           setSuccessMsg("Quota rule removed.");
           if (editingQuota && editingQuota._id === quota._id) {
             setDrawerOpen(false);
@@ -519,6 +522,7 @@ const QuotaManagement = () => {
     const newStatus = quota.status === "active" ? "inactive" : "active";
     try {
       await updateQuota(quota._id, { status: newStatus });
+      emitERPDataUpdate(['quotas', 'admissions', 'students', 'fees'], 'status_changed', { id: quota._id, status: newStatus });
       setSuccessMsg(`Status changed to ${newStatus}.`);
       await loadData();
     } catch (err) {
@@ -1041,7 +1045,7 @@ const QuotaManagement = () => {
                   const discValue = Number(item.discountValue || 0);
                   const normalVal = Number(item.normalFee || 0);
                   const calculatedDiscAmt = isPercentage ? Math.round((normalVal * discValue) / 100) : discValue;
-                  const computedFinal = Number(item.finalFee || Math.max(0, normalVal - calculatedDiscAmt));
+                  const computedFinal = normalVal > 0 ? Math.max(0, normalVal - calculatedDiscAmt) : Number(item.finalFee || 0);
                   const meta = getQuotaMeta(item.quotaName);
                   const IconComp = meta.icon || Award;
                   const deptDisplay = item.departmentName || (typeof item.department === "object" ? item.department?.name : item.department) || "All Departments";

@@ -10,13 +10,68 @@ import {
   getHostelBlocks, getHostelRooms, getHostelStudents, getHostelComplaints, getHostelRequests,
   allocateHostelRequest, updateHostelComplaint, getStudents, updateStudent
 } from '../../api/index';
-import useRealtimeSync from '../../hooks/useRealtimeSync';
+import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import './HostelManagement.css';
 
 const MOCK_VISITORS = [];
+
+// Step 58.1: Unified Student Hostel Fee & Payment Resolver
+export const getStudentHostelFeeInfo = (student) => {
+  if (!student) {
+    return {
+      hostelFee: 0,
+      paidAmount: 0,
+      dueAmount: 0,
+      hostelFeeStatus: 'pending',
+      isPaid: false,
+      isPartial: false
+    };
+  }
+
+  // Determine configured hostel fee amount
+  let hostelFee = 0;
+  if (student.hostelFeeAmount !== undefined && student.hostelFeeAmount !== null && student.hostelFeeAmount !== '') {
+    hostelFee = Number(student.hostelFeeAmount) || 0;
+  } else if (student.hostelFee !== undefined && student.hostelFee !== null && student.hostelFee !== '') {
+    hostelFee = Number(student.hostelFee) || 0;
+  } else if (student.feeBreakdown?.hostelFee !== undefined && student.feeBreakdown?.hostelFee !== null) {
+    hostelFee = Number(student.feeBreakdown.hostelFee) || 0;
+  } else if (student.feeStructure?.hostelFee !== undefined && student.feeStructure?.hostelFee !== null) {
+    hostelFee = Number(student.feeStructure.hostelFee) || 0;
+  } else {
+    hostelFee = 45000; // default baseline only if completely unconfigured
+  }
+
+  const rawStatus = (student.hostelFeeStatus || student.paymentStatus || student.feeStatus || 'pending').toString().toLowerCase();
+
+  let paidAmount = 0;
+  if (rawStatus === 'paid') {
+    paidAmount = hostelFee;
+  } else if (student.hostelPaidAmount !== undefined && student.hostelPaidAmount !== null) {
+    paidAmount = Math.min(hostelFee, Number(student.hostelPaidAmount) || 0);
+  } else if (rawStatus === 'partial' || rawStatus === 'partially paid') {
+    paidAmount = student.amountPaid !== undefined ? Math.min(hostelFee, Number(student.amountPaid) || Math.round(hostelFee / 2)) : Math.round(hostelFee / 2);
+  } else {
+    paidAmount = 0;
+  }
+
+  const dueAmount = Math.max(0, hostelFee - paidAmount);
+  const isPaid = (dueAmount === 0 && hostelFee > 0) || rawStatus === 'paid';
+  const isPartial = paidAmount > 0 && dueAmount > 0;
+  const computedStatus = isPaid ? 'paid' : isPartial ? 'partial' : 'pending';
+
+  return {
+    hostelFee,
+    paidAmount,
+    dueAmount,
+    hostelFeeStatus: computedStatus,
+    isPaid,
+    isPartial
+  };
+};
 
 const DEFAULT_MESS_MENU = [
   { day: 'Monday', breakfast: 'Idli, Sambar, Chutney, Tea', lunch: 'Steamed Rice, Dal Tadka, Paneer Butter Masala, Curd', dinner: 'Chapati, Mixed Veg Curry, Rice, Rasam' },
@@ -269,6 +324,8 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
 
       if (isHostel && hasAssignedRoom) {
         const key = s.id || s.rollNo || s._id;
+        const feeInfo = getStudentHostelFeeInfo(s);
+
         allocatedMap.set(key, {
           ...s,
           _id: s._id,
@@ -283,8 +340,13 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
           bedNumber: s.bedNumber || s.bed || '1',
           wardenName: s.wardenName || wardens[0]?.name || 'Mr. Ramesh Kumar',
           wardenContact: s.wardenContact || '+91 9876543210',
-          hostelFeeStatus: (s.hostelFeeStatus || s.feeStatus || 'pending').toLowerCase(),
-          hostelFeeAmount: Number(s.hostelFeeAmount || s.hostelFee || 45000)
+          hostelFeeAmount: feeInfo.hostelFee,
+          hostelFee: feeInfo.hostelFee,
+          hostelPaidAmount: feeInfo.paidAmount,
+          hostelDueAmount: feeInfo.dueAmount,
+          hostelFeeStatus: feeInfo.hostelFeeStatus,
+          isPaid: feeInfo.isPaid,
+          isPartial: feeInfo.isPartial
         });
       }
     });
@@ -296,6 +358,9 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
         const key = req.studentId || (req.student?._id || req.student);
         if (!key) return;
         const existing = allocatedMap.get(key) || {};
+        const combinedCandidate = { ...existing, ...req, hostelFeeAmount: req.hostelFee || existing.hostelFeeAmount, hostelFeeStatus: req.hostelFeeStatus || existing.hostelFeeStatus };
+        const feeInfo = getStudentHostelFeeInfo(combinedCandidate);
+
         allocatedMap.set(key, {
           ...existing,
           _id: req.student?._id || req.student || existing._id,
@@ -310,8 +375,13 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
           bedNumber: req.bed || existing.bedNumber || '1',
           wardenName: req.wardenName || existing.wardenName || wardens[0]?.name || 'Mr. Ramesh Kumar',
           wardenContact: req.wardenContact || existing.wardenContact || '+91 9876543210',
-          hostelFeeStatus: (req.hostelFeeStatus || existing.hostelFeeStatus || 'pending').toLowerCase(),
-          hostelFeeAmount: Number(req.hostelFee || existing.hostelFeeAmount || 45000)
+          hostelFeeAmount: feeInfo.hostelFee,
+          hostelFee: feeInfo.hostelFee,
+          hostelPaidAmount: feeInfo.paidAmount,
+          hostelDueAmount: feeInfo.dueAmount,
+          hostelFeeStatus: feeInfo.hostelFeeStatus,
+          isPaid: feeInfo.isPaid,
+          isPartial: feeInfo.isPartial
         });
       });
 
@@ -332,6 +402,7 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
   ];
 
   const handleOpenAllocate = (st) => {
+    const feeInfo = getStudentHostelFeeInfo(st);
     setAllocForm({
       studentId: st.id || st.rollNo || st._id,
       hostelName: st.hostelName && st.hostelName !== 'Unassigned' ? st.hostelName : 'Boys Hostel A',
@@ -340,8 +411,8 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
       bedNumber: st.bedNumber && st.bedNumber !== '--' ? st.bedNumber : '1',
       wardenName: st.wardenName || wardens[0]?.name || 'Mr. Ramesh Kumar',
       wardenContact: st.wardenContact || '+91 9876543210',
-      hostelFeeAmount: st.hostelFeeAmount || '45000',
-      hostelFeeStatus: st.hostelFeeStatus || 'paid'
+      hostelFeeAmount: feeInfo.hostelFee ? String(feeInfo.hostelFee) : '45000',
+      hostelFeeStatus: feeInfo.hostelFeeStatus || 'pending'
     });
     setShowAllocateModal(true);
   };
@@ -355,6 +426,7 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
     }
     
     try {
+      const feeNum = Number(allocForm.hostelFeeAmount) || 45000;
       const payload = {
         hostelRequired: 'yes',
         hostelerStatus: 'Hosteler',
@@ -367,7 +439,8 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
         bedNumber: allocForm.bedNumber,
         wardenName: allocForm.wardenName,
         wardenContact: allocForm.wardenContact,
-        hostelFeeAmount: allocForm.hostelFeeAmount ? Number(allocForm.hostelFeeAmount) : 45000,
+        hostelFeeAmount: feeNum,
+        hostelFee: feeNum,
         hostelFeeStatus: allocForm.hostelFeeStatus
       };
       
@@ -375,7 +448,11 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
         await allocateHostelRequest(allocForm.studentId, payload);
       } catch (allocErr) {
         console.warn('allocateHostelRequest note:', allocErr);
+      }
+      try {
         await updateStudent(allocForm.studentId, payload);
+      } catch (studErr) {
+        console.warn('updateStudent note:', studErr);
       }
       
       // Update local storage backup
@@ -384,9 +461,12 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
       const updated = saved.map(s => (s.id === allocForm.studentId || s.rollNo === allocForm.studentId || s._id === allocForm.studentId) ? { ...s, ...payload } : s);
       localStorage.setItem(tenantKey, JSON.stringify(updated));
 
+      // Trigger cross-dashboard real-time sync across all open modules
+      emitERPDataUpdate(['hostel', 'students', 'admissions', 'fees'], 'allocated', payload);
+
       alert(`Room ${allocForm.roomNumber} successfully allocated to student!`);
       setShowAllocateModal(false);
-      setAllocForm({ studentId:'', hostelName:'Boys Hostel A', blockWing:'A-Block', roomNumber:'', bedNumber:'1', wardenName:'Mr. Ramesh Kumar', wardenContact:'+91 9876543210', hostelFeeAmount:'45000', hostelFeeStatus:'paid' });
+      setAllocForm({ studentId:'', hostelName:'Boys Hostel A', blockWing:'A-Block', roomNumber:'', bedNumber:'1', wardenName:'Mr. Ramesh Kumar', wardenContact:'+91 9876543210', hostelFeeAmount:'45000', hostelFeeStatus:'pending' });
       fetchHostelData(true);
     } catch (err) {
       console.error('Failed to allocate hostel', err);
@@ -540,12 +620,9 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
 
   const pendingPasses = gatePasses.filter(p => p.status === 'Pending');
   const openComplaints = complaints.filter(c => c.status !== 'Resolved');
-  const feeDueStudents = allocatedStudents.filter(s => (s.hostelFeeStatus || '').toLowerCase() === 'pending' || (s.hostelFeeStatus || '').toLowerCase() === 'due');
-  const totalFeeCollected = allocatedStudents
-    .filter(s => (s.hostelFeeStatus || '').toLowerCase() === 'paid')
-    .reduce((sum, s) => sum + (Number(s.hostelFeeAmount) || 45000), 0);
-  const totalFeePending = feeDueStudents
-    .reduce((sum, s) => sum + (Number(s.hostelFeeAmount) || 45000), 0);
+  const feeDueStudents = allocatedStudents.filter(s => (s.hostelDueAmount || 0) > 0 || !s.isPaid);
+  const totalFeeCollected = allocatedStudents.reduce((sum, s) => sum + (Number(s.hostelPaidAmount) || 0), 0);
+  const totalFeePending = allocatedStudents.reduce((sum, s) => sum + (Number(s.hostelDueAmount) || 0), 0);
   const totalFeeExpected = totalFeeCollected + totalFeePending;
 
   return (
@@ -1135,8 +1212,18 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
                       </td>
                       <td>{hasAssignedRoom ? `Bed ${st.bedNumber || '1'}` : '--'}</td>
                       <td>
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${st.hostelFeeStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {st.hostelFeeStatus === 'paid' ? 'Paid' : 'Due ₹45,000'}
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                          st.isPaid || st.hostelFeeStatus === 'paid' 
+                            ? 'bg-green-100 text-green-700' 
+                            : st.isPartial 
+                              ? 'bg-yellow-100 text-yellow-800' 
+                              : 'bg-red-100 text-red-700'
+                        }`}>
+                          {st.isPaid || st.hostelFeeStatus === 'paid' 
+                            ? 'Paid' 
+                            : st.isPartial 
+                              ? `Partial (Due ₹${(st.hostelDueAmount || 0).toLocaleString()})` 
+                              : `Due ₹${(st.hostelDueAmount || st.hostelFeeAmount || 0).toLocaleString()}`}
                         </span>
                       </td>
                       <td>
@@ -1442,17 +1529,17 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
               </thead>
               <tbody>
                 {allocatedStudents.filter(s => (s.name || '').toLowerCase().includes(search.toLowerCase()) || (s.id || s.rollNo || '').toLowerCase().includes(search.toLowerCase())).map(st => {
-                  const totalFee = Number(st.hostelFeeAmount) || 45000;
-                  const isPaid = st.hostelFeeStatus === 'paid';
-                  const paidAmount = isPaid ? totalFee : 0;
-                  const dueAmount = isPaid ? 0 : totalFee;
+                  const totalFee = Number(st.hostelFeeAmount) || 0;
+                  const paidAmount = Number(st.hostelPaidAmount) || 0;
+                  const dueAmount = Number(st.hostelDueAmount) || 0;
+                  const isPaid = st.isPaid || dueAmount === 0;
                   
                   return (
                     <tr key={st.id || st.rollNo}>
                       <td className="font-mono text-sm">{st.id || st.rollNo}</td>
                       <td className="font-medium">{st.name}</td>
                       <td>{st.roomNumber || 'Unassigned'}</td>
-                      <td>₹{totalFee.toLocaleString()}</td>
+                      <td className="font-bold text-indigo-700">₹{totalFee.toLocaleString()}</td>
                       <td className="text-emerald-600 font-bold">₹{paidAmount.toLocaleString()}</td>
                       <td className={isPaid ? "text-emerald-600 font-bold" : "text-red-600 font-bold"}>
                         ₹{dueAmount.toLocaleString()}
@@ -1460,10 +1547,12 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
                       <td>
                         {isPaid ? (
                           <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Paid</span>
+                        ) : st.isPartial ? (
+                          <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">Partial Paid</span>
                         ) : (
                           <button 
                             className="btn-secondary text-xs py-1 px-2.5"
-                            onClick={() => alert(`Fee payment reminder SMS & Email sent to ${st.name} (${st.id || st.rollNo}).`)}
+                            onClick={() => alert(`Fee payment reminder SMS & Email sent to ${st.name} (${st.id || st.rollNo}) for ₹${dueAmount.toLocaleString()}.`)}
                           >
                             Send Reminder
                           </button>

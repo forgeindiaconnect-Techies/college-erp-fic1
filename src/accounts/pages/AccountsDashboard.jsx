@@ -247,19 +247,19 @@ const AccountsDashboard = () => {
   return (
     <div className="accounts-dashboard animate-fade-in">
       {/* Welcome Banner */}
-      <div className="accounts-welcome-banner" style={{ background: '#3730A5', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#ffffff', borderRadius: '12px' }}>
+      <div className="accounts-welcome-banner glass-card" style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-main, #1e293b)', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <div className="banner-left" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <h1 style={{ fontSize: '1.35rem', fontWeight: '700', margin: 0, lineHeight: 1.2, color: '#ffffff' }}>Finance & Accounts Dashboard</h1>
-          <p style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.9)', margin: 0, lineHeight: 1.4, fontWeight: 500 }}>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: '700', margin: 0, lineHeight: 1.2, color: 'var(--text-main, #0f172a)' }}>Finance & Accounts Dashboard</h1>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)', margin: 0, lineHeight: 1.4, fontWeight: 500 }}>
             Welcome back, {accountsSession?.name || 'Accounts Admin'}. Real-time department-level fee analytics & collections.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button onClick={() => fetchAll()} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '10px', color: 'white', padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', backdropFilter: 'blur(10px)' }}>
+          <button onClick={() => fetchAll()} style={{ background: 'var(--bg-muted, #f1f5f9)', border: '1px solid var(--border-color, #cbd5e1)', borderRadius: '8px', color: 'var(--text-main, #334155)', padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
             <RefreshCw size={15} /> Refresh Live
           </button>
-          <div className="accounts-badge-number">
-            <span>FISCAL YEAR: <strong>2026–2027</strong></span>
+          <div className="accounts-badge-number" style={{ background: 'var(--bg-subtle, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #475569)', padding: '6px 14px', borderRadius: '8px', fontSize: '0.85rem' }}>
+            <span>FISCAL YEAR: <strong style={{ color: 'var(--text-main, #0f172a)' }}>2026–2027</strong></span>
           </div>
         </div>
       </div>

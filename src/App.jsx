@@ -60,6 +60,7 @@ import ActivityLogs from './pages/activity-logs/ActivityLogs';
 import SystemAnalytics from './pages/analytics/SystemAnalytics';
 import LibraryManagement from './pages/library/LibraryManagement';
 import TransportManagement from './pages/transport/TransportManagement';
+import DriverManagement from './pages/admin/DriverManagement';
 import HostelManagement from './pages/hostel/HostelManagement';
 import HostelDashboard from './pages/hostel/HostelDashboard';
 import HostelLayout from './hostel/components/HostelLayout';
@@ -331,6 +332,10 @@ function App() {
 
     // Fetch college settings
     const fetchCollegeSettings = async () => {
+      if (!activeToken) {
+        setCollegeSettings(null);
+        return;
+      }
       try {
         const res = await getSettings();
         if (res.data) {
@@ -347,7 +352,6 @@ function App() {
           setCollegeSettings(null);
         }
       } catch (err) {
-        console.warn('Could not fetch college settings. Either not logged in or endpoint failed.');
         setCollegeSettings(null);
       }
     };
@@ -445,6 +449,7 @@ function App() {
               <Route path="reports"       element={<ReportsManagement />} />
               <Route path="library"       element={<LibraryManagement />} />
               <Route path="transport"     element={<TransportManagement />} />
+              <Route path="drivers"       element={<DriverManagement />} />
               <Route path="hostel"        element={<HostelDashboard />} />
               <Route path="hostel-dashboard" element={<HostelDashboard />} />
               <Route path="placement"     element={<PlacementManagement />} />
@@ -583,6 +588,7 @@ function App() {
               <Route path="route" element={<DriverRoute />} />
               <Route path="students" element={<DriverStudents />} />
               <Route path="trip" element={<DriverTripManagement />} />
+              <Route path="trips" element={<DriverTripManagement />} />
               <Route path="vehicle" element={<DriverVehicle />} />
               <Route path="tasks" element={<DriverTasks />} />
               <Route path="payroll" element={<DriverPayroll />} />

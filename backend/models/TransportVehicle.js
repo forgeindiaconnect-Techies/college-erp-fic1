@@ -6,6 +6,7 @@ const transportVehicleSchema = new mongoose.Schema({
   vehicleType: { type: String, required: true, default: 'Bus' }, // Bus, Van
   capacity: { type: Number, required: true, default: 50 },
   registrationNumber: { type: String, required: true },
+  collegeId: { type: String },
   insuranceExpiryDate: { type: Date, required: true },
   maintenanceStatus: { type: String, required: true, default: 'Good' }, // Good, Needs Service, Under Maintenance
   assignedRoute: { type: String }, // e.g. Route 1

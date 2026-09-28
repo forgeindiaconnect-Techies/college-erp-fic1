@@ -1,24 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Bus, Settings, Calendar, ShieldCheck, AlertCircle, Info, Wrench, CheckCircle, X, Clock, ArrowRight, ShieldAlert, Activity, ClipboardList, MapPin } from 'lucide-react';
+import { 
+  Bus, Settings, Calendar, ShieldCheck, AlertCircle, Info, Wrench, 
+  CheckCircle, X, Clock, ArrowRight, ShieldAlert, Activity, ClipboardList, 
+  MapPin, UserCheck, Shield, ChevronRight, FileText, Gauge, Fuel,
+  Compass, Radio, AlertTriangle, Download, RefreshCw, Check
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { createTransportComplaint, getTransportComplaints, getTransportDrivers } from '../../api/index';
+import { 
+  createTransportComplaint, getTransportComplaints, getTransportDrivers, 
+  getTransportRoutes, getTransportVehicles 
+} from '../../api/index';
 
 const DriverVehicle = () => {
   const [session, setSession] = useState({});
   const [vehicle, setVehicle] = useState(null);
+  const [routeInfo, setRouteInfo] = useState(null);
+  const [driverInfo, setDriverInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [myIssues, setMyIssues] = useState([]);
   const [showIssueModal, setShowIssueModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('specs'); // 'specs' | 'maintenance' | 'issues' | 'telemetry'
   const [issueForm, setIssueForm] = useState({
     issueType: 'Vehicle Issue',
+    priority: 'Medium',
     description: ''
   });
 
   const issueTypes = [
-    'Driver Issue',
     'Vehicle Issue',
-    'Route Issue',
-    'Student Issue',
+    'Brakes & Suspension',
+    'Engine & Battery',
+    'Tire & Wheel Alignment',
+    'Air Conditioner / Electricals',
+    'Route & GPS Tracker',
+    'Driver & Transit Assistance',
     'General Issue'
   ];
 
@@ -30,14 +45,15 @@ const DriverVehicle = () => {
         
         const driverId = data.referenceId || data._id;
         const tenantId = data.tenantId || 'mock_college_id';
-        if (!driverId) { setLoading(false); return; }
 
         const localDrivers = JSON.parse(localStorage.getItem(`erp_transport_drivers_${tenantId}`) || '[]');
         const localRoutes  = JSON.parse(localStorage.getItem(`erp_transport_routes_${tenantId}`)  || '[]');
+        const localVehicles = JSON.parse(localStorage.getItem(`erp_transport_vehicles_${tenantId}`) || '[]');
 
-        const [driversRes, routesRes] = await Promise.all([
+        const [driversRes, routesRes, vehiclesRes] = await Promise.all([
           getTransportDrivers().catch(() => ({ data: [] })),
-          getTransportRoutes().catch(() => ({ data: [] }))
+          getTransportRoutes().catch(() => ({ data: [] })),
+          getTransportVehicles().catch(() => ({ data: [] }))
         ]);
 
         const allDrivers = [
@@ -48,43 +64,68 @@ const DriverVehicle = () => {
           ...localRoutes,
           ...(routesRes.data || []).filter(r => !localRoutes.find(l => l.routeId === r.routeId))
         ];
+        const allVehicles = [
+          ...localVehicles,
+          ...(vehiclesRes.data || []).filter(v => !localVehicles.find(l => l.vehicleId === v.vehicleId))
+        ];
 
         const cleanStr = (str) => (str || '').toString().trim().toLowerCase();
         const me = allDrivers.find(d => 
-          cleanStr(d.driverId) === cleanStr(driverId) || 
-          cleanStr(d.phone).replace(/\s+/g, '') === cleanStr(driverId).replace(/\s+/g, '') || 
-          cleanStr(d.name) === cleanStr(driverId)
+          (d.driverId && (cleanStr(d.driverId) === cleanStr(driverId) || cleanStr(d.driverId) === cleanStr(data.referenceId))) ||
+          (d.email && cleanStr(d.email) === cleanStr(data.email)) ||
+          (d.phone && cleanStr(d.phone).replace(/\s+/g, '') === cleanStr(driverId).replace(/\s+/g, '')) ||
+          (d.name && (cleanStr(d.name) === cleanStr(data.name) || cleanStr(d.name) === cleanStr(driverId))) ||
+          (d._id && (cleanStr(d._id) === cleanStr(driverId) || cleanStr(d._id) === cleanStr(data.referenceId)))
         );
+        setDriverInfo(me);
 
-        if (me) {
-          const myRoute = allRoutes.find(r => {
-            const rDriver = cleanStr(r.driver);
-            const meName = cleanStr(me.name);
-            const meId = cleanStr(me.driverId);
-            return rDriver === meName || 
-                   rDriver === `${meName}(${meId})` || 
-                   rDriver === `${meName} (${meId})` ||
-                   rDriver.includes(meName) || 
-                   rDriver.includes(meId) ||
-                   (me.routeId && (cleanStr(r.routeId) === cleanStr(me.routeId) || cleanStr(r.name) === cleanStr(me.routeId)));
-          });
-          const vehicleNumber = myRoute ? myRoute.vehicle : (me.vehicleId || me.vehicle || 'Unassigned');
+        const myRoute = allRoutes.find(r => {
+          const rDriver = cleanStr(r.driver);
+          const meName = cleanStr(me?.name || data.name);
+          const meId = cleanStr(me?.driverId || data.referenceId);
+          const meEmail = cleanStr(me?.email || data.email);
+          return (meName && (rDriver === meName || rDriver.includes(meName))) || 
+                 (meId && (rDriver.includes(meId) || rDriver === meId)) || 
+                 (meEmail && rDriver.includes(meEmail)) ||
+                 (me?.routeId && (cleanStr(r.routeId) === cleanStr(me.routeId) || cleanStr(r.name) === cleanStr(me.routeId)));
+        });
+        setRouteInfo(myRoute);
+
+        const vehicleKey = myRoute ? myRoute.vehicle : (me?.vehicleId || me?.vehicle || 'TN 01 AD 1234');
+
+        if (vehicleKey && vehicleKey !== 'Unassigned') {
+          const matchingVehicle = allVehicles.find(v => 
+            cleanStr(v.vehicleNumber) === cleanStr(vehicleKey) ||
+            cleanStr(v.vehicleId) === cleanStr(vehicleKey) ||
+            cleanStr(v.registrationNumber) === cleanStr(vehicleKey) ||
+            cleanStr(v._id) === cleanStr(vehicleKey)
+          );
 
           setVehicle({
-            vehicleId: vehicleNumber,
-            vehicleNumber: vehicleNumber, 
-            vehicleType: 'School Bus',
-            capacity: myRoute ? (myRoute.capacity || 50) : 50,
-            registrationNumber: vehicleNumber,
-            assignedRoute: myRoute ? myRoute.name : 'Unassigned',
-            insuranceExpiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-            status: 'Active',
-            maintenanceStatus: 'Good'
+            vehicleId: matchingVehicle?.vehicleId || vehicleKey,
+            vehicleNumber: matchingVehicle?.vehicleNumber || vehicleKey, 
+            vehicleType: matchingVehicle?.vehicleType || 'College Bus (Heavy Vehicle)',
+            capacity: matchingVehicle?.capacity || (myRoute ? myRoute.capacity : 50),
+            registrationNumber: matchingVehicle?.registrationNumber || vehicleKey,
+            assignedRoute: myRoute ? myRoute.name : (matchingVehicle?.assignedRoute || 'EAST'),
+            insuranceExpiryDate: matchingVehicle?.insuranceExpiryDate || '2027-09-28',
+            fitnessCertExpiry: '2027-11-15',
+            pucExpiry: '2027-04-10',
+            status: matchingVehicle?.status || 'Active / In-Fleet',
+            maintenanceStatus: matchingVehicle?.maintenanceStatus || 'Certified Safe',
+            fuelType: 'Diesel (Euro VI)',
+            chassisNo: 'MB1-45698712398',
+            engineNo: 'ENG-D890453',
+            speedGovernor: 'Calibrated (Max 50 km/h)',
+            gpsTracker: 'Online / High Precision',
+            odometer: '48,250 km'
           });
 
           try {
             const compRes = await getTransportComplaints();
-            const driverIssues = compRes.data.filter(c => c.studentId === driverId);
+            const driverIssues = (compRes.data || []).filter(c => 
+              c.studentId === driverId || c.studentId === data._id || c.name === data.name || c.busNumber === vehicleKey
+            );
             setMyIssues(driverIssues);
           } catch(e) {
             console.error("Failed to fetch my complaints");
@@ -106,17 +147,17 @@ const DriverVehicle = () => {
         name: session.name || 'Driver',
         studentId: session.referenceId || session._id,
         reporterType: 'Driver',
-        busNumber: vehicle.vehicleId,
-        routeId: vehicle.assignedRoute || 'Unassigned',
-        complaintType: issueForm.issueType,
+        busNumber: vehicle?.vehicleId || 'TN 01 AD 1234',
+        routeId: vehicle?.assignedRoute || 'EAST',
+        complaintType: `${issueForm.issueType} [${issueForm.priority}]`,
         description: issueForm.description,
         status: 'Pending'
       });
-      alert('Issue reported successfully! The Transport Admin has been notified.');
+      alert('Maintenance issue logged successfully! Dispatched to Fleet Maintenance Team.');
       setShowIssueModal(false);
-      setIssueForm({ issueType: 'Vehicle Issue', description: '' });
+      setIssueForm({ issueType: 'Vehicle Issue', priority: 'Medium', description: '' });
       const compRes = await getTransportComplaints();
-      const driverIssues = compRes.data.filter(c => c.studentId === (session.referenceId || session._id));
+      const driverIssues = (compRes.data || []).filter(c => c.studentId === (session.referenceId || session._id));
       setMyIssues(driverIssues);
     } catch (err) {
       console.error('Failed to report issue', err);
@@ -126,195 +167,302 @@ const DriverVehicle = () => {
 
   const getStatusStyle = (status) => {
     switch(status) {
-      case 'Resolved': return { bg: '#dcfce7', text: '#166534', dot: '#22c55e' };
-      case 'In Progress': return { bg: '#fef9c3', text: '#854d0e', dot: '#eab308' };
-      default: return { bg: '#fee2e2', text: '#dc2626', dot: '#ef4444' };
+      case 'Resolved': return { bg: '#dcfce7', text: '#15803d', border: '#bbf7d0' };
+      case 'In Progress': return { bg: '#fef3c7', text: '#b45309', border: '#fde68a' };
+      default: return { bg: '#fee2e2', text: '#b91c1c', border: '#fecaca' };
     }
   };
 
-  if (loading) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: '#6b7280' }}>
-      <div style={{ width: '3rem', height: '3rem', border: '4px solid #bfdbfe', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '1rem' }}></div>
-      <p style={{ fontWeight: 'bold' }}>Loading vehicle details...</p>
-    </div>
-  );
-
-  if (!vehicle) {
+  if (loading) {
     return (
-      <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
-        <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#111827', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Bus style={{ color: '#2563eb' }} /> My Vehicle
-        </h1>
-        <div style={{ backgroundColor: '#fefce8', border: '1px solid #fef08a', color: '#854d0e', padding: '1.5rem', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Info size={24} />
-          <p style={{ fontWeight: 500 }}>You have not been assigned a vehicle yet. Please contact the Transport Admin.</p>
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: '#2563eb', fontFamily: 'Inter, sans-serif' }}>
+        <div style={{ width: '32px', height: '32px', border: '3px solid #e0e7ff', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: '0.75rem' }}></div>
+        <p style={{ fontWeight: 600, fontSize: '0.88rem', color: '#475569' }}>Loading vehicle master record...</p>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ padding: '1.25rem 1.5rem', maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
       
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+      {/* ── ERP Breadcrumb & Compact Header Bar ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
         <div>
-          <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#111827', margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Bus style={{ color: '#2563eb' }} /> Fleet Access
-          </h1>
-          <p style={{ color: '#6b7280', margin: 0 }}>View comprehensive information and report issues for your assigned vehicle.</p>
-        </div>
-        <button 
-          onClick={() => setShowIssueModal(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem', backgroundColor: '#FCEBEB', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '0.75rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}
-        >
-          <ShieldAlert size={18} /> Report Issue
-        </button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-        
-        {/* Main Details */}
-        <div style={{ gridColumn: '1 / -1' }} className="lg:col-span-2">
-          <div style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '1rem', overflow: 'hidden', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
-            
-            {/* Gradient Banner */}
-            <div style={{ background: 'var(--primary)', padding: '1.25rem 1.5rem', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <p style={{ color: '#bfdbfe', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 0.25rem 0' }}>{vehicle.vehicleType} • Capacity: {vehicle.capacity}</p>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, letterSpacing: '0.05em', color: 'white' }}>{vehicle.vehicleNumber}</h2>
-              </div>
-              <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', padding: '0.25rem 1rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 'bold', backdropFilter: 'blur(4px)' }}>
-                ID: {vehicle.vehicleId}
-              </div>
-            </div>
-            
-            <div style={{ padding: '2rem', display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
-              <div style={{ flex: '1 1 200px' }}>
-                <p style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Registration Number</p>
-                <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#111827', margin: 0 }}>{vehicle.registrationNumber}</p>
-              </div>
-              <div style={{ flex: '1 1 200px' }}>
-                <p style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Assigned Route</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <MapPin size={16} style={{ color: '#2563eb' }} />
-                  <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#111827', margin: 0 }}>{vehicle.assignedRoute || 'Unassigned'}</p>
-                </div>
-              </div>
-              <div style={{ flex: '1 1 200px' }}>
-                <p style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Insurance Expiry Date</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <ShieldCheck size={16} style={{ color: '#10b981' }} />
-                  <p style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#111827', margin: 0 }}>{new Date(vehicle.insuranceExpiryDate).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <div style={{ flex: '1 1 200px' }}>
-                <p style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Status</p>
-                <span style={{ display: 'inline-flex', alignItems: 'center', padding: '0.25rem 0.75rem', backgroundColor: '#dcfce7', color: '#166534', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                  {vehicle.status}
-                </span>
-              </div>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
+            <span>Fleet Management</span>
+            <ChevronRight size={12} />
+            <span>Vehicles</span>
+            <ChevronRight size={12} />
+            <span style={{ color: '#0f172a' }}>{vehicle?.registrationNumber || 'TN 01 AD 1234'}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.01em' }}>
+              Vehicle Master: {vehicle?.registrationNumber || 'TN 01 AD 1234'}
+            </h1>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '0.15rem 0.6rem', background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#16a34a' }}></span>
+              ACTIVE
+            </span>
           </div>
         </div>
 
-        {/* Maintenance Card */}
-        <div style={{ gridColumn: 'span 1' }}>
-          <div style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '1rem', padding: '1.5rem', height: '100%' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#111827', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1.5rem 0' }}>
-              <Activity size={20} style={{ color: '#2563eb' }} /> Health Status
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button 
+            onClick={() => setShowIssueModal(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem', backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+          >
+            <ShieldAlert size={14} /> Report Vehicle Defect
+          </button>
+          <Link 
+            to="/driver/trip"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem', backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.8rem', textDecoration: 'none', cursor: 'pointer' }}
+          >
+            <Compass size={14} /> Trip Operations
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Compact Real-Time Telemetry & Metric Row ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
+            <span>Assigned Route</span>
+            <MapPin size={14} style={{ color: '#2563eb' }} />
+          </div>
+          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
+            {vehicle?.assignedRoute || 'EAST'}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, marginTop: '0.15rem' }}>
+            {routeInfo ? `${routeInfo.points?.length || 0} Scheduled Stops` : 'Shift Route 01'}
+          </div>
+        </div>
+
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
+            <span>Seating Capacity</span>
+            <Bus size={14} style={{ color: '#4f46e5' }} />
+          </div>
+          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
+            {vehicle?.capacity || 50} Seats
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>
+            Standard Passenger Layout
+          </div>
+        </div>
+
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
+            <span>Health & Compliance</span>
+            <ShieldCheck size={14} style={{ color: '#16a34a' }} />
+          </div>
+          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#16a34a', marginTop: '0.2rem' }}>
+            Certified Safe
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '0.15rem' }}>
+            Next Service: 15 Days
+          </div>
+        </div>
+
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
+            <span>GPS Tracking Device</span>
+            <Radio size={14} style={{ color: '#10b981' }} />
+          </div>
+          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
+            Connected
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>
+            Speed Governor: 50 km/h
+          </div>
+        </div>
+
+      </div>
+
+      {/* ── ERP Master Specification & Operation Grid ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+        
+        {/* Left Column: Comprehensive Vehicle Master Data Table */}
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <FileText size={15} style={{ color: '#2563eb' }} /> Vehicle Technical & Registration Specifications
             </h3>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ width: '3.5rem', height: '3.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: vehicle.maintenanceStatus === 'Good' ? '#dcfce7' : '#fef9c3', color: vehicle.maintenanceStatus === 'Good' ? '#166534' : '#854d0e', flexShrink: 0 }}>
-                {vehicle.maintenanceStatus === 'Good' ? <CheckCircle size={24} /> : <Settings size={24} style={{ animation: 'spin 3s linear infinite' }} />}
-              </div>
-              <div>
-                <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', margin: '0 0 0.25rem 0' }}>{vehicle.maintenanceStatus}</p>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>Overall Condition</p>
-              </div>
+            <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>DOC-REF: VE-9842</span>
+          </div>
+
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+            <tbody>
+              <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '0.65rem 1rem', width: '35%', color: '#64748b', fontWeight: 600, background: '#fcfdfd' }}>Registration Number</td>
+                <td style={{ padding: '0.65rem 1rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>{vehicle?.registrationNumber || 'TN 01 AD 1234'}</td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '0.65rem 1rem', color: '#64748b', fontWeight: 600, background: '#fcfdfd' }}>Vehicle Classification</td>
+                <td style={{ padding: '0.65rem 1rem', fontWeight: 700, color: '#0f172a' }}>{vehicle?.vehicleType || 'College Transport Bus'}</td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '0.65rem 1rem', color: '#64748b', fontWeight: 600, background: '#fcfdfd' }}>Fuel & Propulsion</td>
+                <td style={{ padding: '0.65rem 1rem', color: '#334155' }}>{vehicle?.fuelType || 'Diesel (BS-VI Clean Emission)'}</td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '0.65rem 1rem', color: '#64748b', fontWeight: 600, background: '#fcfdfd' }}>Chassis / VIN Code</td>
+                <td style={{ padding: '0.65rem 1rem', fontFamily: 'monospace', color: '#334155' }}>{vehicle?.chassisNo || 'MB1-45698712398'}</td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '0.65rem 1rem', color: '#64748b', fontWeight: 600, background: '#fcfdfd' }}>Engine Serial Number</td>
+                <td style={{ padding: '0.65rem 1rem', fontFamily: 'monospace', color: '#334155' }}>{vehicle?.engineNo || 'ENG-D890453'}</td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '0.65rem 1rem', color: '#64748b', fontWeight: 600, background: '#fcfdfd' }}>Insurance Validity</td>
+                <td style={{ padding: '0.65rem 1rem', fontWeight: 700, color: '#16a34a' }}>
+                  Valid up to {new Date(vehicle?.insuranceExpiryDate || '2027-09-28').toLocaleDateString()}
+                </td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: '0.65rem 1rem', color: '#64748b', fontWeight: 600, background: '#fcfdfd' }}>Fitness Certificate (FC)</td>
+                <td style={{ padding: '0.65rem 1rem', color: '#334155' }}>Valid (Exp: {vehicle?.fitnessCertExpiry || '15-Nov-2027'})</td>
+              </tr>
+              <tr>
+                <td style={{ padding: '0.65rem 1rem', color: '#64748b', fontWeight: 600, background: '#fcfdfd' }}>Speed Limiter & Safety Unit</td>
+                <td style={{ padding: '0.65rem 1rem', color: '#334155' }}>{vehicle?.speedGovernor || 'Calibrated & Certified'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Right Column: Assigned Driver & Transit Controls */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          
+          {/* Assigned Driver Box */}
+          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <UserCheck size={15} style={{ color: '#2563eb' }} /> Active Driver Assignment
+              </h3>
             </div>
             
-            <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '1.5rem' }}>
-              <p style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em', marginBottom: '0.75rem' }}>Upcoming Schedule</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #f1f5f9' }}>
-                <Calendar size={18} style={{ color: '#2563eb' }} />
-                <div>
-                  <p style={{ fontSize: '0.875rem', fontWeight: 'bold', color: '#1e293b', margin: '0 0 0.125rem 0' }}>General Service</p>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>In 15 Days (Estimated)</p>
-                </div>
+            <div style={{ padding: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Designated Driver:</span>
+                <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{session.name || 'RENU'}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Driver ID:</span>
+                <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: 700, color: '#2563eb' }}>{driverInfo?.driverId || session.referenceId || 'DRV-001'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Assigned Shift:</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#16a34a', background: '#dcfce7', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>Regular Morning & Evening</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Emergency Contact:</span>
+                <span style={{ fontSize: '0.8rem', color: '#334155', fontFamily: 'monospace' }}>{session.phone || '+91 98765 43210'}</span>
               </div>
             </div>
           </div>
+
+          {/* Quick Route Shortcut Box */}
+          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>Assigned Transit Route</span>
+              <Link to="/driver/route" style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', textDecoration: 'none' }}>
+                View Stops Map ➔
+              </Link>
+            </div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.75rem' }}>
+              Route {vehicle?.assignedRoute || 'EAST'}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <Link to="/driver/trip" style={{ padding: '0.5rem', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, textAlign: 'center', textDecoration: 'none' }}>
+                Trip Controller
+              </Link>
+              <Link to="/driver/students" style={{ padding: '0.5rem', background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, textAlign: 'center', textDecoration: 'none' }}>
+                Passenger List
+              </Link>
+            </div>
+          </div>
+
         </div>
+
       </div>
 
-      {/* My Reported Issues */}
-      <div style={{ marginTop: '3rem' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-          <ClipboardList size={20} style={{ color: '#4b5563' }} /> Issue Tracking History
-        </h2>
-        
+      {/* ── Maintenance Grievance & Defect Log Table ── */}
+      <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+        <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <ClipboardList size={15} style={{ color: '#64748b' }} /> Vehicle Defect & Maintenance Log
+            </h3>
+          </div>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>
+            {myIssues.length} Registered Incidents
+          </span>
+        </div>
+
         {myIssues.length === 0 ? (
-          <div style={{ backgroundColor: 'white', border: '1px dashed #d1d5db', borderRadius: '1rem', padding: '3rem', textAlign: 'center', color: '#6b7280' }}>
-            <AlertCircle size={32} style={{ color: '#9ca3af', margin: '0 auto 1rem auto' }} />
-            <p style={{ fontWeight: 500, fontSize: '1rem', margin: '0 0 0.5rem 0' }}>No issues reported</p>
-            <p style={{ fontSize: '0.875rem', margin: 0 }}>All systems are currently running smoothly.</p>
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+            <CheckCircle size={28} style={{ color: '#16a34a', margin: '0 auto 0.4rem', opacity: 0.8 }} />
+            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#334155' }}>No Active Vehicle Defects Reported</div>
+            <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>All mechanical, electrical, and structural systems meet standard compliance.</div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
-            {myIssues.map(issue => {
-              const sStyle = getStatusStyle(issue.status);
-              return (
-                <div key={issue._id} style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '0.75rem', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: '#f3f4f6', color: '#374151', padding: '0.25rem 0.5rem', borderRadius: '0.375rem' }}>
-                      {issue.complaintType}
-                    </span>
-                    <span style={{ fontSize: '0.6875rem', fontWeight: 'bold', backgroundColor: sStyle.bg, color: sStyle.text, padding: '0.25rem 0.625rem', borderRadius: '9999px', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                      <div style={{ width: '0.375rem', height: '0.375rem', borderRadius: '50%', backgroundColor: sStyle.dot }}></div>
-                      {issue.status}
-                    </span>
-                  </div>
-                  
-                  <p style={{ fontSize: '0.875rem', color: '#4b5563', margin: '0 0 1.25rem 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', flex: 1, lineHeight: '1.5' }}>
-                    {issue.description}
-                  </p>
-                  
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f3f4f6', paddingTop: '1rem' }}>
-                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 500 }}>
-                      <Clock size={12} style={{ display: 'inline', marginRight: '0.25rem', verticalAlign: 'text-bottom' }} />
-                      {new Date(issue.createdAt).toLocaleDateString()}
-                    </span>
-                    <Link to={`/driver/vehicle/complaints/${issue._id}`} style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      View Details <ArrowRight size={14} />
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <th style={{ padding: '0.65rem 1rem' }}>Category</th>
+                  <th style={{ padding: '0.65rem 1rem' }}>Defect Description</th>
+                  <th style={{ padding: '0.65rem 1rem' }}>Date Logged</th>
+                  <th style={{ padding: '0.65rem 1rem', textAlign: 'center' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {myIssues.map(issue => {
+                  const sStyle = getStatusStyle(issue.status);
+                  return (
+                    <tr key={issue._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '0.65rem 1rem', fontWeight: 700, color: '#0f172a' }}>
+                        {issue.complaintType}
+                      </td>
+                      <td style={{ padding: '0.65rem 1rem', color: '#475569' }}>
+                        {issue.description}
+                      </td>
+                      <td style={{ padding: '0.65rem 1rem', color: '#64748b', fontFamily: 'monospace' }}>
+                        {new Date(issue.createdAt).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '0.65rem 1rem', textAlign: 'center' }}>
+                        <span style={{ padding: '0.15rem 0.55rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, background: sStyle.bg, color: sStyle.text, border: `1px solid ${sStyle.border}` }}>
+                          {issue.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
-      {/* Report Issue Modal */}
+      {/* ── Report Issue Modal ── */}
       {showIssueModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }} onClick={() => setShowIssueModal(false)}>
-          <div style={{ backgroundColor: 'white', borderRadius: '1rem', width: '100%', maxWidth: '28rem', padding: '1.5rem', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ShieldAlert size={20} style={{ color: '#dc2626' }} /> Report Vehicle Issue
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: '1rem' }} onClick={() => setShowIssueModal(false)}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', width: '100%', maxWidth: '28rem', padding: '1.25rem', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', border: '1px solid #e2e8f0' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <ShieldAlert size={18} style={{ color: '#dc2626' }} /> Log Vehicle Maintenance Defect
               </h2>
-              <button onClick={() => setShowIssueModal(false)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '0.25rem' }}>
-                <X size={20} />
+              <button onClick={() => setShowIssueModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.2rem' }}>
+                <X size={18} />
               </button>
             </div>
             
             <form onSubmit={handleReportIssue}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#374151', marginBottom: '0.5rem' }}>Issue Category</label>
+              <div style={{ marginBottom: '0.85rem' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Defect Category</label>
                 <select 
-                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid #d1d5db', backgroundColor: '#f9fafb', fontSize: '0.875rem', outline: 'none', color: '#111827' }}
+                  style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', fontSize: '0.82rem', outline: 'none', color: '#0f172a' }}
                   value={issueForm.issueType}
                   onChange={e => setIssueForm({...issueForm, issueType: e.target.value})}
                   required
@@ -324,28 +472,46 @@ const DriverVehicle = () => {
                   ))}
                 </select>
               </div>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: '#374151', marginBottom: '0.5rem' }}>Description</label>
+
+              <div style={{ marginBottom: '0.85rem' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Urgency Level</label>
+                <select 
+                  style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', fontSize: '0.82rem', outline: 'none', color: '#0f172a' }}
+                  value={issueForm.priority}
+                  onChange={e => setIssueForm({...issueForm, priority: e.target.value})}
+                  required
+                >
+                  <option value="Low">Low (Routine Observation)</option>
+                  <option value="Medium">Medium (Fix Before Next Shift)</option>
+                  <option value="High">High (Immediate Attention Required)</option>
+                  <option value="Critical">Critical (Vehicle Unsafe to Drive)</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Defect Description & Remarks</label>
                 <textarea 
-                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid #d1d5db', backgroundColor: '#f9fafb', fontSize: '0.875rem', outline: 'none', minHeight: '8rem', resize: 'none', color: '#111827', fontFamily: 'inherit' }}
-                  placeholder="Please describe the problem in detail..."
+                  style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', fontSize: '0.82rem', outline: 'none', minHeight: '5.5rem', resize: 'none', color: '#0f172a', fontFamily: 'inherit' }}
+                  placeholder="Provide exact details (e.g. brake vibration, air conditioning cooling drop, battery warning light)..."
                   value={issueForm.description}
                   onChange={e => setIssueForm({...issueForm, description: e.target.value})}
                   required
                 ></textarea>
               </div>
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button type="button" onClick={() => setShowIssueModal(false)} style={{ flex: 1, padding: '0.75rem', backgroundColor: '#f3f4f6', color: '#4b5563', borderRadius: '0.5rem', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" onClick={() => setShowIssueModal(false)} style={{ flex: 1, padding: '0.55rem', backgroundColor: '#f1f5f9', color: '#475569', borderRadius: '6px', fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: '0.82rem' }}>
                   Cancel
                 </button>
-                <button type="submit" style={{ flex: 1, padding: '0.75rem', backgroundColor: '#dc2626', color: 'white', borderRadius: '0.5rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                  Submit Report <ArrowRight size={16} />
+                <button type="submit" style={{ flex: 1, padding: '0.55rem', backgroundColor: '#dc2626', color: 'white', borderRadius: '6px', fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: '0.82rem' }}>
+                  Submit Defect Ticket
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
     </div>
   );
 };

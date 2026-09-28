@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, MapPin, User, Phone, CheckCircle2, AlertCircle, Calendar, MessageSquare, Users } from 'lucide-react';
-import { getStudentById, getStudentHostelComplaints, createHostelComplaint } from '../../api/index';
+import { Home, MapPin, User, Phone, CheckCircle2, AlertCircle, Calendar, MessageSquare, Users, CreditCard } from 'lucide-react';
+import { getStudentById, getStudentHostelComplaints, createHostelComplaint, updateStudent } from '../../api/index';
+import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
+import { getStudentHostelFeeInfo } from '../../pages/hostel/HostelDashboard';
 import './StudentDashboard.css';
 
 const DEFAULT_STUDENT = {
@@ -182,64 +184,70 @@ const StudentHostel = () => {
         console.error("Failed to parse saved mess menu", e);
       }
     }
+  }, []);
 
-    const init = async () => {
-      const session = sessionStorage.getItem('student_session');
-      let activeStud = DEFAULT_STUDENT;
-      if (session) {
-        activeStud = JSON.parse(session);
-      } else {
-        navigate('/student/login');
-        return;
+  const loadHostelDetails = useCallback(async () => {
+    const session = sessionStorage.getItem('student_session');
+    let activeStud = DEFAULT_STUDENT;
+    if (session) {
+      activeStud = JSON.parse(session);
+    } else {
+      navigate('/student/login');
+      return;
+    }
+
+    try {
+      const studentId = activeStud.referenceId || activeStud.id || activeStud._id;
+      const res = await getStudentById(studentId).catch(() => null);
+      let dbRecord = res?.data || null;
+
+      if (!dbRecord) {
+        // Fallback to local storage or session
+        const erpStudents = JSON.parse(localStorage.getItem(`erp_students_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
+        dbRecord = erpStudents.find(s => s.rollNo === activeStud.id || s.id === activeStud.id || s._id === activeStud.id) || activeStud;
       }
 
-      try {
-        const studentId = activeStud.referenceId || activeStud.id || activeStud._id;
-        const res = await getStudentById(studentId).catch(() => null);
-        let dbRecord = res?.data || null;
+      setStudentDetails(dbRecord);
 
-        if (!dbRecord) {
-          // Fallback to local storage or session
-          const erpStudents = JSON.parse(localStorage.getItem(`erp_students_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
-          dbRecord = erpStudents.find(s => s.rollNo === activeStud.id || s.id === activeStud.id) || activeStud;
+      if (dbRecord) {
+        fetchComplaints(dbRecord.id || dbRecord.referenceId);
+
+        // Load visitor records filtered by student name
+        try {
+          const savedVisitors = JSON.parse(localStorage.getItem(`erp_hostel_visitors_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
+          const studentName = dbRecord.name || '';
+          const filtered = savedVisitors.filter(v =>
+            v.student?.toLowerCase().includes(studentName.toLowerCase().split(' ')[0])
+          );
+          setMyVisitors(filtered);
+        } catch (e) {
+          setMyVisitors([]);
         }
 
-        setStudentDetails(dbRecord);
-
-        if (dbRecord) {
-          fetchComplaints(dbRecord.id || dbRecord.referenceId);
-
-          // Load visitor records filtered by student name
-          try {
-            const savedVisitors = JSON.parse(localStorage.getItem(`erp_hostel_visitors_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
-            const studentName = dbRecord.name || '';
-            const filtered = savedVisitors.filter(v =>
-              v.student?.toLowerCase().includes(studentName.toLowerCase().split(' ')[0])
-            );
-            setMyVisitors(filtered);
-          } catch (e) {
-            setMyVisitors([]);
-          }
-
-          // Check if attendance already marked today
-          try {
-            const today = new Date().toISOString().split('T')[0];
-            const attendanceLog = JSON.parse(localStorage.getItem(`erp_hostel_attendance_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
-            const isMarked = attendanceLog.some(a => 
-              (a.studentId === dbRecord.id || a.studentId === dbRecord.referenceId) && 
-              a.date === today
-            );
-            setAttendanceMarked(isMarked);
-          } catch (e) {}
-        }
-      } catch (err) {
-        console.error("Failed to load hostel details", err);
-      } finally {
-        setLoading(false);
+        // Check if attendance already marked today
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          const attendanceLog = JSON.parse(localStorage.getItem(`erp_hostel_attendance_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
+          const isMarked = attendanceLog.some(a => 
+            (a.studentId === dbRecord.id || a.studentId === dbRecord.referenceId) && 
+            a.date === today
+          );
+          setAttendanceMarked(isMarked);
+        } catch (e) {}
       }
-    };
-    init();
+    } catch (err) {
+      console.error("Failed to load hostel details", err);
+    } finally {
+      setLoading(false);
+    }
   }, [navigate]);
+
+  // Hook real-time sync for instant multi-dashboard updates
+  useRealtimeSync(loadHostelDetails, ['hostel', 'students', 'leaves', 'attendance', 'fees']);
+
+  useEffect(() => {
+    loadHostelDetails();
+  }, [loadHostelDetails]);
 
   if (loading || !studentDetails) {
     return (
@@ -249,7 +257,47 @@ const StudentHostel = () => {
     );
   }
 
-  const isHosteller = studentDetails?.hostelRequired === 'yes';
+  const isHosteller =
+    String(studentDetails?.hostelRequired || '').toLowerCase() === 'yes' ||
+    studentDetails?.hostelRequired === true ||
+    String(studentDetails?.hostelOpted || '').toLowerCase() === 'yes' ||
+    studentDetails?.hostelOpted === true ||
+    Boolean(studentDetails?.hostelBlock || studentDetails?.roomNumber || studentDetails?.blockWing || studentDetails?.hostelName);
+
+  const handleApplyHostel = async () => {
+    try {
+      const studentId = studentDetails?.id || studentDetails?.referenceId || studentDetails?._id;
+      if (!studentId) return;
+
+      await updateStudent(studentId, {
+        hostelRequired: 'yes',
+        hostelFee: 45000,
+        hostelStatus: 'Applied / In Review'
+      }).catch(() => null);
+
+      // Save to localStorage fallback
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const erpStudents = JSON.parse(localStorage.getItem(`erp_students_${tenantId}`) || '[]');
+      const idx = erpStudents.findIndex(s => s.rollNo === studentId || s.id === studentId || s._id === studentId);
+      if (idx !== -1) {
+        erpStudents[idx] = { ...erpStudents[idx], hostelRequired: 'yes', hostelFee: 45000, hostelStatus: 'Applied / In Review' };
+        localStorage.setItem(`erp_students_${tenantId}`, JSON.stringify(erpStudents));
+      }
+
+      setStudentDetails(prev => ({
+        ...prev,
+        hostelRequired: 'yes',
+        hostelFee: 45000,
+        hostelStatus: 'Applied / In Review'
+      }));
+
+      emitERPDataUpdate(['hostel', 'students', 'admissions', 'fees'], 'hostel_applied', { studentId });
+      alert('Hostel application submitted successfully! Accounts & Hostel Wardens have been notified.');
+    } catch (err) {
+      console.error('Error applying for hostel:', err);
+      alert('Failed to submit hostel application. Please try again.');
+    }
+  };
 
   return (
     <>
@@ -275,7 +323,7 @@ const StudentHostel = () => {
           </div>
           <h2 style={{ fontSize: '1.8rem', color: 'var(--text-main)', marginBottom: '1rem', fontWeight: 800 }}>Not Registered</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', lineHeight: '1.6' }}>You are currently not registered for campus hostel accommodation. If you believe this is an error or wish to apply, please contact the Hostel Administration.</p>
-          <button className="btn-primary" style={{ marginTop: '2rem', padding: '12px 24px', fontSize: '1rem', borderRadius: '12px' }}>Apply for Hostel</button>
+          <button onClick={handleApplyHostel} className="btn-primary" style={{ marginTop: '2rem', padding: '12px 24px', fontSize: '1rem', borderRadius: '12px' }}>Apply for Hostel</button>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
@@ -349,20 +397,27 @@ const StudentHostel = () => {
               </div>
             </div>
 
-            <div style={{ marginTop: '1.5rem', background: 'linear-gradient(to right, rgba(13,148,136,0.05), rgba(59,130,246,0.05))', padding: '1rem 1.5rem', borderRadius: '16px', border: '1px solid rgba(13, 148, 136, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ background: 'white', padding: '10px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-                  <AlertCircle size={24} className="text-primary" />
+            {(() => {
+              const feeInfo = getStudentHostelFeeInfo(studentDetails);
+              return (
+                <div style={{ marginTop: '1.5rem', background: 'linear-gradient(to right, rgba(13,148,136,0.05), rgba(59,130,246,0.05))', padding: '1.25rem 1.5rem', borderRadius: '16px', border: '1px solid rgba(13, 148, 136, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ background: 'white', padding: '10px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                      <CreditCard size={24} className="text-primary" />
+                    </div>
+                    <div>
+                      <div style={{ color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 800 }}>Hostel Fee & Ledger</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '2px' }}>
+                        Total: <strong style={{ color: '#1e40af' }}>₹{feeInfo.hostelFee.toLocaleString()}</strong> • Paid: <strong style={{ color: '#16a34a' }}>₹{feeInfo.paidAmount.toLocaleString()}</strong> • Due: <strong style={{ color: feeInfo.dueAmount > 0 ? '#dc2626' : '#16a34a' }}>₹{feeInfo.dueAmount.toLocaleString()}</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ padding: '8px 20px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', background: feeInfo.isPaid ? 'rgba(16,185,129,0.1)' : feeInfo.isPartial ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)', color: feeInfo.isPaid ? '#10b981' : feeInfo.isPartial ? '#d97706' : '#ef4444', border: `1px solid ${feeInfo.isPaid ? 'rgba(16,185,129,0.2)' : feeInfo.isPartial ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
+                    {feeInfo.isPaid ? 'PAID IN FULL' : feeInfo.isPartial ? `PARTIALLY PAID (DUE ₹${feeInfo.dueAmount.toLocaleString()})` : `PENDING (DUE ₹${feeInfo.dueAmount.toLocaleString()})`}
+                  </div>
                 </div>
-                <div>
-                  <div style={{ color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 800 }}>Hostel Fee Status</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Total Amount: ₹{studentDetails.hostelFeeAmount || 0}</div>
-                </div>
-              </div>
-              <div style={{ padding: '10px 24px', borderRadius: '12px', fontWeight: 800, fontSize: '1.1rem', background: studentDetails.hostelFeeStatus === 'paid' || studentDetails.hostelFeeStatus?.toLowerCase() === 'paid' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', color: studentDetails.hostelFeeStatus === 'paid' || studentDetails.hostelFeeStatus?.toLowerCase() === 'paid' ? '#10b981' : '#f59e0b', border: `1px solid ${studentDetails.hostelFeeStatus === 'paid' || studentDetails.hostelFeeStatus?.toLowerCase() === 'paid' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}` }}>
-                {(studentDetails.hostelFeeStatus || 'Pending').toUpperCase()}
-              </div>
-            </div>
+              );
+            })()}
           </div>
 
           {/* Secondary Grid */}

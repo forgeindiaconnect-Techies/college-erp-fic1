@@ -4,7 +4,14 @@ import {
   CreditCard, UserCheck, ShieldCheck, FileText, BarChart, Clock,
   CheckCircle, AlertCircle, CheckSquare, Wrench
 } from 'lucide-react';
-import { getTransportRoutes, getTransportDrivers, getTransportStudents, getStudents, getTransportMaintenance, createTransportMaintenance, getTransportComplaints, createTransportComplaint } from '../../api/index';
+import { 
+  getTransportRoutes, createTransportRoute, updateTransportRoute, deleteTransportRoute,
+  getTransportDrivers, createTransportDriver, updateTransportDriver, deleteTransportDriver,
+  getTransportStudents, createTransportStudent, updateTransportStudent, deleteTransportStudent,
+  getTransportVehicles, createTransportVehicle, updateTransportVehicle, deleteTransportVehicle,
+  getStudents, getTransportMaintenance, createTransportMaintenance, 
+  getTransportComplaints, createTransportComplaint 
+} from '../../api/index';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, AreaChart, Area
@@ -19,11 +26,12 @@ const CHART_DATA = [
 
 
 
-const TransportManagement = () => {
-  const [activeTab, setActiveTab] = useState('Dashboard');
+const TransportManagement = ({ initialTab = 'Dashboard' }) => {
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [search, setSearch] = useState('');
   const [routes, setRoutes] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [students, setStudents] = useState([]);
   const [driverAttendanceLogs, setDriverAttendanceLogs] = useState([]);
@@ -87,26 +95,42 @@ const TransportManagement = () => {
   // Create Route Modal State
   const [showDriverModal, setShowDriverModal] = useState(false);
   const [driverForm, setDriverForm] = useState({
-    driverId: '', name: '', experience: '', license: '', phone: '', status: 'Active'
+    driverId: '', name: '', experience: '', license: '', phone: '', status: 'Active', email: '', password: ''
   });
 
-  const handleAddDriver = (e) => {
+  const handleAddDriver = async (e) => {
     e.preventDefault();
     if (!driverForm.name || !driverForm.driverId) return;
 
-    const newDriver = {
-      _id: Date.now().toString(),
-      ...driverForm
-    };
+    try {
+      // Create via API so credentials are saved in the User collection
+      const res = await createTransportDriver(driverForm);
+      const newDriver = res.data;
 
-    setDrivers(prev => {
-      const updated = [newDriver, ...prev];
-      localStorage.setItem(`erp_transport_drivers_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(updated));
-      return updated;
-    });
-    showToast(`Successfully added driver ${driverForm.name}`);
-    setShowDriverModal(false);
-    setDriverForm({ driverId: '', name: '', experience: '', license: '', phone: '', status: 'Active' });
+      setDrivers(prev => {
+        const updated = [newDriver, ...prev];
+        localStorage.setItem(`erp_transport_drivers_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(updated));
+        return updated;
+      });
+      showToast(`Successfully added driver ${driverForm.name} with login credentials`);
+      setShowDriverModal(false);
+      setDriverForm({ driverId: '', name: '', experience: '', license: '', phone: '', status: 'Active', email: '', password: '' });
+    } catch (err) {
+      console.error(err);
+      // Fallback to local storage if API fails
+      const newDriver = {
+        _id: Date.now().toString(),
+        ...driverForm
+      };
+      setDrivers(prev => {
+        const updated = [newDriver, ...prev];
+        localStorage.setItem(`erp_transport_drivers_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(updated));
+        return updated;
+      });
+      showToast(`Successfully added driver ${driverForm.name} locally (API failed)`, 'warning');
+      setShowDriverModal(false);
+      setDriverForm({ driverId: '', name: '', experience: '', license: '', phone: '', status: 'Active', email: '', password: '' });
+    }
   };
   const [showRouteModal, setShowRouteModal] = useState(false);
   const [routeForm, setRouteForm] = useState({
@@ -118,12 +142,11 @@ const TransportManagement = () => {
     points: ''
   });
 
-  const handleCreateRoute = (e) => {
+  const handleCreateRoute = async (e) => {
     e.preventDefault();
     if (!routeForm.name || !routeForm.routeId) return;
 
     const newRoute = {
-      _id: Date.now().toString(),
       routeId: routeForm.routeId,
       name: routeForm.name,
       vehicle: routeForm.vehicle,
@@ -133,12 +156,27 @@ const TransportManagement = () => {
       points: routeForm.points.split(',').map(p => p.trim()).filter(Boolean)
     };
 
-    setRoutes(prev => {
-      const updated = [newRoute, ...prev];
-      localStorage.setItem(`erp_transport_routes_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(updated));
-      return updated;
-    });
-    showToast(`Successfully created route ${routeForm.name}`);
+    try {
+      const res = await createTransportRoute(newRoute);
+      const savedRoute = res.data || newRoute;
+      setRoutes(prev => {
+        const filtered = prev.filter(r => r.routeId !== savedRoute.routeId);
+        const updated = [savedRoute, ...filtered];
+        localStorage.setItem(`erp_transport_routes_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(updated));
+        return updated;
+      });
+      showToast(`Successfully created route ${routeForm.name}`);
+    } catch (err) {
+      console.error('API create route failed, saving locally:', err);
+      const localRoute = { _id: Date.now().toString(), ...newRoute };
+      setRoutes(prev => {
+        const updated = [localRoute, ...prev];
+        localStorage.setItem(`erp_transport_routes_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(updated));
+        return updated;
+      });
+      showToast(`Created route ${routeForm.name} locally`);
+    }
+
     setShowRouteModal(false);
     setRouteForm({ routeId: '', name: '', vehicle: '', driver: '', capacity: 50, points: '' });
   };
@@ -149,7 +187,7 @@ const TransportManagement = () => {
     setShowEditPointsModal(true);
   };
 
-  const handleSavePoints = (e) => {
+  const handleSavePoints = async (e) => {
     e.preventDefault();
     if (!editPointsRoute) return;
 
@@ -157,6 +195,16 @@ const TransportManagement = () => {
       .split(',')
       .map(p => p.trim())
       .filter(Boolean);
+
+    try {
+      if (editPointsRoute._id && !editPointsRoute._id.startsWith('mock-') && editPointsRoute._id.length > 10) {
+        await updateTransportRoute(editPointsRoute._id, { points: updatedPoints });
+      } else {
+        await createTransportRoute({ ...editPointsRoute, points: updatedPoints });
+      }
+    } catch (err) {
+      console.warn('Backend update points failed, persisting locally', err);
+    }
 
     setRoutes(prev => {
       const updated = prev.map(r => 
@@ -180,9 +228,19 @@ const TransportManagement = () => {
     setShowChangeBusModal(true);
   };
 
-  const handleSaveBus = (e) => {
+  const handleSaveBus = async (e) => {
     e.preventDefault();
     if (!changeBusRoute) return;
+
+    try {
+      if (changeBusRoute._id && !changeBusRoute._id.startsWith('mock-') && changeBusRoute._id.length > 10) {
+        await updateTransportRoute(changeBusRoute._id, { vehicle: changeBusForm.vehicle, driver: changeBusForm.driver });
+      } else {
+        await createTransportRoute({ ...changeBusRoute, vehicle: changeBusForm.vehicle, driver: changeBusForm.driver });
+      }
+    } catch (err) {
+      console.warn('Backend update bus/driver failed, persisting locally', err);
+    }
 
     setRoutes(prev => {
       const updated = prev.map(r => 
@@ -197,12 +255,11 @@ const TransportManagement = () => {
     setChangeBusRoute(null);
   };
 
-  const handleAssignStudent = (e) => {
+  const handleAssignStudent = async (e) => {
     e.preventDefault();
     if (!assignForm.studentId || !assignForm.routeId) return;
 
     const newStudent = {
-      _id: Date.now().toString(),
       studentId: assignForm.studentId,
       name: assignForm.name || 'Unknown Student',
       routeId: assignForm.routeId,
@@ -211,19 +268,37 @@ const TransportManagement = () => {
       amount: Number(assignForm.amount) || 0
     };
 
-    // Persist to localStorage so the Driver dashboard can read assigned students
-    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
-    const storageKey = `erp_transport_students_${tenantId}`;
-    const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    // Avoid duplicates — replace if same studentId already present
-    const filtered = existing.filter(s => s.studentId !== newStudent.studentId);
-    localStorage.setItem(storageKey, JSON.stringify([newStudent, ...filtered]));
+    try {
+      const res = await createTransportStudent(newStudent);
+      const savedStudent = res.data || { _id: Date.now().toString(), ...newStudent };
+      
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const storageKey = `erp_transport_students_${tenantId}`;
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      const filtered = existing.filter(s => s.studentId !== savedStudent.studentId);
+      localStorage.setItem(storageKey, JSON.stringify([savedStudent, ...filtered]));
 
-    setStudents(prev => {
-      const filtered = prev.filter(s => s.studentId !== newStudent.studentId);
-      return [newStudent, ...filtered];
-    });
-    showToast(`Successfully assigned ${assignForm.studentId} to route ${assignForm.routeId}`);
+      setStudents(prev => {
+        const filteredPrev = prev.filter(s => s.studentId !== savedStudent.studentId);
+        return [savedStudent, ...filteredPrev];
+      });
+      showToast(`Successfully assigned ${assignForm.studentId} to route ${assignForm.routeId}`);
+    } catch (err) {
+      console.error('API create student failed, saving locally:', err);
+      const localStudent = { _id: Date.now().toString(), ...newStudent };
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const storageKey = `erp_transport_students_${tenantId}`;
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      const filtered = existing.filter(s => s.studentId !== localStudent.studentId);
+      localStorage.setItem(storageKey, JSON.stringify([localStudent, ...filtered]));
+
+      setStudents(prev => {
+        const filteredPrev = prev.filter(s => s.studentId !== localStudent.studentId);
+        return [localStudent, ...filteredPrev];
+      });
+      showToast(`Assigned ${assignForm.studentId} to route ${assignForm.routeId} locally`);
+    }
+
     setShowAssignModal(false);
     setAssignForm({ studentId: '', name: '', routeId: '', pickupPoint: '', feeStatus: 'Pending', amount: '' });
   };
@@ -351,16 +426,19 @@ const TransportManagement = () => {
 
   const fetchTransportData = async () => {
     try {
-      const [routesRes, driversRes, studentsRes, allStudentsRes] = await Promise.all([
+      const [routesRes, driversRes, studentsRes, vehiclesRes, allStudentsRes] = await Promise.all([
         getTransportRoutes(),
         getTransportDrivers(),
         getTransportStudents(),
+        getTransportVehicles(),
         getStudents().catch(() => ({ data: [] }))
       ]);
       const localRoutes = JSON.parse(localStorage.getItem(`erp_transport_routes_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
       const combinedRoutes = [...routesRes.data, ...localRoutes];
       const uniqueRoutes = Array.from(new Map(combinedRoutes.map(item => [item.routeId, item])).values());
       setRoutes(uniqueRoutes);
+
+      setVehicles(vehiclesRes.data || []);
 
       const localDrivers = JSON.parse(localStorage.getItem(`erp_transport_drivers_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`) || '[]');
       const combinedDrivers = [...driversRes.data, ...localDrivers];
@@ -469,39 +547,27 @@ const TransportManagement = () => {
   ];
 
   return (
-    <div className="dashboard-container animate-fade-in" style={{ padding: '2rem', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+    <div className="tm-erp-container">
       {/* Premium Header Banner */}
-      <div style={{
-        background: 'var(--primary)',
-        borderRadius: '16px',
-        padding: '1.5rem 2rem',
-        marginBottom: '1.5rem',
-        color: '#fff',
-        boxShadow: '0 4px 15px -5px rgba(59, 130, 246, 0.4)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        {/* Decorative blur */}
-        <div style={{ position: 'absolute', top: '-50%', right: '-10%', width: '300px', height: '300px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', filter: 'blur(40px)' }} />
-        
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Bus size={24} /> Advanced Transport Management
-          </h1>
-          <p style={{ margin: 0, opacity: 0.9, fontSize: '0.875rem', fontWeight: 500 }}>
+      <div className="tm-erp-header">
+        <div className="tm-header-left">
+          <div className="tm-title-row">
+            <h1 className="tm-page-title"><Bus size={28} className="text-primary" /> Advanced Transport Management</h1>
+            <div className="tm-live-badge">
+              <span className="tm-pulse-dot"></span> Live Fleet Sync
+            </div>
+          </div>
+          <p className="tm-page-subtitle">
             Manage college fleets, routes, student allocations, and track buses in real-time.
           </p>
         </div>
       </div>
 
-      <div className="transport-tabs">
+      <div className="tm-erp-tabs">
         {TABS.map(tab => (
           <button
             key={tab.name}
-            className={`transport-tab ${activeTab === tab.name ? 'active' : ''}`}
+            className={`tm-tab-btn ${activeTab === tab.name ? 'active' : ''}`}
             onClick={() => setActiveTab(tab.name)}
           >
             {tab.icon} {tab.name}
@@ -511,42 +577,34 @@ const TransportManagement = () => {
 
       {activeTab === 'Dashboard' && (
         <div className="animate-fade-in">
-          <div className="transport-stats-grid mb-6">
-            <div className="transport-stat-card blue">
-              <div className="transport-icon-wrapper">
-                <Bus size={24} />
+          <div className="tm-kpi-grid mb-6">
+            <div className="tm-kpi-card blue">
+              <div className="tm-kpi-header">
+                <h3 className="tm-kpi-label">Total Vehicles</h3>
+                <div className="tm-icon-box"><Bus size={20} /></div>
               </div>
-              <div className="transport-stat-info">
-                <h3 className="transport-stat-label">Total Vehicles</h3>
-                <p className="transport-stat-value">{routes.length} Buses</p>
-              </div>
+              <p className="tm-kpi-value">{vehicles.length} Vehicles</p>
             </div>
-            <div className="transport-stat-card indigo">
-              <div className="transport-icon-wrapper">
-                <Navigation size={24} />
+            <div className="tm-kpi-card indigo">
+              <div className="tm-kpi-header">
+                <h3 className="tm-kpi-label">Active Routes</h3>
+                <div className="tm-icon-box"><Navigation size={20} /></div>
               </div>
-              <div className="transport-stat-info">
-                <h3 className="transport-stat-label">Active Routes</h3>
-                <p className="transport-stat-value">{routes.length} Routes</p>
-              </div>
+              <p className="tm-kpi-value">{routes.length} Routes</p>
             </div>
-            <div className="transport-stat-card green">
-              <div className="transport-icon-wrapper">
-                <Users size={24} />
+            <div className="tm-kpi-card green">
+              <div className="tm-kpi-header">
+                <h3 className="tm-kpi-label">Assigned Students</h3>
+                <div className="tm-icon-box"><Users size={20} /></div>
               </div>
-              <div className="transport-stat-info">
-                <h3 className="transport-stat-label">Assigned Students</h3>
-                <p className="transport-stat-value">{students.length}</p>
-              </div>
+              <p className="tm-kpi-value">{students.length}</p>
             </div>
-            <div className="transport-stat-card red">
-              <div className="transport-icon-wrapper">
-                <CreditCard size={24} />
+            <div className="tm-kpi-card red">
+              <div className="tm-kpi-header">
+                <h3 className="tm-kpi-label">Pending Fees</h3>
+                <div className="tm-icon-box"><CreditCard size={20} /></div>
               </div>
-              <div className="transport-stat-info">
-                <h3 className="transport-stat-label">Pending Fees</h3>
-                <p className="transport-stat-value text-danger">₹ {students.filter(s=>s.feeStatus==='Pending').reduce((a,b)=>a+b.amount,0).toLocaleString('en-IN')}</p>
-              </div>
+              <p className="tm-kpi-value tm-text-danger">₹ {students.filter(s=>s.feeStatus==='Pending').reduce((a,b)=>a+b.amount,0).toLocaleString('en-IN')}</p>
             </div>
           </div>
 
@@ -605,30 +663,30 @@ const TransportManagement = () => {
         <div className="animate-fade-in">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold">Manage Bus Routes</h2>
-            <button className="btn-primary flex items-center gap-2" onClick={() => setShowRouteModal(true)}><Plus size={16}/> Create Route</button>
+            <button className="tm-btn tm-btn-primary" onClick={() => setShowRouteModal(true)}><Plus size={16}/> Create Route</button>
           </div>
-          <div className="transport-routes-grid">
+          <div className="tm-routes-grid">
             {routes.map(route => (
-              <div key={route.routeId} className="glass-card route-card relative">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <h3 className="font-bold text-lg pr-4">{route.name}</h3>
-                  <div className="text-xs font-bold text-primary bg-primary-light px-2 py-1 rounded" style={{ backgroundColor: 'rgba(79, 70, 229, 0.1)', color: 'var(--primary)' }}>
+              <div key={route.routeId} className="tm-route-card">
+                <div className="tm-route-header">
+                  <h3 className="tm-route-title">{route.name}</h3>
+                  <div className="tm-badge tm-badge-route">
                     {route.routeId}
                   </div>
                 </div>
-                <div className="flex flex-col gap-1 text-sm text-muted mb-4">
-                  <span className="flex items-center gap-2"><Bus size={14}/> {route.vehicle}</span>
-                  <span className="flex items-center gap-2"><ShieldCheck size={14}/> {route.driver}</span>
-                  <span className="flex items-center gap-2"><Users size={14}/> {route.occupied} / {route.capacity} Allocated</span>
+                <div className="tm-route-meta">
+                  <span className="tm-route-meta-item"><Bus size={14}/> {route.vehicle}</span>
+                  <span className="tm-route-meta-item"><ShieldCheck size={14}/> {route.driver}</span>
+                  <span className="tm-route-meta-item"><Users size={14}/> {route.occupied} / {route.capacity} Allocated</span>
                 </div>
-                <div className="route-points mt-2">
+                <div className="tm-route-points">
                   {route.points.map((point, idx) => (
-                    <div key={idx} className="point-item text-muted">{point}</div>
+                    <div key={idx} className="tm-point-tag">{point}</div>
                   ))}
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <button className="flex-1 btn-secondary py-2 text-xs" onClick={() => handleOpenEditPoints(route)}>Edit Points</button>
-                  <button className="flex-1 btn-secondary py-2 text-xs" onClick={() => handleOpenChangeBus(route)}>Change Bus</button>
+                  <button className="flex-1 tm-btn tm-btn-secondary py-2 text-xs" onClick={() => handleOpenEditPoints(route)}>Edit Points</button>
+                  <button className="flex-1 tm-btn tm-btn-secondary py-2 text-xs" onClick={() => handleOpenChangeBus(route)}>Change Bus</button>
                 </div>
               </div>
             ))}
@@ -638,16 +696,16 @@ const TransportManagement = () => {
 
       {activeTab === 'Student Allocation' && (
         <div className="animate-fade-in">
-          <div className="glass-card">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
-              <div className="search-box">
-                <Search size={16} className="text-muted"/>
-                <input type="text" placeholder="Search student or route..." value={search} onChange={e=>setSearch(e.target.value)}/>
+          <div className="tm-panel">
+            <div className="tm-panel-header">
+              <div className="tm-search-box">
+                <Search size={16} />
+                <input type="text" className="tm-input" placeholder="Search student or route..." value={search} onChange={e=>setSearch(e.target.value)}/>
               </div>
-              <button className="btn-primary flex items-center gap-2" onClick={() => setShowAssignModal(true)}><Plus size={16}/> Assign Student</button>
+              <button className="tm-btn tm-btn-primary" onClick={() => setShowAssignModal(true)}><Plus size={16}/> Assign Student</button>
             </div>
-            <div className="table-container">
-              <table>
+            <div className="tm-table-container">
+              <table className="tm-table">
                 <thead>
                   <tr>
                     <th>Student ID</th>
@@ -687,17 +745,17 @@ const TransportManagement = () => {
       {activeTab === 'Tasks & Maintenance' && (
         <div className="animate-fade-in flex flex-col gap-6">
           {/* Maintenance Section */}
-          <div className="glass-card p-6">
-            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-200 dark:border-gray-800">
-              <h3 className="font-bold text-lg flex items-center gap-2">
+          <div className="tm-panel">
+            <div className="tm-panel-header">
+              <h3 className="tm-panel-title">
                 <Wrench size={18} className="text-primary"/> Vehicle Maintenance Schedules
               </h3>
-              <button className="btn-primary flex items-center gap-2 py-1 px-3 text-xs" onClick={() => setShowMaintModal(true)}>
+              <button className="tm-btn tm-btn-primary" onClick={() => setShowMaintModal(true)}>
                 <Plus size={14}/> Schedule Maintenance
               </button>
             </div>
-            <div className="table-container">
-              <table>
+            <div className="tm-table-container">
+              <table className="tm-table">
                 <thead>
                   <tr>
                     <th>Vehicle Number</th>
@@ -714,9 +772,9 @@ const TransportManagement = () => {
                       <td>{task.serviceType}</td>
                       <td>{new Date(task.serviceDate).toLocaleDateString()}</td>
                       <td>
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                          task.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                          task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
+                        <span className={`tm-badge ${
+                          task.status === 'Completed' ? 'tm-badge-paid' :
+                          task.status === 'In Progress' ? 'tm-badge-route' : 'tm-badge-pending'
                         }`}>
                           {task.status}
                         </span>
@@ -735,17 +793,17 @@ const TransportManagement = () => {
           </div>
 
           {/* Complaints / Tasks Section */}
-          <div className="glass-card p-6">
-            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-200 dark:border-gray-800">
-              <h3 className="font-bold text-lg flex items-center gap-2">
+          <div className="tm-panel">
+            <div className="tm-panel-header">
+              <h3 className="tm-panel-title">
                 <CheckSquare size={18} className="text-primary"/> Driver Tasks & Student Complaints
               </h3>
-              <button className="btn-primary flex items-center gap-2 py-1 px-3 text-xs" onClick={() => setShowComplaintModal(true)}>
+              <button className="tm-btn tm-btn-primary" onClick={() => setShowComplaintModal(true)}>
                 <Plus size={14}/> Assign Driver Task
               </button>
             </div>
-            <div className="table-container">
-              <table>
+            <div className="tm-table-container">
+              <table className="tm-table">
                 <thead>
                   <tr>
                     <th>Complaint ID</th>
@@ -765,16 +823,16 @@ const TransportManagement = () => {
                       <td className="font-mono text-sm">{comp.studentId}</td>
                       <td className="font-medium">{comp.name}</td>
                       <td>
-                        <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">Bus: {comp.busNumber || 'N/A'}</span>
-                        <span className="text-xs bg-primary-light text-primary px-2 py-1 rounded ml-1">Route: {comp.routeId || 'N/A'}</span>
+                        <span className="tm-badge bg-gray-100 text-gray-700 mr-1">Bus: {comp.busNumber || 'N/A'}</span>
+                        <span className="tm-badge tm-badge-route">Route: {comp.routeId || 'N/A'}</span>
                       </td>
                       <td className="font-bold text-xs">{comp.complaintType}</td>
                       <td className="text-sm max-w-xs truncate" title={comp.description}>{comp.description}</td>
-                      <td><span className="font-medium text-primary">{comp.assignedTo || 'Unassigned'}</span></td>
+                      <td><span className="font-medium tm-text-primary">{comp.assignedTo || 'Unassigned'}</span></td>
                       <td>
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                          comp.status === 'Resolved' ? 'bg-green-100 text-green-700' :
-                          comp.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
+                        <span className={`tm-badge ${
+                          comp.status === 'Resolved' ? 'tm-badge-paid' :
+                          comp.status === 'In Progress' ? 'tm-badge-route' : 'tm-badge-pending'
                         }`}>
                           {comp.status}
                         </span>
@@ -797,22 +855,22 @@ const TransportManagement = () => {
         <div className="animate-fade-in">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold">Manage Transport Drivers</h2>
-            <button className="btn-primary flex items-center gap-2" onClick={() => setShowDriverModal(true)}>
+            <button className="tm-btn tm-btn-primary" onClick={() => setShowDriverModal(true)}>
               <Plus size={16}/> Add Driver
             </button>
           </div>
-          <div className="transport-drivers-grid">
+          <div className="tm-routes-grid">
           {drivers.map(driver => (
-            <div key={driver.driverId} className="glass-card p-6 flex flex-col items-center text-center">
+            <div key={driver.driverId} className="tm-route-card flex flex-col items-center text-center">
               <div className="w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded-full mb-4 flex items-center justify-center text-gray-500">
                 <UserCheck size={32} />
               </div>
-              <h3 className="font-bold text-lg">{driver.name}</h3>
-              <p className="text-muted text-sm mb-4">Exp: {driver.experience} • License: {driver.license}</p>
+              <h3 className="tm-route-title">{driver.name}</h3>
+              <p className="tm-route-meta text-sm mb-2">Exp: {driver.experience} • License: {driver.license}</p>
               <div className="w-full bg-gray-50 dark:bg-gray-800 p-3 rounded mb-4">
-                <p className="text-xs text-muted">Contact: <span className="font-mono text-main">{driver.phone}</span></p>
+                <p className="text-xs text-muted">Contact: <span className="font-mono tm-text-primary">{driver.phone}</span></p>
               </div>
-              <span className={`px-4 py-1 rounded-full text-xs font-bold uppercase ${driver.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+              <span className={`tm-badge ${driver.status === 'Active' ? 'tm-badge-paid' : 'tm-badge-pending'}`}>
                 {driver.status}
               </span>
             </div>
@@ -824,16 +882,16 @@ const TransportManagement = () => {
 
 
       {activeTab === 'Attendance' && (
-        <div className="animate-fade-in glass-card">
-          <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
-            <h2 className="font-bold">Driver Attendance Logs</h2>
-            <div className="search-box">
-              <Search size={16} className="text-muted"/>
-              <input type="text" placeholder="Search driver or date..." value={search} onChange={e=>setSearch(e.target.value)}/>
+        <div className="animate-fade-in tm-panel">
+          <div className="tm-panel-header">
+            <h2 className="tm-panel-title">Driver Attendance Logs</h2>
+            <div className="tm-search-box">
+              <Search size={16} />
+              <input type="text" className="tm-input" placeholder="Search driver or date..." value={search} onChange={e=>setSearch(e.target.value)}/>
             </div>
           </div>
-          <div className="table-container">
-            <table>
+          <div className="tm-table-container">
+            <table className="tm-table">
               <thead>
                 <tr>
                   <th>Date</th>
@@ -858,8 +916,8 @@ const TransportManagement = () => {
                     <td className="font-mono text-sm">{log.checkInTime || '-'}</td>
                     <td className="font-mono text-sm">{log.checkOutTime || '-'}</td>
                     <td>
-                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                        log.status === 'Present' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      <span className={`tm-badge ${
+                        log.status === 'Present' ? 'tm-badge-paid' : 'tm-badge-pending'
                       }`}>
                         {log.status}
                       </span>
@@ -876,13 +934,13 @@ const TransportManagement = () => {
       )}
 
       {activeTab === 'Reports' && (
-        <div className="animate-fade-in glass-card p-12 flex flex-col items-center text-center">
+        <div className="animate-fade-in tm-panel p-12 flex flex-col items-center text-center">
           <FileText size={48} className="text-muted opacity-50 mb-4"/>
           <h2 className="text-xl font-bold mb-2">Transport Reports Generator</h2>
           <p className="text-muted max-w-md mb-6">Export route-wise student lists, fee defaulter reports, and driver attendance logs to Excel.</p>
           <div className="flex gap-4">
-            <button className="btn-primary flex items-center gap-2" onClick={handleViewManifest}><FileText size={16}/> View Student Manifest</button>
-            <button className="btn-secondary flex items-center gap-2" onClick={handleViewDefaulters}><FileText size={16}/> View Defaulters List</button>
+            <button className="tm-btn tm-btn-primary" onClick={handleViewManifest}><FileText size={16}/> View Student Manifest</button>
+            <button className="tm-btn tm-btn-secondary" onClick={handleViewDefaulters}><FileText size={16}/> View Defaulters List</button>
           </div>
         </div>
       )}
@@ -1067,16 +1125,28 @@ const TransportManagement = () => {
                   <input type="text" required placeholder="e.g., TN-XX-XXXX" className="input-field" value={driverForm.license} onChange={e => setDriverForm({...driverForm, license: e.target.value})} />
                 </div>
               </div>
-              <div className="form-group mt-3">
-                <label>Phone Number</label>
-                <input type="text" required placeholder="e.g., +91 9876543210" className="input-field" value={driverForm.phone} onChange={e => setDriverForm({...driverForm, phone: e.target.value})} />
+              <div className="grid grid-cols-2 gap-4 mt-3">
+                <div className="form-group">
+                  <label>Email (for Login)</label>
+                  <input type="email" required placeholder="e.g., driver@college.edu" className="input-field" value={driverForm.email} onChange={e => setDriverForm({...driverForm, email: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label>Password</label>
+                  <input type="password" required placeholder="Enter password" className="input-field" value={driverForm.password} onChange={e => setDriverForm({...driverForm, password: e.target.value})} />
+                </div>
               </div>
-              <div className="form-group mt-3">
-                <label>Status</label>
-                <select className="input-field" value={driverForm.status} onChange={e => setDriverForm({...driverForm, status: e.target.value})}>
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4 mt-3">
+                <div className="form-group">
+                  <label>Phone Number</label>
+                  <input type="text" required placeholder="e.g., +91 9876543210" className="input-field" value={driverForm.phone} onChange={e => setDriverForm({...driverForm, phone: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label>Status</label>
+                  <select className="input-field" value={driverForm.status} onChange={e => setDriverForm({...driverForm, status: e.target.value})}>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
               </div>
               <div className="flex gap-4 mt-6">
                 <button type="button" className="btn-secondary flex-1" onClick={() => setShowDriverModal(false)}>Cancel</button>
@@ -1292,3 +1362,6 @@ const TransportManagement = () => {
 };
 
 export default TransportManagement;
+
+
+

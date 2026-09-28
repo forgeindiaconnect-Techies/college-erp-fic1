@@ -118,8 +118,14 @@ const StudentDashboard = () => {
         feeStatus: 'Paid'
       };
 
-      if (dbStudent.scholarshipDetails?.status === 'Approved') {
-        setScholarship(dbStudent.scholarshipDetails);
+      if (dbStudent.scholarshipDetails?.status === 'Approved' || Number(dbStudent.scholarshipAmount) > 0 || dbStudent.scholarship) {
+        setScholarship(dbStudent.scholarshipDetails || {
+          scholarshipName: dbStudent.scholarship || 'Scholarship Scheme',
+          discountAmount: Number(dbStudent.scholarshipAmount || 0),
+          status: 'Approved'
+        });
+      } else {
+        setScholarship(null);
       }
 
       // 2. Class Advisor
@@ -147,22 +153,22 @@ const StudentDashboard = () => {
         resolvedStudent.attendance = 0;
       }
 
-      // 4. Original Fee Status Calculation
-      const localFees = JSON.parse(localStorage.getItem(`erp_fees_${tenantId}`) || '[]');
-      const studentFees = (feesRes?.data && Array.isArray(feesRes.data)) ? feesRes.data : localFees.filter(f => f.studentId === targetStudentId || f.rollNo === targetStudentId);
-      
-      if (studentFees.length > 0) {
-        const hasPending = studentFees.some(f => (Number(f.pendingAmount) > 0 || Number(f.remainingFee) > 0 || f.status === 'Pending' || f.status === 'Partial'));
-        resolvedStudent.feeStatus = hasPending ? 'Pending' : 'Paid';
-        const totalPending = studentFees.reduce((sum, f) => sum + (Number(f.pendingAmount) || Number(f.remainingFee) || (f.status === 'Pending' ? Number(f.amount || 0) : 0)), 0);
-        resolvedStudent.pendingFeeAmount = totalPending;
-      } else if (dbStudent.hostelFeeStatus === 'pending' || dbStudent.feeStatus === 'Pending') {
-        resolvedStudent.feeStatus = 'Pending';
-        resolvedStudent.pendingFeeAmount = Number(dbStudent.hostelFeeAmount || dbStudent.pendingFee || 0);
-      } else {
-        resolvedStudent.feeStatus = dbStudent.feeStatus || 'Paid';
-        resolvedStudent.pendingFeeAmount = Number(dbStudent.pendingFee || 0);
-      }
+      // 4. Uniform Fee Calculation
+      const normal = Number(dbStudent.normalFee !== undefined && dbStudent.normalFee !== null && dbStudent.normalFee !== "" ? dbStudent.normalFee : (dbStudent.totalFee || 0));
+      const quotaDisc = Number(dbStudent.discountAmount || dbStudent.concession || 0);
+      const scholarDisc = Number(dbStudent.scholarshipAmount || dbStudent.scholarshipDiscount || (dbStudent.scholarshipDetails?.discountAmount || 0));
+      const totalDisc = quotaDisc + scholarDisc;
+      const netPayable = dbStudent.finalFee !== undefined && dbStudent.finalFee !== null && Number(dbStudent.finalFee) > 0
+        ? Number(dbStudent.finalFee)
+        : (normal > 0 ? Math.max(0, normal - totalDisc) : Number(dbStudent.totalFee || 0));
+      const paid = Number(dbStudent.paidAmount !== undefined ? dbStudent.paidAmount : (dbStudent.amountPaid || 0));
+      const bal = Math.max(0, netPayable - paid);
+
+      resolvedStudent.totalFee = netPayable;
+      resolvedStudent.paidAmount = paid;
+      resolvedStudent.pendingFeeAmount = bal;
+      resolvedStudent.feeStatus = (bal === 0 && netPayable > 0) ? 'Paid' : (paid > 0 ? 'Partial' : 'Pending');
+
 
       setStudentDetails(resolvedStudent);
 

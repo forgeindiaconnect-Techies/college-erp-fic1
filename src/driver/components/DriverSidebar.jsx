@@ -1,7 +1,7 @@
 import React from 'react';
 import { SettingsContext } from '../../App';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Bus, MapPin, Users, Bell, Wrench, Calendar, Navigation, LogOut, ChevronRight, ChevronDown, CheckSquare, DollarSign } from 'lucide-react';
+import { LayoutDashboard, Bus, MapPin, Users, Bell, Wrench, Calendar, Navigation, LogOut, ChevronRight, ChevronDown, CheckSquare, IndianRupee } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
 const DriverSidebar = ({ isOpen, onClose }) => {
@@ -20,6 +20,7 @@ const DriverSidebar = ({ isOpen, onClose }) => {
       name: 'Transport Ops',
       icon: <Bus size={20} />,
       items: [
+        { name: 'Trip Operations', path: '/driver/trip', icon: <Navigation size={20} /> },
         { name: 'My Vehicle', path: '/driver/vehicle', icon: <Wrench size={20} /> },
         { name: 'My Route', path: '/driver/route', icon: <MapPin size={20} /> }
       ]
@@ -37,7 +38,7 @@ const DriverSidebar = ({ isOpen, onClose }) => {
       icon: <CheckSquare size={20} />,
       items: [
         { name: 'My Tasks', path: '/driver/tasks', icon: <CheckSquare size={20} /> },
-        { name: 'Payroll', path: '/driver/payroll', icon: <DollarSign size={20} /> },
+        { name: 'Payroll', path: '/driver/payroll', icon: <IndianRupee size={20} /> },
         { name: 'Notifications', path: '/driver/notifications', icon: <Bell size={20} /> }
       ]
     }

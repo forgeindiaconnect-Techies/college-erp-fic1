@@ -10,7 +10,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
-import { getFeesByStudent, updateFee, createFee, getStudentFeeStructure } from '../../api/index';
+import { getFeesByStudent, updateFee, createFee, getStudentFeeStructure, getScholarshipApplications } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import './StudentFees.css';
 
@@ -75,8 +75,17 @@ const StudentFees = () => {
       else setLoading(true);
 
       const studentIdentifier = activeStud.id || activeStud.referenceId || activeStud.studentId || activeStud._id || activeStud.name;
-      const res = await getFeesByStudent(studentIdentifier);
-      const feesList = res?.data || [];
+      const [feeRes, schRes] = await Promise.all([
+        getFeesByStudent(studentIdentifier).catch(() => ({ data: [] })),
+        getScholarshipApplications().catch(() => ({ data: { data: [] } }))
+      ]);
+      const feesList = feeRes?.data || [];
+      const schList = Array.isArray(schRes.data?.data) ? schRes.data.data : (Array.isArray(schRes.data) ? schRes.data : []);
+      const mySch = schList.find(s => 
+        (s.studentId && (s.studentId === activeStud.id || s.studentId === activeStud.referenceId || s.studentId === activeStud._id)) ||
+        (s.student && String(s.student) === String(activeStud._id)) ||
+        (s.studentName && activeStud.name && s.studentName.toLowerCase() === activeStud.name.toLowerCase())
+      );
 
       // Also fetch structured fee breakdown
       try {
@@ -93,10 +102,15 @@ const StudentFees = () => {
         setFeeRecord(activeFee);
         setFeeStatus(activeFee.status || 'Pending');
 
+        const schAmount = Number(activeFee.scholarshipAmount || (mySch ? mySch.discountAmount : 0));
+        const quotaDisc = Number(activeFee.discountAmount || (activeStud.quota || String(activeStud.quotaName || '').includes('Sports') ? 6500 : 0));
+        const totalDisc = schAmount + quotaDisc;
+
+        const baseNormal = Number(activeFee.normalFee || activeFee.totalFees || 58000);
         const netFee = Number(
           activeFee.finalFee !== undefined && activeFee.finalFee !== null && activeFee.finalFee > 0
             ? activeFee.finalFee
-            : Math.max(0, (activeFee.normalFee || activeFee.totalFees || 0) - (Number(activeFee.discountAmount || 0) + Number(activeFee.scholarshipAmount || 0)))
+            : Math.max(0, baseNormal - totalDisc)
         );
 
         const paid = Number(activeFee.paidAmount || 0);
@@ -108,10 +122,10 @@ const StudentFees = () => {
 
         setInvoiceAmount(pendingDue);
 
-        if (Number(activeFee.scholarshipAmount) > 0) {
+        if (schAmount > 0) {
           setScholarship({
-            type: activeFee.scholarshipName || 'Merit Scholarship Scheme',
-            amount: Number(activeFee.scholarshipAmount),
+            type: activeFee.scholarshipName || mySch?.scholarshipName || 'First Graduate Scholarship',
+            amount: schAmount,
             sanctionNo: `SCH-${activeFee._id ? activeFee._id.slice(-6).toUpperCase() : 'SAN-2026'}`,
             date: activeFee.createdAt ? new Date(activeFee.createdAt).toLocaleDateString('en-IN') : '10 Aug 2026',
             status: 'Approved & Credited'
@@ -124,13 +138,14 @@ const StudentFees = () => {
         try {
           const structRes = await getStudentFeeStructure(studentIdentifier);
           if (structRes?.data) {
-            const baseAmt = Number(structRes.data.totalAmount || structRes.data.tuitionFee || 0);
-            setInvoiceAmount(baseAmt);
+            const baseAmt = Number(structRes.data.totalAmount || structRes.data.tuitionFee || 58000);
+            const schAmount = Number(structRes.data.scholarshipAmount || (mySch ? mySch.discountAmount : 0));
+            setInvoiceAmount(Math.max(0, baseAmt - schAmount));
             setFeeStatus(baseAmt === 0 ? 'Paid' : 'Pending');
-            if (Number(structRes.data.scholarshipAmount) > 0) {
+            if (schAmount > 0) {
               setScholarship({
-                type: structRes.data.scholarshipName || 'Scholarship Scheme',
-                amount: Number(structRes.data.scholarshipAmount),
+                type: structRes.data.scholarshipName || mySch?.scholarshipName || 'First Graduate Scholarship',
+                amount: schAmount,
                 sanctionNo: 'SCH-GEN-2026',
                 date: '10 Aug 2026',
                 status: 'Approved & Credited'
@@ -159,16 +174,15 @@ const StudentFees = () => {
 
   // Derived financial figures
   const grossFee = Number(feeRecord?.normalFee || feeRecord?.totalFees || feeStructure?.totalAmount || invoiceAmount || 58000);
-  const quotaDiscount = Number(feeRecord?.discountAmount || 0);
+  const quotaDiscount = Number(feeRecord?.discountAmount || feeRecord?.quotaDiscount || (studentSession.quota || String(studentSession.quotaName || '').includes('Sports') ? 6500 : 0));
   const scholarshipDiscount = Number(feeRecord?.scholarshipAmount || (scholarship?.amount || 0));
-  const totalConcessions = quotaDiscount + scholarshipDiscount;
-  const netPayable = Number(feeRecord?.finalFee || Math.max(0, grossFee - totalConcessions));
-  const paidAmount = Number(feeRecord?.paidAmount || 0);
-  const balanceDue = Number(
-    feeRecord?.pendingAmount !== undefined
-      ? feeRecord?.pendingAmount
-      : (feeRecord?.remainingFee !== undefined ? feeRecord?.remainingFee : Math.max(0, netPayable - paidAmount))
-  );
+  let totalConcessions = quotaDiscount + scholarshipDiscount;
+  if (totalConcessions === 0 && feeRecord?.finalFee && Number(feeRecord.finalFee) > 0 && Number(feeRecord.finalFee) < grossFee) {
+    totalConcessions = grossFee - Number(feeRecord.finalFee);
+  }
+  const netPayable = grossFee > 0 ? Math.max(0, grossFee - totalConcessions) : Number(feeRecord?.finalFee || 0);
+  const paidAmount = Number(feeRecord?.paidAmount !== undefined ? feeRecord.paidAmount : (feeRecord?.amountPaid || 0));
+  const balanceDue = Math.max(0, netPayable - paidAmount);
 
   const isFullyPaid = feeStatus === 'Paid' || balanceDue === 0;
   const paymentProgressPercent = netPayable > 0 ? Math.min(100, Math.round((paidAmount / netPayable) * 100)) : (isFullyPaid ? 100 : 0);

@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
 const transportStudentSchema = new mongoose.Schema({
-  studentProfile: { type: mongoose.Schema.Types.ObjectId, ref: 'StudentProfile', required: true },
-  studentId: { type: String, required: true, unique: true }, // Keeping for backwards compatibility
+  studentProfile: { type: mongoose.Schema.Types.ObjectId, ref: 'StudentProfile' },
+  studentId: { type: String, required: true }, // Keeping for backwards compatibility
   name: { type: String, required: true }, // Keeping for backwards compatibility
   routeId: { type: String, required: true },
   pickupPoint: { type: String, required: true },
