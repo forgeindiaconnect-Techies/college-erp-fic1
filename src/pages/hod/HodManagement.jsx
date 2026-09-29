@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Edit2, Trash2, X, GraduationCap, Mail, Phone } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, GraduationCap, Mail, Phone, CheckCircle, Building, AlertTriangle, Users } from 'lucide-react';
 import { getStaff, createStaff, updateStaff, deleteStaff, getDepartments, createUser } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import CustomSelect from '../../components/CustomSelect';
@@ -190,28 +190,54 @@ const HodManagement = () => {
     <div className="hod-management-page animate-fade-in">
       <div className="page-header">
         <div>
-          <h1>HOD Management</h1>
-          <p className="text-muted">Manage department HOD accounts, view assigned codes, and edit credentials.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+            <h1>HOD Management 🏛️</h1>
+            <div className="erp-live-sync-pill">
+              <span className="erp-live-pulse-dot"></span>
+              <span>Real-Time ERP Synced</span>
+            </div>
+          </div>
+          <p className="text-muted">Centralized administration for Department Heads, departmental leadership, and administrative credentials.</p>
         </div>
         <button className="btn-primary shadow-glow" onClick={openAdd}><Plus size={18} /> Add HOD</button>
       </div>
 
       {/* Summary Cards */}
-      <div className="sm-summary-row" style={{ marginTop: '1.5rem' }}>
+      <div className="sm-summary-row" style={{ marginTop: '1.25rem' }}>
         <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Total HODs</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="sm-summary-label">Total HODs</span>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(79, 70, 229, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Users size={18} color="#4f46e5" />
+            </div>
+          </div>
           <span className="sm-summary-value">{hods.length}</span>
         </div>
         <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Active HODs</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="sm-summary-label">Active HODs</span>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(16, 185, 129, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircle size={18} color="#10b981" />
+            </div>
+          </div>
           <span className="sm-summary-value text-success">{hods.filter(h => h.status === 'Active').length}</span>
         </div>
         <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Assigned Departments</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="sm-summary-label">Assigned Depts</span>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(139, 92, 246, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Building size={18} color="#8b5cf6" />
+            </div>
+          </div>
           <span className="sm-summary-value gradient-text">{new Set(hods.map(h => h.dept)).size}</span>
         </div>
         <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Inactive Roles</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="sm-summary-label">Inactive Roles</span>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(239, 68, 68, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AlertTriangle size={18} color="#ef4444" />
+            </div>
+          </div>
           <span className="sm-summary-value text-danger">{hods.filter(h => h.status !== 'Active').length}</span>
         </div>
       </div>

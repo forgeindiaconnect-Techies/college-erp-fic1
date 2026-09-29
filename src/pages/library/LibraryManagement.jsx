@@ -1,10 +1,39 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   BookOpen, Search, Filter, BookDown, CheckCircle, 
   AlertCircle, X, Eye, FileText, Download, QrCode, 
-  Library, Clock, ArrowRightLeft, Bell, TrendingUp
+  LayoutDashboard, Clock, ArrowRightLeft, Bell, TrendingUp,
+  Layers, Plus, Trash2, Edit3, CheckCircle2, Tag, BookMarked,
+  BookmarkCheck, Bookmark, Hash, ShieldAlert, Users, IndianRupee,
+  BarChart3, RefreshCw, ChevronRight, UserCheck, AlertTriangle,
+  FileCheck2, Check, BookPlus, Sparkles, Building, Calendar,
+  GraduationCap, Printer, Receipt, CreditCard
 } from 'lucide-react';
-import { getLibraryBooks, getAllLibraryTransactions, returnLibraryBook, issueLibraryBook, manualIssueLibraryBook, rejectLibraryRequest, getStudents } from '../../api/index';
+import { 
+  getLibraryBooks, 
+  createLibraryBook, 
+  getAllLibraryTransactions, 
+  returnLibraryBook, 
+  issueLibraryBook, 
+  manualIssueLibraryBook, 
+  rejectLibraryRequest, 
+  getStudents,
+  getBookCopies,
+  createBookCopy,
+  updateBookCopy,
+  deleteBookCopy,
+  payLibraryFine,
+  getLibraryFineReceipt,
+  getLibraryFinePayments,
+  createLibraryReservation,
+  getLibraryReservations,
+  approveLibraryReservation,
+  rejectLibraryReservation,
+  getDepartments,
+  getCourses,
+  getLibraryBorrowers
+} from '../../api/index';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line, Legend
@@ -12,41 +41,167 @@ import {
 import CustomSelect from '../../components/CustomSelect';
 import './LibraryManagement.css';
 
-// MOCK Data for static tabs
+// Default Fallback Categories if no courses exist yet
+const FALLBACK_CATEGORIES = ['Computer Science', 'Information Technology', 'Mechanical Engineering', 'Electronics & Communication', 'Electrical Engineering', 'Civil Engineering', 'Mathematics', 'Physics', 'Chemistry', 'Management Studies'];
+const FALLBACK_DEPARTMENTS = ['Computer Science and Engineering', 'Information Technology', 'Mechanical Engineering', 'Electronics and Communication', 'Electrical and Electronics', 'Civil Engineering', 'Management Studies'];
+
 const MOCK_DIGITAL = [
-  { id: 'D001', title: 'Data Structures Lecture Notes', author: 'Prof. Davis', type: 'PDF', size: '2.4 MB', downloads: 342 },
-  { id: 'D002', title: 'Thermodynamics Formula Sheet', author: 'Prof. Wilson', type: 'PDF', size: '1.1 MB', downloads: 156 },
-  { id: 'D003', title: 'Basic Electronics Lab Manual', author: 'Dept. of ECE', type: 'PDF', size: '5.6 MB', downloads: 890 },
+  { id: 'D001', title: 'Data Structures & Algorithms Lecture Notes', author: 'Prof. Cormen & Dept. CSE', type: 'PDF', size: '4.2 MB', downloads: 342, dept: 'Computer Science' },
+  { id: 'D002', title: 'Database Management Systems Handbook', author: 'Prof. Korth & Dept. CSE', type: 'PDF', size: '3.1 MB', downloads: 285, dept: 'Computer Science' },
+  { id: 'D003', title: 'Thermodynamics & Fluid Mechanics Notes', author: 'Dept. of Mechanical Engg.', type: 'PDF', size: '5.6 MB', downloads: 156, dept: 'Mechanical Engg.' },
+  { id: 'D004', title: 'Digital Signal Processing Lab Manual', author: 'Dept. of ECE', type: 'PDF', size: '2.8 MB', downloads: 412, dept: 'Electronics & Comm.' },
+  { id: 'D005', title: 'Engineering Mathematics Formula Book', author: 'Dept. of Mathematics', type: 'PDF', size: '1.9 MB', downloads: 680, dept: 'General' },
 ];
 
-const MOCK_RESERVATIONS = [
-  { resId: 'RES-001', studentName: 'John Doe', regNo: 'CS2021001', bookTitle: 'The C Programming Language', reqDate: '2024-03-20', status: 'Pending' },
-  { resId: 'RES-002', studentName: 'Emily Davis', regNo: 'CS2021004', bookTitle: 'Introduction to Algorithms', reqDate: '2024-03-21', status: 'Approved' },
-  { resId: 'RES-003', studentName: 'Robert Johnson', regNo: 'ME2023001', bookTitle: 'Engineering Mechanics', reqDate: '2024-03-19', status: 'Pending' }
+const TABS = [
+  'Dashboard', 
+  'Book Inventory', 
+  'Issue & Returns', 
+  'Reservations', 
+  'Student Members', 
+  'Fines & Analytics', 
+  'Digital Library'
 ];
 
-const MOCK_CHART_DATA = [
-  { month: 'Aug', issued: 420 }, { month: 'Sep', issued: 380 },
-  { month: 'Oct', issued: 590 }, { month: 'Nov', issued: 610 },
-  { month: 'Dec', issued: 280 }, { month: 'Jan', issued: 450 },
-];
+const normalizeTab = (tab) => {
+  if (!tab) return 'Dashboard';
+  const t = tab.toLowerCase();
+  if (t.includes('book') || t.includes('catalog') || t.includes('inventory')) return 'Book Inventory';
+  if (t.includes('issue') || t.includes('return') || t.includes('circulation')) return 'Issue & Returns';
+  if (t.includes('reserv')) return 'Reservations';
+  if (t.includes('member') || t.includes('student')) return 'Student Members';
+  if (t.includes('fine') || t.includes('report') || t.includes('analytic')) return 'Fines & Analytics';
+  if (t.includes('digit')) return 'Digital Library';
+  return 'Dashboard';
+};
 
-const CATEGORIES = ['All Categories', 'Computer Science', 'Mechanical', 'Electrical', 'Civil', 'Mathematics', 'Software Engg'];
-
-const LibraryManagement = () => {
-  const [activeTab, setActiveTab] = useState('Dashboard');
+const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
+  const [activeTab, setActiveTab] = useState(normalizeTab(defaultTab));
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All Categories');
+  const [deptFilter, setDeptFilter] = useState('All Departments');
+  const [statusFilter, setStatusFilter] = useState('All');
+
+  // Real-time Academic Structure State
+  const [departmentsList, setDepartmentsList] = useState([]);
+  const [coursesList, setCoursesList] = useState([]);
+
+  // Member search state
+  const [memberSearch, setMemberSearch] = useState('');
+  const [selectedMemberForDetails, setSelectedMemberForDetails] = useState(null);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const tabRouteMap = {
+    'Dashboard': '/librarian/dashboard',
+    'Book Inventory': '/librarian/books',
+    'Issue & Returns': '/librarian/circulation',
+    'Reservations': '/librarian/reservations',
+    'Digital Library': '/librarian/digital',
+    'Student Members': '/librarian/members',
+    'Fines & Analytics': '/librarian/reports'
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (location.pathname.startsWith('/librarian')) {
+      const targetRoute = tabRouteMap[tab];
+      if (targetRoute && location.pathname !== targetRoute) {
+        navigate(targetRoute);
+      }
+    }
+  };
+
+  // Sync tab if defaultTab prop updates
+  useEffect(() => {
+    setActiveTab(normalizeTab(defaultTab));
+  }, [defaultTab]);
+
+  // Main Add Book Form State
   const [showAddModal, setShowAddModal] = useState(false);
+  const [addBookForm, setAddBookForm] = useState({
+    bookId: '',
+    isbn: '',
+    title: '',
+    author: '',
+    publisher: '',
+    edition: '1st Edition',
+    category: '',
+    department: '',
+    subject: '',
+    totalCopies: 1,
+    rackNumber: 'R01',
+    shelfNumber: 'S01'
+  });
+
+  // Physical Book Copies State & Modal
+  const [showCopiesModal, setShowCopiesModal] = useState(false);
+  const [selectedBookForCopies, setSelectedBookForCopies] = useState(null);
+  const [bookCopies, setBookCopies] = useState([]);
+  const [loadingCopies, setLoadingCopies] = useState(false);
+  const [newCopyForm, setNewCopyForm] = useState({
+    accessionNumber: '',
+    barcode: '',
+    rackNumber: '',
+    shelfNumber: '',
+    condition: 'Good',
+    price: ''
+  });
+
+  // Issue Book Modal State
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [selectedBookToIssue, setSelectedBookToIssue] = useState(null);
-  const [issueFormData, setIssueFormData] = useState({ studentName: '', regNo: '', dueDate: '' });
+  const [issueFormData, setIssueFormData] = useState({
+    bookId: '',
+    bookCopyId: '',
+    regNo: '',
+    studentName: '',
+    userType: 'Student',
+    issueDate: new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  });
+
+  // Digital Resource Upload Modal State
+  const [showUploadDigitalModal, setShowUploadDigitalModal] = useState(false);
+  const [digitalList, setDigitalList] = useState(MOCK_DIGITAL);
+  const [digitalSearch, setDigitalSearch] = useState('');
+  const [digitalDeptFilter, setDigitalDeptFilter] = useState('All Departments');
+  const [digitalTypeFilter, setDigitalTypeFilter] = useState('All Types');
+  const [digitalForm, setDigitalForm] = useState({ title: '', author: '', dept: '', type: 'PDF' });
+
+  // Fine Payment & Receipt Modals
+  const [receiptModal, setReceiptModal] = useState({
+    isOpen: false,
+    loading: false,
+    receipt: null,
+    error: null
+  });
+
+  const [collectFineModal, setCollectFineModal] = useState({
+    isOpen: false,
+    issueId: '',
+    studentName: '',
+    studentId: '',
+    bookTitle: '',
+    fineAmount: 0,
+    paidAmount: 0,
+    balance: 0,
+    amount: '',
+    paymentMethod: 'Cash',
+    remarks: '',
+    isSubmitting: false,
+    error: null
+  });
+
+  // Core Data
   const [books, setBooks] = useState([]);
+  const [reservationLoading, setReservationLoading] = useState(null);
+  const [reservations, setReservations] = useState([]);
   const [issues, setIssues] = useState([]);
+  const [finePayments, setFinePayments] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const categoryOptions = CATEGORIES.map(c => ({ value: c, label: c }));
 
   useEffect(() => {
     fetchLibraryData();
@@ -55,14 +210,69 @@ const LibraryManagement = () => {
   const fetchLibraryData = async () => {
     try {
       setLoading(true);
-      const [booksRes, txRes, studentsRes] = await Promise.all([
-        getLibraryBooks(),
-        getAllLibraryTransactions(),
-        getStudents()
-      ]);
-      setBooks(booksRes.data);
-      setIssues(txRes.data || []);
-      setStudents(studentsRes.data || []);
+      let bData = [];
+      let tData = [];
+      let sData = [];
+      let dData = [];
+      let cData = [];
+      let rData = [];
+
+      try {
+        const booksRes = await getLibraryBooks();
+        bData = Array.isArray(booksRes.data) ? booksRes.data : [];
+      } catch (e) {
+        console.warn('getLibraryBooks fallback', e);
+      }
+      try {
+        const txRes = await getAllLibraryTransactions();
+        tData = Array.isArray(txRes.data) ? txRes.data : (Array.isArray(txRes.data?.transactions) ? txRes.data.transactions : []);
+        console.log('LIBRARY TRANSACTIONS:', tData);
+      } catch (e) {
+        console.warn('getAllLibraryTransactions fallback', e);
+      }
+      try {
+        let studentsRes = await getLibraryBorrowers().catch(() => null);
+        if (!studentsRes || !studentsRes.data || studentsRes.data.length === 0) {
+          studentsRes = await getStudents().catch(() => ({ data: [] }));
+        }
+        sData = Array.isArray(studentsRes.data) ? studentsRes.data : [];
+      } catch (e) {
+        console.warn('getLibraryBorrowers fallback', e);
+      }
+      try {
+        const reservationsRes = await getLibraryReservations();
+        rData = Array.isArray(reservationsRes.data) ? reservationsRes.data : [];
+      } catch (e) {
+        console.warn('getLibraryReservations fallback', e);
+      }
+      try {
+        const deptsRes = await getDepartments();
+        dData = Array.isArray(deptsRes.data) ? deptsRes.data : [];
+      } catch (e) {
+        console.warn('getDepartments fallback', e);
+      }
+      try {
+        const coursesRes = await getCourses();
+        const rawCourses = coursesRes.data?.courses || coursesRes.data || [];
+        cData = Array.isArray(rawCourses) ? rawCourses : [];
+      } catch (e) {
+        console.warn('getCourses fallback', e);
+      }
+
+      setBooks(bData);
+      setIssues(tData);
+      setReservations(rData);
+
+      try {
+        const paymentRes = await getLibraryFinePayments();
+        setFinePayments(Array.isArray(paymentRes.data) ? paymentRes.data : []);
+      } catch (paymentError) {
+        console.error('Fine payment history error:', paymentError);
+        setFinePayments([]);
+      }
+      setStudents(sData);
+      setDepartmentsList(dData);
+      setCoursesList(cData);
     } catch (error) {
       console.error('Failed to load library data', error);
     } finally {
@@ -70,35 +280,240 @@ const LibraryManagement = () => {
     }
   };
 
+  // Strictly Real Database Departments & Courses
+  const realDeptNames = departmentsList.map(d => d.name || d.code).filter(Boolean);
+  const realCourseNames = coursesList.map(c => c.name || c.code).filter(Boolean);
+
+  const deptOptions = [
+    { value: 'All Departments', label: 'All Departments' },
+    ...departmentsList.map(d => ({
+      value: d.name || d.code,
+      label: d.code ? `${d.name} (${d.code})` : (d.name || d.code)
+    }))
+  ];
+
+  const categoryOptions = [
+    { value: 'All Categories', label: 'All Categories' },
+    ...coursesList.map(c => ({
+      value: c.name || c.code,
+      label: c.code ? `${c.name} [${c.code}]` : (c.name || c.code)
+    }))
+  ];
+
+  // Helper to get real courses for a chosen department from DB
+  const getCoursesForDepartment = (deptName) => {
+    if (!deptName) return coursesList;
+    const selectedDeptObj = departmentsList.find(
+      d => (d.name && d.name.toLowerCase() === deptName.toLowerCase()) || 
+           (d.code && d.code.toLowerCase() === deptName.toLowerCase()) ||
+           (d.id && d.id === deptName)
+    );
+    if (!selectedDeptObj) return coursesList;
+    const deptId = selectedDeptObj.id || selectedDeptObj._id;
+    const filtered = coursesList.filter(c => c.departmentId === deptId || c.department === deptName || c.department === selectedDeptObj.name);
+    return filtered.length > 0 ? filtered : coursesList;
+  };
+
+  const handleViewFineReceipt = async (issueId) => {
+    try {
+      setReceiptModal({ isOpen: true, loading: true, receipt: null, error: null });
+      const response = await getLibraryFineReceipt(issueId);
+      const payment = response?.data?.payment;
+      const transaction = response?.data?.transaction;
+
+      if (!payment) {
+        setReceiptModal({
+          isOpen: true,
+          loading: false,
+          receipt: null,
+          error: 'Fine receipt record not found.'
+        });
+        return;
+      }
+
+      const bookTitle = transaction?.bookId?.title || 'Unknown Book';
+      const studentId = payment.userId || transaction?.userId || 'N/A';
+      const userType = payment.userType || transaction?.userType || 'Student';
+
+      setReceiptModal({
+        isOpen: true,
+        loading: false,
+        receipt: {
+          receiptNumber: payment.receiptNumber || 'N/A',
+          userId: studentId,
+          userType: userType,
+          bookTitle: bookTitle,
+          amount: payment.amount || 0,
+          paymentMethod: payment.paymentMethod || 'Cash',
+          paymentDate: payment.paymentDate ? new Date(payment.paymentDate).toLocaleString() : 'N/A',
+          remarks: payment.remarks || 'Receipt generated from fine payment'
+        },
+        error: null
+      });
+    } catch (error) {
+      console.error('Fine receipt error:', error);
+      setReceiptModal({
+        isOpen: true,
+        loading: false,
+        receipt: null,
+        error: error?.response?.data?.message || 'Failed to load fine receipt.'
+      });
+    }
+  };
+  const handleOpenCollectFine = (issue) => {
+    const fine = Number(issue.fineAmount || 0);
+    const paid = Number(issue.finePaidAmount || 0);
+    const balance = Math.max(0, fine - paid);
+
+    const studentName = typeof issue.userId === 'object' && issue.userId ? (issue.userId.name || issue.userId.studentId || 'Student') : (issue.userId || 'Student');
+    const studentId = typeof issue.userId === 'object' && issue.userId ? (issue.userId.studentId || issue.userId.id || issue.userId._id || 'N/A') : (issue.userId || 'N/A');
+    const bookTitle = typeof issue.bookId === 'object' && issue.bookId ? (issue.bookId.title || 'Book') : 'Book';
+
+    setCollectFineModal({
+      isOpen: true,
+      issueId: issue._id,
+      studentName: studentName,
+      studentId: studentId,
+      bookTitle: bookTitle,
+      fineAmount: fine,
+      paidAmount: paid,
+      balance: balance,
+      amount: String(balance),
+      paymentMethod: 'Cash',
+      remarks: '',
+      isSubmitting: false,
+      error: null
+    });
+  };
+
+  const handleCollectFineSubmit = async (e) => {
+    e.preventDefault();
+    const payment = Number(collectFineModal.amount);
+    if (!Number.isFinite(payment) || payment <= 0) {
+      setCollectFineModal(prev => ({ ...prev, error: 'Please enter a valid payment amount.' }));
+      return;
+    }
+    if (payment > collectFineModal.balance) {
+      setCollectFineModal(prev => ({ ...prev, error: `Payment cannot exceed outstanding fine balance of ₹${collectFineModal.balance}.` }));
+      return;
+    }
+
+    try {
+      setCollectFineModal(prev => ({ ...prev, isSubmitting: true, error: null }));
+      const response = await payLibraryFine(
+        collectFineModal.issueId,
+        payment,
+        collectFineModal.paymentMethod,
+        collectFineModal.remarks
+      );
+
+      const paymentData = response?.data?.payment;
+      const transactionData = response?.data?.transaction;
+
+      // Close collect fine modal
+      setCollectFineModal(prev => ({ ...prev, isOpen: false, isSubmitting: false }));
+
+      // Refresh library transactions & KPIs
+      fetchLibraryData();
+
+      // Show receipt modal with generated receipt
+      if (paymentData) {
+        setReceiptModal({
+          isOpen: true,
+          loading: false,
+          receipt: {
+            receiptNumber: paymentData.receiptNumber || 'N/A',
+            userId: paymentData.userId || transactionData?.userId || collectFineModal.studentId,
+            userType: paymentData.userType || transactionData?.userType || 'Student',
+            bookTitle: transactionData?.bookId?.title || collectFineModal.bookTitle,
+            amount: paymentData.amount || payment,
+            paymentMethod: paymentData.paymentMethod || collectFineModal.paymentMethod,
+            paymentDate: paymentData.paymentDate ? new Date(paymentData.paymentDate).toLocaleString() : new Date().toLocaleString(),
+            remarks: paymentData.remarks || collectFineModal.remarks || 'Receipt generated from fine payment'
+          },
+          error: null
+        });
+      }
+    } catch (error) {
+      console.error('Pay fine error:', error);
+      setCollectFineModal(prev => ({
+        ...prev,
+        isSubmitting: false,
+        error: error?.response?.data?.message || 'Failed to record fine payment.'
+      }));
+    }
+  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   const handleReturn = async (issueId, studentName) => {
     try {
       await returnLibraryBook(issueId, { condition: 'Good' });
       alert(`Successfully approved return for ${studentName}!`);
-      fetchLibraryData(); // Refresh data
+      fetchLibraryData();
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to return book');
     }
   };
 
-  const handleOpenIssueModal = (book) => {
+  const handleOpenIssueModal = (book = null) => {
     setSelectedBookToIssue(book);
-    setIssueFormData({ bookId: book ? book._id : '', studentName: '', regNo: '', dueDate: '' });
+    setIssueFormData({
+      bookId: book ? book._id : (books[0]?._id || ''),
+      bookCopyId: '',
+      regNo: '',
+      studentName: '',
+      userType: 'Student',
+      issueDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
     setShowIssueModal(true);
   };
 
   const handleIssueSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    if (!issueFormData.bookId) {
+      alert('Please select a book to issue.');
+      return;
+    }
+    if (!issueFormData.regNo) {
+      alert('Please select a borrower (student / staff).');
+      return;
+    }
     try {
       await manualIssueLibraryBook({
-        bookId: issueFormData.bookId || selectedBookToIssue?._id,
+        bookId: issueFormData.bookId,
+        bookCopyId: issueFormData.bookCopyId || undefined,
         userId: issueFormData.regNo,
-        userType: 'Student', // hardcode or add to form if needed
+        userType: issueFormData.userType || 'Student',
         dueDate: issueFormData.dueDate
       });
-      alert('Successfully issued book directly!');
+      alert('Book issued successfully!');
       setShowIssueModal(false);
       fetchLibraryData();
-      setActiveTab('Issue & Return');
+      setActiveTab('Issue & Returns');
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to issue book');
     }
@@ -107,7 +522,7 @@ const LibraryManagement = () => {
   const handleIssueRequest = async (transactionId) => {
     try {
       await issueLibraryBook(transactionId);
-      alert('Successfully issued book!');
+      alert('Successfully issued reserved book!');
       fetchLibraryData();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to issue book');
@@ -117,184 +532,910 @@ const LibraryManagement = () => {
   const handleRejectRequest = async (transactionId) => {
     try {
       await rejectLibraryRequest(transactionId);
-      alert('Request rejected.');
+      alert('Reservation request rejected.');
       fetchLibraryData();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to reject request');
     }
   };
 
-  const TABS = ['Dashboard', 'Books Catalog', 'Issue & Return', 'Reservations', 'Digital Library', 'Reports'];
+  const handleAddBookSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!addBookForm.bookId || !addBookForm.title || !addBookForm.author || !addBookForm.category || !addBookForm.department) {
+      alert('Please fill all required fields: Book ID, Title, Author, Category/Course, and Department.');
+      return;
+    }
+    try {
+      await createLibraryBook(addBookForm);
+      alert(`Book "${addBookForm.title}" registered in catalog successfully!`);
+      setShowAddModal(false);
+      setAddBookForm({
+        bookId: '',
+        isbn: '',
+        title: '',
+        author: '',
+        publisher: '',
+        edition: '1st Edition',
+        category: realCourseNames[0] || 'Computer Science',
+        department: realDeptNames[0] || 'Computer Science and Engineering',
+        subject: '',
+        totalCopies: 1,
+        rackNumber: 'R01',
+        shelfNumber: 'S01'
+      });
+      fetchLibraryData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to add book to catalog');
+    }
+  };
 
-  const filteredBooks = books.filter(b => 
-    (b.title.toLowerCase().includes(search.toLowerCase()) || b.author.toLowerCase().includes(search.toLowerCase())) &&
-    (categoryFilter === 'All Categories' || b.category === categoryFilter)
-  );
+  const handleOpenCopiesModal = async (book) => {
+    setSelectedBookForCopies(book);
+    setShowCopiesModal(true);
+    setLoadingCopies(true);
+    const existingCount = (book.totalCopies || 0);
+    setNewCopyForm({
+      accessionNumber: `ACC-${String(existingCount + 1).padStart(5, '0')}`,
+      barcode: `BC-${Date.now().toString().slice(-6)}`,
+      rackNumber: book.rackNumber || 'R01',
+      shelfNumber: book.shelfNumber || 'S01',
+      condition: 'Good',
+      price: ''
+    });
+    try {
+      const res = await getBookCopies(book._id);
+      setBookCopies(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error('Failed to load copies', e);
+      setBookCopies([]);
+    } finally {
+      setLoadingCopies(false);
+    }
+  };
 
-  const totalBooks = books.reduce((acc, curr) => acc + curr.copies, 0);
-  const totalAvailable = books.reduce((acc, curr) => acc + curr.available, 0);
-  const totalIssued = issues.filter(i => i.status !== 'Returned').length;
-  const totalOverdue = issues.filter(i => i.status === 'Overdue').length;
+  const handleAddCopySubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!newCopyForm.accessionNumber) {
+      alert('Accession Number is required');
+      return;
+    }
+    try {
+      await createBookCopy(selectedBookForCopies._id, newCopyForm);
+      alert(`Physical Copy "${newCopyForm.accessionNumber}" registered successfully!`);
+      const res = await getBookCopies(selectedBookForCopies._id);
+      setBookCopies(Array.isArray(res.data) ? res.data : []);
+      fetchLibraryData();
+      setNewCopyForm(prev => ({
+        ...prev,
+        accessionNumber: `ACC-${String(bookCopies.length + 2).padStart(5, '0')}`,
+        barcode: `BC-${Date.now().toString().slice(-6)}`,
+        price: ''
+      }));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to add physical copy');
+    }
+  };
 
-  // Real-time Analytics Calculations
-  const totalFineCollected = issues.filter(i => i.status === 'Returned' && i.fineAmount).reduce((acc, curr) => acc + curr.fineAmount, 0);
-  
+  const handleUpdateCopyStatus = async (copyId, updates) => {
+    try {
+      await updateBookCopy(copyId, updates);
+      const res = await getBookCopies(selectedBookForCopies._id);
+      setBookCopies(Array.isArray(res.data) ? res.data : []);
+      fetchLibraryData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update copy status');
+    }
+  };
+
+  const handleDeleteCopy = async (copyId) => {
+    if (!window.confirm('Are you sure you want to remove this physical copy?')) return;
+    try {
+      await deleteBookCopy(copyId);
+      const res = await getBookCopies(selectedBookForCopies._id);
+      setBookCopies(Array.isArray(res.data) ? res.data : []);
+      fetchLibraryData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete copy');
+    }
+  };
+
+  // Filtered Books List
+  const handleApproveReservation = async (id) => {
+    try {
+      await approveLibraryReservation(id);
+      alert('Reservation approved successfully.');
+      await fetchLibraryData();
+    } catch (error) {
+      alert(error?.response?.data?.message || 'Failed to approve reservation.');
+    }
+  };
+
+  const handleRejectReservation = async (id) => {
+    try {
+      await rejectLibraryReservation(id);
+      alert('Reservation rejected successfully.');
+      await fetchLibraryData();
+    } catch (error) {
+      alert(error?.response?.data?.message || 'Failed to reject reservation.');
+    }
+  };
+
+  const handleReserveBook = async (bookId) => {
+    try {
+      setReservationLoading(bookId);
+
+      await createLibraryReservation(bookId);
+
+      alert('Book reservation submitted successfully.');
+    } catch (error) {
+      alert(
+        error?.response?.data?.message ||
+        'Failed to reserve book.'
+      );
+    } finally {
+      setReservationLoading(null);
+    }
+  };
+  const filteredBooks = books.filter(b => {
+    const q = search.toLowerCase();
+    const matchSearch = 
+      (b.title || '').toLowerCase().includes(q) || 
+      (b.author || '').toLowerCase().includes(q) ||
+      (b.bookId || '').toLowerCase().includes(q) ||
+      (b.isbn || '').toLowerCase().includes(q) ||
+      (b.department || '').toLowerCase().includes(q) ||
+      (b.category || '').toLowerCase().includes(q) ||
+      (b.subject || '').toLowerCase().includes(q);
+
+    const matchCategory = categoryFilter === 'All Categories' || b.category === categoryFilter;
+    const matchDept = deptFilter === 'All Departments' || b.department === deptFilter;
+    const matchStatus = 
+      statusFilter === 'All' || 
+      (statusFilter === 'Available' && ((b.availableCopies !== undefined ? b.availableCopies : b.available) > 0)) ||
+      (statusFilter === 'Out of Stock' && ((b.availableCopies !== undefined ? b.availableCopies : b.available) === 0));
+
+    return matchSearch && matchCategory && matchDept && matchStatus;
+  });
+
+  // Real-time Calculations
+  const totalBookTitles = books.length;
+  const totalPhysicalCopies = books.reduce((acc, curr) => acc + (Number(curr.totalCopies) || Number(curr.copies) || 1), 0);
+  const totalAvailableCopies = books.reduce((acc, curr) => acc + (curr.availableCopies !== undefined ? Number(curr.availableCopies) : (Number(curr.available) || 1)), 0);
+  const totalIssuedBooks = issues.filter(i => ['Issued', 'Overdue'].includes(i.status)).length;
+  const totalOverdueBooks = issues.filter(i => i.status === 'Overdue').length;
+  const totalReservedBooks = issues.filter(i => i.status === 'Pending').length;
+
+  // Active student members (borrowers)
+  const activeBorrowerIds = new Set(issues.filter(i => ['Issued', 'Overdue'].includes(i.status)).map(i => i.userId));
+  const activeMembersCount = activeBorrowerIds.size;
+
+  // Outstanding Fines & Collected Fines
+  const totalOutstandingFines = issues
+    .reduce((acc, curr) => {
+      const fine = Number(curr.fineAmount || 0);
+      const paid = Number(curr.finePaid || 0);
+      return acc + Math.max(0, fine - paid);
+    }, 0);
+
+  const totalFineCollected = issues
+    .reduce((acc, curr) => {
+      return acc + Number(curr.finePaid || 0);
+    }, 0);
+
+  const overdueTransactions = issues.filter(i => i.status === 'Overdue');
+  const recentlyAddedBooks = [...books].slice(-5).reverse();
+
+  // Department circulation map
   const deptCounts = {};
   issues.forEach(issue => {
-    if (issue.bookId?.department) {
-      deptCounts[issue.bookId.department] = (deptCounts[issue.bookId.department] || 0) + 1;
-    }
+    const dept = issue.bookId?.department || 'General';
+    deptCounts[dept] = (deptCounts[dept] || 0) + 1;
   });
-  let mostActiveDept = 'N/A';
-  let maxCount = 0;
-  Object.keys(deptCounts).forEach(dept => {
-    if (deptCounts[dept] > maxCount) {
-      maxCount = deptCounts[dept];
-      mostActiveDept = dept;
+  const deptCirculationData = Object.keys(deptCounts).map(dept => ({
+    name: dept,
+    count: deptCounts[dept]
+  }));
+
+  // Dynamic Most Popular Book Calculation from live issues and books
+  const bookBorrowMap = {};
+  issues.forEach(i => {
+    const bId = i.bookId?._id || (typeof i.bookId === 'string' ? i.bookId : null);
+    const bTitle = i.bookId?.title;
+    const key = bId || bTitle;
+    if (key) {
+      bookBorrowMap[key] = (bookBorrowMap[key] || 0) + 1;
     }
   });
 
-  const returnedTransactions = issues.filter(i => i.status === 'Returned').sort((a,b) => new Date(b.returnDate || b.updatedAt) - new Date(a.returnDate || a.updatedAt));
+  let popularBook = null;
+  let maxBorrowCount = 0;
 
-  if (loading) return <div className="p-8 text-center text-muted">Loading Library Database...</div>;
+  Object.entries(bookBorrowMap).forEach(([key, count]) => {
+    if (count > maxBorrowCount) {
+      maxBorrowCount = count;
+      popularBook = books.find(b => b._id === key || b.bookId === key || b.title === key) || 
+                    issues.find(i => (i.bookId?._id === key || i.bookId?.title === key))?.bookId;
+    }
+  });
+
+  if (!popularBook && books.length > 0) {
+    popularBook = books[0];
+    maxBorrowCount = issues.filter(i => {
+      const bId = i.bookId?._id || i.bookId;
+      return bId === popularBook._id || i.bookId?.title === popularBook.title;
+    }).length;
+  }
+
+  const handleAddDigitalSubmit = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!digitalForm.title || !digitalForm.author) {
+      alert('Please fill all required fields: Resource Title and Author / Faculty.');
+      return;
+    }
+    const newResource = {
+      id: `D${String(Date.now()).slice(-4)}`,
+      title: digitalForm.title,
+      author: digitalForm.author,
+      dept: digitalForm.dept || realDeptNames[0] || 'Computer Science and Engineering',
+      type: digitalForm.type || 'PDF',
+      size: `${(Math.random() * 3 + 1.5).toFixed(1)} MB`,
+      downloads: 0
+    };
+    setDigitalList([newResource, ...digitalList]);
+    setShowUploadDigitalModal(false);
+    setDigitalForm({ title: '', author: '', dept: '', type: 'PDF' });
+    alert(`Resource "${newResource.title}" uploaded to Digital Library successfully!`);
+  };
+
+  // Student members list
+  const filteredStudents = students.filter(s => {
+    const q = memberSearch.toLowerCase();
+    const idToUse = s.id || s.referenceId || s.studentId || s.rollNo || '';
+    return (
+      (s.name || '').toLowerCase().includes(q) ||
+      idToUse.toLowerCase().includes(q) ||
+      (s.dept || s.department || '').toLowerCase().includes(q)
+    );
+  });
+
+  // Digital Library filtering & calculations
+  const filteredDigitalList = digitalList.filter(d => {
+    const q = digitalSearch.toLowerCase();
+    const matchSearch = !digitalSearch || 
+      (d.title || '').toLowerCase().includes(q) || 
+      (d.author || '').toLowerCase().includes(q) || 
+      (d.dept || '').toLowerCase().includes(q);
+    const matchDept = digitalDeptFilter === 'All Departments' || d.dept === digitalDeptFilter;
+    const matchType = digitalTypeFilter === 'All Types' || d.type === digitalTypeFilter;
+    return matchSearch && matchDept && matchType;
+  });
+
+  const totalDigitalDownloads = digitalList.reduce((acc, curr) => acc + (Number(curr.downloads) || 0), 0);
+  const totalDigitalDepts = new Set(digitalList.map(d => d.dept)).size;
+
+  if (loading) {
+    return (
+      <div className="p-12 text-center text-muted animate-fade-in flex flex-col items-center justify-center gap-3">
+        <RefreshCw size={32} className="animate-spin text-primary" />
+        <p className="font-semibold text-base">Loading Library Records & Central ERP Inventory...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="library-page animate-fade-in">
-      <div className="page-header">
-        <div>
-          <h1>Advanced Library Management 📚</h1>
-          <p className="text-muted">Manage books, issues, digital resources, and auto-calculate fines.</p>
+      {/* Header */}
+      <div className="lib-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingBottom: '0.85rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', maxWidth: '700px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <h1 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main, #1e293b)' }}>
+              {activeTab === 'Dashboard' && <LayoutDashboard className="text-primary" size={22} />}
+              {activeTab === 'Book Inventory' && <BookOpen className="text-primary" size={22} />}
+              {activeTab === 'Issue & Returns' && <ArrowRightLeft className="text-primary" size={22} />}
+              {activeTab === 'Reservations' && <BookmarkCheck className="text-primary" size={22} />}
+              {activeTab === 'Student Members' && <Users className="text-primary" size={22} />}
+              {activeTab === 'Fines & Analytics' && <BarChart3 className="text-primary" size={22} />}
+              {activeTab === 'Digital Library' && <FileText className="text-primary" size={22} />}
+              {activeTab === 'Dashboard' ? 'Library Dashboard' : activeTab}
+            </h1>
+            <div className="erp-live-sync-pill">
+              <span className="erp-live-pulse-dot"></span>
+              <span>Live ERP Catalog Synced</span>
+            </div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '9999px', background: 'rgba(79, 70, 229, 0.1)', color: '#4F46E5', border: '1px solid rgba(79, 70, 229, 0.2)' }}>
+              {activeTab}
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>
+            {activeTab === 'Dashboard' && 'Comprehensive overview of catalog inventory, circulation desk operations, active borrower trends, and overdue fine metrics.'}
+            {activeTab === 'Book Inventory' && 'Central book titles catalog, physical copies accession registry, barcodes, and real-time shelf allocations.'}
+            {activeTab === 'Issue & Returns' && 'Circulation counter for manual or barcode issuance, return processing, and overdue tracking.'}
+            {activeTab === 'Reservations' && 'Student online book requests, approval workflow, and 24-hour reservation hold allocations.'}
+            {activeTab === 'Student Members' && 'Directory of registered student library accounts and individual loan histories.'}
+            {activeTab === 'Fines & Analytics' && 'Fine assessment, payment collection receipts, and department circulation analytics.'}
+            {activeTab === 'Digital Library' && 'Digital e-books, lecture PDFs, and previous question paper repository.'}
+          </p>
+        </div>
+
+        {/* Global Quick Action Header Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button 
+            className="btn-primary shadow-glow flex items-center gap-1.5 text-xs py-2 px-3.5"
+            onClick={() => handleOpenIssueModal()}
+          >
+            <BookDown size={15} /> Issue Book
+          </button>
+          <button 
+            className="btn-secondary flex items-center gap-1.5 text-xs py-2 px-3.5"
+            onClick={() => handleTabChange('Issue & Returns')}
+          >
+            <ArrowRightLeft size={15} /> Process Return
+          </button>
+          <button 
+            className="btn-secondary flex items-center gap-1.5 text-xs py-2 px-3.5 border-primary/30 text-primary"
+            onClick={() => {
+              const initialDept = realDeptNames[0] || 'Computer Science and Engineering';
+              const availableCourses = getCoursesForDepartment(initialDept);
+              const initialCourse = (availableCourses[0]?.name || availableCourses[0]?.code || realCourseNames[0] || 'Computer Science');
+              setAddBookForm({
+                bookId: `LIB-${Date.now().toString().slice(-4)}`,
+                isbn: '',
+                title: '',
+                author: '',
+                publisher: '',
+                edition: '1st Edition',
+                category: initialCourse,
+                department: initialDept,
+                subject: '',
+                totalCopies: 1,
+                rackNumber: 'R01',
+                shelfNumber: 'S01'
+              });
+              setShowAddModal(true);
+            }}
+          >
+            <Plus size={15} /> Add Book
+          </button>
         </div>
       </div>
 
-      <div className="lib-tabs-container">
-        {TABS.map(tab => (
-          <button key={tab} className={`lib-tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
-            {tab === 'Dashboard' && <Library size={16} />}
-            {tab === 'Books Catalog' && <BookOpen size={16} />}
-            {tab === 'Issue & Return' && <ArrowRightLeft size={16} />}
-            {tab === 'Reservations' && <Clock size={16} />}
-            {tab === 'Digital Library' && <FileText size={16} />}
-            {tab === 'Reports' && <BarChart size={16} />}
-            {tab}
-          </button>
-        ))}
-      </div>
+      {/* Navigation Tabs (Displayed only when not in dedicated sidebar sub-routes) */}
+      {!location.pathname.startsWith('/librarian') && (
+        <div className="lib-tabs-container">
+          {TABS.map(tab => {
+            const pendingReservationsCount = issues.filter(i => i.status === 'Pending').length;
+            return (
+              <button 
+                key={tab} 
+                className={`lib-tab ${activeTab === tab ? 'active' : ''}`} 
+                onClick={() => handleTabChange(tab)}
+              >
+                {tab === 'Dashboard' && <LayoutDashboard size={16} />}
+                {tab === 'Book Inventory' && <BookOpen size={16} />}
+                {tab === 'Issue & Returns' && <ArrowRightLeft size={16} />}
+                {tab === 'Reservations' && <BookmarkCheck size={16} />}
+                {tab === 'Student Members' && <Users size={16} />}
+                {tab === 'Fines & Analytics' && <BarChart3 size={16} />}
+                {tab === 'Digital Library' && <FileText size={16} />}
+                <span>{tab}</span>
+                {tab === 'Reservations' && pendingReservationsCount > 0 && (
+                  <span className="ml-1.5 px-2 py-0.5 text-xs font-bold bg-amber-500 text-white rounded-full">
+                    {pendingReservationsCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
+      {/* =========================================================
+          TAB 1: LIBRARY DASHBOARD
+          ========================================================= */}
       {activeTab === 'Dashboard' && (
-        <div className="lib-tab-content animate-fade-in">
-          <div className="lib-kpi-grid">
-            <div className="glass-card p-5 relative overflow-hidden">
-              <BookOpen size={24} className="text-blue-500 mb-2"/>
-              <h3 className="text-sm text-muted uppercase font-bold">Total Books</h3>
-              <p className="text-2xl font-bold mt-1">{totalBooks}</p>
+        <div className="lib-tab-content animate-fade-in space-y-6">
+
+          {/* 8 Real-Time KPI Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', width: '100%' }}>
+            <div className="glass-card p-4 relative overflow-hidden border-l-4 border-l-blue-500">
+              <div className="flex items-center justify-between text-blue-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Total Books</span>
+                <BookOpen size={20} />
+              </div>
+              <p className="text-2xl font-black">{totalBookTitles}</p>
+              <span className="text-[11px] text-muted">Unique Catalog Titles</span>
             </div>
-            <div className="glass-card p-5 relative overflow-hidden">
-              <ArrowRightLeft size={24} className="text-purple-500 mb-2"/>
-              <h3 className="text-sm text-muted uppercase font-bold">Currently Issued</h3>
-              <p className="text-2xl font-bold mt-1">{totalIssued}</p>
+
+            <div className="glass-card p-4 relative overflow-hidden border-l-4 border-l-emerald-500">
+              <div className="flex items-center justify-between text-emerald-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Available Books</span>
+                <CheckCircle size={20} />
+              </div>
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{totalAvailableCopies}</p>
+              <span className="text-[11px] text-muted">Copies Ready on Shelf</span>
             </div>
-            <div className="glass-card p-5 relative overflow-hidden">
-              <CheckCircle size={24} className="text-success mb-2"/>
-              <h3 className="text-sm text-muted uppercase font-bold">Available</h3>
-              <p className="text-2xl font-bold mt-1">{totalAvailable}</p>
+
+            <div className="glass-card p-4 relative overflow-hidden border-l-4 border-l-indigo-500">
+              <div className="flex items-center justify-between text-indigo-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Total Copies</span>
+                <Layers size={20} />
+              </div>
+              <p className="text-2xl font-black">{totalPhysicalCopies}</p>
+              <span className="text-[11px] text-muted">Physical Barcoded Books</span>
             </div>
-            <div className="glass-card p-5 relative overflow-hidden">
-              <AlertCircle size={24} className="text-danger mb-2"/>
-              <h3 className="text-sm text-muted uppercase font-bold">Overdue Books</h3>
-              <p className="text-2xl font-bold text-danger mt-1">{totalOverdue}</p>
+
+            <div className="glass-card p-4 relative overflow-hidden border-l-4 border-l-purple-500">
+              <div className="flex items-center justify-between text-purple-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Issued Books</span>
+                <ArrowRightLeft size={20} />
+              </div>
+              <p className="text-2xl font-black text-purple-600 dark:text-purple-400">{totalIssuedBooks}</p>
+              <span className="text-[11px] text-muted">Active Student Loans</span>
+            </div>
+
+            <div className="glass-card p-4 relative overflow-hidden border-l-4 border-l-rose-500 bg-rose-500/5">
+              <div className="flex items-center justify-between text-rose-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Overdue Books</span>
+                <AlertCircle size={20} />
+              </div>
+              <p className="text-2xl font-black text-rose-600 dark:text-rose-400">{totalOverdueBooks}</p>
+              <span className="text-[11px] text-rose-600 font-semibold">Requires Follow-up</span>
+            </div>
+
+            <div className="glass-card p-4 relative overflow-hidden border-l-4 border-l-amber-500">
+              <div className="flex items-center justify-between text-amber-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Reserved Books</span>
+                <BookmarkCheck size={20} />
+              </div>
+              <p className="text-2xl font-black text-amber-600 dark:text-amber-400">{totalReservedBooks}</p>
+              <span className="text-[11px] text-muted">Pending Student Requests</span>
+            </div>
+
+            <div className="glass-card p-4 relative overflow-hidden border-l-4 border-l-teal-500">
+              <div className="flex items-center justify-between text-teal-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Active Members</span>
+                <Users size={20} />
+              </div>
+              <p className="text-2xl font-black">{activeMembersCount}</p>
+              <span className="text-[11px] text-muted">Students with Active Loans</span>
+            </div>
+
+            <div className="glass-card p-4 relative overflow-hidden border-l-4 border-l-orange-500">
+              <div className="flex items-center justify-between text-orange-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Outstanding Fines</span>
+                <IndianRupee size={20} />
+              </div>
+              <p className="text-2xl font-black text-orange-600 dark:text-orange-400">₹{totalOutstandingFines}</p>
+              <span className="text-[11px] text-muted">Accrued Fine Balance</span>
             </div>
           </div>
 
-          <div className="lib-charts-row mt-4">
-            <div className="glass-card p-6">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><TrendingUp size={18}/> Monthly Issue Trends</h3>
-              <div style={{ height: 280 }}>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={MOCK_CHART_DATA}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)"/>
-                    <XAxis dataKey="month" stroke="var(--text-muted)" tickLine={false}/>
-                    <YAxis stroke="var(--text-muted)" tickLine={false}/>
-                    <Tooltip contentStyle={{background:'var(--bg-secondary)', border:'none', borderRadius:'8px', color:'var(--text-main)'}}/>
-                    <Line type="monotone" dataKey="issued" stroke="#3730A5" strokeWidth={3} dot={{r: 4, fill: '#3730A5'}} />
-                  </LineChart>
-                </ResponsiveContainer>
+          {/* Operational Dashboard Grid */}
+          <div className="lib-dashboard-layout">
+            
+            {/* Left Column (2/3 width): Circulation Alerts & Recent Inventory */}
+            <div className="lib-dashboard-col">
+              
+              {/* Overdue Circulation Alert Table */}
+              <div className="glass-card p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-base font-bold flex items-center gap-2 text-rose-600">
+                    <AlertTriangle size={18} /> Overdue Books Alert ({overdueTransactions.length})
+                  </h3>
+                  <button 
+                    className="text-xs text-primary hover:underline font-semibold"
+                    onClick={() => setActiveTab('Issue & Returns')}
+                  >
+                    View All Circulation →
+                  </button>
+                </div>
+                <div className="border border-[var(--border-color)] rounded-xl overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
+                      <tr>
+                        <th className="p-2.5 text-left">Book Title</th>
+                        <th className="p-2.5 text-left">Borrower</th>
+                        <th className="p-2.5 text-left">Due Date</th>
+                        <th className="p-2.5 text-right">Fine</th>
+                        <th className="p-2.5 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overdueTransactions.slice(0, 5).map(ot => (
+                        <tr key={ot._id} className="border-b border-[var(--border-color)]/50 hover:bg-rose-500/5">
+                          <td className="p-2.5 font-semibold text-[var(--text-main)] truncate max-w-[180px]" title={ot.bookId?.title}>
+                            {ot.bookId?.title || 'Unknown Book'}
+                          </td>
+                          <td className="p-2.5 text-muted font-mono">{ot.userId}</td>
+                          <td className="p-2.5 text-rose-600 font-bold">{new Date(ot.dueDate).toLocaleDateString()}</td>
+                          <td className="p-2.5 text-right font-bold text-orange-600">₹{ot.fineAmount || 0}</td>
+                          <td className="p-2.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCollectFine(ot)}
+                              className="btn-primary text-[11px] py-1 px-2.5 shadow-sm"
+                            >
+                              Collect Fine
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {overdueTransactions.length === 0 && (
+                        <tr>
+                          <td colSpan="5" className="p-6 text-center text-muted">
+                            <CheckCircle2 size={22} className="inline mr-1 text-emerald-500" />
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">All books returned on schedule.</span> No overdue fines currently pending!
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+
+              {/* Recently Added Books */}
+              <div className="glass-card p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-base font-bold flex items-center gap-2">
+                    <BookPlus size={18} className="text-primary" /> Recently Added Catalog Titles
+                  </h3>
+                  <button 
+                    className="text-xs text-primary hover:underline font-semibold"
+                    onClick={() => setActiveTab('Book Inventory')}
+                  >
+                    Open Inventory →
+                  </button>
+                </div>
+                <div className="border border-[var(--border-color)] rounded-xl overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
+                      <tr>
+                        <th className="p-2.5 text-left">Accession ID</th>
+                        <th className="p-2.5 text-left">Book Title & Author</th>
+                        <th className="p-2.5 text-left">Department</th>
+                        <th className="p-2.5 text-center">Available</th>
+                        <th className="p-2.5 text-right">Copies</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentlyAddedBooks.slice(0, 5).map(b => (
+                        <tr key={b._id || b.id} className="border-b border-[var(--border-color)]/50 hover:bg-primary/5 cursor-pointer" onClick={() => handleOpenCopiesModal(b)}>
+                          <td className="p-2.5 font-mono font-bold text-primary">{b.bookId || b.id}</td>
+                          <td className="p-2.5">
+                            <div className="font-semibold text-[var(--text-main)] truncate max-w-[200px]" title={b.title}>{b.title}</div>
+                            <div className="text-[11px] text-muted truncate max-w-[200px]">{b.author || 'Author N/A'}</div>
+                          </td>
+                          <td className="p-2.5 text-muted">{b.department || 'CSE'}</td>
+                          <td className="p-2.5 text-center">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${((b.availableCopies !== undefined ? b.availableCopies : b.available) > 0) ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+                              {b.availableCopies !== undefined ? b.availableCopies : (b.available || 0)} Ready
+                            </span>
+                          </td>
+                          <td className="p-2.5 text-right font-bold">{b.totalCopies || b.copies || 1}</td>
+                        </tr>
+                      ))}
+                      {recentlyAddedBooks.length === 0 && (
+                        <tr>
+                          <td colSpan="5" className="p-6 text-center text-muted">
+                            No books added to inventory yet. Click "+ Add Book" to get started.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
             </div>
-            <div className="glass-card p-6 flex flex-col justify-center items-center text-center">
-              <BookDown size={48} className="text-primary mb-4 opacity-50"/>
-              <h3 className="text-lg font-bold mb-2">Most Borrowed Book</h3>
-              <p className="text-xl text-primary font-bold">Introduction to Algorithms</p>
-              <p className="text-muted mt-2">Issued 145 times this semester</p>
+
+            {/* Right Column (1/3 width): Circulation Spotlight & Quick Actions */}
+            <div className="lib-dashboard-col">
+
+              {/* Circulation Spotlight */}
+              <div className="glass-card p-5 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-base font-bold mb-3 flex items-center gap-2">
+                    <BookMarked size={18} className="text-primary"/> Circulation Spotlight
+                  </h3>
+                  {popularBook ? (
+                    <div className="lib-spotlight-box mb-3">
+                      <div className="flex items-center justify-between">
+                        <span className="lib-badge-spotlight">
+                          {maxBorrowCount > 0 ? 'Top Borrowed' : 'Featured'}
+                        </span>
+                        <span className="lib-spotlight-issues">
+                          {maxBorrowCount} {maxBorrowCount === 1 ? 'Issue' : 'Issues'}
+                        </span>
+                      </div>
+                      <div>
+                        <h4 className="lib-spotlight-title truncate" title={popularBook.title || 'Untitled Book'}>
+                          {popularBook.title || 'Untitled Book'}
+                        </h4>
+                        <p className="lib-spotlight-author truncate">
+                          By {popularBook.author || 'Author N/A'}
+                        </p>
+                        <p className="lib-spotlight-dept truncate">
+                          Dept: <strong style={{ color: '#1e293b' }}>{popularBook.department || popularBook.category || 'General'}</strong>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-primary text-xs py-2 px-3 flex items-center justify-center gap-1.5 shadow-sm"
+                        style={{ marginTop: '0.25rem' }}
+                        onClick={() => handleOpenIssueModal(popularBook)}
+                      >
+                        <BookDown size={14} /> Issue Book
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-6 rounded-xl bg-gray-50 dark:bg-gray-800/40 border border-[var(--border-color)] mb-3 text-center text-muted">
+                      <BookOpen size={28} className="mx-auto mb-2 text-muted opacity-50" />
+                      <p className="text-xs font-semibold">No books in catalog yet.</p>
+                    </div>
+                  )}
+                </div>
+                <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-xs text-muted flex items-center justify-between">
+                  <span>Catalog Strength:</span>
+                  <span className="font-bold text-[var(--text-main)]">{books.length} Unique Titles</span>
+                </div>
+              </div>
+
+              {/* Fast Circulation Desk Shortcuts */}
+              <div className="glass-card p-5">
+                <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-[var(--text-main)]">
+                  <Sparkles size={16} className="text-primary" /> Circulation Shortcuts
+                </h3>
+                <div className="flex flex-col gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenIssueModal()}
+                    className="lib-shortcut-btn group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
+                        <BookDown size={16} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[var(--text-main)] group-hover:text-primary">Issue Book Counter</div>
+                        <div className="text-[10px] text-muted">Direct loan assignment</div>
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className="text-muted group-hover:text-primary shrink-0" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('Issue & Returns')}
+                    className="lib-shortcut-btn group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                        <ArrowRightLeft size={16} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[var(--text-main)] group-hover:text-emerald-600">Process Returns & Fines</div>
+                        <div className="text-[10px] text-muted">Barcode return scan & fine receipt</div>
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className="text-muted group-hover:text-emerald-600 shrink-0" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('Reservations')}
+                    className="lib-shortcut-btn group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                        <BookmarkCheck size={16} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[var(--text-main)] group-hover:text-amber-600 flex items-center gap-1.5">
+                          Pending Reservations
+                          {issues.filter(i => i.status === 'Pending').length > 0 && (
+                            <span className="px-1.5 py-0.2 text-[10px] font-bold bg-amber-500 text-white rounded-full">
+                              {issues.filter(i => i.status === 'Pending').length}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-muted">Review student hold requests</div>
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className="text-muted group-hover:text-amber-600 shrink-0" />
+                  </button>
+                </div>
+              </div>
+
             </div>
+
           </div>
         </div>
       )}
 
-      {activeTab === 'Books Catalog' && (
-        <div className="lib-tab-content animate-fade-in">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex gap-4">
-              <div className="search-box">
+      {/* =========================================================
+          TAB 2: BOOK INVENTORY ⭐ (MAIN INVENTORY PAGE)
+          ========================================================= */}
+      {activeTab === 'Book Inventory' && (
+        <div className="lib-tab-content animate-fade-in space-y-4">
+          {/* Action Bar & Search with Real-time Depts and Courses */}
+          <div className="flex flex-wrap justify-between items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 flex-1">
+              <div className="search-box" style={{ minWidth: '280px', maxWidth: '380px' }}>
                 <Search size={16} className="text-muted"/>
-                <input type="text" placeholder="Search by title, author, or ISBN..." value={search} onChange={e=>setSearch(e.target.value)}/>
+                <input 
+                  type="text" 
+                  placeholder="Search books by title, author, ID, ISBN, dept, course..." 
+                  value={search} 
+                  onChange={e => setSearch(e.target.value)}
+                />
               </div>
-              <div style={{ width: '220px' }}>
+
+              <div style={{ width: '200px' }}>
+                <CustomSelect 
+                  options={deptOptions}
+                  value={deptFilter}
+                  onChange={(e) => setDeptFilter(e.target.value)}
+                  icon={Building}
+                />
+              </div>
+
+              <div style={{ width: '200px' }}>
                 <CustomSelect 
                   options={categoryOptions}
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  icon={Filter}
+                  icon={GraduationCap}
                 />
               </div>
+
+              <select 
+                className="p-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-sm font-medium"
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+              >
+                <option value="All">All Statuses</option>
+                <option value="Available">Available Only</option>
+                <option value="Out of Stock">Out of Stock</option>
+              </select>
             </div>
-            <button className="btn-primary shadow-glow" onClick={() => setShowAddModal(true)}>+ Add Book</button>
+
+            <button 
+              className="btn-primary shadow-glow flex items-center gap-2 text-sm py-2 px-4"
+              onClick={() => {
+                const initialDept = realDeptNames[0] || 'Computer Science and Engineering';
+                const availableCourses = getCoursesForDepartment(initialDept);
+                const initialCourse = (availableCourses[0]?.name || availableCourses[0]?.code || realCourseNames[0] || 'Computer Science');
+                setAddBookForm({
+                  bookId: `LIB-${Date.now().toString().slice(-4)}`,
+                  isbn: '',
+                  title: '',
+                  author: '',
+                  publisher: '',
+                  edition: '1st Edition',
+                  category: initialCourse,
+                  department: initialDept,
+                  subject: '',
+                  totalCopies: 1,
+                  rackNumber: 'R01',
+                  shelfNumber: 'S01'
+                });
+                setShowAddModal(true);
+              }}
+            >
+              <Plus size={16} /> + Add Book
+            </button>
           </div>
 
+          {/* Book Catalog Table */}
           <div className="table-wrapper">
             <div className="table-container">
               <table>
                 <thead>
                   <tr>
-                    <th>Book Info</th>
-                    <th>ISBN</th>
-                    <th>Category</th>
-                    <th>Availability</th>
-                    <th>Actions</th>
+                    <th>Book ID</th>
+                    <th>Book Information</th>
+                    <th>Author</th>
+                    <th>Department & Course</th>
+                    <th>Total Copies</th>
+                    <th>Available</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredBooks.map(b => (
-                    <tr key={b.id}>
-                      <td>
-                        <div className="flex items-center gap-3">
-                          <div className="bg-primary/10 p-2 rounded-lg text-primary">
-                            <BookOpen size={20} />
+                  {filteredBooks.map(b => {
+                    const total = b.totalCopies !== undefined ? b.totalCopies : (b.copies || 1);
+                    const avail = b.availableCopies !== undefined ? b.availableCopies : (b.available !== undefined ? b.available : total);
+                    const isAvailable = avail > 0;
+
+                    return (
+                      <tr 
+                        key={b._id || b.id} 
+                        className="hover:bg-primary/5 transition-colors cursor-pointer"
+                        onClick={() => handleOpenCopiesModal(b)}
+                      >
+                        <td className="font-mono text-sm font-bold text-primary">
+                          {b.bookId || b.id || 'N/A'}
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-3">
+                            <div className="bg-primary/10 p-2 rounded-lg text-primary">
+                              <BookOpen size={20} />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="font-bold text-[var(--text-main)] hover:text-primary transition-colors">
+                                {b.title}
+                              </span>
+                              <span className="text-xs text-[var(--text-muted)]">
+                                {b.isbn ? `ISBN: ${b.isbn}` : ''} {b.publisher ? `• ${b.publisher}` : ''}
+                              </span>
+                            </div>
                           </div>
+                        </td>
+                        <td>
+                          <span className="text-sm font-medium">{b.author}</span>
+                        </td>
+                        <td>
                           <div className="flex flex-col">
-                            <span className="font-bold text-[var(--text-main)]">{b.title}</span>
-                            <span className="text-xs text-[var(--text-muted)]">{b.author}</span>
+                            <span className="text-sm font-semibold">{b.department || 'General'}</span>
+                            <span className="text-xs text-[var(--text-muted)]">{b.category}</span>
                           </div>
-                        </div>
-                      </td>
-                      <td className="font-mono text-sm text-[var(--text-muted)]">{b.id || 'N/A'}</td>
-                      <td className="text-sm font-medium text-[var(--text-muted)]">{b.category}</td>
-                      <td>
-                        <span className={`status-badge ${b.availableCopies > 0 ? 'status-available' : 'status-issued'}`}>
-                          {b.availableCopies > 0 ? `${b.availableCopies} Available` : 'Out of Stock'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="flex gap-2">
-                          <button className="btn-primary text-xs py-1.5 px-3" disabled={b.availableCopies === 0} onClick={()=>handleOpenIssueModal(b)}>Issue</button>
-                          <button className="btn-secondary text-xs py-1.5 px-3">Edit</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td>
+                          <span className="text-sm font-bold">{total}</span>
+                        </td>
+                        <td>
+                          <div className="flex flex-col">
+                            <span className={`text-sm font-bold ${isAvailable ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {avail} / {total}
+                            </span>
+                            <div className="w-20 bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden mt-1">
+                              <div 
+                                className={`h-full rounded-full ${isAvailable ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                style={{ width: `${Math.min(100, Math.max(0, (avail / total) * 100))}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`status-badge ${isAvailable ? 'status-available' : 'status-issued'}`}>
+                            {isAvailable ? 'Available' : 'Out of Stock'}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-2">
+                            <button 
+                              className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5"
+                              onClick={() => handleOpenCopiesModal(b)}
+                              title="Inspect book details and physical copies"
+                            >
+                              <Layers size={14} /> Copies ({total})
+                            </button>
+                            <button 
+                              className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5"
+                              disabled={!isAvailable}
+                              onClick={() => handleOpenIssueModal(b)}
+                            >
+                              <BookDown size={14} /> Issue
+                            </button>
+                            <button
+                              className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5"
+                              disabled={reservationLoading === (b._id || b.id)}
+                              onClick={() => handleReserveBook(b._id || b.id)}
+                              title="Reserve this book"
+                            >
+                              <Bookmark size={14} /> {reservationLoading === (b._id || b.id) ? "Reserving..." : "Reserve"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {filteredBooks.length === 0 && (
                     <tr>
-                      <td colSpan="5" className="text-center p-8 text-[var(--text-muted)]">No books found in catalog.</td>
+                      <td colSpan="8" className="text-center p-8 text-[var(--text-muted)]">
+                        No matching books found in inventory catalog.
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -302,140 +1443,436 @@ const LibraryManagement = () => {
             </div>
           </div>
 
-          {showAddModal && (
-            <div className="lib-modal-overlay" onClick={()=>setShowAddModal(false)}>
-              <div className="lib-modal-card" onClick={e=>e.stopPropagation()}>
-                <div className="lib-modal-header">
-                  <h2>Add New Book</h2>
-                  <button className="modal-close-btn" onClick={()=>setShowAddModal(false)}><X size={20}/></button>
+          {/* =========================================================
+              BOOK DETAILS & PHYSICAL COPIES MANAGEMENT MODAL
+              ========================================================= */}
+          {showCopiesModal && selectedBookForCopies && (
+            <div className="lib-modal-overlay" onClick={() => setShowCopiesModal(false)}>
+              <div 
+                className="lib-modal-card animate-fade-in" 
+                style={{ maxWidth: '900px', width: '92%' }} 
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="lib-modal-header border-b border-[var(--border-color)] pb-3">
+                  <div>
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                      <BookOpen className="text-primary" size={22} />
+                      {selectedBookForCopies.title}
+                    </h2>
+                    <p className="text-xs text-muted mt-0.5">
+                      Book ID: <span className="font-mono font-bold text-primary">{selectedBookForCopies.bookId}</span> • 
+                      Author: <span className="font-medium">{selectedBookForCopies.author}</span>
+                    </p>
+                  </div>
+                  <button className="modal-close-btn" onClick={() => setShowCopiesModal(false)}>
+                    <X size={20} />
+                  </button>
                 </div>
-                <div className="lib-modal-form">
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label>Title</label>
-                      <input type="text" placeholder="Enter book title" />
-                    </div>
-                    <div className="form-group">
-                      <label>Author</label>
-                      <input type="text" placeholder="Enter author name" />
+
+                <div className="p-4 space-y-5 max-h-[75vh] overflow-y-auto">
+                  {/* Book Information Section */}
+                  <div className="p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/50">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted mb-3 flex items-center gap-1.5">
+                      <FileCheck2 size={16} className="text-primary" /> Book Information
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div>
+                        <span className="text-muted block">ISBN:</span>
+                        <span className="font-mono font-bold">{selectedBookForCopies.isbn || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted block">Publisher:</span>
+                        <span className="font-semibold">{selectedBookForCopies.publisher || 'MIT Press'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted block">Edition:</span>
+                        <span className="font-semibold">{selectedBookForCopies.edition || '1st Edition'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted block">Department:</span>
+                        <span className="font-semibold">{selectedBookForCopies.department || 'CSE'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted block">Category / Course:</span>
+                        <span className="font-semibold">{selectedBookForCopies.category || 'General'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted block">Rack / Shelf:</span>
+                        <span className="font-mono font-semibold">
+                          Rack {selectedBookForCopies.rackNumber || 'R01'} • Shelf {selectedBookForCopies.shelfNumber || 'S01'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted block">Total Copies:</span>
+                        <span className="font-bold text-sm">{selectedBookForCopies.totalCopies || 1} Copies</span>
+                      </div>
+                      <div>
+                        <span className="text-muted block">Available Copies:</span>
+                        <span className="font-bold text-sm text-emerald-600">
+                          {selectedBookForCopies.availableCopies !== undefined ? selectedBookForCopies.availableCopies : 1} Copies
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className="form-grid" style={{ marginTop: '1rem' }}>
-                    <div className="form-group">
-                      <label>ISBN</label>
-                      <input type="text" placeholder="Enter ISBN" />
+
+                  {/* Physical Copies Section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-bold flex items-center gap-1.5">
+                        <Layers size={16} className="text-primary" /> Physical Copies ({bookCopies.length})
+                      </h4>
+                      {loadingCopies && <span className="text-xs text-muted">Loading copies...</span>}
                     </div>
-                    <div className="form-group">
-                      <label>Category</label>
-                      <select>
-                        {CATEGORIES.slice(1).map(c=><option key={c}>{c}</option>)}
-                      </select>
+
+                    <div className="border border-[var(--border-color)] rounded-xl overflow-hidden mb-4">
+                      <table className="w-full text-xs">
+                        <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
+                          <tr>
+                            <th className="p-2.5 text-left">Accession No</th>
+                            <th className="p-2.5 text-left">Barcode</th>
+                            <th className="p-2.5 text-left">Rack</th>
+                            <th className="p-2.5 text-left">Shelf</th>
+                            <th className="p-2.5 text-left">Condition</th>
+                            <th className="p-2.5 text-left">Status</th>
+                            <th className="p-2.5 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bookCopies.map((copy, idx) => (
+                            <tr key={copy._id || idx} className="border-b border-[var(--border-color)]/50 hover:bg-primary/5">
+                              <td className="p-2.5 font-mono font-bold text-primary">
+                                {copy.accessionNumber}
+                              </td>
+                              <td className="p-2.5 font-mono text-muted">
+                                {copy.barcode || '—'}
+                              </td>
+                              <td className="p-2.5 font-mono font-semibold">
+                                {copy.rackNumber || selectedBookForCopies.rackNumber || 'R01'}
+                              </td>
+                              <td className="p-2.5 font-mono font-semibold">
+                                {copy.shelfNumber || selectedBookForCopies.shelfNumber || 'S01'}
+                              </td>
+                              <td className="p-2.5">
+                                <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                                  copy.condition === 'New' || copy.condition === 'Good' 
+                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                    : copy.condition === 'Fair'
+                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                                    : 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
+                                }`}>
+                                  {copy.condition}
+                                </span>
+                              </td>
+                              <td className="p-2.5">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                  copy.status === 'Available'
+                                    ? 'bg-emerald-500/10 text-emerald-600'
+                                    : copy.status === 'Issued'
+                                    ? 'bg-blue-500/10 text-blue-600'
+                                    : copy.status === 'Reserved'
+                                    ? 'bg-amber-500/10 text-amber-600'
+                                    : 'bg-rose-500/10 text-rose-600'
+                                }`}>
+                                  {copy.status}
+                                </span>
+                              </td>
+                              <td className="p-2.5 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <select 
+                                    className="text-[11px] p-1 rounded border border-[var(--border-color)] bg-[var(--bg-card)]"
+                                    value={copy.status}
+                                    onChange={e => handleUpdateCopyStatus(copy._id, { status: e.target.value })}
+                                  >
+                                    <option value="Available">Available</option>
+                                    <option value="Issued">Issued</option>
+                                    <option value="Reserved">Reserved</option>
+                                    <option value="Damaged">Damaged</option>
+                                    <option value="Lost">Lost</option>
+                                    <option value="Maintenance">Maintenance</option>
+                                  </select>
+                                  <button 
+                                    className="p-1 rounded text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                    onClick={() => handleDeleteCopy(copy._id)}
+                                    title="Delete physical copy"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                          {bookCopies.length === 0 && !loadingCopies && (
+                            <tr>
+                              <td colSpan="7" className="text-center p-6 text-muted">
+                                No physical copies registered yet. Use the form below to add individual physical copies.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
-                  </div>
-                  <div className="form-grid" style={{ marginTop: '1rem' }}>
-                    <div className="form-group">
-                      <label>Total Copies</label>
-                      <input type="number" placeholder="0" />
-                    </div>
-                    <div className="form-group">
-                      <label>Shelf Location</label>
-                      <input type="text" placeholder="e.g. A1-Rack2" />
-                    </div>
+
+                    {/* Inline Form: [ + Add Copy ] */}
+                    <form 
+                      onSubmit={handleAddCopySubmit}
+                      className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3"
+                    >
+                      <h4 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-primary">
+                        <Plus size={16} /> + Add Copy
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5">
+                        <div className="col-span-2">
+                          <label className="text-[11px] font-bold text-muted block mb-1">Accession No *</label>
+                          <input 
+                            type="text" 
+                            required 
+                            className="w-full p-2 text-xs rounded border border-[var(--border-color)] bg-[var(--bg-card)] font-mono"
+                            placeholder="e.g. ACC-00001"
+                            value={newCopyForm.accessionNumber}
+                            onChange={e => setNewCopyForm({ ...newCopyForm, accessionNumber: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-muted block mb-1">Barcode</label>
+                          <input 
+                            type="text" 
+                            className="w-full p-2 text-xs rounded border border-[var(--border-color)] bg-[var(--bg-card)] font-mono"
+                            placeholder="e.g. BC-01"
+                            value={newCopyForm.barcode}
+                            onChange={e => setNewCopyForm({ ...newCopyForm, barcode: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-muted block mb-1">Rack</label>
+                          <input 
+                            type="text" 
+                            className="w-full p-2 text-xs rounded border border-[var(--border-color)] bg-[var(--bg-card)]"
+                            placeholder="e.g. R01"
+                            value={newCopyForm.rackNumber}
+                            onChange={e => setNewCopyForm({ ...newCopyForm, rackNumber: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-muted block mb-1">Shelf</label>
+                          <input 
+                            type="text" 
+                            className="w-full p-2 text-xs rounded border border-[var(--border-color)] bg-[var(--bg-card)]"
+                            placeholder="e.g. S03"
+                            value={newCopyForm.shelfNumber}
+                            onChange={e => setNewCopyForm({ ...newCopyForm, shelfNumber: e.target.value })}
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <button 
+                            type="submit" 
+                            className="btn-primary w-full py-2 text-xs flex items-center justify-center gap-1 shadow-glow"
+                          >
+                            <Plus size={14} /> Add Copy
+                          </button>
+                        </div>
+                      </div>
+                    </form>
                   </div>
                 </div>
-                <div className="lib-modal-actions">
-                  <button className="btn-secondary" onClick={()=>setShowAddModal(false)}>Cancel</button>
-                  <button className="btn-primary shadow-glow" onClick={()=>{alert('Book Added!');setShowAddModal(false)}}>Save Book</button>
+
+                <div className="lib-modal-actions border-t border-[var(--border-color)] pt-3">
+                  <button className="btn-secondary text-sm" onClick={() => setShowCopiesModal(false)}>
+                    Close
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
-          {showIssueModal && selectedBookToIssue && (
-            <div className="lib-modal-overlay" onClick={()=>setShowIssueModal(false)}>
-              <div className="lib-modal-card" onClick={e=>e.stopPropagation()}>
-                <div className="lib-modal-header">
-                  <h2>Issue Book Form</h2>
-                  <button className="lib-modal-close-btn" onClick={()=>setShowIssueModal(false)}><X size={20}/></button>
-                </div>
-                <form className="lib-modal-form space-y-4" onSubmit={handleIssueSubmit}>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-sm font-bold text-muted">Select Book</label>
-                    <select 
-                      required 
-                      className="p-2 rounded border bg-transparent" 
-                      value={issueFormData.bookId || (selectedBookToIssue ? selectedBookToIssue._id : '')} 
-                      onChange={e => setIssueFormData({ ...issueFormData, bookId: e.target.value })}
-                    >
-                      <option value="">-- Choose a Book --</option>
-                      {books.filter(b => b.availableCopies > 0).map(b => (
-                        <option key={b._id} value={b._id}>
-                          {b.title} (Available: {b.availableCopies})
-                        </option>
-                      ))}
-                    </select>
+          {/* =========================================================
+              ADD NEW BOOK MODAL WITH REAL-TIME DEPT & COURSE SELECTORS
+              ========================================================= */}
+          {showAddModal && (
+            <div className="lib-modal-overlay" onClick={() => setShowAddModal(false)}>
+              <div className="lib-modal-card animate-fade-in" style={{ maxWidth: '650px', width: '90%' }} onClick={e => e.stopPropagation()}>
+                <div className="lib-modal-header border-b border-[var(--border-color)] pb-3">
+                  <div>
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                      <BookPlus className="text-primary" size={22} /> Add Book to Catalog
+                    </h2>
+                    <p className="text-xs text-muted">Register a new title linked with real ERP academic departments and courses.</p>
                   </div>
+                  <button className="modal-close-btn" onClick={() => setShowAddModal(false)}>
+                    <X size={20}/>
+                  </button>
+                </div>
+                <form onSubmit={handleAddBookSubmit} className="lib-modal-form space-y-4">
                   <div className="form-grid">
                     <div className="form-group">
-                      <label>Select Student</label>
+                      <label className="text-xs font-bold text-muted">Book ID / Code *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        placeholder="e.g. LIB001" 
+                        value={addBookForm.bookId}
+                        onChange={e => setAddBookForm({ ...addBookForm, bookId: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="text-xs font-bold text-muted">Book Title *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        placeholder="e.g. Data Structures & Algorithms" 
+                        value={addBookForm.title}
+                        onChange={e => setAddBookForm({ ...addBookForm, title: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label className="text-xs font-bold text-muted">Author(s) *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        placeholder="e.g. Thomas H. Cormen" 
+                        value={addBookForm.author}
+                        onChange={e => setAddBookForm({ ...addBookForm, author: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="text-xs font-bold text-muted">Publisher</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. MIT Press / Pearson" 
+                        value={addBookForm.publisher}
+                        onChange={e => setAddBookForm({ ...addBookForm, publisher: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* REAL TIME DEPARTMENT & COURSE / CATEGORY SELECTION */}
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label className="text-xs font-bold text-muted flex items-center gap-1">
+                        <Building size={14} className="text-primary" /> Department *
+                      </label>
                       <select 
                         required 
-                        value={issueFormData.regNo} 
+                        value={addBookForm.department}
                         onChange={e => {
-                          const selected = students.find(s => (s.id || s.referenceId || s.studentId || s._id) === e.target.value);
-                          setIssueFormData({
-                            ...issueFormData, 
-                            regNo: e.target.value,
-                            studentName: selected ? selected.name : ''
+                          const newDept = e.target.value;
+                          const availCourses = getCoursesForDepartment(newDept);
+                          const firstCourse = availCourses[0]?.name || availCourses[0]?.code || realCourseNames[0] || 'General';
+                          setAddBookForm({ 
+                            ...addBookForm, 
+                            department: newDept,
+                            category: firstCourse
                           });
                         }}
                       >
-                        <option value="">-- Choose a Student --</option>
-                        {students.map(s => {
-                          const idToUse = s.id || s.referenceId || s.studentId || s._id;
-                          return (
-                            <option key={s._id} value={idToUse}>
-                              {s.name} ({idToUse}) - {s.dept || s.department || 'No Dept'}
-                            </option>
-                          );
-                        })}
+                        {realDeptNames.map(d => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
                       </select>
                     </div>
+
                     <div className="form-group">
-                      <label>Register Number</label>
-                      <input type="text" value={issueFormData.regNo} readOnly placeholder="Auto-filled" style={{ backgroundColor: 'var(--bg-primary)' }}/>
+                      <label className="text-xs font-bold text-muted flex items-center gap-1">
+                        <GraduationCap size={14} className="text-primary" /> Course / Category *
+                      </label>
+                      <select 
+                        required 
+                        value={addBookForm.category}
+                        onChange={e => setAddBookForm({ ...addBookForm, category: e.target.value })}
+                      >
+                        {Array.from(new Set([
+                          ...getCoursesForDepartment(addBookForm.department).map(c => c.name || c.code || c),
+                          ...realCourseNames
+                        ])).map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
-                  <div className="form-grid" style={{ marginTop: '1rem' }}>
+
+                  <div className="form-grid">
                     <div className="form-group">
-                      <label>Issue Date</label>
-                      <input type="date" value={new Date().toISOString().split('T')[0]} readOnly style={{ backgroundColor: 'var(--bg-primary)' }} />
+                      <label className="text-xs font-bold text-muted">ISBN</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. 978-0262033848" 
+                        value={addBookForm.isbn}
+                        onChange={e => setAddBookForm({ ...addBookForm, isbn: e.target.value })}
+                      />
                     </div>
                     <div className="form-group">
-                      <label>Return Date</label>
-                      <input type="date" required value={issueFormData.dueDate} onChange={e=>setIssueFormData({...issueFormData, dueDate: e.target.value})} />
+                      <label className="text-xs font-bold text-muted">Initial Total Copies *</label>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        required 
+                        value={addBookForm.totalCopies}
+                        onChange={e => setAddBookForm({ ...addBookForm, totalCopies: parseInt(e.target.value) || 1 })}
+                      />
                     </div>
+                  </div>
+
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label className="text-xs font-bold text-muted">Rack Location</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. R01" 
+                        value={addBookForm.rackNumber}
+                        onChange={e => setAddBookForm({ ...addBookForm, rackNumber: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="text-xs font-bold text-muted">Shelf Location</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. S03" 
+                        value={addBookForm.shelfNumber}
+                        onChange={e => setAddBookForm({ ...addBookForm, shelfNumber: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="lib-modal-actions border-t border-[var(--border-color)] pt-4">
+                    <button type="button" className="btn-secondary" onClick={() => setShowAddModal(false)}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn-primary shadow-glow">
+                      Save & Register Book
+                    </button>
                   </div>
                 </form>
-                <div className="lib-modal-actions">
-                  <button type="button" className="btn-secondary" onClick={()=>setShowIssueModal(false)}>Cancel</button>
-                  <button type="submit" className="btn-primary shadow-glow flex items-center gap-2" onClick={handleIssueSubmit}><CheckCircle size={16}/> Confirm Issue</button>
-                </div>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {activeTab === 'Issue & Return' && (
-        <div className="lib-tab-content animate-fade-in">
-          <div className="flex justify-between items-center mb-4">
-            <h2>Live Circulation Desk</h2>
-            <div className="search-box" style={{maxWidth: '300px'}}>
-              <Search size={16} className="text-muted"/>
-              <input type="text" placeholder="Search Issue ID or Student..." />
+      {/* =========================================================
+          TAB 3: ISSUE & RETURNS (DAILY CIRCULATION DESK)
+          ========================================================= */}
+      {activeTab === 'Issue & Returns' && (
+        <div className="lib-tab-content animate-fade-in space-y-4">
+          <div className="flex flex-wrap justify-between items-center gap-3">
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <ArrowRightLeft className="text-primary" size={20} /> Daily Circulation Desk
+              </h2>
+              <p className="text-xs text-muted">Issue books, approve returns, track condition, and settle overdue fines.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                className="btn-primary shadow-glow flex items-center gap-1.5 text-sm py-2 px-4"
+                onClick={() => handleOpenIssueModal()}
+              >
+                <BookDown size={16} /> Issue Book
+              </button>
             </div>
           </div>
+
           <div className="table-wrapper">
             <div className="table-container">
               <table>
@@ -443,18 +1880,23 @@ const LibraryManagement = () => {
                   <tr>
                     <th>Issue ID</th>
                     <th>Book Title</th>
-                    <th>Student Info</th>
+                    <th>Borrower Student / Staff</th>
                     <th>Issue Date</th>
                     <th>Due Date</th>
                     <th>Status / Fine</th>
-                    <th>Actions</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {issues.filter(i => ['Issued', 'Overdue', 'Returned'].includes(i.status)).map(issue => (
+                  {issues.filter(i => ['Pending', 'Issued', 'Overdue', 'Returned', 'Rejected'].includes(i.status)).map(issue => (
                     <tr key={issue._id} className={issue.status === 'Overdue' ? 'bg-red-50 dark:bg-red-900/10' : ''}>
-                      <td className="font-mono text-sm">{issue._id.substring(issue._id.length - 6)}</td>
-                      <td className="font-medium">{issue.bookId?.title}</td>
+                      <td className="font-mono text-sm font-bold text-primary">{issue._id.substring(issue._id.length - 6)}</td>
+                      <td>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-[var(--text-main)]">{issue.bookId?.title}</span>
+                          <span className="text-xs text-muted">ID: {issue.bookId?.bookId}</span>
+                        </div>
+                      </td>
                       <td>
                         <div className="flex flex-col">
                           <span className="font-bold text-gray-800 dark:text-white">
@@ -464,30 +1906,53 @@ const LibraryManagement = () => {
                         </div>
                       </td>
                       <td>{issue.issueDate ? new Date(issue.issueDate).toLocaleDateString() : '-'}</td>
-                      <td className={issue.status === 'Overdue' ? 'text-danger font-bold' : ''}>{issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : '-'}</td>
+                      <td className={issue.status === 'Overdue' ? 'text-danger font-bold' : ''}>
+                        {issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : '-'}
+                      </td>
                       <td>
                         {issue.status === 'Overdue' ? (
                           <div className="flex flex-col gap-1">
-                            <span className="text-danger font-bold text-xs uppercase px-2 py-1 bg-red-100 rounded inline-block w-max">Overdue</span>
-                            <span className="text-sm font-semibold">Fine: ₹{issue.fineAmount}</span>
+                            <span className="text-danger font-bold text-xs uppercase px-2 py-0.5 bg-red-100 dark:bg-red-950/40 rounded inline-block w-max">Overdue</span>
+                            <span className="text-xs font-semibold text-rose-600">Fine: ₹{issue.fineAmount}</span>
                           </div>
                         ) : issue.status === 'Returned' ? (
-                          <span className="text-gray-500 font-bold text-xs uppercase px-2 py-1 bg-gray-100 rounded inline-block w-max">Returned</span>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-gray-500 font-bold text-xs uppercase px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded inline-block w-max">
+                              Returned
+                            </span>
+                            {issue.returnDate && (
+                              <span className="text-xs text-muted">
+                                Returned: {new Date(issue.returnDate).toLocaleDateString()}
+                              </span>
+                            )}
+                            <span className="text-xs font-semibold text-emerald-600">
+                              Fine: ₹{Number(issue.fineAmount || 0)}
+                            </span>
+                          </div>
                         ) : (
-                          <span className="text-success font-bold text-xs uppercase px-2 py-1 bg-green-100 rounded inline-block w-max">Issued</span>
+                          <span className="text-success font-bold text-xs uppercase px-2 py-0.5 bg-green-100 dark:bg-green-950/40 rounded inline-block w-max">Issued</span>
                         )}
                       </td>
-                      <td>
+                      <td style={{ textAlign: 'right' }}>
                         {issue.status !== 'Returned' ? (
-                          <button className="btn-primary text-xs py-1 px-3" onClick={() => handleReturn(issue._id, issue.userId)}>
+                          <button className="btn-primary text-xs py-1.5 px-3" onClick={() => handleReturn(issue._id, issue.userId)}>
                             Approve Return
                           </button>
                         ) : (
-                          <span className="text-xs text-muted font-bold">Clear</span>
+                          <span className="text-xs text-muted font-semibold flex items-center justify-end gap-1">
+                            <CheckCircle2 size={14} className="text-emerald-500" /> Settled
+                          </span>
                         )}
                       </td>
                     </tr>
                   ))}
+                  {issues.filter(i => ['Pending', 'Issued', 'Overdue', 'Returned', 'Rejected'].includes(i.status)).length === 0 && (
+                    <tr>
+                      <td colSpan="7" className="text-center p-8 text-muted">
+                        No active or past issues recorded.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -495,45 +1960,20 @@ const LibraryManagement = () => {
         </div>
       )}
 
-      {activeTab === 'Digital Library' && (
-        <div className="lib-tab-content animate-fade-in">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h2>E-Books & Lecture Notes</h2>
-              <p className="text-sm text-muted">Upload and manage digital resources for students.</p>
-            </div>
-            <button className="btn-primary">+ Upload PDF</button>
-          </div>
-          <div className="digital-grid">
-            {MOCK_DIGITAL.map(d => (
-              <div key={d.id} className="glass-card digital-card">
-                <div className="pdf-icon-wrapper">
-                  <FileText size={30}/>
-                </div>
-                <div>
-                  <h3 className="digital-title">{d.title}</h3>
-                  <p className="text-xs text-muted mt-1">{d.author}</p>
-                </div>
-                <div className="w-full border-t border-gray-100 dark:border-gray-800 pt-3 flex justify-between items-center text-xs text-muted">
-                  <span>{d.size}</span>
-                  <span>{d.downloads} Downloads</span>
-                </div>
-                <button className="w-full btn-secondary text-sm mt-2"><Download size={14} className="inline mr-2"/> Download</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
+      {/* =========================================================
+          TAB 4: RESERVATIONS
+          ========================================================= */}
       {activeTab === 'Reservations' && (
-        <div className="lib-tab-content animate-fade-in">
-          <div className="flex justify-between items-center mb-4">
-            <h2>Book Reservations</h2>
-            <div className="search-box" style={{maxWidth: '300px'}}>
-              <Search size={16} className="text-muted"/>
-              <input type="text" placeholder="Search Request ID or Student..." />
+        <div className="lib-tab-content animate-fade-in space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <BookmarkCheck className="text-primary" size={20} /> Student Book Reservations
+              </h2>
+              <p className="text-xs text-muted">Review hold requests placed by students from student portal.</p>
             </div>
           </div>
+
           <div className="table-wrapper">
             <div className="table-container">
               <table>
@@ -542,45 +1982,59 @@ const LibraryManagement = () => {
                     <th>Req ID</th>
                     <th>Student Info</th>
                     <th>Book Requested</th>
-                    <th>Date</th>
+                    <th>Date Requested</th>
                     <th>Status</th>
-                    <th>Actions</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {issues.filter(i => i.status === 'Pending').map(res => (
+                  {reservations.map(res => (
                     <tr key={res._id}>
-                      <td className="font-mono text-sm">{res._id.substring(res._id.length - 6)}</td>
+                      <td className="font-mono text-sm font-bold text-primary">{res._id.substring(res._id.length - 6)}</td>
                       <td>
                         <div className="flex flex-col">
                           <span className="font-bold text-gray-800 dark:text-white">
-                            {students.find(s => s.id === res.userId || s.referenceId === res.userId)?.name || res.userId}
+                            {students.find(s => s.id === res.userId || s.referenceId === res.userId || s.studentId === res.userId || s.rollNo === res.userId || String(s._id) === String(res.userId))?.name || res.userId}
                           </span>
                           <span className="text-xs text-muted">{res.userId} • {res.userType}</span>
                         </div>
                       </td>
-                      <td className="font-medium">{res.bookId?.title}</td>
-                      <td>{new Date(res.requestDate).toLocaleDateString()}</td>
+                      <td className="font-medium text-[var(--text-main)]">{res.bookId?.title}</td>
+                      <td>{new Date(res.requestDate || res.createdAt).toLocaleDateString()}</td>
                       <td>
-                        {res.status === 'Pending' ? (
-                          <span className="text-warning font-bold text-xs uppercase px-2 py-1 bg-yellow-100 rounded inline-block w-max">Pending</span>
-                        ) : (
-                          <span className="text-success font-bold text-xs uppercase px-2 py-1 bg-green-100 rounded inline-block w-max">Approved</span>
-                        )}
+                        <span className={`font-bold text-xs uppercase px-2 py-0.5 rounded inline-block ${
+                          res.status === 'Approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' :
+                          res.status === 'Rejected' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400' :
+                          'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                        }`}>
+                          {res.status || 'Pending'}
+                        </span>
                       </td>
-                      <td>
-                        {res.status === 'Pending' && (
-                          <div className="flex gap-2">
-                            <button className="btn-primary text-xs py-1 px-3" onClick={() => handleIssueRequest(res._id)}>Approve</button>
-                            <button className="btn-secondary text-xs py-1 px-3 text-danger" onClick={() => handleRejectRequest(res._id)}>Deny</button>
-                          </div>
-                        )}
+                      <td style={{ textAlign: 'right' }}>
+                        <div className="flex items-center justify-end gap-2">
+                          {(res.status === 'Pending' || !res.status) ? (
+                            <>
+                              <button className="btn-primary text-xs py-1.5 px-3" onClick={() => handleApproveReservation(res._id)}>
+                                Approve
+                              </button>
+                              <button className="btn-secondary text-xs py-1.5 px-3 text-danger" onClick={() => handleRejectReservation(res._id)}>
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted font-semibold">
+                              {res.status}
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
-                  {issues.filter(i => i.status === 'Pending').length === 0 && (
+                  {reservations.length === 0 && (
                     <tr>
-                      <td colSpan="6" className="text-center p-8 text-muted">No pending book requests</td>
+                      <td colSpan="6" className="text-center p-8 text-muted">
+                        No pending book reservations.
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -590,79 +2044,852 @@ const LibraryManagement = () => {
         </div>
       )}
 
-      {activeTab === 'Reports' && (
-        <div className="lib-tab-content animate-fade-in">
-          <div className="flex justify-between items-center mb-4">
+      {/* =========================================================
+          TAB 5: STUDENT MEMBERS (AUTOMATIC ERP STUDENTS)
+          ========================================================= */}
+      {activeTab === 'Student Members' && (
+        <div className="lib-tab-content animate-fade-in space-y-4">
+          <div className="flex flex-wrap justify-between items-center gap-3">
             <div>
-              <h2>Library Analytics & Reports</h2>
-              <p className="text-sm text-muted">Generate full library circulation history.</p>
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Users className="text-primary" size={20} /> Student Library Members
+              </h2>
+              <p className="text-xs text-muted">Automatically synced with ERP student registry with active loan counts and fine records.</p>
             </div>
-            <button className="btn-primary flex items-center gap-2"><Download size={16}/> Export Excel</button>
-          </div>
-          <div className="grid grid-cols-3 gap-6 mb-6">
-            <div className="glass-card p-5">
-              <h3 className="text-sm text-muted uppercase font-bold mb-1">Total Fine Collected</h3>
-              <p className="text-2xl font-bold text-success">₹{totalFineCollected.toLocaleString()}</p>
-            </div>
-            <div className="glass-card p-5">
-              <h3 className="text-sm text-muted uppercase font-bold mb-1">Most Active Dept</h3>
-              <p className="text-2xl font-bold text-primary">{mostActiveDept}</p>
-            </div>
-            <div className="glass-card p-5">
-              <h3 className="text-sm text-muted uppercase font-bold mb-1">Books Lost/Damaged</h3>
-              <p className="text-2xl font-bold text-danger">0</p>
+            <div className="search-box" style={{ maxWidth: '320px' }}>
+              <Search size={16} className="text-muted" />
+              <input 
+                type="text" 
+                placeholder="Search by student name, register no, dept..." 
+                value={memberSearch}
+                onChange={e => setMemberSearch(e.target.value)}
+              />
             </div>
           </div>
 
           <div className="table-wrapper">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
-              <h3 className="font-bold">Recent Completed Returns</h3>
-              <div className="flex gap-2">
-                <select className="p-1 rounded border bg-white dark:bg-gray-800 text-sm">
-                  <option>Last 7 Days</option>
-                  <option>Last 30 Days</option>
-                  <option>This Semester</option>
-                </select>
-              </div>
-            </div>
             <div className="table-container">
               <table>
                 <thead>
                   <tr>
-                    <th>Issue ID</th>
-                    <th>Book Title</th>
-                    <th>Borrower Info</th>
-                    <th>Returned On</th>
-                    <th>Condition</th>
-                    <th>Fine Paid</th>
+                    <th>Name</th>
+                    <th>Register No</th>
+                    <th>Department</th>
+                    <th>Books Borrowed</th>
+                    <th>Outstanding Fine</th>
+                    <th>Clearance Status</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {returnedTransactions.map(rt => (
-                    <tr key={rt._id}>
-                      <td className="font-mono text-sm">{rt._id.substring(rt._id.length - 6)}</td>
-                      <td className="font-medium">{rt.bookId?.title}</td>
-                      <td>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-gray-800 dark:text-white">
-                            {students.find(s => s.id === rt.userId || s.referenceId === rt.userId)?.name || rt.userId}
+                  {filteredStudents.map(student => {
+                    const studentId = student.id || student.referenceId || student.studentId || student.rollNo || student._id;
+                    const studentLoans = issues.filter(i => i.userId === studentId && ['Issued', 'Overdue'].includes(i.status));
+                    const studentFines = studentLoans.reduce((acc, curr) => acc + (curr.fineAmount || 0), 0);
+                    const isCleared = studentLoans.length === 0 && studentFines === 0;
+
+                    return (
+                      <tr key={student._id || studentId} className="hover:bg-primary/5 transition-colors">
+                        <td>
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
+                              {student.name ? student.name.charAt(0).toUpperCase() : 'S'}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="font-bold text-[var(--text-main)]">{student.name}</span>
+                              <span className="text-xs text-muted">{student.email || 'student@fic.edu'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="font-mono text-sm font-semibold">{studentId}</td>
+                        <td>
+                          <span className="text-sm">{student.dept || student.department || 'CSE'}</span>
+                        </td>
+                        <td>
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${studentLoans.length > 0 ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}>
+                            {studentLoans.length} Books
                           </span>
-                          <span className="text-xs text-muted">{rt.userId} • {rt.userType}</span>
-                        </div>
-                      </td>
-                      <td>{new Date(rt.returnDate || rt.updatedAt).toLocaleDateString()}</td>
-                      <td><span className="text-success text-xs font-bold uppercase">Good</span></td>
-                      <td>₹{rt.fineAmount || 0}</td>
-                    </tr>
-                  ))}
-                  {returnedTransactions.length === 0 && (
+                        </td>
+                        <td>
+                          <span className={`text-sm font-bold ${studentFines > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            ₹{studentFines}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${isCleared ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'}`}>
+                            {isCleared ? 'Cleared' : 'Pending Return/Fine'}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button 
+                            className="btn-secondary text-xs py-1.5 px-3"
+                            onClick={() => setSelectedMemberForDetails({ student, loans: studentLoans, fines: studentFines })}
+                          >
+                            View Library Card
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Member Library Card Detail Modal */}
+          {selectedMemberForDetails && (
+            <div className="lib-modal-overlay" onClick={() => setSelectedMemberForDetails(null)}>
+              <div className="lib-modal-card animate-fade-in" style={{ maxWidth: '600px', width: '90%' }} onClick={e => e.stopPropagation()}>
+                <div className="lib-modal-header border-b border-[var(--border-color)] pb-3">
+                  <div>
+                    <h2 className="text-lg font-bold flex items-center gap-2">
+                      <Users className="text-primary" size={20} /> Student Library History
+                    </h2>
+                    <p className="text-xs text-muted">
+                      {selectedMemberForDetails.student.name} • {selectedMemberForDetails.student.id || selectedMemberForDetails.student.rollNo}
+                    </p>
+                  </div>
+                  <button className="modal-close-btn" onClick={() => setSelectedMemberForDetails(null)}><X size={20}/></button>
+                </div>
+                <div className="p-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 text-xs">
+                    <div>
+                      <span className="text-muted block">Department:</span>
+                      <span className="font-bold">{selectedMemberForDetails.student.dept || selectedMemberForDetails.student.department || 'CSE'}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted block">Outstanding Fine:</span>
+                      <span className="font-bold text-rose-600">₹{selectedMemberForDetails.fines}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted mb-2">Currently Borrowed Books</h4>
+                    <div className="border border-[var(--border-color)] rounded-xl overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
+                          <tr>
+                            <th className="p-2 text-left">Book</th>
+                            <th className="p-2 text-left">Due Date</th>
+                            <th className="p-2 text-right">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedMemberForDetails.loans.map(l => (
+                            <tr key={l._id} className="border-b border-[var(--border-color)]/50">
+                              <td className="p-2 font-semibold">{l.bookId?.title}</td>
+                              <td className="p-2">{new Date(l.dueDate).toLocaleDateString()}</td>
+                              <td className="p-2 text-right">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${l.status === 'Overdue' ? 'bg-rose-100 text-rose-700' : 'bg-green-100 text-green-700'}`}>
+                                  {l.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                          {selectedMemberForDetails.loans.length === 0 && (
+                            <tr>
+                              <td colSpan="3" className="p-4 text-center text-muted">No books currently borrowed.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                <div className="lib-modal-actions border-t border-[var(--border-color)] pt-3">
+                  <button className="btn-secondary" onClick={() => setSelectedMemberForDetails(null)}>Close</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =========================================================
+          TAB 6: FINES & ANALYTICS
+          ========================================================= */}
+      {activeTab === 'Fines & Analytics' && (
+        <div className="lib-tab-content animate-fade-in space-y-6">
+          
+          {/* 4 Financial & Circulation KPI Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', width: '100%' }}>
+            <div className="glass-card p-4 border-l-4 border-l-emerald-500">
+              <div className="flex items-center justify-between text-emerald-600 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Total Fine Collected</span>
+                <IndianRupee size={20} />
+              </div>
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">₹{totalFineCollected}</p>
+              <span className="text-[11px] text-muted">Cleared Receipts Total</span>
+            </div>
+
+            <div className="glass-card p-4 border-l-4 border-l-rose-500 bg-rose-500/5">
+              <div className="flex items-center justify-between text-rose-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Outstanding Fines</span>
+                <AlertTriangle size={20} />
+              </div>
+              <p className="text-2xl font-black text-rose-600 dark:text-rose-400">₹{totalOutstandingFines}</p>
+              <span className="text-[11px] text-rose-600 font-semibold">Pending Collection</span>
+            </div>
+
+            <div className="glass-card p-4 border-l-4 border-l-indigo-500">
+              <div className="flex items-center justify-between text-indigo-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Most Active Dept</span>
+                <Building size={20} />
+              </div>
+              <p className="text-2xl font-black text-primary truncate">{deptCirculationData[0]?.name || (realDeptNames[0] || '—')}</p>
+              <span className="text-[11px] text-muted">Highest Circulation Volume</span>
+            </div>
+
+            <div className="glass-card p-4 border-l-4 border-l-amber-500">
+              <div className="flex items-center justify-between text-amber-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Overdue Borrowers</span>
+                <Users size={20} />
+              </div>
+              <p className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                {issues.filter(i => Number(i.fineAmount || 0) > Number(i.finePaid || 0)).length}
+              </p>
+              <span className="text-[11px] text-muted">Students with Balances</span>
+            </div>
+          </div>
+
+          {/* Main Fine Collection & Audit Ledger Table */}
+          <div className="glass-card overflow-hidden">
+            <div className="p-4 border-b border-[var(--border-color)] flex flex-wrap items-center justify-between gap-3 bg-[var(--bg-secondary)]/40">
+              <div>
+                <h3 className="font-bold text-base text-[var(--text-main)] flex items-center gap-2">
+                  <Receipt className="text-primary" size={18} /> Fine Collection & Audit Ledger
+                </h3>
+                <p className="text-xs text-muted mt-0.5">
+                  Track and collect outstanding student library fines and view generated counter receipts.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  {issues.filter(i => Number(i.fineAmount || 0) > 0).length} Fine Records
+                </span>
+                <button 
+                  type="button" 
+                  onClick={() => alert('Exporting Fine Ledger Report...')}
+                  className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-3"
+                >
+                  <Download size={14}/> Export Report
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-left">
+                    <th className="p-3">Borrower (Student / Staff)</th>
+                    <th className="p-3">Book Information</th>
+                    <th className="p-3 text-right">Total Fine</th>
+                    <th className="p-3 text-right">Paid</th>
+                    <th className="p-3 text-right">Balance</th>
+                    <th className="p-3 text-center">Status</th>
+                    <th className="p-3 text-center">Receipt</th>
+                    <th className="p-3 text-right">Action</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {issues
+                    .filter(i => Number(i.fineAmount || 0) > 0)
+                    .map(issue => {
+                      const fine = Number(issue.fineAmount || 0);
+                      const paid = Number(issue.finePaid || 0);
+                      const balance = Math.max(0, fine - paid);
+
+                      return (
+                        <tr
+                          key={issue._id}
+                          className="border-b border-[var(--border-color)]/60 hover:bg-primary/5 transition-colors"
+                        >
+                          <td className="p-3">
+                            <div className="font-bold font-mono text-[var(--text-main)]">
+                              {issue.userId}
+                            </div>
+                            <div className="text-[11px] text-muted">
+                              {issue.userType || 'Student'}
+                            </div>
+                          </td>
+
+                          <td className="p-3">
+                            <div className="font-semibold text-[var(--text-main)]">
+                              {issue.bookId?.title || 'Unknown Book'}
+                            </div>
+                            <div className="text-[11px] text-muted">
+                              ID: {issue.bookId?.bookId || '—'}
+                            </div>
+                          </td>
+
+                          <td className="p-3 text-right font-bold text-orange-600">
+                            ₹{fine}
+                          </td>
+
+                          <td className="p-3 text-right font-bold text-emerald-600">
+                            ₹{paid}
+                          </td>
+
+                          <td className="p-3 text-right font-bold text-rose-600">
+                            ₹{balance}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            {balance <= 0 ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-[11px] font-bold border border-emerald-300 dark:border-emerald-800">
+                                Paid
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 text-[11px] font-bold border border-orange-300 dark:border-orange-800">
+                                Pending
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            {paid > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => handleViewFineReceipt(issue._id)}
+                                className="text-primary font-bold text-xs hover:underline flex items-center gap-1 mx-auto"
+                              >
+                                <Receipt size={13} /> View Receipt
+                              </button>
+                            ) : (
+                              <span className="text-xs text-muted">—</span>
+                            )}
+                          </td>
+
+                          <td className="p-3 text-right">
+                            {balance > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenCollectFine(issue)}
+                                className="btn-primary text-xs px-3 py-1.5 shadow-sm"
+                              >
+                                Collect Fine
+                              </button>
+                            ) : (
+                              <span className="text-xs font-bold text-emerald-600">
+                                ✓ Settled
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                  {issues.filter(i => Number(i.fineAmount || 0) > 0).length === 0 && (
                     <tr>
-                      <td colSpan="6" className="text-center p-8 text-muted">No completed returns yet</td>
+                      <td colSpan="8" className="p-8 text-center text-muted">
+                        <CheckCircle2 size={24} className="mx-auto mb-2 text-emerald-500" />
+                        <span className="font-semibold text-emerald-600">No overdue fines recorded.</span> All accounts are settled!
+                      </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          TAB 7: DIGITAL LIBRARY
+          ========================================================= */}
+      {activeTab === 'Digital Library' && (
+        <div className="lib-tab-content animate-fade-in space-y-6">
+          
+          {/* 4 Digital Repository KPI Summary Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', width: '100%' }}>
+            <div className="glass-card p-4 border-l-4 border-l-blue-500">
+              <div className="flex items-center justify-between text-blue-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Total E-Resources</span>
+                <FileText size={20} />
+              </div>
+              <p className="text-2xl font-black text-blue-600 dark:text-blue-400">{digitalList.length}</p>
+              <span className="text-[11px] text-muted">Archived PDF Notes & Manuals</span>
+            </div>
+
+            <div className="glass-card p-4 border-l-4 border-l-emerald-500">
+              <div className="flex items-center justify-between text-emerald-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Total Downloads</span>
+                <Download size={20} />
+              </div>
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{totalDigitalDownloads}</p>
+              <span className="text-[11px] text-muted">Student Access Velocity</span>
+            </div>
+
+            <div className="glass-card p-4 border-l-4 border-l-indigo-500">
+              <div className="flex items-center justify-between text-indigo-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Department Branches</span>
+                <Building size={20} />
+              </div>
+              <p className="text-2xl font-black text-primary">{totalDigitalDepts}</p>
+              <span className="text-[11px] text-muted">Academic Departments Covered</span>
+            </div>
+
+            <div className="glass-card p-4 border-l-4 border-l-purple-500">
+              <div className="flex items-center justify-between text-purple-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Repository Access</span>
+                <Sparkles size={20} />
+              </div>
+              <p className="text-2xl font-black text-purple-600 dark:text-purple-400">Open 24/7</p>
+              <span className="text-[11px] text-muted">Direct Student PDF Access</span>
+            </div>
+          </div>
+
+          {/* Search, Filter, and Upload Action Bar */}
+          <div className="flex flex-wrap justify-between items-center gap-3 bg-[var(--bg-secondary)]/50 p-4 rounded-xl border border-[var(--border-color)]">
+            <div className="flex flex-wrap items-center gap-3 flex-1">
+              <div className="search-box" style={{ minWidth: '260px', maxWidth: '360px' }}>
+                <Search size={16} className="text-muted"/>
+                <input 
+                  type="text" 
+                  placeholder="Search notes, handbook, faculty..." 
+                  value={digitalSearch} 
+                  onChange={e => setDigitalSearch(e.target.value)}
+                />
+              </div>
+
+              <div style={{ width: '200px' }}>
+                <CustomSelect 
+                  options={deptOptions}
+                  value={digitalDeptFilter}
+                  onChange={(e) => setDigitalDeptFilter(e.target.value)}
+                  icon={Building}
+                />
+              </div>
+
+              <select 
+                className="p-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-semibold"
+                value={digitalTypeFilter}
+                onChange={e => setDigitalTypeFilter(e.target.value)}
+              >
+                <option value="All Types">All Formats</option>
+                <option value="PDF">PDF Documents</option>
+                <option value="Lecture Notes">Lecture Notes</option>
+                <option value="Lab Manual">Lab Manuals</option>
+                <option value="Formula Book">Formula Books</option>
+              </select>
+            </div>
+
+            <button 
+              className="btn-primary shadow-glow flex items-center gap-2 text-xs py-2.5 px-4"
+              onClick={() => setShowUploadDigitalModal(true)}
+            >
+              <Plus size={15} /> Upload Digital Resource
+            </button>
+          </div>
+
+          {/* Digital Resources Cards Grid */}
+          <div className="digital-grid">
+            {filteredDigitalList.map(d => (
+              <div key={d.id} className="digital-card">
+                <div>
+                  <div className="digital-card-top">
+                    <div className="digital-icon-box">
+                      <FileText size={22} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="digital-tag">{d.type || 'PDF'}</span>
+                        <span className="text-[11px] font-bold text-muted">{d.size}</span>
+                      </div>
+                      <h3 className="font-bold text-sm text-[var(--text-main)] mt-1.5 line-clamp-2" title={d.title}>
+                        {d.title}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="mt-3.5 space-y-1">
+                    <p className="text-xs text-muted font-medium truncate">
+                      Faculty: <strong className="text-[var(--text-main)]">{d.author}</strong>
+                    </p>
+                    <p className="text-[11px] text-muted truncate">
+                      Dept: <span className="font-semibold text-primary">{d.dept}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="digital-footer">
+                  <span className="font-medium text-muted">{d.downloads || 0} Downloads</span>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      type="button"
+                      className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
+                      onClick={() => alert(`Downloading ${d.title} (${d.size})...`)}
+                    >
+                      <Download size={13} /> Download
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {filteredDigitalList.length === 0 && (
+            <div className="glass-card p-12 text-center text-muted animate-fade-in">
+              <FileText size={40} className="mx-auto mb-3 text-muted opacity-40" />
+              <h3 className="font-bold text-base text-[var(--text-main)]">No Digital Resources Found</h3>
+              <p className="text-xs text-muted mt-1">Try adjusting your search query or department filter.</p>
+            </div>
+          )}
+
+          {/* Upload Digital Resource Modal */}
+          {showUploadDigitalModal && (
+            <div className="lib-modal-overlay" onClick={() => setShowUploadDigitalModal(false)}>
+              <div className="lib-modal-card animate-fade-in" style={{ maxWidth: '520px', width: '90%' }} onClick={e => e.stopPropagation()}>
+                <div className="lib-modal-header border-b border-[var(--border-color)] pb-3">
+                  <div>
+                    <h2 className="text-base font-bold flex items-center gap-2">
+                      <FileText className="text-primary" size={18} /> Upload Digital Resource
+                    </h2>
+                    <p className="text-xs text-muted">Publish lecture notes, handbooks, and course PDFs to student repository.</p>
+                  </div>
+                  <button className="modal-close-btn" onClick={() => setShowUploadDigitalModal(false)}><X size={20}/></button>
+                </div>
+                <form onSubmit={handleAddDigitalSubmit} className="lib-modal-form space-y-4">
+                  <div className="form-group">
+                    <label className="text-xs font-bold text-muted">Resource Title *</label>
+                    <input 
+                      type="text" 
+                      required 
+                      placeholder="e.g. Operating Systems Complete Lecture Notes"
+                      value={digitalForm.title}
+                      onChange={e => setDigitalForm({ ...digitalForm, title: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="text-xs font-bold text-muted">Author / Faculty *</label>
+                    <input 
+                      type="text" 
+                      required 
+                      placeholder="e.g. Prof. Abraham Silberschatz & CSE Dept"
+                      value={digitalForm.author}
+                      onChange={e => setDigitalForm({ ...digitalForm, author: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="text-xs font-bold text-muted">Department</label>
+                    <select 
+                      value={digitalForm.dept}
+                      onChange={e => setDigitalForm({ ...digitalForm, dept: e.target.value })}
+                    >
+                      {realDeptNames.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div className="lib-modal-actions border-t border-[var(--border-color)] pt-3">
+                    <button type="button" className="btn-secondary" onClick={() => setShowUploadDigitalModal(false)}>Cancel</button>
+                    <button type="submit" className="btn-primary shadow-glow">Publish Resource</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =========================================================
+          ISSUE BOOK MODAL (UNIVERSAL)
+          ========================================================= */}
+      {showIssueModal && (
+        <div className="lib-modal-overlay" onClick={() => setShowIssueModal(false)}>
+          <div className="lib-modal-card animate-fade-in" style={{ maxWidth: '550px', width: '90%' }} onClick={e => e.stopPropagation()}>
+            <div className="lib-modal-header border-b border-[var(--border-color)] pb-3">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <BookDown className="text-primary" size={20} /> Issue Book to Borrower
+                </h2>
+                <p className="text-xs text-muted">Record loan and compute due date for auto-fine tracking.</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowIssueModal(false)}><X size={20}/></button>
+            </div>
+            <form onSubmit={handleIssueSubmit} className="lib-modal-form space-y-4">
+              <div className="form-group">
+                <label className="text-xs font-bold text-muted">Select Catalog Book *</label>
+                <select 
+                  required 
+                  value={issueFormData.bookId}
+                  onChange={e => setIssueFormData({ ...issueFormData, bookId: e.target.value })}
+                >
+                  <option value="">-- Choose Book --</option>
+                  {books.map(b => (
+                    <option key={b._id} value={b._id}>
+                      {b.title} (ID: {b.bookId || b.id}) - Avail: {b.availableCopies !== undefined ? b.availableCopies : b.available}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="text-xs font-bold text-muted">Select Borrower Student *</label>
+                <select 
+                  required 
+                  value={issueFormData.regNo}
+                  onChange={e => {
+                    const sel = students.find(s => (s.id || s.referenceId || s.studentId || s._id) === e.target.value);
+                    setIssueFormData({
+                      ...issueFormData,
+                      regNo: e.target.value,
+                      studentName: sel ? sel.name : ''
+                    });
+                  }}
+                >
+                  <option value="">-- Choose Student --</option>
+                  {students.map(s => {
+                    const sid = s.id || s.referenceId || s.studentId || s._id;
+                    return (
+                      <option key={s._id || sid} value={sid}>
+                        {s.name} ({sid}) - {s.dept || s.department || 'CSE'}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="form-group">
+                  <label className="text-xs font-bold text-muted">Issue Date</label>
+                  <input type="date" value={issueFormData.issueDate} readOnly className="opacity-75" />
+                </div>
+                <div className="form-group">
+                  <label className="text-xs font-bold text-muted">Due Date *</label>
+                  <input 
+                    type="date" 
+                    required 
+                    value={issueFormData.dueDate}
+                    onChange={e => setIssueFormData({ ...issueFormData, dueDate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="lib-modal-actions border-t border-[var(--border-color)] pt-4">
+                <button type="button" className="btn-secondary" onClick={() => setShowIssueModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary shadow-glow flex items-center gap-1.5">
+                  <CheckCircle size={16} /> Confirm Issue
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* =========================================================
+          FINE RECEIPT MODAL (IN-APP POPUP)
+          ========================================================= */}
+      {receiptModal.isOpen && (
+        <div className="lib-modal-overlay animate-fade-in" onClick={() => setReceiptModal({ isOpen: false, loading: false, receipt: null, error: null })}>
+          <div className="lib-modal-card animate-scale-up" style={{ maxWidth: '520px', width: '92%' }} onClick={e => e.stopPropagation()}>
+            <div className="lib-modal-header border-b border-[var(--border-color)] pb-3 flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
+                  <Receipt size={22} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[var(--text-main)]">Library Fine Receipt</h2>
+                  <p className="text-xs text-muted">Official Payment Confirmation</p>
+                </div>
+              </div>
+              <button className="modal-close-btn" onClick={() => setReceiptModal({ isOpen: false, loading: false, receipt: null, error: null })}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto" style={{ maxHeight: '70vh' }}>
+              {receiptModal.loading && (
+                <div className="p-8 text-center text-muted">
+                  <RefreshCw className="animate-spin mx-auto mb-2 text-primary" size={28} />
+                  <p className="text-sm font-medium">Loading receipt details...</p>
+                </div>
+              )}
+
+              {receiptModal.error && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-600 text-sm flex items-center gap-2">
+                  <AlertCircle size={18} />
+                  <span>{receiptModal.error}</span>
+                </div>
+              )}
+
+              {receiptModal.receipt && (
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-4 space-y-3.5 shadow-inner">
+                  <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-muted tracking-wider">Receipt Number</span>
+                      <p className="text-sm font-mono font-bold text-primary">{receiptModal.receipt.receiptNumber}</p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-bold border border-emerald-500/20 flex items-center gap-1">
+                      <CheckCircle2 size={13} /> PAID & VERIFIED
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-muted block text-[11px]">Student / User ID</span>
+                      <span className="font-semibold text-[var(--text-main)]">{receiptModal.receipt.userId}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted block text-[11px]">User Type</span>
+                      <span className="font-semibold text-[var(--text-main)]">{receiptModal.receipt.userType}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted block text-[11px]">Book Title</span>
+                      <span className="font-semibold text-[var(--text-main)]">{receiptModal.receipt.bookTitle}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted block text-[11px]">Payment Method</span>
+                      <span className="font-semibold text-[var(--text-main)]">{receiptModal.receipt.paymentMethod}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted block text-[11px]">Payment Date</span>
+                      <span className="font-semibold text-[var(--text-main)]">{receiptModal.receipt.paymentDate}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-[var(--border-color)] flex items-center justify-between bg-emerald-500/5 -mx-4 -mb-3.5 p-3.5 rounded-b-xl">
+                    <span className="text-xs font-bold uppercase text-muted">Amount Paid</span>
+                    <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">₹{receiptModal.receipt.amount}</span>
+                  </div>
+
+                  {receiptModal.receipt.remarks && (
+                    <p className="text-[11px] text-muted italic pt-1">
+                      Remarks: {receiptModal.receipt.remarks}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="lib-modal-actions border-t border-[var(--border-color)] p-4 flex justify-between items-center">
+              <button
+                type="button"
+                className="btn-secondary text-xs flex items-center gap-1.5"
+                onClick={() => window.print()}
+              >
+                <Printer size={15} /> Print Receipt
+              </button>
+              <button
+                type="button"
+                className="btn-primary text-xs px-5 py-2 shadow-glow"
+                onClick={() => setReceiptModal({ isOpen: false, loading: false, receipt: null, error: null })}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          COLLECT FINE MODAL (IN-APP POPUP)
+          ========================================================= */}
+      {collectFineModal.isOpen && (
+        <div className="lib-modal-overlay animate-fade-in" onClick={() => setCollectFineModal(prev => ({ ...prev, isOpen: false }))}>
+          <div className="lib-modal-card animate-scale-up" style={{ maxWidth: '480px', width: '92%' }} onClick={e => e.stopPropagation()}>
+            <div className="lib-modal-header border-b border-[var(--border-color)] pb-3 flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                  <CreditCard size={22} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[var(--text-main)]">Collect Library Fine</h2>
+                  <p className="text-xs text-muted">Process payment and issue official receipt</p>
+                </div>
+              </div>
+              <button className="modal-close-btn" onClick={() => setCollectFineModal(prev => ({ ...prev, isOpen: false }))}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCollectFineSubmit} className="lib-modal-form space-y-4 p-5">
+              {collectFineModal.error && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-600 text-xs flex items-center gap-2">
+                  <AlertCircle size={16} />
+                  <span>{collectFineModal.error}</span>
+                </div>
+              )}
+
+              <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3.5 space-y-2 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted">Borrower / Student</span>
+                  <span className="font-bold text-[var(--text-main)]">{collectFineModal.studentName} ({collectFineModal.studentId})</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted">Book</span>
+                  <span className="font-semibold text-[var(--text-main)]">{collectFineModal.bookTitle}</span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-[var(--border-color)]">
+                  <span className="font-bold text-muted">Outstanding Fine Balance</span>
+                  <span className="text-lg font-black text-rose-600 dark:text-rose-400">₹{collectFineModal.balance}</span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="text-xs font-bold text-muted block mb-1">Payment Amount (₹) *</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={collectFineModal.balance}
+                  required
+                  value={collectFineModal.amount}
+                  onChange={e => setCollectFineModal(prev => ({ ...prev, amount: e.target.value }))}
+                  className="w-full p-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm font-bold text-[var(--text-main)]"
+                />
+                <span className="text-[11px] text-muted mt-1 block">Maximum payable: ₹{collectFineModal.balance}</span>
+              </div>
+
+              <div className="form-group">
+                <label className="text-xs font-bold text-muted block mb-1">Payment Method *</label>
+                <select
+                  value={collectFineModal.paymentMethod}
+                  onChange={e => setCollectFineModal(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                  className="w-full p-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm text-[var(--text-main)]"
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="UPI">UPI / QR Code</option>
+                  <option value="Card">Debit / Credit Card</option>
+                  <option value="Bank Transfer">Bank Transfer / Net Banking</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="text-xs font-bold text-muted block mb-1">Remarks (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Paid at library counter"
+                  value={collectFineModal.remarks}
+                  onChange={e => setCollectFineModal(prev => ({ ...prev, remarks: e.target.value }))}
+                  className="w-full p-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm text-[var(--text-main)]"
+                />
+              </div>
+
+              <div className="lib-modal-actions border-t border-[var(--border-color)] pt-4 mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="btn-secondary text-xs px-4 py-2"
+                  onClick={() => setCollectFineModal(prev => ({ ...prev, isOpen: false }))}
+                  disabled={collectFineModal.isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary text-xs shadow-glow px-4 py-2 flex items-center gap-1.5"
+                  disabled={collectFineModal.isSubmitting}
+                >
+                  {collectFineModal.isSubmitting ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={15} /> Confirm & Generate Receipt
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -671,3 +2898,30 @@ const LibraryManagement = () => {
 };
 
 export default LibraryManagement;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

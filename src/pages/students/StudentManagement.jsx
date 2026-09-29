@@ -273,25 +273,36 @@ const StudentManagement = () => {
       {/* ── Page Header ── */}
       <div className="page-header">
         <div>
-          <h1>Student Management</h1>
-          <p className="text-muted">Manage all student records, CGPA, attendance, and fee status.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+            <h1>Student Management 🎓</h1>
+            <div className="erp-live-sync-pill">
+              <span className="erp-live-pulse-dot"></span>
+              <span>Real-Time ERP Synced</span>
+            </div>
+          </div>
+          <p className="text-muted">Centralized registry for student admissions, academic performance, fee tracking, hostel, and transport allocations.</p>
         </div>
         <button id="add-student-btn" className="btn-primary shadow-glow" onClick={openAdd}>
           <Plus size={18} /> Add Student
         </button>
       </div>
 
-      {/* ── Summary Cards ── */}
+      {/* ── Summary KPI Cards ── */}
       <div className="sm-summary-row">
         {[
-          { label:'Total Students',  value: students.length,                              cls:'' },
-          { label:'Active',          value: students.filter(s => s.status === 'Active').length,  cls:'text-success' },
-          { label:'Avg CGPA',        value: students.length ? (students.reduce((a,b) => a + b.cgpa, 0)/students.length).toFixed(2) : '—', cls:'gradient-text' },
-          { label:'Fee Pending',     value: students.filter(s => s.feeStatus === 'Pending').length, cls:'text-danger' },
-          { label:'Low Attendance',  value: students.filter(s => s.attendance < 75).length, cls:'text-warning-c' },
+          { label: 'Total Enrolled', value: students.length, cls: '', icon: <User size={20} color="#4f46e5" />, bg: 'rgba(79, 70, 229, 0.08)' },
+          { label: 'Active Students', value: students.filter(s => s.status === 'Active').length, cls: 'text-success', icon: <CheckCircle size={20} color="#10b981" />, bg: 'rgba(16, 185, 129, 0.08)' },
+          { label: 'Avg CGPA', value: students.length ? (students.reduce((a,b) => a + (Number(b.cgpa) || 0), 0)/students.length).toFixed(2) : '—', cls: 'gradient-text', icon: <BookOpen size={20} color="#8b5cf6" />, bg: 'rgba(139, 92, 246, 0.08)' },
+          { label: 'Fee Pending', value: students.filter(s => s.feeStatus === 'Pending').length, cls: 'text-danger', icon: <DollarSign size={20} color="#ef4444" />, bg: 'rgba(239, 68, 68, 0.08)' },
+          { label: 'Low Attendance (<75%)', value: students.filter(s => Number(s.attendance) < 75).length, cls: 'text-warning-c', icon: <Percent size={20} color="#f59e0b" />, bg: 'rgba(245, 158, 11, 0.08)' },
         ].map((c, i) => (
           <div key={i} className="sm-summary-card glass-card">
-            <span className="sm-summary-label">{c.label}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <span className="sm-summary-label">{c.label}</span>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {c.icon}
+              </div>
+            </div>
             <span className={`sm-summary-value ${c.cls}`}>{c.value}</span>
           </div>
         ))}
@@ -317,27 +328,27 @@ const StudentManagement = () => {
                 <option value="All">All Departments</option>
                 {(() => {
                   const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
-                  return activeDepts.map(d => <option key={d}>{d}</option>);
+                  return activeDepts.map(d => <option key={d} value={d}>{d}</option>);
                 })()}
               </select>
             </div>
             <div className="filter-select-wrapper">
               <select className="filter-select" value={semFilter} onChange={e => setSemFilter(e.target.value)}>
                 <option value="All">All Semesters</option>
-                {SEMESTERS.map(s => <option key={s}>{s}</option>)}
+                {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div className="filter-select-wrapper">
               <DollarSign size={13} className="text-muted" />
               <select className="filter-select" value={feeFilter} onChange={e => setFeeFilter(e.target.value)}>
-                <option value="All">Fee Status</option>
-                {FEE_STATUS.map(f => <option key={f}>{f}</option>)}
+                <option value="All">All Fee Status</option>
+                {FEE_STATUS.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
             </div>
             <div className="filter-select-wrapper">
               <Building size={13} className="text-muted" />
               <select className="filter-select" value={hostelFilter} onChange={e => setHostelFilter(e.target.value)}>
-                <option value="All">All Students</option>
+                <option value="All">All Residency</option>
                 <option value="Hostel Requested">Hostel Requested</option>
                 <option value="Hostel Allocated">Hostel Allocated</option>
                 <option value="Non-Hostellers">Non-Hostellers</option>
@@ -351,10 +362,10 @@ const StudentManagement = () => {
           <table>
             <thead>
               <tr>
-                <th style={{width:40}}>#</th>
+                <th style={{width: 45, textAlign: 'center'}}>#</th>
                 {[
                   ['name','Student Name'], ['id','Register No'], ['dept','Department'],
-                  ['hostelRequired','Hostel Req'], ['transportRequired','Transport Req'],
+                  ['hostelRequired','Hostel'], ['transportRequired','Transport'],
                   ['sem','Semester'], ['feeStatus','Fee Status'], ['admissionStatus','Admission'],
                   ['status','Status'],
                 ].map(([k, label]) => (
@@ -362,7 +373,7 @@ const StudentManagement = () => {
                     {label} {makeSortIcon(k, sortKey, sortAsc)}
                   </th>
                 ))}
-                <th>Actions</th>
+                <th style={{ textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -373,90 +384,113 @@ const StudentManagement = () => {
                     ))}</tr>
                   ))
                 : filtered.length === 0
-                  ? <tr><td colSpan={10} className="no-data">No students found matching your filters.</td></tr>
+                  ? <tr><td colSpan={10} className="no-data" style={{ textAlign: 'center', padding: '3rem 1rem' }}>No student records found matching the selected filters.</td></tr>
                   : filtered.map((s, idx) => (
-                      <tr key={s.id}>
-                        <td className="cell-num">{idx + 1}</td>
+                      <tr key={s.id || idx}>
+                        <td className="cell-num" style={{ textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>{idx + 1}</td>
                         <td>
-                          <div className="name-cell">
-                            <div className={`av ${AVATAR_COLORS[idx % AVATAR_COLORS.length]}`}>{getInitials(s.name)}</div>
+                          <div className="name-cell" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div className="avatar-sm" style={{ background: `linear-gradient(135deg, ${['#4f46e5', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ec4899'][idx % 6]}, ${['#3730a3', '#6d28d9', '#0891b2', '#059669', '#d97706', '#db2777'][idx % 6]})` }}>
+                              {getInitials(s.name)}
+                            </div>
                             <div>
-                              <p className="name-primary">{s.name}</p>
-                              <p className="name-sub">{s.email}</p>
+                              <p className="name-primary" style={{ margin: 0, fontWeight: 700, color: 'var(--text-main)' }}>{s.name}</p>
+                              <p className="name-sub" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>{s.email}</p>
                             </div>
                           </div>
                         </td>
-                        <td><span className="reg-no">{s.id}</span></td>
-                        <td className="cell-muted">{s.dept}</td>
+                        <td><span className="code-badge">{s.id || 'N/A'}</span></td>
+                        <td className="cell-muted" style={{ fontWeight: 500 }}>{s.dept}</td>
                         <td>
-                          <span className={`badge-outline ${s.hostelRequired?.toLowerCase() === 'yes' ? 'bg-primary-light text-primary' : 'bg-gray-100 text-muted'}`}>
-                            {s.hostelRequired?.toLowerCase() === 'yes' ? 'Yes' : 'No'}
+                          <span className={`status-badge ${s.hostelRequired?.toLowerCase() === 'yes' ? 'badge-hostel' : 'badge-inactive'}`} style={{ fontSize: '0.74rem' }}>
+                            {s.hostelRequired?.toLowerCase() === 'yes' ? (s.roomNumber ? `Room ${s.roomNumber}` : 'Requested') : 'No'}
                           </span>
                         </td>
                         <td>
-                          <span className={`badge-outline ${s.transportRequired?.toLowerCase() === 'yes' ? 'bg-primary-light text-primary' : 'bg-gray-100 text-muted'}`}>
-                            {s.transportRequired?.toLowerCase() === 'yes' ? 'Yes' : 'No'}
+                          <span className={`status-badge ${s.transportRequired?.toLowerCase() === 'yes' ? 'badge-route' : 'badge-inactive'}`} style={{ fontSize: '0.74rem' }}>
+                            {s.transportRequired?.toLowerCase() === 'yes' ? (s.busRoute || 'Yes') : 'No'}
                           </span>
                         </td>
-                        <td><span className="badge-outline">{s.sem}</span></td>
-                        <td><span className={`fee-badge ${getFeeClass(s.feeStatus)}`}>{s.feeStatus}</span></td>
-                        <td><span className={`status-badge ${s.status === 'Active' ? 'status-active' : 'status-inactive'}`}>{s.status}</span></td>
+                        <td><span className="code-badge" style={{ background: '#f8fafc', border: '1px solid #cbd5e1' }}>{s.sem || 'Sem 1'}</span></td>
                         <td>
-                          <div className="action-btns">
+                          <span className={`status-badge ${
+                            s.feeStatus === 'Paid' ? 'badge-paid' :
+                            s.feeStatus === 'Partial' ? 'badge-pending' :
+                            s.feeStatus === 'Waived' ? 'badge-confirmed' : 'badge-rejected'
+                          }`}>
+                            {s.feeStatus || 'Pending'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`status-badge ${
+                            s.admissionStatus === 'Confirmed' || s.admissionStatus === 'Approved' ? 'badge-confirmed' :
+                            s.admissionStatus === 'Under Review' ? 'badge-under-review' :
+                            s.admissionStatus === 'Rejected' ? 'badge-rejected' : 'badge-applied'
+                          }`}>
+                            {s.admissionStatus || 'Applied'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`status-badge ${s.status === 'Active' ? 'badge-active' : 'badge-inactive'}`}>
+                            {s.status || 'Active'}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div className="action-btns" style={{ justifyContent: 'center' }}>
                             <button
                               className="act-btn"
-                              title="Edit"
+                              title="Edit Student"
                               onClick={() => openEdit(s)}
                             >
-                              <Edit2 size={15} />
+                              <Edit2 size={14} />
                             </button>
 
                             {s.admissionStatus === 'Applied' && (
                               <button
-                                className="act-btn"
+                                className="act-btn act-approve"
                                 title="Move to Under Review"
                                 onClick={() => updateAdmissionStatus(s, 'Under Review')}
                               >
-                                <CheckCircle size={15} />
+                                <CheckCircle size={14} />
                               </button>
                             )}
 
                             {s.admissionStatus === 'Under Review' && (
                               <>
                                 <button
-                                  className="act-btn"
-                                  title="Approve"
+                                  className="act-btn act-approve"
+                                  title="Approve Admission"
                                   onClick={() => updateAdmissionStatus(s, 'Approved')}
                                 >
-                                  <CheckCircle size={15} />
+                                  <CheckCircle size={14} />
                                 </button>
 
                                 <button
                                   className="act-btn act-delete"
-                                  title="Reject"
+                                  title="Reject Admission"
                                   onClick={() => updateAdmissionStatus(s, 'Rejected')}
                                 >
-                                  <X size={15} />
+                                  <X size={14} />
                                 </button>
                               </>
                             )}
 
                             {s.admissionStatus === 'Approved' && (
                               <button
-                                className="act-btn"
-                                title="Confirm Admission"
+                                className="act-btn act-approve"
+                                title="Confirm Enrollment"
                                 onClick={() => updateAdmissionStatus(s, 'Confirmed')}
                               >
-                                <CheckCircle size={15} />
+                                <CheckCircle size={14} />
                               </button>
                             )}
 
                             <button
                               className="act-btn act-delete"
-                              title="Delete"
+                              title="Delete Record"
                               onClick={() => handleDelete(s.id)}
                             >
-                              <Trash2 size={15} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </td>
@@ -468,10 +502,12 @@ const StudentManagement = () => {
         </div>
 
         {!loading && (
-          <div className="table-footer">
-            Showing <strong>{filtered.length}</strong> of <strong>{students.length}</strong> students
+          <div className="table-footer" style={{ padding: '0.9rem 1.4rem', borderTop: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+            <div>
+              Showing <strong style={{ color: 'var(--text-main)' }}>{filtered.length}</strong> of <strong style={{ color: 'var(--text-main)' }}>{students.length}</strong> students
+            </div>
             {(deptFilter !== 'All' || semFilter !== 'All' || feeFilter !== 'All' || hostelFilter !== 'All' || search) && (
-              <button className="clear-filters-link" onClick={() => { setSearch(''); setDeptFilter('All'); setSemFilter('All'); setFeeFilter('All'); setHostelFilter('All'); }}>
+              <button className="clear-filters-link" style={{ background: 'none', border: 'none', color: 'var(--primary, #4f46e5)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setSearch(''); setDeptFilter('All'); setSemFilter('All'); setFeeFilter('All'); setHostelFilter('All'); }}>
                 Clear all filters ×
               </button>
             )}

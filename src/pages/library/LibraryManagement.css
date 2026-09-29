@@ -4,6 +4,37 @@
   gap: 1.5rem;
 }
 
+/* ── Live Pulse Pill ── */
+.erp-live-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #059669;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.erp-live-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: erpPulse 2s infinite;
+}
+
+@keyframes erpPulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
 /* Tabs Navigation */
 .lib-tabs-container {
   display: flex;
@@ -54,19 +85,170 @@
 /* Dashboard KPIs */
 .lib-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+  width: 100%;
 }
 
-/* Charts */
-.lib-charts-row {
+/* Operational Dashboard 2-Column Layout */
+.lib-dashboard-layout {
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 1.25rem;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.1fr);
+  gap: 1.5rem;
+  width: 100%;
+  align-items: start;
 }
 
 @media (max-width: 1024px) {
-  .lib-charts-row { grid-template-columns: 1fr; }
+  .lib-dashboard-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lib-dashboard-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+/* Spotlight Card */
+.lib-spotlight-box {
+  padding: 1.1rem 1.25rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(147, 51, 234, 0.05) 100%);
+  border: 1px solid rgba(79, 70, 229, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lib-badge-spotlight {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  background: #4f46e5 !important;
+  color: #ffffff !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: inline-block;
+  line-height: 1.2;
+}
+
+.lib-spotlight-issues {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #4f46e5;
+}
+
+.lib-spotlight-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-main, #0f172a);
+  margin-top: 0.35rem;
+  margin-bottom: 0.2rem;
+}
+
+.lib-spotlight-author {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+  margin: 0;
+}
+
+.lib-spotlight-dept {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #475569;
+  margin-top: 0.25rem;
+}
+
+/* Shortcut Items */
+.lib-shortcut-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: var(--bg-secondary, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.lib-shortcut-btn:hover {
+  border-color: var(--primary, #4f46e5);
+  background: rgba(79, 70, 229, 0.04);
+  transform: translateX(2px);
+}
+
+/* Digital Library Modern Styles */
+.digital-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.digital-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.digital-card:hover {
+  border-color: var(--primary, #4f46e5);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -4px rgba(79, 70, 229, 0.12);
+}
+
+.digital-card-top {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+
+.digital-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(79, 70, 229, 0.1);
+  color: #4f46e5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.digital-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: var(--bg-secondary, #f1f5f9);
+  color: #475569;
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.digital-footer {
+  border-top: 1px solid var(--border-color, #f1f5f9);
+  padding-top: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted, #64748b);
 }
 
 /* Books Grid */

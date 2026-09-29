@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const transportDriverAttendanceSchema = new mongoose.Schema({
   driverId: { type: String, required: true },
+  driverName: { type: String },
   date: { type: String, required: true }, // Format: YYYY-MM-DD
   status: { type: String, enum: ['Present', 'Absent', 'On Leave'], required: true },
   checkInTime: { type: String },

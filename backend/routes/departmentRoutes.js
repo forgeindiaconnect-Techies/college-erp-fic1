@@ -17,10 +17,12 @@ router.get('/', protect, collegeScope, async (req, res) => {
         { collegeId: null },
         { collegeId: { $exists: false } }
       ]
-    });
+    }).sort({ name: 1 });
+
     if (!departments || departments.length === 0) {
-      departments = await Department.find({});
+      departments = await Department.find({}).sort({ name: 1 });
     }
+
     res.json(departments);
   } catch (err) {
     res.status(500).json({ message: err.message });

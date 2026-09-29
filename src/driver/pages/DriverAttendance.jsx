@@ -48,8 +48,11 @@ const DriverAttendance = () => {
       const driverId = session.referenceId || session._id;
       if (!driverId) return;
 
+      const driverName = session.name || session.userName || 'Driver';
+
       let payload = {
         driverId: driverId,
+        driverName: driverName,
         date: todayStr,
         status: 'Present'
       };
@@ -63,7 +66,7 @@ const DriverAttendance = () => {
       }
 
       try {
-        await markDriverAttendance({ records: [payload] });
+        await markDriverAttendance(payload);
       } catch (e) {
         const allAtt = JSON.parse(localStorage.getItem(`erp_driver_attendance_${driverId}`) || '[]');
         const existingIdx = allAtt.findIndex(a => a.date === todayStr);

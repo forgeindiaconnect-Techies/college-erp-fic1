@@ -149,8 +149,14 @@ const StaffManagement = () => {
     <div className="staff-management animate-fade-in">
       <div className="page-header">
         <div>
-          <h1>Staff Management</h1>
-          <p className="text-muted">Manage faculty, workload, and department assignments.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+            <h1>Staff Management 👨‍🏫</h1>
+            <div className="erp-live-sync-pill">
+              <span className="erp-live-pulse-dot"></span>
+              <span>Real-Time ERP Synced</span>
+            </div>
+          </div>
+          <p className="text-muted">Centralized faculty registry, workload allocation, and department assignments.</p>
         </div>
         <button className="btn-primary shadow-glow" onClick={openAdd}><Plus size={18} /> Add Staff</button>
       </div>
@@ -158,22 +164,42 @@ const StaffManagement = () => {
       {/* Summary */}
       <div className="sm-summary-row">
         <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Total Staff</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="sm-summary-label">Total Staff</span>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(79, 70, 229, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <BookOpen size={18} color="#4f46e5" />
+            </div>
+          </div>
           <span className="sm-summary-value">{staff.length}</span>
         </div>
         <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Professors</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="sm-summary-label">Professors</span>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(139, 92, 246, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircle size={18} color="#8b5cf6" />
+            </div>
+          </div>
           <span className="sm-summary-value gradient-text">{staff.filter(s => s.designation === 'Professor').length}</span>
         </div>
         <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Avg Attendance</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="sm-summary-label">Avg Attendance</span>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(16, 185, 129, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Clock size={18} color="#10b981" />
+            </div>
+          </div>
           <span className="sm-summary-value text-success">
-            {staff.length ? (staff.reduce((a, b) => a + b.attendance, 0) / staff.length).toFixed(1) + '%' : '—'}
+            {staff.length ? (staff.reduce((a, b) => a + (Number(b.attendance) || 0), 0) / staff.length).toFixed(1) + '%' : '—'}
           </span>
         </div>
         <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Overloaded (&gt;18h)</span>
-          <span className="sm-summary-value text-danger">{staff.filter(s => s.workload > 18).length}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="sm-summary-label">Overloaded (&gt;18h)</span>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(239, 68, 68, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AlertTriangle size={18} color="#ef4444" />
+            </div>
+          </div>
+          <span className="sm-summary-value text-danger">{staff.filter(s => Number(s.workload) > 18).length}</span>
         </div>
       </div>
 

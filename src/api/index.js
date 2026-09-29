@@ -1,4 +1,4 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 
 // In production (Vercel), use the Render backend URL.
 // In local dev, use localhost via the Vite proxy.
@@ -51,6 +51,8 @@ api.interceptors.request.use(
         token = sessionStorage.getItem('driver_token');
       } else if (path.startsWith('/hostel')) {
         token = sessionStorage.getItem('hostel_token');
+      } else if (path.startsWith('/librarian')) {
+        token = sessionStorage.getItem('librarian_token');
       } else {
         // Fallback: Check all in priority
         token = sessionStorage.getItem('superadmin_token')
@@ -64,6 +66,7 @@ api.interceptors.request.use(
           || sessionStorage.getItem('accounts_token')
           || sessionStorage.getItem('driver_token')
           || sessionStorage.getItem('hostel_token')
+          || sessionStorage.getItem('librarian_token')
           || sessionStorage.getItem('token');
       }
     } catch (e) {
@@ -359,8 +362,6 @@ export const getPendingFeesReport = () => api.get('/reports/pending-fees');
 export const getDepartmentsReport = () => api.get('/reports/departments');
 export const getActivityLogs = () => api.get('/reports/activity-logs');
 
-// Library Management (Old exports removed, new ones at bottom)
-
 // Transport Management
 export const getTransportVehicles = () => api.get('/transport/vehicles').catch(() => ({ data: [] }));
 export const createTransportVehicle = (data) => api.post('/transport/vehicles', data);
@@ -410,7 +411,6 @@ export const updateHostelComplaint = (id, data) => api.put(`/hostel/complaints/$
 
 // Placement Endpoints
 export const applyForPlacement = (data) => api.post('/placement/applications', data);
-
 
 // Placement Management
 export const getPlacementCompanies = () => api.get('/placement/companies');
@@ -541,6 +541,31 @@ export const issueLibraryBook = (id) => api.put(`/library/transactions/${id}/iss
 export const manualIssueLibraryBook = (data) => api.post('/library/transactions/manual-issue', data);
 export const returnLibraryBook = (id) => api.put(`/library/transactions/${id}/return`);
 export const rejectLibraryRequest = (id) => api.put(`/library/transactions/${id}/reject`);
+export const payLibraryFine = (id, amount, paymentMethod = 'Cash', remarks = '') =>
+  api.put(`/library/transactions/${id}/pay-fine`, {
+    amount,
+    paymentMethod,
+    remarks
+  });
+export const getLibraryFineReceipt = (id) => api.get(`/library/transactions/${id}/fine-receipt`);
+export const getLibraryFinePayments = () => api.get('/library/fine-payments');
+export const createLibraryReservation = (bookId) =>
+  api.post('/library/reservations', { bookId });
+
+export const getLibraryReservations = () =>
+  api.get('/library/reservations');
+
+export const approveLibraryReservation = (id) =>
+  api.put(`/library/reservations/${id}/approve`);
+
+export const rejectLibraryReservation = (id) =>
+  api.put(`/library/reservations/${id}/reject`);
+
+// Book Copies Management
+export const getBookCopies = (bookId) => api.get(`/library/books/${bookId}/copies`);
+export const createBookCopy = (bookId, data) => api.post(`/library/books/${bookId}/copies`, data);
+export const updateBookCopy = (id, data) => api.put(`/library/copies/${id}`, data);
+export const deleteBookCopy = (id) => api.delete(`/library/copies/${id}`);
 
 // Super Admin Subscriptions
 export const getSuperAdminSubscriptions = () => api.get('/superadmin/subscriptions');
@@ -665,3 +690,14 @@ export const createScholarshipApplication = (data) =>
 
 // Transport APIs
 export const createTransportDriver = (data) => api.post('/transport/drivers', data);
+
+// Librarian Management APIs
+export const getLibrarians = () => api.get('/librarian');
+export const createLibrarian = (data) => api.post('/librarian', data);
+export const updateLibrarian = (id, data) => api.put(`/librarian/${id}`, data);
+export const deleteLibrarian = (id) => api.delete(`/librarian/${id}`);
+export const getLibraryBorrowers = () => api.get('/library/borrowers');
+
+
+
+

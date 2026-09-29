@@ -154,24 +154,45 @@ const ParentsManagement = () => {
     <div className="parent-management animate-fade-in">
       <div className="page-header">
         <div>
-          <h1>Parent Management</h1>
-          <p className="text-muted">Register and link parent accounts to student academic profiles for dashboard visibility.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+            <h1>Parent Management 👨‍👩‍👧</h1>
+            <div className="erp-live-sync-pill">
+              <span className="erp-live-pulse-dot"></span>
+              <span>Real-Time ERP Synced</span>
+            </div>
+          </div>
+          <p className="text-muted">Register and link parent accounts to student academic profiles for dashboard visibility and progress tracking.</p>
         </div>
         <button className="btn-primary shadow-glow" onClick={openAdd}><Plus size={18} /> Add Parent Account</button>
       </div>
 
-      <div className="sm-summary-row" style={{ marginTop: '1.5rem' }}>
+      <div className="sm-summary-row" style={{ marginTop: '1.25rem' }}>
         <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Total Parents</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="sm-summary-label">Total Parents</span>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(79, 70, 229, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <User size={18} color="#4f46e5" />
+            </div>
+          </div>
           <span className="sm-summary-value">{parents.length}</span>
         </div>
         <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Linked Students</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="sm-summary-label">Linked Students</span>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(16, 185, 129, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Link2 size={18} color="#10b981" />
+            </div>
+          </div>
           <span className="sm-summary-value text-success">{new Set(parents.map(p => p.parentOf)).size}</span>
         </div>
         <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Unlinked Profiles</span>
-          <span className="sm-summary-value text-warning-c">0</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="sm-summary-label">Active Portals</span>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(139, 92, 246, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircle size={18} color="#8b5cf6" />
+            </div>
+          </div>
+          <span className="sm-summary-value gradient-text">{parents.length}</span>
         </div>
       </div>
 

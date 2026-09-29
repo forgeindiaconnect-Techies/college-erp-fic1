@@ -74,6 +74,7 @@ import hodSupportRoutes from './routes/hodSupportRoutes.js';
 import superadminRoutes from './routes/superadminRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import accountsOfficerRoutes from './routes/accountsOfficerRoutes.js';
+import librarianRoutes from './routes/librarianRoutes.js';
 import employeeAttendanceRoutes from './routes/employeeAttendanceRoutes.js';
 import subjectRoutes from './routes/subjectRoutes.js';
 import academicRoutes from './routes/academicRoutes.js';
@@ -102,6 +103,7 @@ import Attendance from './models/Attendance.js';
 import Fee from './models/Fee.js';
 import Mark from './models/Mark.js';
 import Book from './models/Book.js';
+import BookCopy from './models/BookCopy.js';
 import IssueRecord from './models/IssueRecord.js';
 import TransportRoute from './models/TransportRoute.js';
 import TransportDriver from './models/TransportDriver.js';
@@ -581,6 +583,7 @@ const autoSeedIfEmpty = async () => {
       { name: 'Vaideeswari (Admin)', email: 'vaideeswari@gmail.com', password: 'password123', role: 'Admin' },
       { name: 'Sree (Principal)', email: 'sree@gmail.com',         password: 'sree123', role: 'Principal' },
       { name: 'Pooja (Staff)',    email: 'pooja@gmail.com',        password: 'pooja', role: 'Staff', department: 'Computer Science', referenceId: 'STF008', subjects: ['Data Structures'] },
+      { name: 'Meena (Librarian)', email: 'meena@gmail.com',       password: 'meena', role: 'Librarian', referenceId: 'LIB001' },
       
       { name: 'Sub Admin',        email: 'subadmin@college.edu',     password: 'password123', role: 'Sub Admin', permissions: [
         "view_departments",
@@ -969,6 +972,7 @@ app.use('/api/hod-support', hodSupportRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/accounts-officer', accountsOfficerRoutes);
+app.use('/api/librarian', librarianRoutes);
 app.use('/api/employee-attendance', employeeAttendanceRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/academic', academicRoutes);

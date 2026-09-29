@@ -380,8 +380,26 @@ router.get('/attendance', protect, collegeScope, async (req, res) => {
     const filter = {};
     if (req.query.driverId) filter.driverId = req.query.driverId;
     if (req.query.date) filter.date = req.query.date;
-    const records = await TransportDriverAttendance.find(filter).sort({ date: -1 });
-    res.json(records);
+    const records = await TransportDriverAttendance.find(filter).sort({ date: -1 }).lean();
+
+    const [drivers, users] = await Promise.all([
+      TransportDriver.find({}).lean().catch(() => []),
+      User.find({ role: 'Driver' }).lean().catch(() => [])
+    ]);
+
+    const enriched = records.map(r => {
+      const match = drivers.find(d => d.driverId === r.driverId || d._id.toString() === r.driverId) ||
+                    users.find(u => u._id.toString() === r.driverId || u.referenceId === r.driverId);
+      const isHex = /^[0-9a-fA-F]{24}$/.test(r.driverId || '');
+      return {
+        ...r,
+        driverName: (r.driverName && !/^[0-9a-fA-F]{24}$/.test(r.driverName)) ? r.driverName : (match ? match.name : 'Bus Driver'),
+        displayDriverId: match?.driverId || match?.referenceId || (isHex ? `DRV-${r.driverId.slice(-4).toUpperCase()}` : r.driverId || 'DRV-001'),
+        phone: match?.phone || ''
+      };
+    });
+
+    res.json(enriched);
   } catch (error) {
     res.status(500).json({ message: 'Server Error fetching driver attendance' });
   }
@@ -392,25 +410,35 @@ router.get('/attendance', protect, collegeScope, async (req, res) => {
 // @access  Private
 router.post('/attendance', protect, collegeScope, async (req, res) => {
   try {
-    const { driverId, date, status, checkInTime, checkOutTime, remarks } = req.body;
-    let record = await TransportDriverAttendance.findOne({ driverId, date });
-    if (record) {
-      if (status) record.status = status;
-      if (checkInTime) record.checkInTime = checkInTime;
-      if (checkOutTime) record.checkOutTime = checkOutTime;
-      if (remarks) record.remarks = remarks;
-      await record.save();
-    } else {
-      record = await TransportDriverAttendance.create({
-        driverId,
-        date: date || new Date().toISOString().split('T')[0],
-        status: status || 'Present',
-        checkInTime: checkInTime || new Date().toLocaleTimeString(),
-        checkOutTime,
-        remarks
-      });
+    const items = Array.isArray(req.body.records) ? req.body.records : (Array.isArray(req.body) ? req.body : [req.body]);
+    const results = [];
+
+    for (const item of items) {
+      const { driverId, date, status, checkInTime, checkOutTime, remarks, driverName } = item;
+      if (!driverId) continue;
+      let record = await TransportDriverAttendance.findOne({ driverId, date: date || new Date().toISOString().split('T')[0] });
+      if (record) {
+        if (status) record.status = status;
+        if (checkInTime) record.checkInTime = checkInTime;
+        if (checkOutTime) record.checkOutTime = checkOutTime;
+        if (remarks) record.remarks = remarks;
+        if (driverName) record.driverName = driverName;
+        await record.save();
+        results.push(record);
+      } else {
+        record = await TransportDriverAttendance.create({
+          driverId,
+          driverName,
+          date: date || new Date().toISOString().split('T')[0],
+          status: status || 'Present',
+          checkInTime: checkInTime || new Date().toLocaleTimeString(),
+          checkOutTime,
+          remarks
+        });
+        results.push(record);
+      }
     }
-    res.status(201).json(record);
+    res.status(201).json(results.length === 1 ? results[0] : results);
   } catch (error) {
     res.status(500).json({ message: error.message || 'Server Error marking attendance' });
   }

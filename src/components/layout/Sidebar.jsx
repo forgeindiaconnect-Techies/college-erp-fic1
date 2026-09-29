@@ -36,7 +36,8 @@ const Sidebar = ({ isOpen, onClose }) => {
         { name: 'Staff', path: '/admin/staff', icon: <GraduationCap size={20} /> },
         { name: 'Students', path: '/admin/students', icon: <Users size={20} /> },
         { name: 'Parents', path: '/admin/parents', icon: <Heart size={20} /> },
-        { name: 'Drivers', path: '/admin/drivers', icon: <Bus size={20} /> }
+        { name: 'Drivers', path: '/admin/drivers', icon: <Bus size={20} /> },
+        { name: 'Library', path: '/admin/librarian-management', icon: <Library size={20} /> }
       ]
     },
     {

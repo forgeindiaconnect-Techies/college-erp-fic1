@@ -43,7 +43,27 @@ router.post('/login', async (req, res) => {
 
   try {
     // 1. Find User
-    const user = await User.findOne({ email: { $regex: new RegExp(`^${email.trim()}$`, 'i') } });
+    let user = await User.findOne({ email: { $regex: new RegExp(`^${email.trim()}$`, 'i') } });
+    if (!user) {
+      // Auto-provision if demo Librarian credentials
+      if (email.trim().toLowerCase() === 'meena@gmail.com') {
+        try {
+          user = new User({
+            name: 'Meena (Librarian)',
+            email: 'meena@gmail.com',
+            password: password ? password.trim() : 'meena',
+            role: 'Librarian',
+            referenceId: 'LIB001',
+            tenantId: 'COL001',
+            collegeId: 'COL001'
+          });
+          await user.save();
+        } catch (seedErr) {
+          console.error('Failed to auto-provision librarian:', seedErr);
+        }
+      }
+    }
+
     if (!user) {
       console.error(`[auth/login] Login failed: User not found for email: ${email.trim()}`);
       return res.status(401).json({ message: `[DEBUG] User not found in database for email: ${email.trim()}` });

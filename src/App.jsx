@@ -59,6 +59,7 @@ import RolePermissions from './pages/permissions/RolePermissions';
 import ActivityLogs from './pages/activity-logs/ActivityLogs';
 import SystemAnalytics from './pages/analytics/SystemAnalytics';
 import LibraryManagement from './pages/library/LibraryManagement';
+import LibrarianManagement from './pages/library/LibrarianManagement';
 import TransportManagement from './pages/transport/TransportManagement';
 import DriverManagement from './pages/admin/DriverManagement';
 import HostelManagement from './pages/hostel/HostelManagement';
@@ -214,6 +215,10 @@ import DriverPayroll from './driver/pages/DriverPayroll';
 import DriverNotifications from './driver/pages/DriverNotifications';
 import DriverAttendance from './driver/pages/DriverAttendance';
 
+// Librarian Layout & Pages
+import LibrarianLayout from './librarian/components/LibrarianLayout';
+import LibrarianDashboard from './librarian/pages/LibrarianDashboard';
+
 import Unauthorized from './pages/Unauthorized';
 
 import './index.css';
@@ -222,7 +227,7 @@ export const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {
 export const SettingsContext = createContext({ collegeSettings: null, setCollegeSettings: () => {} });
 
 const hasAnyOtherSession = (excludeKey) => {
-  const keys = ['superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session', 'hostel_session', 'watchman_session'];
+  const keys = ['superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session', 'hostel_session', 'watchman_session', 'librarian_session'];
   return keys.some(key => key !== excludeKey && sessionStorage.getItem(key));
 };
 
@@ -234,9 +239,9 @@ const SuperAdminGuard = ({ children }) => {
 };
 
 const AdminGuard = ({ children }) => {
-  const session = sessionStorage.getItem('admin_session');
+  const session = sessionStorage.getItem('admin_session') || sessionStorage.getItem('librarian_session');
   if (session) return children;
-  if (hasAnyOtherSession('admin_session')) return <Navigate to="/unauthorized" replace />;
+  if (hasAnyOtherSession('admin_session') && !sessionStorage.getItem('librarian_session')) return <Navigate to="/unauthorized" replace />;
   return <Navigate to="/login" replace />;
 };
 
@@ -284,6 +289,13 @@ const AccountsGuard = ({ children }) => {
   return <Navigate to="/login" replace />;
 };
 
+const LibrarianGuard = ({ children }) => {
+  const session = sessionStorage.getItem('librarian_session');
+  if (session) return children;
+  if (hasAnyOtherSession('librarian_session')) return <Navigate to="/unauthorized" replace />;
+  return <Navigate to="/login" replace />;
+};
+
 const DriverGuard = ({ children }) => {
   const session = sessionStorage.getItem('driver_session');
   if (session) return children;
@@ -304,7 +316,7 @@ function App() {
 
   // Derive the active token to re-trigger settings fetch on login / logout
   const getActiveToken = () => {
-    const keys = ['superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token', 'hostel_token', 'watchman_token'];
+    const keys = ['superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token', 'hostel_token', 'watchman_token', 'librarian_token'];
     for (const key of keys) {
       const val = sessionStorage.getItem(key);
       if (val) return val;
@@ -448,6 +460,7 @@ function App() {
               <Route path="payroll"       element={<Salary />} />
               <Route path="reports"       element={<ReportsManagement />} />
               <Route path="library"       element={<LibraryManagement />} />
+              <Route path="librarian-management" element={<LibrarianManagement />} />
               <Route path="transport"     element={<TransportManagement />} />
               <Route path="drivers"       element={<DriverManagement />} />
               <Route path="hostel"        element={<HostelDashboard />} />
@@ -612,6 +625,18 @@ function App() {
               <Route path="visitors" element={<HostelDashboard defaultTab="Visitors" />} />
               <Route path="attendance" element={<HostelDashboard defaultTab="Attendance" />} />
               <Route path="reports" element={<HostelDashboard defaultTab="Reports" />} />
+            </Route>
+
+            {/* ── LIBRARIAN ROUTES ── */}
+            <Route path="/librarian" element={<LibrarianGuard><GlobalLockdown><LibrarianLayout /></GlobalLockdown></LibrarianGuard>}>
+              <Route index element={<Navigate to="/librarian/dashboard" replace />} />
+              <Route path="dashboard" element={<LibrarianDashboard defaultTab="Dashboard" />} />
+              <Route path="books" element={<LibrarianDashboard defaultTab="Book Inventory" />} />
+              <Route path="circulation" element={<LibrarianDashboard defaultTab="Issue & Returns" />} />
+              <Route path="reservations" element={<LibrarianDashboard defaultTab="Reservations" />} />
+              <Route path="digital" element={<LibrarianDashboard defaultTab="Digital Library" />} />
+              <Route path="members" element={<LibrarianDashboard defaultTab="Student Members" />} />
+              <Route path="reports" element={<LibrarianDashboard defaultTab="Fines & Analytics" />} />
             </Route>
           </Routes>
         </BrowserRouter>
