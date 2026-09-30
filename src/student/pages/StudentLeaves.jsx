@@ -6,18 +6,15 @@ import {
 } from 'lucide-react';
 import './StudentLeaves.css';
 
-// Fallbacks
 const DEFAULT_STUDENT = {
-  id: 'CS2022001',
-  name: 'John Doe',
-  dept: 'Computer Science',
-  sem: 'Sem 6',
-  email: 'john@college.edu'
+  id: '',
+  name: '',
+  dept: '',
+  sem: '',
+  email: ''
 };
 
-const MOCK_LEAVES = [
-  { id: '101', staffId: 'CS2022001', staffName: 'John Doe', type: 'Medical Leave', startDate: '2026-05-02', endDate: '2026-05-04', reason: 'Flu recovery, medical certificate attached.', status: 'Approved' }
-];
+const MOCK_LEAVES = [];
 
 const StudentLeaves = () => {
   const navigate = useNavigate();

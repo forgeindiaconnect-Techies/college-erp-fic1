@@ -16,23 +16,7 @@ const Navbar = ({ role = 'Admin', onMenuToggle }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const navigate = useNavigate();
-  const [departments, setDepartments] = useState([
-    { id: '1', name: 'Computer Science Engineering' },
-    { id: '2', name: 'Information Technology' },
-    { id: '3', name: 'Electronics & Communication Engineering' },
-    { id: '4', name: 'Electrical & Electronics Engineering' },
-    { id: '5', name: 'Mechanical Engineering' },
-    { id: '6', name: 'Civil Engineering' },
-    { id: '7', name: 'Artificial Intelligence & Data Science' },
-    { id: '8', name: 'Artificial Intelligence & Machine Learning' },
-    { id: '9', name: 'Cyber Security' },
-    { id: '10', name: 'Biomedical Engineering' },
-    { id: '11', name: 'Aeronautical Engineering' },
-    { id: '12', name: 'Automobile Engineering' },
-    { id: '13', name: 'Robotics Engineering' },
-    { id: '14', name: 'Chemical Engineering' },
-    { id: '15', name: 'Biotechnology Engineering' }
-  ]);
+  const [departments, setDepartments] = useState([]);
 
   useEffect(() => {
     // Determine which session key to check
@@ -72,9 +56,8 @@ const Navbar = ({ role = 'Admin', onMenuToggle }) => {
     if (role !== 'Super Admin' && role !== 'Student' && role !== 'Parent') {
       getDepartments()
         .then(res => {
-          if (res?.data && res.data.length > 0) {
-            // If backend has real departments, use them instead of fallback
-            // setDepartments(res.data); 
+          if (res?.data && Array.isArray(res.data)) {
+            setDepartments(res.data);
           }
         })
         .catch(() => {

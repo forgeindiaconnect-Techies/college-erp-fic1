@@ -1,7 +1,13 @@
 import mongoose from 'mongoose';
 
-const libraryReservationSchema = new mongoose.Schema(
+const libraryReturnRequestSchema = new mongoose.Schema(
   {
+    transactionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'LibraryTransaction',
+      required: true,
+      index: true
+    },
     bookId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Book',
@@ -24,13 +30,17 @@ const libraryReservationSchema = new mongoose.Schema(
       type: Date,
       default: Date.now
     },
-    approvedDate: {
+    processedDate: {
       type: Date
     },
     status: {
       type: String,
-      enum: ['Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed'],
+      enum: ['Pending', 'Approved', 'Rejected', 'Completed'],
       default: 'Pending'
+    },
+    remarks: {
+      type: String,
+      trim: true
     },
     collegeId: {
       type: String,
@@ -41,16 +51,15 @@ const libraryReservationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-libraryReservationSchema.index({
+libraryReturnRequestSchema.index({
   collegeId: 1,
-  bookId: 1,
-  userId: 1,
+  transactionId: 1,
   status: 1
 });
 
-const LibraryReservation = mongoose.model(
-  'LibraryReservation',
-  libraryReservationSchema
+const LibraryReturnRequest = mongoose.model(
+  'LibraryReturnRequest',
+  libraryReturnRequestSchema
 );
 
-export default LibraryReservation;
+export default LibraryReturnRequest;

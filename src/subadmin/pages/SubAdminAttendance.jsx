@@ -9,7 +9,6 @@ import {
 import { getStudents, getAllAttendance, createAttendance, getDepartments } from '../../api/index';
 import '../../pages/attendance/AttendanceManagement.css';
 
-const DEPARTMENTS = ['All', 'Computer Science', 'Electrical Engg.', 'Mechanical Engg.', 'Civil Engg.', 'Information Tech.'];
 const SEMESTERS = ['All', 'Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6', 'Sem 7', 'Sem 8'];
 
 const MONTHLY_ANALYTICS = [
@@ -331,10 +330,11 @@ const SubAdminAttendance = () => {
               <Filter size={14} className="text-muted" />
               <select className="filter-select" value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
                 <option value="All">All Departments</option>
-                {(() => {
-                  const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS.slice(1);
-                  return activeDepts.map(d => <option key={d} value={d}>{d}</option>);
-                })()}
+                {dbDepartments.map(d => (
+                  <option key={d.id || d._id || d.name} value={d.name}>
+                    {d.name}
+                  </option>
+                ))}
               </select>
             </div>
 

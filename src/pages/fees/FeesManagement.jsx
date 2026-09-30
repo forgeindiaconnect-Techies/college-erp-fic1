@@ -25,7 +25,6 @@ import useRealtimeSync from '../../hooks/useRealtimeSync';
 import FeeStructure from '../../accounts/pages/FeeStructure';
 import './FeesManagement.css';
 
-const DEPARTMENTS = ['All','Computer Science','Electrical Engg.','Mechanical Engg.','Civil Engg.','Information Tech.', 'Computer Science & Engineering', 'Information Technology', 'Biotechnology Engineering', 'Artificial Intelligence & Data Science', 'Cyber Security'];
 const SEMESTERS   = ['All','Sem 1','Sem 2','Sem 3','Sem 4','Sem 5','Sem 6','Sem 7','Sem 8'];
 const PIE_COLORS  = { Paid:'#10b981', Pending:'#ef4444', Partial:'#f59e0b', Waived:'#6366f1' };
 const AVATAR_COLORS = ['bg-gradient-blue','bg-gradient-purple','bg-gradient-green','bg-gradient-orange','bg-gradient-pink','bg-gradient-teal'];
@@ -853,7 +852,11 @@ const FeesManagement = () => {
                   <Filter size={13} className="text-muted"/>
                   <select className="filter-select" value={deptFilter} onChange={e=>setDeptFilter(e.target.value)}>
                     <option value="All">All Departments</option>
-                    {DEPARTMENTS.slice(1).map(d=><option key={d} value={d}>{d}</option>)}
+                    {departments.map(d => (
+                      <option key={d.id || d._id || d.name} value={d.name}>
+                        {d.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="filter-select-wrapper">

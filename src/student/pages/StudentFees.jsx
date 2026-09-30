@@ -405,7 +405,7 @@ const StudentFees = () => {
           <div className="meta-item">
             <Building2 size={14} className="meta-icon" />
             <span className="meta-label">Department:</span>
-            <strong className="meta-value">{studentSession.dept || 'Computer Science'}</strong>
+            <strong className="meta-value">{studentSession.dept || studentSession.department || '—'}</strong>
           </div>
           <div className="meta-item">
             <Calendar size={14} className="meta-icon" />
@@ -1026,9 +1026,9 @@ const StudentFees = () => {
               <div className="receipt-info-grid">
                 <div className="receipt-info-col">
                   <div className="r-row"><span className="r-label">Student Name:</span> <strong>{studentSession.name}</strong></div>
-                  <div className="r-row"><span className="r-label">Register / Roll No:</span> <strong>{studentSession.id || 'CS2022001'}</strong></div>
-                  <div className="r-row"><span className="r-label">Department:</span> <span>{studentSession.dept || 'Computer Science'}</span></div>
-                  <div className="r-row"><span className="r-label">Semester / Term:</span> <span>{studentSession.sem || 'Semester 1'} (2026-2027)</span></div>
+                  <div className="r-row"><span className="r-label">Register / Roll No:</span> <strong>{studentSession.id || studentSession.rollNo || '—'}</strong></div>
+                  <div className="r-row"><span className="r-label">Department:</span> <span>{studentSession.dept || studentSession.department || '—'}</span></div>
+                  <div className="r-row"><span className="r-label">Semester / Term:</span> <span>{studentSession.sem || studentSession.semester || 'Semester 1'} (2026-2027)</span></div>
                 </div>
                 <div className="receipt-info-col">
                   <div className="r-row"><span className="r-label">Receipt Date:</span> <strong>{selectedReceipt.date}</strong></div>
@@ -1109,7 +1109,7 @@ const StudentFees = () => {
 
                 <div className="cert-body-text">
                   <p>
-                    This is to officially certify that <strong>{studentSession.name}</strong>, bearing University Registration No. <strong>{studentSession.id || 'CS2022001'}</strong>, enrolled in the Department of <strong>{studentSession.dept || 'Computer Science'}</strong> for <strong>{studentSession.sem || 'Semester 1'}</strong> (Academic Session 2026-2027), has fully settled and cleared all institutional tuition, laboratory, examination, and hostel fees.
+                    This is to officially certify that <strong>{studentSession.name}</strong>, bearing University Registration No. <strong>{studentSession.id || studentSession.rollNo || '—'}</strong>, enrolled in the Department of <strong>{studentSession.dept || studentSession.department || '—'}</strong> for <strong>{studentSession.sem || studentSession.semester || 'Semester 1'}</strong> (Academic Session 2026-2027), has fully settled and cleared all institutional tuition, laboratory, examination, and hostel fees.
                   </p>
                   <p className="cert-sub-note">
                     There are <strong>NO OUTSTANDING DUES</strong> recorded against this student in the Central College ERP Ledger. The student is unconditionally cleared for semester examination hall tickets and academic progression.

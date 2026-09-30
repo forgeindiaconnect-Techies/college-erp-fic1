@@ -17,24 +17,6 @@ import {
 import './SubjectsManagement.css';
 
 const DEFAULT_SUBJECTS = [];
-
-const DEPARTMENTS = [
-  'Computer Science Engineering',
-  'Information Technology',
-  'Electronics & Communication Engineering',
-  'Electrical & Electronics Engineering',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Artificial Intelligence & Data Science',
-  'Artificial Intelligence & Machine Learning',
-  'Cyber Security',
-  'Biomedical Engineering',
-  'Aeronautical Engineering',
-  'Automobile Engineering',
-  'Robotics Engineering',
-  'Chemical Engineering',
-  'Biotechnology Engineering'
-];
 const SEMESTERS = ['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8'];
 
 const SubjectsManagement = () => {
@@ -323,10 +305,11 @@ const SubjectsManagement = () => {
           <div className="filter-group">
             <select className="filter-select" value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
               <option value="All">All Departments</option>
-              {(() => {
-                const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
-                return activeDepts.map(d => <option key={d}>{d}</option>);
-              })()}
+              {dbDepartments.map(d => (
+                <option key={d.id || d._id || d.name} value={d.name}>
+                  {d.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>

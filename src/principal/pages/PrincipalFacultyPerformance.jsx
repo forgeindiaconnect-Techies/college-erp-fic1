@@ -40,7 +40,7 @@ import {
   Radar
 } from 'recharts';
 import '../../pages/Dashboard.css';
-import { getStaff } from '../../api/index.js';
+import { getStaff, getDepartments } from '../../api/index.js';
 import { io } from 'socket.io-client';
 import { getBackendURL } from '../../utils/backendUrl';
 
@@ -150,12 +150,17 @@ const initialFeedbackLogs = [
 
 export default function PrincipalFacultyPerformance() {
   const [facultyList, setFacultyList] = useState([]);
+  const [dbDepartments, setDbDepartments] = useState([]);
 
   useEffect(() => {
     const fetchFacultyData = async () => {
       try {
-        const res = await getStaff();
+        const [res, deptsRes] = await Promise.all([
+          getStaff().catch(() => ({ data: [] })),
+          getDepartments().catch(() => ({ data: [] }))
+        ]);
         const staffData = res.data || [];
+        setDbDepartments(Array.isArray(deptsRes?.data) ? deptsRes.data : []);
         
         const formattedFaculty = staffData.map(s => ({
           id: s.id || s._id,
@@ -510,25 +515,14 @@ export default function PrincipalFacultyPerformance() {
                       minWidth: '240px'
                     }}
                   >
-                    {[
-                      'All Departments',
-                      'Computer Science Engineering',
-                      'Information Technology',
-                      'Electronics & Communication Engineering',
-                      'Electrical & Electronics Engineering',
-                      'Mechanical Engineering',
-                      'Civil Engineering',
-                      'Artificial Intelligence & Data Science',
-                      'Artificial Intelligence & Machine Learning',
-                      'Cyber Security',
-                      'Biomedical Engineering',
-                      'Aeronautical Engineering',
-                      'Automobile Engineering',
-                      'Robotics Engineering',
-                      'Chemical Engineering',
-                      'Biotechnology Engineering'
-                    ].map(dept => (
-                      <option key={dept} value={dept === 'All Departments' ? 'All' : dept}>{dept}</option>
+                    <option value="All">All Departments</option>
+                    {Array.from(
+                      new Set([
+                        ...dbDepartments.map(d => d.name || d.departmentName || d),
+                        ...facultyList.map(f => f.department).filter(d => d && d !== 'Unknown')
+                      ])
+                    ).map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
                     ))}
                   </select>
                   <Layers size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)' }} />

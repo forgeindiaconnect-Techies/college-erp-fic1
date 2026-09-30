@@ -49,7 +49,7 @@ export default function PrincipalDepartments() {
         };
 
         depts.forEach((d, idx) => {
-          const code = d.code || deptCodes[d.name] || d.name.substring(0, 4).toUpperCase();
+          const code = d.code || deptCodes[d.name] || d.name.split(' ').map(w => w[0]).join('').toUpperCase() || d.name.substring(0, 4).toUpperCase();
           const pseudoRand = d.name.length + idx;
           const mockStudents = d.students || (pseudoRand * 15 + 120);
           const mockAttendance = d.attendance || (85 + (pseudoRand % 12));
@@ -88,7 +88,7 @@ export default function PrincipalDepartments() {
         setDepartmentsData(newData);
         setAnalyticsChartData(newAnalytics);
         if (depts.length > 0) {
-          const firstCode = depts[0].code || depts[0].name.substring(0, 4).toUpperCase();
+          const firstCode = depts[0].code || deptCodes[depts[0].name] || depts[0].name.split(' ').map(w => w[0]).join('').toUpperCase() || depts[0].name.substring(0, 4).toUpperCase();
           setSelectedDept(firstCode);
         }
       } catch (err) {

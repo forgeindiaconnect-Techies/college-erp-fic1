@@ -79,7 +79,7 @@ const StudentTimetable = () => {
         setSelectedSem(querySem);
       }
 
-      const deptName = activeStud.dept || activeStud.department || 'Computer Science Engineering';
+      const deptName = activeStud.dept || activeStud.department || '';
       const secName = activeStud.section || 'A';
 
       const [ttRes, periodRes] = await Promise.all([
@@ -116,8 +116,8 @@ const StudentTimetable = () => {
     loadData();
   }, [loadData]);
 
-  const activeDept = studentSession.dept || studentSession.department || 'Computer Science Engineering';
-  const activeSec = studentSession.section || 'A';
+  const activeDept = studentSession?.dept || studentSession?.department || 'General';
+  const activeSec = studentSession?.section || 'A';
 
   return (
     <div className="animate-fade-in p-6 pb-24 max-w-7xl mx-auto">

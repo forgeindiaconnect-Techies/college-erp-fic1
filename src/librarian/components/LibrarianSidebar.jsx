@@ -4,7 +4,8 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, BookOpen, ArrowRightLeft, Clock, 
   FileText, Users, BarChart3, LogOut, ChevronRight, 
-  ChevronDown, Library, PlusCircle, BookmarkCheck
+  ChevronDown, Library, PlusCircle, BookmarkCheck,
+  BookDown, CheckCircle2
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -43,7 +44,9 @@ const LibrarianSidebar = ({ isOpen, onClose }) => {
       name: 'Circulation Ops',
       icon: <ArrowRightLeft size={20} />,
       items: [
-        { name: 'Issue & Returns', path: '/librarian/circulation', icon: <ArrowRightLeft size={18} /> },
+        { name: 'Issued Books', path: '/librarian/issued', icon: <BookDown size={18} /> },
+        { name: 'Returned Books', path: '/librarian/returned-books', icon: <CheckCircle2 size={18} /> },
+        { name: 'Return Requests', path: '/librarian/returns', icon: <Clock size={18} /> },
         { name: 'Reservations', path: '/librarian/reservations', icon: <BookmarkCheck size={18} /> },
       ]
     },
@@ -142,3 +145,5 @@ const LibrarianSidebar = ({ isOpen, onClose }) => {
 };
 
 export default LibrarianSidebar;
+
+

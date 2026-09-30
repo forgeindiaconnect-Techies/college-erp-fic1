@@ -8,17 +8,8 @@ import { getStudents, createStudent, updateStudent, deleteStudent, getDepartment
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import './StudentManagement.css';
 
-const DEPARTMENTS = [
-  'Computer Science Engineering', 'Information Technology', 'Electronics & Communication Engineering',
-  'Electrical & Electronics Engineering', 'Mechanical Engineering', 'Civil Engineering',
-  'Artificial Intelligence & Data Science', 'Artificial Intelligence & Machine Learning',
-  'Cyber Security', 'Biomedical Engineering', 'Aeronautical Engineering', 'Automobile Engineering',
-  'Robotics Engineering', 'Chemical Engineering', 'Biotechnology Engineering'
-];
 const SEMESTERS  = ['Sem 1','Sem 2','Sem 3','Sem 4','Sem 5','Sem 6','Sem 7','Sem 8'];
 const FEE_STATUS = ['Paid', 'Pending', 'Partial', 'Waived'];
-
-
 
 const EMPTY_FORM = {
   name:'', email:'', password:'', phone:'', dept:'', sem:'',
@@ -45,17 +36,9 @@ const makeSortIcon  = (key, sortKey, sortAsc) => {
 };
 
 /* ── Auto-generate Register No ── */
-const generateRegNo = (dept, studentsList) => {
-  const codes = { 
-    'Computer Science Engineering':'CSE', 'Information Technology':'IT',
-    'Electronics & Communication Engineering':'ECE', 'Electrical & Electronics Engineering':'EEE',
-    'Mechanical Engineering':'MECH', 'Civil Engineering':'CIVIL',
-    'Artificial Intelligence & Data Science':'AIDS', 'Artificial Intelligence & Machine Learning':'AIML',
-    'Cyber Security':'CYBER', 'Biomedical Engineering':'BME',
-    'Aeronautical Engineering':'AERO', 'Automobile Engineering':'AUTO',
-    'Robotics Engineering':'ROBOTICS', 'Chemical Engineering':'CHEM', 'Biotechnology Engineering':'BIOTECH'
-  };
-  const code = codes[dept] || 'ST';
+const generateRegNo = (dept, studentsList, dbDepartments = []) => {
+  const matchedDept = dbDepartments.find(d => d.name?.toLowerCase() === (dept || '').toLowerCase());
+  const code = matchedDept?.code || (dept ? dept.replace(/[^A-Za-z]/g, '').substring(0, 3).toUpperCase() : 'ST');
   const year = new Date().getFullYear();
   const deptStudents = studentsList.filter(s => s.dept === dept && s.id && s.id.startsWith(`${code}${year}`));
   let maxSeq = 0;
@@ -169,7 +152,7 @@ const StudentManagement = () => {
 
   /* ── Modal helpers ── */
   const openAdd  = ()  => { 
-    const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
+    const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : [];
     setForm({ ...EMPTY_FORM, dept: activeDepts[0] || '' }); 
     setEditTarget(null); 
     setFormErrors({}); 
@@ -326,10 +309,11 @@ const StudentManagement = () => {
               <Filter size={13} className="text-muted" />
               <select className="filter-select" value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
                 <option value="All">All Departments</option>
-                {(() => {
-                  const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
-                  return activeDepts.map(d => <option key={d} value={d}>{d}</option>);
-                })()}
+                {dbDepartments.map(d => (
+                  <option key={d.id || d._id || d.name} value={d.name}>
+                    {d.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="filter-select-wrapper">
@@ -601,10 +585,11 @@ const StudentManagement = () => {
                     <label><BookOpen size={13}/> Department <span className="req">*</span></label>
                     <select {...field('dept')}>
                       <option value="">— Select Department —</option>
-                      {(() => {
-                        const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
-                        return activeDepts.map(d => <option key={d}>{d}</option>);
-                      })()}
+                      {dbDepartments.map(d => (
+                        <option key={d.id || d._id || d.name} value={d.name}>
+                          {d.name}
+                        </option>
+                      ))}
                     </select>
                     {formErrors.dept && <span className="err-msg">{formErrors.dept}</span>}
                   </div>

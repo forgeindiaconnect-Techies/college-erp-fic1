@@ -328,24 +328,8 @@ export default function PrincipalReports() {
               style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-main)', fontWeight: 600, outline: 'none' }}
             >
               <option value="All">All Departments</option>
-              {[
-                'Computer Science Engineering',
-                'Information Technology',
-                'Electronics & Communication Engineering',
-                'Electrical & Electronics Engineering',
-                'Mechanical Engineering',
-                'Civil Engineering',
-                'Artificial Intelligence & Data Science',
-                'Artificial Intelligence & Machine Learning',
-                'Cyber Security',
-                'Biomedical Engineering',
-                'Aeronautical Engineering',
-                'Automobile Engineering',
-                'Robotics Engineering',
-                'Chemical Engineering',
-                'Biotechnology Engineering'
-              ].map(dept => (
-                <option key={dept} value={dept}>{dept}</option>
+              {departmentStats.map(dept => (
+                <option key={dept.name} value={dept.name}>{dept.name}</option>
               ))}
             </select>
           </div>

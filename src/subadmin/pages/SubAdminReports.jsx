@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { BarChart2, FileText, Users, TrendingUp, Download, Printer, Table2, AlertTriangle, Trophy, BookOpen, DollarSign, Clock, Filter, Calendar } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { getAttendanceReport, getLowAttendanceReport, getCgpaReport, getFeesReport, getDepartmentsReport } from '../../api/index';
+import { getAttendanceReport, getLowAttendanceReport, getCgpaReport, getFeesReport, getDepartmentsReport, getDepartments } from '../../api/index';
 import '../../pages/reports/ReportsManagement.css';
 
 const TABS = ['All Reports','Student Report','Staff Report','Attendance Report','Department Report','Exam Report','Fees Report','Leave Report'];
-const DEPARTMENTS = ['All Departments', 'Computer Science', 'Electrical Engg.', 'Mechanical Engg.', 'Civil Engg.', 'Information Tech.'];
 const AVATAR_COLORS = ['bg-gradient-blue','bg-gradient-purple','bg-gradient-green','bg-gradient-orange','bg-gradient-pink','bg-gradient-teal'];
 
 const DEPT_PERF = [
@@ -100,17 +99,19 @@ const SubAdminReports = () => {
   const [feesReport, setFeesReport] = useState(null);
   const [deptReport, setDeptReport] = useState(null);
   const [lowAttReport, setLowAttReport] = useState(null);
+  const [departmentsList, setDepartmentsList] = useState([]);
 
   React.useEffect(() => {
     const fetchReports = async () => {
       try {
         setLoading(true);
-        const [att, cgpa, fees, dept, lowAtt] = await Promise.all([
+        const [att, cgpa, fees, dept, lowAtt, deptsRes] = await Promise.all([
           getAttendanceReport(),
           getCgpaReport(),
           getFeesReport(),
           getDepartmentsReport(),
-          getLowAttendanceReport()
+          getLowAttendanceReport(),
+          getDepartments().catch(() => ({ data: [] }))
         ]);
         
         setAttReport(att.data);
@@ -118,6 +119,7 @@ const SubAdminReports = () => {
         setFeesReport(fees.data);
         setDeptReport(dept.data);
         setLowAttReport(lowAtt.data);
+        setDepartmentsList(Array.isArray(deptsRes.data) ? deptsRes.data : []);
       } catch (err) {
         console.error('Failed to fetch reports:', err);
       } finally {
@@ -161,7 +163,12 @@ const SubAdminReports = () => {
         <div className="filter-select-wrapper">
           <Filter size={14} className="text-muted" />
           <select className="filter-select" value={deptFilter} onChange={e => setDeptFilter(e.target.value)} style={{ paddingLeft: '2rem', border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-secondary)', color: 'var(--text-main)', height: '36px' }}>
-            {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+            <option value="All Departments">All Departments</option>
+            {departmentsList.map(d => (
+              <option key={d.id || d._id || d.name} value={d.name}>
+                {d.name}
+              </option>
+            ))}
           </select>
         </div>
 

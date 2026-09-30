@@ -45,12 +45,13 @@ const MOCK_FEES = { totalCollected: 1250000, totalPending: 350000 };
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366F1'];
 
-import { getAnalytics } from '../../api';
+import { getAnalytics, getDepartments } from '../../api';
 
 const SystemAnalytics = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
+  const [departmentsList, setDepartmentsList] = useState([]);
   const [userContext, setUserContext] = useState({ role: 'Guest', dept: null });
   
   // Filters
@@ -78,7 +79,13 @@ const SystemAnalytics = () => {
 
   const fetchAnalyticsData = async () => {
     try {
-      const { data } = await getAnalytics();
+      const [{ data }, deptsRes] = await Promise.all([
+        getAnalytics().catch(() => ({ data: {} })),
+        getDepartments().catch(() => ({ data: [] }))
+      ]);
+
+      const depts = Array.isArray(deptsRes?.data) ? deptsRes.data.map(d => d.name || d.departmentName || d) : [];
+      setDepartmentsList(depts);
       
       // Provide graceful fallbacks if the database is currently empty
       if (!data.placements || data.placements.length === 0) {
@@ -150,23 +157,7 @@ const SystemAnalytics = () => {
               onChange={v => setDeptFilter(v)} 
               options={[
                 { value: 'All Departments', label: 'All Departments' },
-                ...[
-                  'Computer Science Engineering',
-                  'Information Technology',
-                  'Electronics & Communication Engineering',
-                  'Electrical & Electronics Engineering',
-                  'Mechanical Engineering',
-                  'Civil Engineering',
-                  'Artificial Intelligence & Data Science',
-                  'Artificial Intelligence & Machine Learning',
-                  'Cyber Security',
-                  'Biomedical Engineering',
-                  'Aeronautical Engineering',
-                  'Automobile Engineering',
-                  'Robotics Engineering',
-                  'Chemical Engineering',
-                  'Biotechnology Engineering'
-                ].map(d => ({ value: d, label: d }))
+                ...departmentsList.map(d => ({ value: d, label: d }))
               ]}
               icon={Filter}
             />

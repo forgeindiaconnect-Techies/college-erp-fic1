@@ -632,7 +632,10 @@ function App() {
               <Route index element={<Navigate to="/librarian/dashboard" replace />} />
               <Route path="dashboard" element={<LibrarianDashboard defaultTab="Dashboard" />} />
               <Route path="books" element={<LibrarianDashboard defaultTab="Book Inventory" />} />
-              <Route path="circulation" element={<LibrarianDashboard defaultTab="Issue & Returns" />} />
+              <Route path="issued" element={<LibrarianDashboard defaultTab="Issued Books" />} />
+              <Route path="returned-books" element={<LibrarianDashboard defaultTab="Returned Books" />} />
+              <Route path="circulation" element={<LibrarianDashboard defaultTab="Issued Books" />} />
+              <Route path="returns" element={<LibrarianDashboard defaultTab="Return Requests" />} />
               <Route path="reservations" element={<LibrarianDashboard defaultTab="Reservations" />} />
               <Route path="digital" element={<LibrarianDashboard defaultTab="Digital Library" />} />
               <Route path="members" element={<LibrarianDashboard defaultTab="Student Members" />} />
@@ -647,6 +650,7 @@ function App() {
 }
 
 export default App;
+
 
 
 

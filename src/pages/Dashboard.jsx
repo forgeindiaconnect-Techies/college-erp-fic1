@@ -33,7 +33,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, LineChart, Line, Legend
 } from 'recharts';
-import { getStudents, getStaff, getDepartments, getAllFees, getAllAttendance, getExams, getActivityLogs, getAllTimetables, getPendingApprovals, getAnalytics } from '../api/index';
+import { getStudents, getStaff, getDepartments, getCourses, getAllFees, getAllAttendance, getExams, getActivityLogs, getAllTimetables, getPendingApprovals, getAnalytics } from '../api/index';
 import api from '../api';
 import './Dashboard.css';
 import CollegeInfoCard from '../components/common/CollegeInfoCard';
@@ -45,15 +45,6 @@ const MOCK_ATTENDANCE = [
   { name: 'Thu', students: 89, staff: 95 },
   { name: 'Fri', students: 98, staff: 100 },
   { name: 'Sat', students: 85, staff: 90 },
-];
-
-const MOCK_DEPT_SCORES = [
-  { name: 'CSE', score: 92, staff: 94 },
-  { name: 'ECE', score: 85, staff: 91 },
-  { name: 'MECH', score: 78, staff: 86 },
-  { name: 'EEE', score: 80, staff: 89 },
-  { name: 'BCA', score: 88, staff: 92 },
-  { name: 'MBA', score: 94, staff: 96 }
 ];
 
 const MOCK_CGPA = [
@@ -70,6 +61,7 @@ const Dashboard = () => {
   const [students, setStudents] = useState([]);
   const [staff, setStaff] = useState([]);
   const [depts, setDepts] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [hods, setHods] = useState([]);
   const [fees, setFees] = useState([]);
   const [exams, setExams] = useState([]);
@@ -79,17 +71,18 @@ const Dashboard = () => {
   const [attendanceTrends, setAttendanceTrends] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Live subscription state â€” always fetched fresh from backend
+  // Live subscription state — always fetched fresh from backend
   const [subscription, setSubscription] = useState(null);
   const [subLoading, setSubLoading] = useState(true);
 
   const fetchAllData = useCallback(async () => {
     try {
       setLoading(true);
-      const [studentsRes, staffRes, deptsRes, feesRes, examsRes, logsRes, timetablesRes, approvalsRes, analyticsRes] = await Promise.all([
+      const [studentsRes, staffRes, deptsRes, coursesRes, feesRes, examsRes, logsRes, timetablesRes, approvalsRes, analyticsRes] = await Promise.all([
         getStudents().catch(() => ({ data: [] })),
         getStaff().catch(() => ({ data: [] })),
         getDepartments().catch(() => ({ data: [] })),
+        getCourses().catch(() => ({ data: [] })),
         getAllFees().catch(() => ({ data: [] })),
         getExams().catch(() => ({ data: [] })),
         getActivityLogs().catch(() => ({ data: [] })),
@@ -101,6 +94,8 @@ const Dashboard = () => {
       const sData = studentsRes?.data || [];
       const fData = staffRes?.data || [];
       const dData = deptsRes?.data || [];
+      const rawCourses = coursesRes?.data?.courses || coursesRes?.data || [];
+      const cData = Array.isArray(rawCourses) ? rawCourses : [];
       const feesData = feesRes?.data || [];
       const examsData = examsRes?.data || [];
       const logsData = logsRes?.data || [];
@@ -111,6 +106,7 @@ const Dashboard = () => {
       setStudents(sData);
       setStaff(fData);
       setDepts(dData);
+      setCourses(cData);
       setFees(feesData);
       setExams(examsData);
       setActivityLogs(logsData);
@@ -166,6 +162,7 @@ const Dashboard = () => {
   const totalStudentsCount = students.length;
   const totalStaffCount = staff.filter(s => s.designation !== 'HOD' && s.role !== 'HOD' && !s.email?.includes('hod')).length;
   const totalDeptsCount = depts.length;
+  const totalCoursesCount = courses.length;
   const totalHodsCount = hods.length;
   const totalParentsCount = students.length;
   // Dynamic Subjects: Calculate based on unique subjects taught by staff or approximate by department
@@ -186,20 +183,44 @@ const Dashboard = () => {
     ? (students.reduce((sum, s) => sum + (s.attendance || 0), 0) / students.length).toFixed(1)
     : '0';
 
-  // Calculate dynamic department scores for chart
-  const deptScores = depts.length > 0 ? depts.map(d => {
-    const deptStudents = students.filter(s => s.dept === d.name);
+  // Calculate dynamic department scores for chart strictly from real database departments
+  const deptScores = depts.map(d => {
+    const deptStudents = students.filter(s => s.dept === d.name || s.department === d.name);
     const avgScore = deptStudents.length > 0 
       ? (deptStudents.reduce((sum, s) => sum + (s.cgpa || 0), 0) / deptStudents.length) * 10
       : 0;
-    const deptStaff = staff.filter(s => s.dept === d.name);
+    const deptStaff = staff.filter(s => s.dept === d.name || s.department === d.name);
     const totalLoad = deptStaff.reduce((sum, s) => sum + (s.workload || 0), 0);
     return {
       name: d.code || d.name.slice(0, 4).toUpperCase(),
+      fullName: d.name,
       score: parseFloat(avgScore.toFixed(1)),
       staff: totalLoad || 0
     };
-  }) : [];
+  });
+
+  // Real-time Department & Courses breakdown mapping
+  const deptBreakdown = depts.map(d => {
+    const deptStudents = students.filter(s => (s.dept || s.department) === d.name);
+    const deptStaff = staff.filter(s => (s.dept || s.department) === d.name);
+    const deptCourses = courses.filter(c => 
+      c.departmentId === d.id || 
+      c.departmentId === d._id || 
+      c.department === d.name || 
+      c.dept === d.name || 
+      (c.code && d.code && c.code.startsWith(d.code))
+    );
+    return {
+      id: d.id || d._id,
+      name: d.name,
+      code: d.code || d.name.slice(0, 4).toUpperCase(),
+      hod: d.hod || staff.find(s => (s.dept === d.name || s.department === d.name) && (s.designation === 'HOD' || s.role === 'HOD'))?.name || 'Unassigned',
+      studentsCount: deptStudents.length || d.students || 0,
+      staffCount: deptStaff.length || d.staff || 0,
+      coursesCount: deptCourses.length,
+      courses: deptCourses
+    };
+  });
 
   // Use real attendance trends, fallback to MOCK if totally empty
   const attendanceData = attendanceTrends && attendanceTrends.length > 0 ? attendanceTrends : MOCK_ATTENDANCE;
@@ -209,9 +230,6 @@ const Dashboard = () => {
     ...MOCK_CGPA.slice(0, 5),
     { semester: 'Current', avg: Number((students.reduce((sum, s) => sum + (s.cgpa || 0), 0) / students.length).toFixed(1)), top: Math.max(...students.map(s => s.cgpa || 0)) }
   ] : MOCK_CGPA;
-
-  // For DeptScores, use MOCK_DEPT_SCORES if depts is empty
-  const finalDeptScores = depts.length > 0 ? deptScores : MOCK_DEPT_SCORES;
 
   // Always use live subscription from backend API
   const isTrial = subscription?.isTrial ?? false;
@@ -416,7 +434,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="stat-card glass-card">
+        <div className="stat-card glass-card" onClick={() => navigate('/admin/departments')} style={{ cursor: 'pointer' }}>
           <div className="stat-icon-wrapper bg-icon-primary" style={{ background: "#EEEDFE", color: "#3C3489" }}>
             <Building2 size={18} />
           </div>
@@ -424,6 +442,19 @@ const Dashboard = () => {
             <h3>Departments</h3>
             <p className="stat-value">{totalDeptsCount}</p>
             <p className="stat-change text-muted">Active divisions</p>
+          </div>
+        </div>
+
+        <div className="stat-card glass-card" onClick={() => navigate('/admin/academic')} style={{ cursor: 'pointer' }}>
+          <div className="stat-icon-wrapper bg-icon-primary" style={{ background: "#E0F2FE", color: "#0284C7" }}>
+            <BookOpen size={18} />
+          </div>
+          <div className="stat-details">
+            <h3>Total Courses</h3>
+            <p className="stat-value">{totalCoursesCount}</p>
+            <p className="stat-change positive">
+              <TrendingUp size={12} /> Live Programs
+            </p>
           </div>
         </div>
 
@@ -464,6 +495,110 @@ const Dashboard = () => {
               <TrendingUp size={12} /> Active links
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Real-Time Live Departments & Associated Courses Distribution */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Building2 size={20} className="text-primary" />
+              Real-Time Academic Departments & Mapped Courses
+            </h3>
+            <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Dynamic live registry of active divisions and their associated curriculum offerings.
+            </p>
+          </div>
+          <button 
+            className="btn-outline"
+            onClick={() => navigate('/admin/departments')}
+            style={{ fontSize: '0.8rem', padding: '6px 14px', borderRadius: '8px' }}
+          >
+            Manage Departments
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+          {deptBreakdown.length > 0 ? (
+            deptBreakdown.map((dept) => (
+              <div 
+                key={dept.id || dept.name} 
+                className="glass-card" 
+                style={{ 
+                  padding: '1.25rem', 
+                  borderRadius: '12px',
+                  borderTop: '3px solid var(--primary)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '0.75rem'
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--primary)', background: 'rgba(99,102,241,0.1)', padding: '2px 8px', borderRadius: '12px', textTransform: 'uppercase' }}>
+                        {dept.code}
+                      </span>
+                      <h4 style={{ margin: '6px 0 2px', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                        {dept.name}
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        HOD: <strong>{dept.hod}</strong>
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                        {dept.studentsCount}
+                      </span>
+                      <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)' }}>Students</p>
+                    </div>
+                  </div>
+
+                  {/* Associated Courses List */}
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                      Mapped Courses ({dept.courses.length})
+                    </div>
+                    {dept.courses.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {dept.courses.map((course, idx) => (
+                          <span 
+                            key={course.id || idx}
+                            style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              background: 'var(--bg-primary)',
+                              border: '1px solid var(--border-color)',
+                              color: 'var(--text-main)'
+                            }}
+                          >
+                            {course.name || course.code}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        Primary Degree Course Active
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <span>Faculty: <strong>{dept.staffCount}</strong></span>
+                  <span style={{ color: '#10b981', fontWeight: 600 }}>Active Division</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="glass-card" style={{ padding: '2rem', textAlign: 'center', gridColumn: '1 / -1', color: 'var(--text-muted)' }}>
+              No departments loaded. Please configure departments in the Department Management module.
+            </div>
+          )}
         </div>
       </div>
 

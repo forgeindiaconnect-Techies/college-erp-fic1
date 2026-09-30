@@ -16,24 +16,6 @@ import {
 } from '../../api/index';
 import './ExamsManagement.css';
 
-const DEPARTMENTS = [
-  'Computer Science Engineering',
-  'Information Technology',
-  'Electronics & Communication Engineering',
-  'Electrical & Electronics Engineering',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Artificial Intelligence & Data Science',
-  'Artificial Intelligence & Machine Learning',
-  'Cyber Security',
-  'Biomedical Engineering',
-  'Aeronautical Engineering',
-  'Automobile Engineering',
-  'Robotics Engineering',
-  'Chemical Engineering',
-  'Biotechnology Engineering'
-];
-
 const SEMS = ['Sem 1','Sem 2','Sem 3','Sem 4','Sem 5','Sem 6','Sem 7','Sem 8'];
 
 const EXAM_TYPES = [
@@ -525,7 +507,11 @@ const ExamsManagement = () => {
           <div className="filter-group">
             <select className="filter-select" value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
               <option value="All">All Departments</option>
-              {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
+              {departments.map(d => (
+                <option key={d._id || d.id || d.name} value={d.name || d.code}>
+                  {d.name || d.code}
+                </option>
+              ))}
             </select>
           </div>
         </div>

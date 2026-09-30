@@ -4,29 +4,12 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import {
   getStudents,
   getAllMarks,
-  getExams
+  getExams,
+  getDepartments
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import './CgpaManagement.css';
 
-const DEPARTMENTS = [
-  'All',
-  'Computer Science Engineering',
-  'Information Technology',
-  'Electronics & Communication Engineering',
-  'Electrical & Electronics Engineering',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Artificial Intelligence & Data Science',
-  'Artificial Intelligence & Machine Learning',
-  'Cyber Security',
-  'Biomedical Engineering',
-  'Aeronautical Engineering',
-  'Automobile Engineering',
-  'Robotics Engineering',
-  'Chemical Engineering',
-  'Biotechnology Engineering',
-];
 const SEMESTERS   = ['All','Sem 1','Sem 2','Sem 3','Sem 4','Sem 5','Sem 6','Sem 7','Sem 8'];
 const AVATAR_COLORS = ['bg-gradient-blue','bg-gradient-purple','bg-gradient-orange','bg-gradient-green','bg-gradient-teal','bg-gradient-pink'];
 
@@ -52,6 +35,7 @@ const CGPA_TREND = [
 const CgpaManagement = () => {
   const [loading,    setLoading]    = useState(true);
   const [marks,      setMarks]      = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [search,     setSearch]     = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
   const [semFilter,  setSemFilter]  = useState('All');
@@ -67,11 +51,17 @@ const CgpaManagement = () => {
     try {
       setLoading(true);
 
-      const [studentsRes, marksRes, examsRes] = await Promise.all([
+      const [studentsRes, marksRes, examsRes, deptsRes] = await Promise.all([
         getStudents(),
         getAllMarks(),
-        getExams()
+        getExams(),
+        getDepartments().catch(() => ({ data: [] }))
       ]);
+
+      const deptList = Array.isArray(deptsRes.data)
+        ? deptsRes.data
+        : (deptsRes.data?.departments || deptsRes.data?.data || []);
+      setDepartments(deptList);
 
       const studentList = Array.isArray(studentsRes.data)
         ? studentsRes.data
@@ -377,10 +367,13 @@ const CgpaManagement = () => {
                 {search && <button style={{border:'none',background:'none',cursor:'pointer',color:'var(--text-muted)',display:'flex'}} onClick={()=>setSearch('')}><X size={14}/></button>}
               </div>
               <div className="filter-select-wrapper">
-                <Filter size={13} className="text-muted"/>
                 <select className="filter-select" value={deptFilter} onChange={e=>setDeptFilter(e.target.value)}>
                   <option value="All">All Departments</option>
-                  {DEPARTMENTS.slice(1).map(d=><option key={d} value={d}>{d}</option>)}
+                  {departments.map(d => (
+                    <option key={d.id || d._id || d.name} value={d.name}>
+                      {d.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="filter-select-wrapper">

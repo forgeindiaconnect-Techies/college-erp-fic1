@@ -1,4 +1,4 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 
 // In production (Vercel), use the Render backend URL.
 // In local dev, use localhost via the Vite proxy.
@@ -534,6 +534,9 @@ export const deleteExam = (id) => api.delete(`/exams/${id}`);
 // Library Management
 export const getLibraryBooks = (params) => api.get('/library/books', { params });
 export const createLibraryBook = (data) => api.post('/library/books', data);
+export const deleteLibraryBook = (id) => api.delete(`/library/books/${id}`);
+export const deleteLibraryTransaction = (id) => api.delete(`/library/transactions/${id}`);
+export const clearLibraryDummyData = (data = {}) => api.post('/library/clear-dummy-data', data);
 export const requestLibraryBook = (data) => api.post('/library/request', data);
 export const getMyLibraryTransactions = () => api.get('/library/my-transactions');
 export const getAllLibraryTransactions = (params) => api.get('/library/transactions', { params });
@@ -699,5 +702,21 @@ export const deleteLibrarian = (id) => api.delete(`/librarian/${id}`);
 export const getLibraryBorrowers = () => api.get('/library/borrowers');
 
 
+
+
+
+export const attachLibraryTransactionCopy = (transactionId, bookCopyId) => api.put(`/library/transactions/${transactionId}/attach-copy`, { bookCopyId });
+export const issueLibraryReservation = (id, bookCopyId, dueDate) =>
+  api.put(`/library/reservations/${id}/issue`, { bookCopyId, dueDate });
+
+export const createLibraryReturnRequest = (transactionId) =>
+  api.post('/library/return-requests', { transactionId });
+
+export const getMyLibraryReturnRequests = () =>
+  api.get('/library/return-requests/my');
+
+export const getLibraryReturnRequests = () => api.get('/library/return-requests');
+export const approveLibraryReturnRequest = (id) => api.put('/library/return-requests/' + id + '/approve');
+export const rejectLibraryReturnRequest = (id, remarks = '') => api.put('/library/return-requests/' + id + '/reject', { remarks });
 
 

@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
   ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area 
 } from 'recharts';
-import { getStaff, getStudents, getSubjects, createNotification } from '../../api/index';
+import { getStaff, getStudents, getSubjects, getDepartments, createNotification } from '../../api/index';
 import '../../pages/Dashboard.css';
 
 // EMPTY INITIAL STATE
@@ -12,27 +12,8 @@ const initialStaff = [];
 const deptData = [];
 const trendData = [];
 
-const FULL_DEPARTMENTS = [
-  'Computer Science Engineering',
-  'Information Technology',
-  'Electronics & Communication Engineering',
-  'Electrical & Electronics Engineering',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Artificial Intelligence & Data Science',
-  'Artificial Intelligence & Machine Learning',
-  'Cyber Security',
-  'Biomedical Engineering',
-  'Aeronautical Engineering',
-  'Automobile Engineering',
-  'Robotics Engineering',
-  'Chemical Engineering',
-  'Biotechnology Engineering'
-];
-
-// DEPT_SUBJECTS removed as it is fetched from MongoDB
-
 export default function PrincipalStaffOverview() {
+  const [dbDepartments, setDbDepartments] = useState([]);
   const [staffList, setStaffList] = useState(initialStaff);
   const [allStudents, setAllStudents] = useState([]);
   const [search, setSearch] = useState('');
@@ -61,15 +42,19 @@ export default function PrincipalStaffOverview() {
   useEffect(() => {
     const fetchPrincipalStaff = async () => {
       try {
-        const [res, subRes, studentsRes] = await Promise.all([
+        const [res, subRes, studentsRes, deptsRes] = await Promise.all([
           getStaff().catch(() => ({ data: [] })),
           getSubjects().catch(() => ({ data: [] })),
-          getStudents().catch(() => ({ data: [] }))
+          getStudents().catch(() => ({ data: [] })),
+          getDepartments().catch(() => ({ data: [] }))
         ]);
         
         const allSubjects = subRes.data || [];
         const studentsData = Array.isArray(studentsRes?.data) ? studentsRes.data : [];
         setAllStudents(studentsData);
+
+        const deptsData = Array.isArray(deptsRes?.data) ? deptsRes.data : [];
+        setDbDepartments(deptsData);
 
         if (res.data && Array.isArray(res.data)) {
           const regularStaff = res.data.filter(s => s.role !== 'HOD' && s.designation !== 'HOD');
@@ -135,7 +120,7 @@ export default function PrincipalStaffOverview() {
   const activeStaffCount = staffList.filter(s => s.status === 'Active').length;
   const topPerformingCount = staffList.filter(s => s.performance >= 90).length;
   const lowAttendanceCount = staffList.filter(s => s.attendance < 92).length;
-  const avgRating = (staffList.reduce((a, s) => a + s.rating, 0) / staffList.length).toFixed(1);
+  const avgRating = (staffList.reduce((a, s) => a + s.rating, 0) / (staffList.length || 1)).toFixed(1);
 
   // Department counts
   const deptCounts = staffList.reduce((acc, s) => {
@@ -167,8 +152,16 @@ export default function PrincipalStaffOverview() {
     { month: 'May', performance: 92, attendance: 96 }
   ];
 
-  // Extract all distinct departments and subjects
-  const departments = ['All', ...FULL_DEPARTMENTS];
+  // Extract all distinct departments and subjects strictly from real DB + staff list
+  const departments = [
+    'All',
+    ...Array.from(
+      new Set([
+        ...dbDepartments.map(d => d.name || d.departmentName || d),
+        ...staffList.map(s => s.dept).filter(d => d && d !== 'N/A')
+      ])
+    )
+  ];
   const allSubjects = ['All', ...new Set(staffList.flatMap(s => s.subjects))];
 
   // Filtering System logic

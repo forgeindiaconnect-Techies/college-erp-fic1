@@ -29,24 +29,10 @@ const makeSortIcon  = (key, sortKey, sortAsc) => {
 
 /* ── Auto-generate Register No ── */
 const generateRegNo = (dept, existingCount) => {
-  const codes = {
-    'Computer Science Engineering': 'CSE',
-    'Information Technology': 'IT',
-    'Electronics & Communication Engineering': 'ECE',
-    'Electrical & Electronics Engineering': 'EEE',
-    'Mechanical Engineering': 'MECH',
-    'Civil Engineering': 'CIVIL',
-    'Artificial Intelligence & Data Science': 'AIDS',
-    'Artificial Intelligence & Machine Learning': 'AIML',
-    'Cyber Security': 'CYBER',
-    'Biomedical Engineering': 'BME',
-    'Aeronautical Engineering': 'AERO',
-    'Automobile Engineering': 'AUTO',
-    'Robotics Engineering': 'ROBOTICS',
-    'Chemical Engineering': 'CHEM',
-    'Biotechnology Engineering': 'BIOTECH'
-  };
-  const code = codes[dept] || dept?.substring(0, 3).toUpperCase() || 'ST';
+  const words = (dept || 'ST').trim().split(/\s+/);
+  const code = words.length > 1
+    ? words.map(w => w[0]).join('').toUpperCase()
+    : dept?.substring(0, 4).toUpperCase() || 'ST';
   const year = new Date().getFullYear();
   return `${code}${year}${String(existingCount + 1).padStart(3,'0')}`;
 };

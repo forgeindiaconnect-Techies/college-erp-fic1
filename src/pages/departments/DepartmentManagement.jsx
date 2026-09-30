@@ -5,13 +5,6 @@ import { getDepartments, createDepartment, updateDepartment, deleteDepartment, g
 import CustomSelect from '../../components/CustomSelect';
 import './DepartmentManagement.css';
 
-const MOCK_DEPARTMENTS = [
-  { id: 'DEPT01', name: 'Computer Science', code: 'CS', hod: 'Dr. Ananya Rao', students: 420, staff: 28, established: 1998, status: 'Active' },
-  { id: 'DEPT02', name: 'Electrical Engg.', code: 'EE', hod: 'Prof. Rajan Iyer', students: 380, staff: 22, established: 1990, status: 'Active' },
-  { id: 'DEPT03', name: 'Mechanical Engg.', code: 'ME', hod: 'Dr. Meena Pillai', students: 360, staff: 20, established: 1985, status: 'Active' },
-  { id: 'DEPT04', name: 'Civil Engg.', code: 'CE', hod: 'Dr. Shalini Nair', students: 290, staff: 18, established: 1988, status: 'Inactive' },
-  { id: 'DEPT05', name: 'Information Tech.', code: 'IT', hod: 'Prof. Karthik S.', students: 340, staff: 19, established: 2001, status: 'Active' },
-];
 
 
 const STANDARD_DEPARTMENTS = [

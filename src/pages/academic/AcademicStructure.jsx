@@ -19,24 +19,6 @@ import {
 } from '../../api/index';
 import './AcademicStructure.css';
 
-const DEFAULT_DEPARTMENTS = [
-  'Computer Science Engineering',
-  'Information Technology',
-  'Electronics & Communication Engineering',
-  'Electrical & Electronics Engineering',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Artificial Intelligence & Data Science',
-  'Artificial Intelligence & Machine Learning',
-  'Cyber Security',
-  'Biomedical Engineering',
-  'Aeronautical Engineering',
-  'Automobile Engineering',
-  'Robotics Engineering',
-  'Chemical Engineering',
-  'Biotechnology Engineering'
-];
-
 const DEFAULT_SUBJECTS = [
   { id: 'SUB001', code: 'CS301', name: 'Data Structures', dept: 'Computer Science Engineering', sem: 'Semester 3', teacher: 'Dr. Ananya Rao', credits: 4, workload: 4 },
   { id: 'SUB002', code: 'CS302', name: 'DBMS', dept: 'Computer Science Engineering', sem: 'Semester 3', teacher: 'Dr. Agila', credits: 4, workload: 4 },
@@ -142,11 +124,7 @@ const AcademicStructure = () => {
         ? departmentRes.data
         : [];
 
-      setDepartments(
-        databaseDepartments.length > 0
-          ? databaseDepartments
-          : DEFAULT_DEPARTMENTS
-      );
+      setDepartments(databaseDepartments);
 
       const subjectRes = await getSubjects().catch(() => ({
         data: []

@@ -5,23 +5,6 @@ import useRealtimeSync from '../../hooks/useRealtimeSync';
 import CustomSelect from '../../components/CustomSelect';
 import './StaffManagement.css';
 
-const DEPARTMENTS = [
-  'Computer Science Engineering', 'Information Technology', 'Electronics & Communication Engineering',
-  'Electrical & Electronics Engineering', 'Mechanical Engineering', 'Civil Engineering',
-  'Artificial Intelligence & Data Science', 'Artificial Intelligence & Machine Learning',
-  'Cyber Security', 'Biomedical Engineering', 'Aeronautical Engineering', 'Automobile Engineering',
-  'Robotics Engineering', 'Chemical Engineering', 'Biotechnology Engineering'
-];
-
-const MOCK_STAFF = [
-  { id: 'STF001', name: 'Dr. Ananya Rao', email: 'ananya@college.edu', phone: '9876543210', dept: 'Computer Science', designation: 'Professor', subjects: ['Data Structures', 'DBMS'], workload: 18, attendance: 97, status: 'Active' },
-  { id: 'STF001', name: 'Dr. Ananya Rao', email: 'ananya@college.edu', phone: '9876543210', dept: 'Computer Science', designation: 'Professor', workload: 18, attendance: 97, status: 'Active' },
-  { id: 'STF002', name: 'Prof. Rajan Iyer', email: 'rajan@college.edu', phone: '9845123456', dept: 'Electrical Engg.', designation: 'HOD', workload: 14, attendance: 95, status: 'Active' },
-  { id: 'STF003', name: 'Dr. Meena Pillai', email: 'meena@college.edu', phone: '9812987654', dept: 'Mechanical Engg.', designation: 'Associate Prof.', workload: 16, attendance: 92, status: 'Active' },
-  { id: 'STF004', name: 'Prof. Karthik S.', email: 'karthik@college.edu', phone: '9823456789', dept: 'Computer Science', designation: 'Assistant Prof.', workload: 20, attendance: 89, status: 'Active' },
-  { id: 'STF005', name: 'Dr. Shalini Nair', email: 'shalini@college.edu', phone: '9867123456', dept: 'Civil Engg.', designation: 'Professor', workload: 12, attendance: 98, status: 'Inactive' },
-];
-
 const EMPTY_FORM = { name: '', email: '', phone: '', dept: '', designation: 'Assistant Prof.', workload: '', attendance: '95', status: 'Active' };
 
 const getInitials = (name) => name.replace('Dr. ', '').replace('Prof. ', '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
@@ -85,7 +68,7 @@ const StaffManagement = () => {
   });
 
   const openAdd = () => { 
-    const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
+    const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : [];
     setForm({ ...EMPTY_FORM, dept: activeDepts[0] || '' }); 
     setEditTarget(null); 
     setModalOpen(true); 
@@ -213,13 +196,10 @@ const StaffManagement = () => {
             <CustomSelect 
               value={deptFilter} 
               onChange={e => setDeptFilter(e.target.value)}
-              options={(() => {
-                const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
-                return [
-                  { value: 'All', label: 'All Departments' },
-                  ...activeDepts.map(d => ({ value: d, label: d }))
-                ];
-              })()}
+              options={[
+                { value: 'All', label: 'All Departments' },
+                ...dbDepartments.map(d => ({ value: d.name, label: d.name }))
+              ]}
             />
           </div>
         </div>
@@ -314,10 +294,7 @@ const StaffManagement = () => {
                   <CustomSelect 
                     value={form.dept}
                     onChange={e => setForm({ ...form, dept: e.target.value })}
-                    options={(() => {
-                      const activeDepts = dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS;
-                      return activeDepts.map(d => ({ value: d, label: d }));
-                    })()}
+                    options={dbDepartments.map(d => ({ value: d.name, label: d.name }))}
                     placeholder="Select Department"
                     required
                   />

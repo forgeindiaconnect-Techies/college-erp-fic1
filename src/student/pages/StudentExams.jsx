@@ -182,8 +182,8 @@ const StudentExams = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1rem 1.25rem', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
                 <div>
                   <p style={{ margin: '0.25rem 0' }}><strong>Student Name:</strong> {student.name || 'John Doe'}</p>
-                  <p style={{ margin: '0.25rem 0' }}><strong>Register / Roll No:</strong> {student.id || student.rollNo || 'CS2022001'}</p>
-                  <p style={{ margin: '0.25rem 0' }}><strong>Department:</strong> {student.department || student.dept || 'Computer Science Engineering'}</p>
+                  <p style={{ margin: '0.25rem 0' }}><strong>Register / Roll No:</strong> {student.id || student.rollNo || '—'}</p>
+                  <p style={{ margin: '0.25rem 0' }}><strong>Department:</strong> {student.department || student.dept || '—'}</p>
                 </div>
                 <div>
                   <p style={{ margin: '0.25rem 0' }}><strong>Semester:</strong> {student.sem || student.semester || 'Semester 3'}</p>

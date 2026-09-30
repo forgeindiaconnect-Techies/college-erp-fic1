@@ -3,13 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, Lock, CheckCircle, ArrowLeft, Save } from 'lucide-react';
 import './StudentSettings.css';
 
-// Fallbacks
 const DEFAULT_STUDENT = {
-  id: 'CS2022001',
-  name: 'John Doe',
-  dept: 'Computer Science',
-  sem: 'Sem 6',
-  email: 'john@college.edu'
+  id: '',
+  name: '',
+  dept: '',
+  sem: '',
+  email: ''
 };
 
 const StudentSettings = () => {

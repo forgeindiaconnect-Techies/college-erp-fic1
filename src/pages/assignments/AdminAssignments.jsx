@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { ClipboardList, Search, Calendar, Users, FileText, ArrowLeft, BookOpen, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getAssignments, getAssignmentSubmissions, getStudents } from '../../api/index';
+import { getAssignments, getAssignmentSubmissions, getStudents, getDepartments } from '../../api/index';
 
 const AdminAssignments = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [assignments, setAssignments] = useState([]);
+  const [dbDepartments, setDbDepartments] = useState([]);
   const [search, setSearch] = useState('');
   const [filterDept, setFilterDept] = useState('All Departments');
 
@@ -49,8 +50,12 @@ const AdminAssignments = () => {
     // 2. Load assignments from backend API
     const loadData = async () => {
       try {
-        const res = await getAssignments();
+        const [res, deptsRes] = await Promise.all([
+          getAssignments().catch(() => ({ data: [] })),
+          getDepartments().catch(() => ({ data: [] }))
+        ]);
         setAssignments(res.data || []);
+        setDbDepartments(Array.isArray(deptsRes?.data) ? deptsRes.data : []);
       } catch (err) {
         console.error('Failed to load assignments', err);
         // Fallback to local storage if API fails completely
@@ -68,21 +73,12 @@ const AdminAssignments = () => {
 
   const departments = [
     'All Departments',
-    'Computer Science Engineering',
-    'Information Technology',
-    'Electronics & Communication Engineering',
-    'Electrical & Electronics Engineering',
-    'Mechanical Engineering',
-    'Civil Engineering',
-    'Artificial Intelligence & Data Science',
-    'Artificial Intelligence & Machine Learning',
-    'Cyber Security',
-    'Biomedical Engineering',
-    'Aeronautical Engineering',
-    'Automobile Engineering',
-    'Robotics Engineering',
-    'Chemical Engineering',
-    'Biotechnology Engineering'
+    ...Array.from(
+      new Set([
+        ...dbDepartments.map(d => d.name || d.departmentName || d),
+        ...assignments.map(a => a.department).filter(Boolean)
+      ])
+    )
   ];
 
   // Filter assignments by selected department

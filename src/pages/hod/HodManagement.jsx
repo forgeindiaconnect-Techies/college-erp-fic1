@@ -5,24 +5,6 @@ import useRealtimeSync from '../../hooks/useRealtimeSync';
 import CustomSelect from '../../components/CustomSelect';
 import './HodManagement.css';
 
-const DEPARTMENTS = [
-  { name: 'Computer Science Engineering', code: 'CSE' },
-  { name: 'Information Technology', code: 'IT' },
-  { name: 'Electronics & Communication Engineering', code: 'ECE' },
-  { name: 'Electrical & Electronics Engineering', code: 'EEE' },
-  { name: 'Mechanical Engineering', code: 'MECH' },
-  { name: 'Civil Engineering', code: 'CIVIL' },
-  { name: 'Artificial Intelligence & Data Science', code: 'AIDS' },
-  { name: 'Artificial Intelligence & Machine Learning', code: 'AIML' },
-  { name: 'Cyber Security', code: 'CYBER' },
-  { name: 'Biomedical Engineering', code: 'BME' },
-  { name: 'Aeronautical Engineering', code: 'AERO' },
-  { name: 'Automobile Engineering', code: 'AUTO' },
-  { name: 'Robotics Engineering', code: 'ROBOTICS' },
-  { name: 'Chemical Engineering', code: 'CHEM' },
-  { name: 'Biotechnology Engineering', code: 'BIOTECH' },
-];
-
 const EMPTY_FORM = {
   id: '',
   name: '',
@@ -90,8 +72,7 @@ const HodManagement = () => {
   );
 
   const openAdd = () => { 
-    const activeDepts = availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS;
-    setForm({ ...EMPTY_FORM, dept: activeDepts[0]?.name || '' }); 
+    setForm({ ...EMPTY_FORM, dept: availableDepartments[0]?.name || '' }); 
     setEditTarget(null); 
     setModalOpen(true); 
   };
@@ -131,11 +112,8 @@ const HodManagement = () => {
       return;
     }
 
-    const allDepartments =
-      availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS;
-
     const deptInfo =
-      allDepartments.find(d => d.name === form.dept) || { code: 'HOD' };
+      availableDepartments.find(d => d.name === form.dept) || { code: form.dept?.substring(0, 4).toUpperCase() || 'HOD' };
     
     try {
       if (editTarget) {
@@ -287,8 +265,8 @@ const HodManagement = () => {
                 </tr>
               ) : (
                 filtered.map((hod) => {
-                  const deptObj = DEPARTMENTS.find(d => d.name === hod.dept);
-                  const displayCode = hod.deptCode || (deptObj ? deptObj.code : '—');
+                  const deptObj = availableDepartments.find(d => d.name === hod.dept);
+                  const displayCode = hod.deptCode || (deptObj ? deptObj.code : (hod.dept ? hod.dept.split(' ').map(w => w[0]).join('').toUpperCase() : '—'));
                   return (
                   <tr key={hod.id}>
                     <td><span className="roll-no">{hod.id}</span></td>
@@ -380,10 +358,7 @@ const HodManagement = () => {
                   <CustomSelect 
                     value={form.dept}
                     onChange={e => setForm({ ...form, dept: e.target.value })}
-                    options={(() => {
-                      const activeDepts = availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS;
-                      return activeDepts.map(d => ({ value: d.name, label: d.name }));
-                    })()}
+                    options={availableDepartments.map(d => ({ value: d.name, label: d.name }))}
                     placeholder="Select Department"
                   />
                 </div>
