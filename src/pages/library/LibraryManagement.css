@@ -414,13 +414,18 @@
 .search-box {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  gap: 0.75rem;
+  background-color: var(--bg-primary, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 8px;
-  padding: 0.5rem 1rem;
-  min-width: 300px;
-  flex: 1;
+  padding: 0.45rem 0.85rem;
+  min-width: 260px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-box:focus-within {
+  border-color: var(--primary, #4f46e5);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 .search-box input {
@@ -428,7 +433,13 @@
   border: none;
   outline: none;
   width: 100%;
-  color: var(--text-main);
+  font-size: 0.82rem;
+  color: var(--text-main, #1e293b);
+  font-family: inherit;
+}
+
+.search-box input::placeholder {
+  color: var(--text-muted, #94a3b8);
 }
 
 /* Library Modal Overrides */
@@ -437,4 +448,180 @@
 .lib-modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
 .lib-modal-form { padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.5rem; flex: 1; }
 .lib-modal-actions { padding: 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 1rem; background: var(--bg-card); }
+
+/* ── Enhanced Filter Pills & Circulation Desk UI ── */
+.lib-filter-pill-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.lib-filter-pill-container::-webkit-scrollbar {
+  height: 4px;
+}
+
+.lib-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-card, #ffffff);
+  color: var(--text-main, #334155);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.lib-filter-pill:hover {
+  background: var(--bg-secondary, #f8fafc);
+  border-color: #cbd5e1;
+  color: var(--text-main, #0f172a);
+  transform: translateY(-1px);
+}
+
+.lib-filter-pill.active {
+  background: var(--primary, #4f46e5) !important;
+  color: #ffffff !important;
+  border-color: var(--primary, #4f46e5) !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+
+.lib-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 1.25rem;
+}
+
+.lib-filter-pill .lib-filter-badge.badge-neutral {
+  background: rgba(100, 116, 139, 0.12);
+  color: var(--text-main, #475569);
+}
+
+.lib-filter-pill.active .lib-filter-badge {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+.lib-filter-badge.badge-amber {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.lib-filter-badge.badge-rose {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+
+.lib-filter-badge.badge-blue {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.lib-filter-badge.badge-emerald {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.lib-filter-pill.active .lib-filter-badge.badge-amber,
+.lib-filter-pill.active .lib-filter-badge.badge-rose,
+.lib-filter-pill.active .lib-filter-badge.badge-blue,
+.lib-filter-pill.active .lib-filter-badge.badge-emerald {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+.lib-pulse-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  display: inline-block;
+  animation: erpPulse 1.5s infinite;
+}
+
+/* Circulation Desk Quick Toolbar */
+.lib-circulation-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Clearance Desk Specific Styles */
+.clearance-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  width: 100%;
+}
+
+.clearance-kpi-card {
+  padding: 1.15rem;
+  border-radius: 12px;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  box-shadow: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.clearance-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
+}
+
+.clearance-kpi-card.kpi-amber {
+  border-left: 4px solid #f59e0b;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.04) 0%, var(--bg-card, #ffffff) 100%);
+}
+
+.clearance-kpi-card.kpi-emerald {
+  border-left: 4px solid #10b981;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, var(--bg-card, #ffffff) 100%);
+}
+
+.clearance-kpi-card.kpi-rose {
+  border-left: 4px solid #f43f5e;
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.04) 0%, var(--bg-card, #ffffff) 100%);
+}
+
+.clearance-kpi-card.kpi-indigo {
+  border-left: 4px solid #6366f1;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.04) 0%, var(--bg-card, #ffffff) 100%);
+}
+
+.clearance-icon-bubble {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+
 

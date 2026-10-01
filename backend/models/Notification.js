@@ -16,8 +16,9 @@ const notificationSchema = new mongoose.Schema({
   },
   type: { 
     type: String, 
-    enum: ['Info', 'Warning', 'Success', 'Error'], 
-    default: 'Info' 
+    enum: ['Info', 'Warning', 'Success', 'Error', 'info', 'warning', 'success', 'error'], 
+    default: 'Info',
+    set: (v) => v ? v.charAt(0).toUpperCase() + v.slice(1).toLowerCase() : 'Info'
   },
   readBy: [{ type: String, ref: 'User' }],
   link: { type: String, default: null }

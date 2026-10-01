@@ -535,10 +535,26 @@ export const deleteExam = (id) => api.delete(`/exams/${id}`);
 export const getLibraryBooks = (params) => api.get('/library/books', { params });
 export const createLibraryBook = (data) => api.post('/library/books', data);
 export const deleteLibraryBook = (id) => api.delete(`/library/books/${id}`);
-export const deleteLibraryTransaction = (id) => api.delete(`/library/transactions/${id}`);
 export const clearLibraryDummyData = (data = {}) => api.post('/library/clear-dummy-data', data);
+export const deleteLibraryTransaction = (id) => api.delete(`/library/transactions/${id}`);
+export const cancelLibraryRequest = (id) => api.delete(`/library/transactions/${id}`);
+export const deleteLibraryReservation = (id) => api.delete(`/library/reservations/${id}`);
 export const requestLibraryBook = (data) => api.post('/library/request', data);
 export const getMyLibraryTransactions = () => api.get('/library/my-transactions');
+export const getMyLibraryClearance = () =>
+  api.get('/library/clearance/my');
+
+export const requestLibraryClearance = () =>
+  api.post('/library/clearance/request');
+
+export const getLibraryClearanceRequests = () =>
+  api.get('/library/clearance');
+
+export const approveLibraryClearance = (id, remarks = '') =>
+  api.put(`/library/clearance/${id}/approve`, { remarks });
+
+export const rejectLibraryClearance = (id, remarks = '') =>
+  api.put(`/library/clearance/${id}/reject`, { remarks });
 export const getAllLibraryTransactions = (params) => api.get('/library/transactions', { params });
 export const issueLibraryBook = (id) => api.put(`/library/transactions/${id}/issue`);
 export const manualIssueLibraryBook = (data) => api.post('/library/transactions/manual-issue', data);

@@ -135,6 +135,14 @@ input, select {
 }
 
 .text-primary { color: var(--primary); }
+.text-white { color: #ffffff !important; }
+.bg-primary { background-color: var(--primary) !important; }
+.border-primary { border-color: var(--primary) !important; }
+.bg-blue-600 { background-color: #2563eb !important; }
+.border-blue-600 { border-color: #2563eb !important; }
+.bg-emerald-600 { background-color: #059669 !important; }
+.bg-rose-500 { background-color: #f43f5e !important; }
+.bg-amber-500 { background-color: #f59e0b !important; }
 
 .glass-card, .stat-card, .dashboard-card {
   background: #FFFFFF;

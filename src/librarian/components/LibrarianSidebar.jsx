@@ -5,7 +5,7 @@ import {
   LayoutDashboard, BookOpen, ArrowRightLeft, Clock, 
   FileText, Users, BarChart3, LogOut, ChevronRight, 
   ChevronDown, Library, PlusCircle, BookmarkCheck,
-  BookDown, CheckCircle2
+  BookDown, CheckCircle2, ShieldCheck
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -47,6 +47,7 @@ const LibrarianSidebar = ({ isOpen, onClose }) => {
         { name: 'Issued Books', path: '/librarian/issued', icon: <BookDown size={18} /> },
         { name: 'Returned Books', path: '/librarian/returned-books', icon: <CheckCircle2 size={18} /> },
         { name: 'Return Requests', path: '/librarian/returns', icon: <Clock size={18} /> },
+        { name: 'Clearance Requests', path: '/librarian/clearance', icon: <ShieldCheck size={18} /> },
         { name: 'Reservations', path: '/librarian/reservations', icon: <BookmarkCheck size={18} /> },
       ]
     },
@@ -55,7 +56,7 @@ const LibrarianSidebar = ({ isOpen, onClose }) => {
       icon: <Users size={20} />,
       items: [
         { name: 'Student Members', path: '/librarian/members', icon: <Users size={18} /> },
-        { name: 'Fines & Analytics', path: '/librarian/reports', icon: <BarChart3 size={18} /> },
+        { name: 'Reports & Analytics', path: '/librarian/reports', icon: <BarChart3 size={18} /> },
       ]
     }
   ];

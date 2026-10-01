@@ -301,98 +301,225 @@ const StudentHostel = () => {
 
   return (
     <>
-      <div className="student-dashboard animate-fade-in" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Premium Header Banner */}
-      <div style={{ background: '#3730A5', borderRadius: '24px', padding: '1.25rem 2rem', color: 'white', marginBottom: '2.5rem', boxShadow: '0 20px 40px -15px rgba(55, 48, 165, 0.5)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', right: '-10%', top: '-50%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 70%)', borderRadius: '50%' }}></div>
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '10px', borderRadius: '14px', backdropFilter: 'blur(10px)' }}>
+      <div className="student-dashboard animate-fade-in" style={{ padding: '1.5rem', maxWidth: '1280px', margin: '0 auto' }}>
+        {/* Real-time Enterprise ERP Header Banner */}
+        <div style={{
+          background: 'var(--bg-surface, #ffffff)',
+          border: '1px solid var(--border-color, #e2e8f0)',
+          borderRadius: '16px',
+          padding: '1.25rem 1.75rem',
+          marginBottom: '1.75rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '1rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{
+              background: 'rgba(99, 102, 241, 0.08)',
+              color: '#4f46e5',
+              border: '1px solid rgba(99, 102, 241, 0.2)',
+              padding: '12px',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
               <Home size={24} />
             </div>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>Hostel Allocation</h1>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h1 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
+                  Hostel Allocation & Residency
+                </h1>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  background: 'rgba(99, 102, 241, 0.1)',
+                  color: '#4f46e5',
+                  letterSpacing: '0.04em'
+                }}>
+                  Residential ERP
+                </span>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                Manage your accommodation details, gate passes, warden contacts, and residential ledger.
+              </p>
+            </div>
           </div>
-          <p style={{ fontSize: '0.95rem', opacity: 0.9, margin: '0 0 0 3.5rem', maxWidth: '600px' }}>Manage your accommodation details, gate passes, and stay updated with residential notices all in one place.</p>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              background: 'var(--bg-main, #f8fafc)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              fontSize: '0.78rem',
+              color: 'var(--text-muted)',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <Calendar size={14} className="text-primary" />
+              <span>AY 2026 - 2027</span>
+            </div>
+          </div>
         </div>
-      </div>
 
       {!isHosteller ? (
-        <div className="glass-card" style={{ padding: '4rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto', borderRadius: '24px' }}>
-          <div style={{ background: 'var(--primary)', color: '#dc2626', display: 'inline-flex', padding: '24px', borderRadius: '50%', marginBottom: '1.5rem', boxShadow: '0 10px 25px -5px rgba(220, 38, 38, 0.4)' }}>
-            <AlertCircle size={48} />
+        <div style={{
+          background: 'var(--bg-surface, #ffffff)',
+          border: '1px solid var(--border-color, #e2e8f0)',
+          borderRadius: '16px',
+          padding: '3rem 2rem',
+          textAlign: 'center',
+          maxWidth: '600px',
+          margin: '0 auto',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+        }}>
+          <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#dc2626', display: 'inline-flex', padding: '20px', borderRadius: '50%', marginBottom: '1.25rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+            <AlertCircle size={40} />
           </div>
-          <h2 style={{ fontSize: '1.8rem', color: 'var(--text-main)', marginBottom: '1rem', fontWeight: 800 }}>Not Registered</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', lineHeight: '1.6' }}>You are currently not registered for campus hostel accommodation. If you believe this is an error or wish to apply, please contact the Hostel Administration.</p>
-          <button onClick={handleApplyHostel} className="btn-primary" style={{ marginTop: '2rem', padding: '12px 24px', fontSize: '1rem', borderRadius: '12px' }}>Apply for Hostel</button>
+          <h2 style={{ fontSize: '1.4rem', color: 'var(--text-main)', marginBottom: '0.5rem', fontWeight: 800 }}>Not Registered for Hostel</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', lineHeight: '1.6' }}>You are currently not registered for campus hostel accommodation. If you believe this is an error or wish to apply, please submit an application below.</p>
+          <button onClick={handleApplyHostel} className="btn-primary" style={{ marginTop: '1.5rem', padding: '10px 22px', fontSize: '0.9rem', borderRadius: '10px' }}>Apply for Hostel</button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
           {/* Main Allocation Card */}
-          <div className="glass-card" style={{ borderRadius: '24px', padding: '1.5rem', border: '1px solid rgba(13, 148, 136, 0.1)', boxShadow: '0 10px 40px -10px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+          <div style={{
+            background: 'var(--bg-surface, #ffffff)',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div>
-                <h2 style={{ fontSize: '1.6rem', color: 'var(--text-main)', margin: 0, fontWeight: 800, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h2 style={{ fontSize: '1.25rem', color: 'var(--text-main)', margin: 0, fontWeight: 800 }}>
                   Your Room Details
                 </h2>
-                <p style={{ fontSize: '1rem', color: 'var(--text-muted)', marginTop: '6px' }}>Current academic year allocation</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '2px', marginBottom: 0 }}>Current academic year residential allotment</p>
               </div>
-              <div style={{ background: 'var(--primary)', color: 'white', padding: '10px 20px', borderRadius: '20px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 10px 20px -5px rgba(16, 185, 129, 0.4)' }}>
-                <CheckCircle2 size={18} /> Active Hosteller
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border-color)', transition: 'transform 0.2s', cursor: 'default' }} className="hover:-translate-y-1 hover:shadow-lg">
-                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(13, 148, 136, 0.1)', color: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                  <Home size={20} />
-                </div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>Hostel Name</div>
-                <div style={{ fontSize: '1.3rem', color: 'var(--text-main)', fontWeight: 700 }}>{studentDetails.hostelName || 'Not Assigned'}</div>
-              </div>
-
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border-color)', transition: 'transform 0.2s', cursor: 'default' }} className="hover:-translate-y-1 hover:shadow-lg">
-                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                  <MapPin size={20} />
-                </div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>Block / Wing</div>
-                <div style={{ fontSize: '1.3rem', color: 'var(--text-main)', fontWeight: 700 }}>{studentDetails.blockWing || 'Not Assigned'}</div>
-              </div>
-
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border-color)', transition: 'transform 0.2s', cursor: 'default' }} className="hover:-translate-y-1 hover:shadow-lg">
-                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                  <div style={{ fontWeight: 900, fontSize: '1.2rem' }}>#</div>
-                </div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>Room Number</div>
-                <div style={{ fontSize: '1.5rem', color: '#f59e0b', fontWeight: 900 }}>{studentDetails.roomNumber || 'Pending'}</div>
-              </div>
-
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border-color)', transition: 'transform 0.2s', cursor: 'default' }} className="hover:-translate-y-1 hover:shadow-lg">
-                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                  <div style={{ fontWeight: 900, fontSize: '1.2rem' }}>B</div>
-                </div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>Bed Number</div>
-                <div style={{ fontSize: '1.5rem', color: '#10b981', fontWeight: 900 }}>{studentDetails.bedNumber || 'Pending'}</div>
+              <div style={{
+                background: '#ecfdf5',
+                color: '#059669',
+                border: '1px solid #a7f3d0',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
+                Active Hosteller
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1.5rem' }}>
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <User size={24} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div style={{
+                background: 'var(--bg-main, #f8fafc)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color, #e2e8f0)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(13, 148, 136, 0.1)', color: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Home size={16} />
+                  </div>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Hostel Name</span>
+                </div>
+                <div style={{ fontSize: '1.15rem', color: 'var(--text-main)', fontWeight: 800 }}>{studentDetails.hostelName || 'Not Assigned'}</div>
+              </div>
+
+              <div style={{
+                background: 'var(--bg-main, #f8fafc)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color, #e2e8f0)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <MapPin size={16} />
+                  </div>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Block / Wing</span>
+                </div>
+                <div style={{ fontSize: '1.15rem', color: 'var(--text-main)', fontWeight: 800 }}>{studentDetails.blockWing || 'Not Assigned'}</div>
+              </div>
+
+              <div style={{
+                background: 'var(--bg-main, #f8fafc)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color, #e2e8f0)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                    #
+                  </div>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Room Number</span>
+                </div>
+                <div style={{ fontSize: '1.25rem', color: '#d97706', fontWeight: 900 }}>{studentDetails.roomNumber || 'Pending'}</div>
+              </div>
+
+              <div style={{
+                background: 'var(--bg-main, #f8fafc)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color, #e2e8f0)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                    B
+                  </div>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Bed Number</span>
+                </div>
+                <div style={{ fontSize: '1.25rem', color: '#059669', fontWeight: 900 }}>{studentDetails.bedNumber || 'Pending'}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+              <div style={{
+                background: 'var(--bg-main, #f8fafc)',
+                padding: '0.9rem 1.1rem',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color, #e2e8f0)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <User size={20} />
                 </div>
                 <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Warden Name</div>
-                  <div style={{ fontSize: '1.2rem', color: 'var(--text-main)', fontWeight: 700 }}>{studentDetails.wardenName || 'Admin Assigned'}</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Warden Name</div>
+                  <div style={{ fontSize: '0.98rem', color: 'var(--text-main)', fontWeight: 700 }}>{studentDetails.wardenName || 'Admin Assigned'}</div>
                 </div>
               </div>
 
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '16px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(236, 72, 153, 0.1)', color: '#ec4899', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Phone size={24} />
+              <div style={{
+                background: 'var(--bg-main, #f8fafc)',
+                padding: '0.9rem 1.1rem',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color, #e2e8f0)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(236, 72, 153, 0.1)', color: '#ec4899', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Phone size={20} />
                 </div>
                 <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Warden Contact</div>
-                  <div style={{ fontSize: '1.2rem', color: 'var(--text-main)', fontWeight: 700 }}>{studentDetails.wardenContact || 'N/A'}</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Warden Contact</div>
+                  <div style={{ fontSize: '0.98rem', color: 'var(--text-main)', fontWeight: 700 }}>{studentDetails.wardenContact || 'N/A'}</div>
                 </div>
               </div>
             </div>
@@ -400,19 +527,38 @@ const StudentHostel = () => {
             {(() => {
               const feeInfo = getStudentHostelFeeInfo(studentDetails);
               return (
-                <div style={{ marginTop: '1.5rem', background: 'linear-gradient(to right, rgba(13,148,136,0.05), rgba(59,130,246,0.05))', padding: '1.25rem 1.5rem', borderRadius: '16px', border: '1px solid rgba(13, 148, 136, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ background: 'white', padding: '10px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-                      <CreditCard size={24} className="text-primary" />
+                <div style={{
+                  marginTop: '1rem',
+                  background: 'var(--bg-main, #f8fafc)',
+                  padding: '1rem 1.25rem',
+                  borderRadius: '12px',
+                  border: '1px solid var(--border-color, #e2e8f0)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ background: 'var(--bg-surface, #ffffff)', padding: '8px', borderRadius: '10px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                      <CreditCard size={20} className="text-primary" />
                     </div>
                     <div>
-                      <div style={{ color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 800 }}>Hostel Fee & Ledger</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '2px' }}>
+                      <div style={{ color: 'var(--text-main)', fontSize: '0.95rem', fontWeight: 800 }}>Hostel Fee & Ledger</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '2px' }}>
                         Total: <strong style={{ color: '#1e40af' }}>₹{feeInfo.hostelFee.toLocaleString()}</strong> • Paid: <strong style={{ color: '#16a34a' }}>₹{feeInfo.paidAmount.toLocaleString()}</strong> • Due: <strong style={{ color: feeInfo.dueAmount > 0 ? '#dc2626' : '#16a34a' }}>₹{feeInfo.dueAmount.toLocaleString()}</strong>
                       </div>
                     </div>
                   </div>
-                  <div style={{ padding: '8px 20px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', background: feeInfo.isPaid ? 'rgba(16,185,129,0.1)' : feeInfo.isPartial ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)', color: feeInfo.isPaid ? '#10b981' : feeInfo.isPartial ? '#d97706' : '#ef4444', border: `1px solid ${feeInfo.isPaid ? 'rgba(16,185,129,0.2)' : feeInfo.isPartial ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
+                  <div style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    background: feeInfo.isPaid ? '#ecfdf5' : feeInfo.isPartial ? '#fffbeb' : '#fef2f2',
+                    color: feeInfo.isPaid ? '#059669' : feeInfo.isPartial ? '#d97706' : '#dc2626',
+                    border: `1px solid ${feeInfo.isPaid ? '#a7f3d0' : feeInfo.isPartial ? '#fde68a' : '#fecaca'}`
+                  }}>
                     {feeInfo.isPaid ? 'PAID IN FULL' : feeInfo.isPartial ? `PARTIALLY PAID (DUE ₹${feeInfo.dueAmount.toLocaleString()})` : `PENDING (DUE ₹${feeInfo.dueAmount.toLocaleString()})`}
                   </div>
                 </div>
@@ -421,22 +567,30 @@ const StudentHostel = () => {
           </div>
 
           {/* Secondary Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
             
             {/* Leave Requests (Gate Pass) */}
-            <div className="glass-card" style={{ padding: '1.5rem', borderRadius: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h3 style={{ fontSize: '1.3rem', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}><MapPin size={22} className="text-primary" /> Leave Requests</h3>
-                <button onClick={() => setShowLeaveModal(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px' }}>Apply Pass</button>
+            <div style={{
+              background: 'var(--bg-surface, #ffffff)',
+              padding: '1.25rem 1.5rem',
+              borderRadius: '16px',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '1.15rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
+                  <MapPin size={18} className="text-primary" /> Leave Requests (Gate Pass)
+                </h3>
+                <button onClick={() => setShowLeaveModal(true)} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem', borderRadius: '8px' }}>Apply Pass</button>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {leaveRequests.map(req => (
-                  <div key={req.id} style={{ padding: '1.25rem', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s cursor-pointer' }} className={`hover:border-${req.status === 'Approved' ? 'emerald' : 'amber'}-500`}>
+                  <div key={req.id} style={{ padding: '0.9rem 1rem', background: 'var(--bg-main, #f8fafc)', borderRadius: '10px', border: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <p style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>{req.type}</p>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>{req.dates}</p>
+                      <p style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>{req.type}</p>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>{req.dates}</p>
                     </div>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 800, padding: '6px 12px', borderRadius: '8px', background: req.status === 'Approved' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: req.status === 'Approved' ? '#10b981' : '#f59e0b' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px', background: req.status === 'Approved' ? '#ecfdf5' : '#fffbeb', color: req.status === 'Approved' ? '#059669' : '#d97706', border: `1px solid ${req.status === 'Approved' ? '#a7f3d0' : '#fde68a'}` }}>
                       {req.status}
                     </span>
                   </div>
@@ -445,75 +599,89 @@ const StudentHostel = () => {
             </div>
 
             {/* Hostel Notices */}
-            <div className="glass-card" style={{ padding: '1.5rem', borderRadius: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h3 style={{ fontSize: '1.3rem', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}><AlertCircle size={22} className="text-warning" /> Hostel Notices</h3>
+            <div style={{
+              background: 'var(--bg-surface, #ffffff)',
+              padding: '1.25rem 1.5rem',
+              borderRadius: '16px',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '1.15rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
+                  <AlertCircle size={18} className="text-warning" /> Hostel Notices
+                </h3>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ padding: '1.25rem', borderLeft: '4px solid #f59e0b', background: 'var(--bg-secondary)', borderRadius: '12px', borderTop: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>
-                  <p style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>Water Supply Maintenance</p>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: '6px 0 0', lineHeight: '1.5' }}>Water supply will be disrupted tomorrow between 10 AM to 2 PM.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ padding: '0.9rem 1rem', borderLeft: '3px solid #f59e0b', background: 'var(--bg-main, #f8fafc)', borderRadius: '8px', borderTop: '1px solid var(--border-color, #e2e8f0)', borderRight: '1px solid var(--border-color, #e2e8f0)', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
+                  <p style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>Water Supply Maintenance</p>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0', lineHeight: '1.4' }}>Water supply will be disrupted tomorrow between 10 AM to 2 PM.</p>
                 </div>
-                <div style={{ padding: '1.25rem', borderLeft: '4px solid #3b82f6', background: 'var(--bg-secondary)', borderRadius: '12px', borderTop: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>
-                  <p style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>Mess Menu Update</p>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: '6px 0 0', lineHeight: '1.5' }}>The mess menu for the upcoming week has been updated. Please check the notice board.</p>
+                <div style={{ padding: '0.9rem 1rem', borderLeft: '3px solid #3b82f6', background: 'var(--bg-main, #f8fafc)', borderRadius: '8px', borderTop: '1px solid var(--border-color, #e2e8f0)', borderRight: '1px solid var(--border-color, #e2e8f0)', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
+                  <p style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>Mess Menu Update</p>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0', lineHeight: '1.4' }}>The mess menu for the upcoming week has been updated. Please check the notice board.</p>
                 </div>
               </div>
             </div>
            </div>
           
           {/* Hostel Night Attendance */}
-          <div className="glass-card" style={{ padding: '1.5rem', borderRadius: '24px', marginTop: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.4rem', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}>
-                <CheckCircle2 size={24} style={{ color: '#10b981' }} /> Night Attendance
+          <div style={{
+            background: 'var(--bg-surface, #ffffff)',
+            padding: '1.25rem 1.5rem',
+            borderRadius: '16px',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <h3 style={{ fontSize: '1.2rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
+                <CheckCircle2 size={20} style={{ color: '#10b981' }} /> Night Attendance
               </h3>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', background: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: '20px', border: '1px solid var(--border-color)' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', background: 'var(--bg-main, #f8fafc)', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--border-color, #e2e8f0)' }}>
                 {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
               </span>
             </div>
             
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', alignItems: 'center' }}>
-              <div style={{ flex: '1', minWidth: '300px' }}>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: '1.5' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center' }}>
+              <div style={{ flex: '1', minWidth: '280px' }}>
+                <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: '1.5', fontSize: '0.85rem' }}>
                   Please mark your daily night attendance before 9:00 PM. The system verifies your location to ensure you are within the hostel premises.
                 </p>
                 
-                <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem' }}>
-                  <div style={{ textAlign: 'center', background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '16px', flex: '1', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>84%</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>This Month</div>
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.5rem' }}>
+                  <div style={{ textAlign: 'center', background: 'var(--bg-main, #f8fafc)', padding: '0.75rem 1rem', borderRadius: '10px', flex: '1', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)' }}>84%</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>This Month</div>
                   </div>
-                  <div style={{ textAlign: 'center', background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '16px', flex: '1', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>21</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Present</div>
+                  <div style={{ textAlign: 'center', background: 'var(--bg-main, #f8fafc)', padding: '0.75rem 1rem', borderRadius: '10px', flex: '1', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#10b981' }}>21</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Present</div>
                   </div>
-                  <div style={{ textAlign: 'center', background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '16px', flex: '1', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ef4444' }}>4</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Absent</div>
+                  <div style={{ textAlign: 'center', background: 'var(--bg-main, #f8fafc)', padding: '0.75rem 1rem', borderRadius: '10px', flex: '1', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ef4444' }}>4</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Absent</div>
                   </div>
                 </div>
               </div>
               
-              <div style={{ flex: '0 0 auto', background: attendanceMarked ? 'rgba(16, 185, 129, 0.05)' : 'var(--bg-secondary)', border: `2px dashed ${attendanceMarked ? '#10b981' : 'var(--border-color)'}`, padding: '2rem', borderRadius: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: '250px' }}>
+              <div style={{ flex: '0 0 auto', background: attendanceMarked ? '#ecfdf5' : 'var(--bg-main, #f8fafc)', border: `1px solid ${attendanceMarked ? '#a7f3d0' : 'var(--border-color, #e2e8f0)'}`, padding: '1.5rem', borderRadius: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: '220px' }}>
                 {attendanceMarked ? (
                   <>
-                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#10b981', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                      <CheckCircle2 size={32} />
+                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#10b981', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
+                      <CheckCircle2 size={26} />
                     </div>
-                    <h4 style={{ margin: 0, fontSize: '1.2rem', color: '#10b981', fontWeight: 800 }}>Checked In</h4>
-                    <p style={{ margin: '8px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>Recorded at {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#059669', fontWeight: 800 }}>Checked In</h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Recorded at {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                   </>
                 ) : (
                   <>
-                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                      <MapPin size={28} />
+                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
+                      <MapPin size={22} />
                     </div>
-                    <h4 style={{ margin: '0 0 1rem', fontSize: '1.1rem', color: 'var(--text-main)', fontWeight: 700 }}>Pending Verification</h4>
+                    <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: 700 }}>Pending Check-in</h4>
                     <button 
                       onClick={handleMarkAttendance}
                       className="btn-primary" 
-                      style={{ padding: '12px 24px', fontSize: '1rem', borderRadius: '12px', width: '100%', display: 'flex', justifyContent: 'center' }}
+                      style={{ padding: '8px 18px', fontSize: '0.85rem', borderRadius: '8px', width: '100%', display: 'flex', justifyContent: 'center' }}
                     >
                       Mark Present
                     </button>
@@ -524,27 +692,35 @@ const StudentHostel = () => {
           </div>
           
           {/* Mess Menu Timetable */}
-          <div className="glass-card" style={{ padding: '1.5rem', borderRadius: '24px', marginTop: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.4rem', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}><Calendar size={24} className="text-primary" /> Weekly Mess Menu</h3>
+          <div style={{
+            background: 'var(--bg-surface, #ffffff)',
+            padding: '1.25rem 1.5rem',
+            borderRadius: '16px',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.2rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
+                <Calendar size={20} className="text-primary" /> Weekly Mess Menu
+              </h3>
             </div>
-            <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+            <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid var(--border-color, #e2e8f0)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
                 <thead>
-                  <tr style={{ background: 'var(--bg-secondary)' }}>
-                    <th style={{ padding: '1.25rem 1rem', borderBottom: '2px solid var(--border-color)', fontWeight: 800, color: 'var(--text-main)', fontSize: '1.05rem' }}>Day</th>
-                    <th style={{ padding: '1.25rem 1rem', borderBottom: '2px solid var(--border-color)', fontWeight: 800, color: 'var(--text-main)', fontSize: '1.05rem' }}>Breakfast</th>
-                    <th style={{ padding: '1.25rem 1rem', borderBottom: '2px solid var(--border-color)', fontWeight: 800, color: 'var(--text-main)', fontSize: '1.05rem' }}>Lunch</th>
-                    <th style={{ padding: '1.25rem 1rem', borderBottom: '2px solid var(--border-color)', fontWeight: 800, color: 'var(--text-main)', fontSize: '1.05rem' }}>Dinner</th>
+                  <tr style={{ background: 'var(--bg-main, #f8fafc)' }}>
+                    <th style={{ padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', fontWeight: 700, color: 'var(--text-main)', fontSize: '0.85rem' }}>Day</th>
+                    <th style={{ padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', fontWeight: 700, color: 'var(--text-main)', fontSize: '0.85rem' }}>Breakfast</th>
+                    <th style={{ padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', fontWeight: 700, color: 'var(--text-main)', fontSize: '0.85rem' }}>Lunch</th>
+                    <th style={{ padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', fontWeight: 700, color: 'var(--text-main)', fontSize: '0.85rem' }}>Dinner</th>
                   </tr>
                 </thead>
                 <tbody>
                   {currentMessMenu.map((item, index) => (
-                    <tr key={index} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td style={{ padding: '1rem', fontWeight: 800, color: 'var(--text-main)' }}>{item.day}</td>
-                      <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>{item.breakfast}</td>
-                      <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>{item.lunch}</td>
-                      <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>{item.dinner}</td>
+                    <tr key={index} style={{ borderBottom: '1px solid var(--border-color, #e2e8f0)', fontSize: '0.85rem' }}>
+                      <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: 'var(--text-main)' }}>{item.day}</td>
+                      <td style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>{item.breakfast}</td>
+                      <td style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>{item.lunch}</td>
+                      <td style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>{item.dinner}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -553,48 +729,55 @@ const StudentHostel = () => {
           </div>
 
           {/* Maintenance Complaints */}
-          <div className="glass-card" style={{ padding: '1.5rem', borderRadius: '24px', marginTop: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.4rem', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}>
-                <MessageSquare size={24} style={{ color: '#ef4444' }} /> Maintenance Complaints
+          <div style={{
+            background: 'var(--bg-surface, #ffffff)',
+            padding: '1.25rem 1.5rem',
+            borderRadius: '16px',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.2rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
+                <MessageSquare size={20} style={{ color: '#ef4444' }} /> Maintenance Complaints
               </h3>
               <button 
                 className="btn-primary" 
-                style={{ padding: '8px 16px', fontSize: '0.9rem', borderRadius: '10px', background: '#ef4444', border: 'none', cursor: 'pointer' }}
+                style={{ padding: '6px 14px', fontSize: '0.82rem', borderRadius: '8px', background: '#dc2626', border: 'none', cursor: 'pointer' }}
                 onClick={() => setShowComplaintModal(true)}
               >
                 Log New Complaint
               </button>
             </div>
             {complaintsList.length === 0 ? (
-              <div style={{ padding: '3rem', textAlign: 'center', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
-                <p style={{ color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>You have no active maintenance complaints.</p>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', margin: '8px 0 0' }}>If you are facing any issues with your room facilities (plumbing, electrical, furniture), click the button above to notify the warden immediately.</p>
+              <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-main, #f8fafc)', borderRadius: '10px', border: '1px dashed var(--border-color, #e2e8f0)' }}>
+                <p style={{ color: 'var(--text-main)', fontSize: '0.95rem', fontWeight: 600, margin: 0 }}>You have no active maintenance complaints.</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: '6px 0 0' }}>If you are facing any issues with your room facilities (plumbing, electrical, furniture), click the button above to notify the warden immediately.</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {complaintsList.map(comp => (
-                  <div key={comp._id || comp.complaintId || comp.id} style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '10px' }}>
+                  <div key={comp._id || comp.complaintId || comp.id} style={{ background: 'var(--bg-main, #f8fafc)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '8px' }}>
                       <div>
-                        <span style={{ fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '4px 10px', borderRadius: '20px', fontWeight: 700 }}>{comp.category}</span>
-                        {comp.priority && <span style={{ marginLeft: '10px', fontSize: '0.75rem', background: comp.priority === 'High' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: comp.priority === 'High' ? '#ef4444' : '#f59e0b', padding: '4px 8px', borderRadius: '12px', fontWeight: 600 }}>{comp.priority} Priority</span>}
-                        <h4 style={{ margin: '10px 0 0', fontSize: '1.1rem', color: 'var(--text-main)', fontWeight: 600 }}>{comp.description}</h4>
-                        <span style={{ display: 'block', marginTop: '6px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: '0.72rem', background: 'rgba(239, 68, 68, 0.1)', color: '#dc2626', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>{comp.category}</span>
+                        {comp.priority && <span style={{ marginLeft: '8px', fontSize: '0.72rem', background: comp.priority === 'High' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: comp.priority === 'High' ? '#dc2626' : '#d97706', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>{comp.priority} Priority</span>}
+                        <h4 style={{ margin: '8px 0 0', fontSize: '0.98rem', color: 'var(--text-main)', fontWeight: 600 }}>{comp.description}</h4>
+                        <span style={{ display: 'block', marginTop: '4px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                           Logged on {new Date(comp.date || comp.createdAt).toLocaleDateString()} • Ticket #{comp.complaintId || comp.id}
                         </span>
                         {comp.resolutionRemarks && (
-                          <div style={{ marginTop: '10px', padding: '10px', background: 'rgba(16, 185, 129, 0.05)', borderLeft: '3px solid #10b981', borderRadius: '4px' }}>
-                            <strong style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>Warden Remarks:</strong>
-                            <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{comp.resolutionRemarks}</p>
+                          <div style={{ marginTop: '8px', padding: '8px', background: '#ecfdf5', borderLeft: '3px solid #10b981', borderRadius: '4px' }}>
+                            <strong style={{ fontSize: '0.78rem', color: '#065f46' }}>Warden Remarks:</strong>
+                            <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#047857' }}>{comp.resolutionRemarks}</p>
                           </div>
                         )}
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <span style={{ 
-                          fontSize: '0.85rem', fontWeight: 700, padding: '6px 12px', borderRadius: '8px',
-                          background: comp.status === 'Resolved' ? 'rgba(16, 185, 129, 0.1)' : (comp.status === 'In Progress' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(245, 158, 11, 0.1)'),
-                          color: comp.status === 'Resolved' ? '#10b981' : (comp.status === 'In Progress' ? '#3b82f6' : '#f59e0b')
+                          fontSize: '0.75rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px',
+                          background: comp.status === 'Resolved' ? '#ecfdf5' : (comp.status === 'In Progress' ? '#eff6ff' : '#fffbeb'),
+                          color: comp.status === 'Resolved' ? '#059669' : (comp.status === 'In Progress' ? '#2563eb' : '#d97706'),
+                          border: `1px solid ${comp.status === 'Resolved' ? '#a7f3d0' : (comp.status === 'In Progress' ? '#bfdbfe' : '#fde68a')}`
                         }}>
                           {comp.status}
                         </span>
@@ -637,62 +820,68 @@ const StudentHostel = () => {
           </div>
 
           {/* My Visitors Section */}
-          <div className="glass-card" style={{ padding: '1.5rem', borderRadius: '24px', marginTop: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.4rem', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}>
-                <Users size={24} style={{ color: '#6366F1' }} /> My Visitors
+          <div style={{
+            background: 'var(--bg-surface, #ffffff)',
+            padding: '1.25rem 1.5rem',
+            borderRadius: '16px',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            marginTop: '1.5rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.2rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
+                <Users size={20} style={{ color: '#6366F1' }} /> My Visitors
               </h3>
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', background: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: '20px', border: '1px solid var(--border-color)' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', background: 'var(--bg-main, #f8fafc)', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--border-color, #e2e8f0)' }}>
                 {myVisitors.length} record{myVisitors.length !== 1 ? 's' : ''}
               </span>
             </div>
 
             {myVisitors.length === 0 ? (
-              <div style={{ padding: '3rem', textAlign: 'center', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
-                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-                  <Users size={28} />
+              <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-main, #f8fafc)', borderRadius: '10px', border: '1px dashed var(--border-color, #e2e8f0)' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem' }}>
+                  <Users size={22} />
                 </div>
-                <p style={{ color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>No visitor records found</p>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: '8px 0 0' }}>When a family member or friend visits you at the hostel, the warden will log their entry here.</p>
+                <p style={{ color: 'var(--text-main)', fontSize: '0.95rem', fontWeight: 600, margin: 0 }}>No visitor records found</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: '6px 0 0' }}>When a family member or friend visits you at the hostel, the warden will log their entry here.</p>
               </div>
             ) : (
-              <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+              <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid var(--border-color, #e2e8f0)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '500px' }}>
                   <thead>
-                    <tr style={{ background: 'var(--bg-secondary)' }}>
-                      <th style={{ padding: '1rem', borderBottom: '2px solid var(--border-color)', fontWeight: 800, color: 'var(--text-main)', fontSize: '0.9rem' }}>Visitor Name</th>
-                      <th style={{ padding: '1rem', borderBottom: '2px solid var(--border-color)', fontWeight: 800, color: 'var(--text-main)', fontSize: '0.9rem' }}>Relation</th>
-                      <th style={{ padding: '1rem', borderBottom: '2px solid var(--border-color)', fontWeight: 800, color: 'var(--text-main)', fontSize: '0.9rem' }}>Date</th>
-                      <th style={{ padding: '1rem', borderBottom: '2px solid var(--border-color)', fontWeight: 800, color: 'var(--text-main)', fontSize: '0.9rem' }}>In Time</th>
-                      <th style={{ padding: '1rem', borderBottom: '2px solid var(--border-color)', fontWeight: 800, color: 'var(--text-main)', fontSize: '0.9rem' }}>Out Time</th>
-                      <th style={{ padding: '1rem', borderBottom: '2px solid var(--border-color)', fontWeight: 800, color: 'var(--text-main)', fontSize: '0.9rem' }}>Status</th>
+                    <tr style={{ background: 'var(--bg-main, #f8fafc)' }}>
+                      <th style={{ padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', fontWeight: 700, color: 'var(--text-main)', fontSize: '0.85rem' }}>Visitor Name</th>
+                      <th style={{ padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', fontWeight: 700, color: 'var(--text-main)', fontSize: '0.85rem' }}>Relation</th>
+                      <th style={{ padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', fontWeight: 700, color: 'var(--text-main)', fontSize: '0.85rem' }}>Date</th>
+                      <th style={{ padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', fontWeight: 700, color: 'var(--text-main)', fontSize: '0.85rem' }}>In Time</th>
+                      <th style={{ padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', fontWeight: 700, color: 'var(--text-main)', fontSize: '0.85rem' }}>Out Time</th>
+                      <th style={{ padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', fontWeight: 700, color: 'var(--text-main)', fontSize: '0.85rem' }}>Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {myVisitors.map((vis, idx) => (
-                      <tr key={vis.id || idx} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                        <td style={{ padding: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{vis.name}</td>
-                        <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>
-                          <span style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1', padding: '3px 10px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600 }}>{vis.relation}</span>
+                      <tr key={vis.id || idx} style={{ borderBottom: '1px solid var(--border-color, #e2e8f0)', fontSize: '0.85rem' }}>
+                        <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: 'var(--text-main)' }}>{vis.name}</td>
+                        <td style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)' }}>
+                          <span style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1', padding: '2px 8px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600 }}>{vis.relation}</span>
                         </td>
-                        <td style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>{vis.date}</td>
-                        <td style={{ padding: '1rem', fontFamily: 'monospace', color: 'var(--text-main)', fontWeight: 600 }}>{vis.inTime}</td>
-                        <td style={{ padding: '1rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{vis.outTime === '--' ? '—' : vis.outTime}</td>
-                        <td style={{ padding: '1rem' }}>
+                        <td style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)', fontWeight: 500 }}>{vis.date}</td>
+                        <td style={{ padding: '0.85rem 1rem', fontFamily: 'monospace', color: 'var(--text-main)', fontWeight: 600 }}>{vis.inTime}</td>
+                        <td style={{ padding: '0.85rem 1rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{vis.outTime === '--' ? '—' : vis.outTime}</td>
+                        <td style={{ padding: '0.85rem 1rem' }}>
                           {vis.outTime === '--' ? (
                             <button 
                               onClick={() => handleCheckOut(vis.id)}
                               style={{
-                                fontSize: '0.8rem', fontWeight: 700, padding: '6px 16px', borderRadius: '8px',
-                                background: '#f59e0b', color: 'white', border: 'none', cursor: 'pointer',
-                                boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.2)'
+                                fontSize: '0.75rem', fontWeight: 700, padding: '4px 12px', borderRadius: '6px',
+                                background: '#d97706', color: 'white', border: 'none', cursor: 'pointer'
                               }}>
                               Check Out
                             </button>
                           ) : (
                             <span style={{
-                              fontSize: '0.8rem', fontWeight: 700, padding: '4px 12px', borderRadius: '20px',
-                              background: 'rgba(16, 185, 129, 0.1)', color: '#10b981'
+                              fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: '6px',
+                              background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0'
                             }}>
                               Checked Out
                             </span>

@@ -567,6 +567,40 @@ const autoSeedIfEmpty = async () => {
         console.log('✅ TransportDrivers seeded successfully.');
       }
 
+      // Incremental patch for Library Books
+      const bookCount = await Book.countDocuments();
+      if (bookCount < 4) {
+        console.log('🌱 Patching database: populating core Library Catalog books...');
+        const initialBooks = [
+          { bookId: 'B001', isbn: '978-0131103627', title: 'The C Programming Language', author: 'Brian W. Kernighan', category: 'Computer Science', department: 'Computer Science', totalCopies: 15, availableCopies: 12, copies: 15, available: 12, rackNumber: 'R01', shelfNumber: 'S01', collegeId: defaultTenantId },
+          { bookId: 'B002', isbn: '978-0201835953', title: 'The Mythical Man-Month', author: 'Frederick P. Brooks Jr.', category: 'Software Engg', department: 'Computer Science', totalCopies: 5, availableCopies: 1, copies: 5, available: 1, rackNumber: 'R01', shelfNumber: 'S02', collegeId: defaultTenantId },
+          { bookId: 'B003', isbn: '978-0262033848', title: 'Introduction to Algorithms', author: 'Thomas H. Cormen', category: 'Computer Science', department: 'Computer Science', totalCopies: 10, availableCopies: 5, copies: 10, available: 5, rackNumber: 'R02', shelfNumber: 'S01', collegeId: defaultTenantId },
+          { bookId: 'B004', isbn: '978-1118531648', title: 'Engineering Mechanics', author: 'J.L. Meriam', category: 'Mechanical', department: 'Mechanical Engg.', totalCopies: 8, availableCopies: 6, copies: 8, available: 6, rackNumber: 'R03', shelfNumber: 'S01', collegeId: defaultTenantId },
+          { bookId: 'B005', isbn: '978-0073380490', title: 'Power System Analysis', author: 'John Grainger', category: 'Electrical', department: 'Electrical & Electronics', totalCopies: 12, availableCopies: 8, copies: 12, available: 8, rackNumber: 'R04', shelfNumber: 'S02', collegeId: defaultTenantId },
+        ];
+
+        for (const bk of initialBooks) {
+          const exists = await Book.findOne({ bookId: bk.bookId });
+          if (!exists) {
+            const saved = await Book.create(bk);
+            for (let i = 1; i <= bk.totalCopies; i++) {
+              await BookCopy.create({
+                bookId: saved._id,
+                copyNumber: i,
+                barcode: `${saved.bookId}-C${String(i).padStart(3, '0')}`,
+                accessionNumber: `ACC-${saved.bookId}-${String(i).padStart(3, '0')}`,
+                status: i <= bk.availableCopies ? 'Available' : 'Issued',
+                condition: 'Good',
+                rackNumber: bk.rackNumber,
+                shelfNumber: bk.shelfNumber,
+                collegeId: defaultTenantId
+              });
+            }
+          }
+        }
+        console.log('✅ Core Library Catalog books populated successfully.');
+      }
+
       return;
     }
     console.log('🌱 Empty database detected – seeding fresh demo data...');

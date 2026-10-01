@@ -290,9 +290,9 @@ const AccountsGuard = ({ children }) => {
 };
 
 const LibrarianGuard = ({ children }) => {
-  const session = sessionStorage.getItem('librarian_session');
+  const session = sessionStorage.getItem('librarian_session') || sessionStorage.getItem('admin_session') || sessionStorage.getItem('superadmin_session');
   if (session) return children;
-  if (hasAnyOtherSession('librarian_session')) return <Navigate to="/unauthorized" replace />;
+  if (hasAnyOtherSession('librarian_session') && !sessionStorage.getItem('admin_session') && !sessionStorage.getItem('superadmin_session')) return <Navigate to="/unauthorized" replace />;
   return <Navigate to="/login" replace />;
 };
 
@@ -636,6 +636,7 @@ function App() {
               <Route path="returned-books" element={<LibrarianDashboard defaultTab="Returned Books" />} />
               <Route path="circulation" element={<LibrarianDashboard defaultTab="Issued Books" />} />
               <Route path="returns" element={<LibrarianDashboard defaultTab="Return Requests" />} />
+              <Route path="clearance" element={<LibrarianDashboard defaultTab="Clearance Requests" />} />
               <Route path="reservations" element={<LibrarianDashboard defaultTab="Reservations" />} />
               <Route path="digital" element={<LibrarianDashboard defaultTab="Digital Library" />} />
               <Route path="members" element={<LibrarianDashboard defaultTab="Student Members" />} />

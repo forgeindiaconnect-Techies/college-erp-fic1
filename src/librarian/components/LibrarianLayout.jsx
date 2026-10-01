@@ -5,7 +5,7 @@ import Navbar from '../../components/layout/Navbar';
 import '../../components/layout/Layout.css';
 
 const LibrarianGuard = ({ children }) => {
-  const session = sessionStorage.getItem('librarian_session') || sessionStorage.getItem('admin_session');
+  const session = sessionStorage.getItem('librarian_session') || sessionStorage.getItem('admin_session') || sessionStorage.getItem('superadmin_session');
   if (session) return children;
   return <Navigate to="/login" replace />;
 };

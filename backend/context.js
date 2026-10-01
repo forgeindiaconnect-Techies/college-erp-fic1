@@ -11,12 +11,22 @@ mongoose.plugin((schema) => {
     'findOneAndUpdate', 'update', 'updateOne', 'updateMany', 'countDocuments'
   ];
 
+  const globalModels = [
+    'College', 'SystemSetting', 'User', 'Subscription', 'Attendance',
+    'Book', 'BookCopy', 'LibraryReservation', 'LibraryTransaction', 'LibraryReturnRequest', 'LibraryFinePayment', 'LibraryClearance'
+  ];
+
   queryMethods.forEach(method => {
     schema.pre(method, function(next) {
+      if (this.getOptions && (this.getOptions().skipTenant || this.getOptions().bypassTenant)) {
+        if (typeof next === 'function') return next();
+        return;
+      }
+
       const store = context.getStore();
       if (store && store.get('collegeId')) {
-        // Exclude models that are intentionally global
-        if (this.model && ['College', 'SystemSetting', 'User', 'Subscription', 'Attendance'].includes(this.model.modelName)) {
+        // Exclude models that are intentionally global or cross-tenant within college
+        if (this.model && globalModels.includes(this.model.modelName)) {
           if (typeof next === 'function') return next();
           return;
         }
@@ -27,7 +37,7 @@ mongoose.plugin((schema) => {
   });
 
   schema.pre('insertMany', function(next, docs) {
-    if (this.modelName && ['College', 'SystemSetting', 'User', 'Subscription', 'Attendance'].includes(this.modelName)) {
+    if (this.modelName && globalModels.includes(this.modelName)) {
       if (typeof next === 'function') return next();
       return;
     }
@@ -49,8 +59,7 @@ mongoose.plugin((schema) => {
   schema.pre('aggregate', function(next) {
     const store = context.getStore();
     if (store && store.get('collegeId')) {
-      // Cannot reliably get modelName in aggregate hook sometimes, but we can check if it's the College collection
-      if (this._model && ['College', 'SystemSetting', 'User', 'Subscription', 'Attendance'].includes(this._model.modelName)) {
+      if (this._model && globalModels.includes(this._model.modelName)) {
         if (typeof next === 'function') return next();
         return;
       }
@@ -60,7 +69,7 @@ mongoose.plugin((schema) => {
   });
 
   schema.pre('save', function(next) {
-    if (this.constructor && ['College', 'SystemSetting', 'User', 'Subscription', 'Attendance'].includes(this.constructor.modelName)) {
+    if (this.constructor && globalModels.includes(this.constructor.modelName)) {
       if (typeof next === 'function') return next();
       return;
     }

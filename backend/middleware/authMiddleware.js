@@ -83,10 +83,11 @@ export const protect = async (req, res, next) => {
 };
 
 export const authorize = (...roles) => {
-  const lowerRoles = roles.map(r => r.toLowerCase());
+  const lowerRoles = roles.map(r => String(r || '').toLowerCase().trim());
   return (req, res, next) => {
-    if (!req.user || !lowerRoles.includes(req.user.role.toLowerCase())) {
-      return res.status(403).json({ message: `User role ${req.user?.role} is not authorized` });
+    const userRole = String(req.user?.role || '').toLowerCase().trim();
+    if (!req.user || (lowerRoles.length > 0 && !lowerRoles.includes(userRole))) {
+      return res.status(403).json({ message: `User role ${req.user?.role || 'Unknown'} is not authorized` });
     }
     next();
   };

@@ -27,25 +27,26 @@ const getUserType = (req) => {
   return req.user.role === 'Staff' ? 'Staff' : 'Student';
 };
 
-const getTenantFilter = (req) => {
-  if (req.user?.role === 'Super Admin') {
-    return {};
-  }
+  const getTenantFilter = (req) => {
+    if (req.user?.role === 'Super Admin') {
+      return {};
+    }
 
-  const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
+    const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
 
-  return {
-    $or: [
-      { collegeId: collegeId },
-      { tenantId: collegeId },
-      { collegeId: 'COL002-8379189' },
-      { collegeId: 'COL001' },
-      { collegeId: 'unassigned_college' },
-      { collegeId: { $exists: false } },
-      { collegeId: null }
-    ]
+    if (!collegeId) {
+      return {};
+    }
+
+    return {
+      $or: [
+        { collegeId: collegeId },
+        { collegeId: { $exists: false } },
+        { collegeId: null }
+      ]
+    };
   };
-};
+
 
 const calculateFine = (dueDate, date = new Date()) => {
   if (!dueDate || date <= dueDate) return 0;
@@ -69,9 +70,11 @@ const updateOverdueStatus = (transaction) => {
   return transaction;
 };
 
+
 router.get(
   '/transactions/:id/fine-receipt',
   protect,
+  authorize('Admin', 'Sub Admin', 'Principal', 'Librarian'),
   collegeScope,
   async (req, res) => {
     try {
@@ -187,24 +190,18 @@ router.get(
 router.get(
   '/fine-payments',
   protect,
+  authorize(
+    'Admin',
+    'Sub Admin',
+    'Principal',
+    'Librarian',
+    'Library'
+  ),
   collegeScope,
   async (req, res) => {
     try {
       const payments = await LibraryFinePayment.find({
-        ...getTenantFilter(req),
-        ...(req.user?.role === 'Student' || req.user?.role === 'Staff'
-          ? {
-              $or: [
-                { userId: getUserId(req) },
-                { userId: req.user?.rollNo },
-                { userId: req.user?.admissionNumber },
-                { userId: req.user?.referenceId },
-                { userId: req.user?.name },
-                { userId: req.user?.id },
-                { userId: String(req.user?._id) }
-              ].filter(f => f.userId)
-            }
-          : {})
+        ...getTenantFilter(req)
       })
         .populate('bookId')
         .populate('transactionId')
@@ -220,6 +217,9 @@ router.get(
     }
   }
 );
+/* =========================================================
+   GET ALL BOOKS
+   ========================================================= */
 
 /* =========================================================
    LIBRARY RESERVATIONS
@@ -228,6 +228,7 @@ router.get(
 router.post(
   '/reservations',
   protect,
+  authorize('Admin', 'Sub Admin', 'Principal', 'Librarian', 'Library', 'Student', 'Staff'),
   collegeScope,
   async (req, res) => {
     try {
@@ -316,6 +317,7 @@ router.post(
 router.get(
   '/reservations',
   protect,
+  authorize('Admin', 'Sub Admin', 'Principal', 'Librarian', 'Library', 'HOD', 'Staff', 'Student'),
   collegeScope,
   async (req, res) => {
     try {
@@ -1574,13 +1576,18 @@ router.get(
 
       let filterDept = department;
 
+      if (
+        req.user.role === 'HOD' ||
+        req.user.role === 'Staff'
+      ) {
+        filterDept = req.user.department;
+      }
+
       const filtered = filterDept
         ? transactions.filter(
-            (transaction) => {
-              const bDept = (transaction.bookId?.department || transaction.bookId?.category || '').toLowerCase();
-              const target = filterDept.toLowerCase();
-              return bDept.includes(target) || target.includes(bDept);
-            }
+            (transaction) =>
+              transaction.bookId?.department ===
+              filterDept
           )
         : transactions;
 
@@ -1888,6 +1895,7 @@ router.post(
 router.put(
   '/transactions/:id/pay-fine',
   protect,
+  authorize('Admin', 'Sub Admin', 'Principal', 'Librarian', 'Library', 'Student', 'Staff', 'HOD', 'Super Admin'),
   collegeScope,
   async (req, res) => {
     try {
@@ -2027,7 +2035,6 @@ router.put(
     }
   }
 );
-
 /* =========================================================
    BOOK COPY MANAGEMENT
    ========================================================= */
@@ -2598,7 +2605,6 @@ router.post(
     }
   }
 );
-
 /* =========================================================
    MY RETURN REQUESTS
    ========================================================= */
@@ -2990,261 +2996,67 @@ router.post(
   collegeScope,
   async (req, res) => {
     try {
-      const collegeId =
-        req.collegeId ||
-        req.user?.tenantId ||
-        req.user?.collegeId;
-
-      if (!collegeId) {
-        return res.status(400).json({
-          message: 'College ID could not be determined'
-        });
-      }
-
-      /*
-       * Find the logged-in student.
-       */
-      let student = await Student.findOne({
+      const student = await Student.findOne({
         $or: [
           { email: req.user?.email },
           { id: req.user?.referenceId },
           { referenceId: req.user?.referenceId },
           { rollNo: req.user?.rollNo },
-          { admissionNumber: req.user?.referenceId },
           { _id: req.user?._id }
-        ].filter(Boolean)
+        ]
       }).lean();
 
-      if (!student) {
-        student = {
-          _id: req.user?._id,
-          id: req.user?.referenceId || req.user?._id,
-          name: req.user?.name || 'Student',
-          admissionNumber: req.user?.referenceId || req.user?.rollNo || 'HAA2026-001',
-          department: req.user?.department || 'General',
-          academicYear: '2026-2027',
-          collegeId: collegeId
-        };
-      }
+      const collegeId =
+        req.collegeId ||
+        req.user?.tenantId ||
+        req.user?.collegeId ||
+        student?.collegeId ||
+        'COL001';
 
-      /*
-       * Build all possible student reference IDs.
-       * LibraryTransaction.userId stores referenceId/string.
-       */
-      const studentIds = [
-        student.id,
-        student.referenceId,
-        student.studentId,
-        student.rollNo,
-        student.admissionNumber,
-        req.user?.referenceId,
-        req.user?.rollNo,
-        req.user?.id
-      ]
-        .filter(Boolean)
-        .map(String);
-
-      const uniqueStudentIds = [
-        ...new Set(studentIds)
-      ];
-
-      /*
-       * 1. Pending / requested books
-       */
-      const pendingBooks =
-        await LibraryTransaction.countDocuments({
-          collegeId,
-          userId: { $in: uniqueStudentIds },
-          status: 'Pending'
-        });
-
-      /*
-       * 2. Currently issued books
-       */
-      const issuedBooks =
-        await LibraryTransaction.countDocuments({
-          collegeId,
-          userId: { $in: uniqueStudentIds },
-          status: 'Issued'
-        });
-
-      /*
-       * 3. Overdue books
-       */
-      const overdueBooks =
-        await LibraryTransaction.countDocuments({
-          collegeId,
-          userId: { $in: uniqueStudentIds },
-          status: 'Overdue'
-        });
-
-      /*
-       * 4. Pending return requests
-       */
-      const pendingReturns =
-        await LibraryReturnRequest.countDocuments({
-          collegeId,
-          userId: { $in: uniqueStudentIds },
-          status: 'Pending'
-        });
-
-      /*
-       * 5. Calculate outstanding fine.
-       *
-       * Outstanding = fineAmount - finePaid
-       */
-      const transactions =
-        await LibraryTransaction.find({
-          collegeId,
-          userId: { $in: uniqueStudentIds }
-        })
-          .select('fineAmount finePaid fineStatus')
-          .lean();
-
-      const outstandingFine = transactions.reduce(
-        (total, transaction) => {
-          const fine =
-            Number(transaction.fineAmount || 0);
-
-          const paid =
-            Number(transaction.finePaid || 0);
-
-          return total + Math.max(fine - paid, 0);
-        },
-        0
-      );
-
-      /*
-       * Clearance is allowed ONLY when
-       * everything is completely clear.
-       */
-      if (
-        pendingBooks > 0 ||
-        issuedBooks > 0 ||
-        overdueBooks > 0 ||
-        pendingReturns > 0 ||
-        outstandingFine > 0
-      ) {
-        const reasons = [];
-
-        if (pendingBooks > 0) {
-          reasons.push(
-            `${pendingBooks} pending book request${pendingBooks > 1 ? 's' : ''}`
-          );
-        }
-
-        if (issuedBooks > 0) {
-          reasons.push(
-            `${issuedBooks} issued book${issuedBooks > 1 ? 's' : ''}`
-          );
-        }
-
-        if (overdueBooks > 0) {
-          reasons.push(
-            `${overdueBooks} overdue book${overdueBooks > 1 ? 's' : ''}`
-          );
-        }
-
-        if (pendingReturns > 0) {
-          reasons.push(
-            `${pendingReturns} pending return request${pendingReturns > 1 ? 's' : ''}`
-          );
-        }
-
-        if (outstandingFine > 0) {
-          reasons.push(
-            `Outstanding fine ₹${outstandingFine}`
-          );
-        }
-
-        return res.status(400).json({
-          message:
-            'Library Clearance cannot be requested.',
-          reason: reasons.join(', '),
-          details: {
-            pendingBooks,
-            issuedBooks,
-            overdueBooks,
-            pendingReturns,
-            outstandingFine
-          }
-        });
-      }
-
-      /*
-       * Prevent duplicate active clearance requests.
-       */
       const admissionNumber =
-        student.admissionNumber ||
-        student.rollNo ||
-        student.referenceId ||
-        student.id;
+        student?.admissionNumber ||
+        student?.rollNo ||
+        student?.referenceId ||
+        req.user?.referenceId ||
+        req.user?.rollNo ||
+        'STU-001';
 
-      const existing =
-        await LibraryClearance.findOne({
-          $or: [
-            ...(student._id ? [{ studentId: student._id }] : []),
-            ...(admissionNumber ? [{ admissionNumber }] : []),
-            { studentName: student.name || req.user?.name }
-          ],
-          status: {
-            $in: ['Pending', 'Approved']
-          }
-        }).sort({ createdAt: -1 });
+      const studentName = student?.name || req.user?.name || 'Student';
+      const department = student?.department || student?.dept || req.user?.department || '';
+      const academicYear = student?.academicYear || student?.batch || '2026-2027';
+
+      const existing = await LibraryClearance.findOne({
+        $or: [
+          ...(student ? [{ studentId: student._id }] : []),
+          { admissionNumber }
+        ],
+        status: { $in: ['Pending', 'Approved'] }
+      });
 
       if (existing) {
         return res.status(200).json({
-          message:
-            `Clearance request is already ${existing.status}`,
+          message: `Clearance request is already ${existing.status}`,
           clearance: existing
         });
       }
 
-      /*
-       * Create clearance request.
-       */
-      const clearance =
-        await LibraryClearance.create({
-          studentId: student._id,
-          admissionNumber,
-          studentName:
-            student.name ||
-            student.fullName ||
-            req.user?.name ||
-            'Student',
-          department:
-            student.department ||
-            student.dept ||
-            '',
-          academicYear:
-            student.academicYear ||
-            student.batch ||
-            '2026-2027',
-          status: 'Pending',
-          collegeId: student.collegeId || collegeId || req.collegeId || req.user?.tenantId || req.user?.collegeId || 'DEFAULT_COLLEGE'
-        });
+      const clearance = await LibraryClearance.create({
+        studentId: student?._id || req.user?._id,
+        admissionNumber,
+        studentName,
+        department,
+        academicYear,
+        status: 'Pending',
+        collegeId
+      });
 
       res.status(201).json({
-        message:
-          'Library clearance request submitted successfully.',
-        clearance,
-        details: {
-          pendingBooks: 0,
-          issuedBooks: 0,
-          overdueBooks: 0,
-          pendingReturns: 0,
-          outstandingFine: 0
-        }
+        message: 'No-dues clearance request submitted successfully',
+        clearance
       });
     } catch (err) {
-      console.error(
-        'POST /library/clearance/request:',
-        err
-      );
-
-      res.status(500).json({
-        message: err.message
-      });
+      console.error('POST /library/clearance/request:', err);
+      res.status(500).json({ message: err.message });
     }
   }
 );
@@ -3256,17 +3068,9 @@ router.get(
   collegeScope,
   async (req, res) => {
     try {
-      const tenantFilter = getTenantFilter(req);
-      let list = await LibraryClearance.find(tenantFilter)
+      const list = await LibraryClearance.find({})
         .populate('studentId')
         .sort({ createdAt: -1 });
-
-      if (!list || list.length === 0) {
-        list = await LibraryClearance.find({})
-          .populate('studentId')
-          .sort({ createdAt: -1 });
-      }
-
       res.json(list);
     } catch (err) {
       console.error('GET /library/clearance:', err);
@@ -3282,13 +3086,7 @@ router.put(
   collegeScope,
   async (req, res) => {
     try {
-      let clearance = await LibraryClearance.findOne({
-        _id: req.params.id,
-        ...getTenantFilter(req)
-      });
-      if (!clearance) {
-        clearance = await LibraryClearance.findById(req.params.id);
-      }
+      const clearance = await LibraryClearance.findById(req.params.id);
       if (!clearance) {
         return res.status(404).json({ message: 'Clearance request not found' });
       }
@@ -3296,22 +3094,8 @@ router.put(
       clearance.status = 'Approved';
       clearance.approvedAt = new Date();
       clearance.approvedBy = req.user?._id;
-      clearance.remarks = req.body?.remarks || 'All library books returned and dues cleared. No-Due Certificate issued.';
+      clearance.remarks = req.body?.remarks || 'All library books returned and dues cleared.';
       await clearance.save();
-
-      try {
-        if (clearance.studentId) {
-          await sendNotification({
-            userId: clearance.studentId,
-            title: 'Library Clearance Approved',
-            message: 'Your library clearance request has been verified and approved by the Librarian. You can now download your digital No-Due certificate.',
-            type: 'LIBRARY_CLEARANCE_APPROVED',
-            link: '/student/library'
-          });
-        }
-      } catch (notifErr) {
-        console.warn('Failed to send clearance notification:', notifErr.message);
-      }
 
       res.json({ message: 'Clearance approved successfully', clearance });
     } catch (err) {
@@ -3321,49 +3105,6 @@ router.put(
   }
 );
 
-router.put(
-  '/clearance/:id/reject',
-  protect,
-  authorize('Admin', 'Sub Admin', 'Super Admin', 'Librarian', 'Library', 'Principal'),
-  collegeScope,
-  async (req, res) => {
-    try {
-      let clearance = await LibraryClearance.findOne({
-        _id: req.params.id,
-        ...getTenantFilter(req)
-      });
-      if (!clearance) {
-        clearance = await LibraryClearance.findById(req.params.id);
-      }
-      if (!clearance) {
-        return res.status(404).json({ message: 'Clearance request not found' });
-      }
-
-      clearance.status = 'Rejected';
-      clearance.remarks = req.body?.remarks || 'Library clearance request rejected after verification.';
-      await clearance.save();
-
-      try {
-        if (clearance.studentId) {
-          await sendNotification({
-            userId: clearance.studentId,
-            title: 'Library Clearance Rejected',
-            message: `Your library clearance request was rejected. Reason: ${clearance.remarks}`,
-            type: 'LIBRARY_CLEARANCE_REJECTED',
-            link: '/student/library'
-          });
-        }
-      } catch (notifErr) {
-        console.warn('Failed to send rejection notification:', notifErr.message);
-      }
-
-      res.json({ message: 'Library clearance rejected successfully', clearance });
-    } catch (err) {
-      console.error('PUT /library/clearance/:id/reject:', err);
-      res.status(500).json({ message: err.message });
-    }
-  }
-);
 
 /*
  * Delete book
@@ -3389,6 +3130,40 @@ router.delete(
       res.json({ message: 'Book and associated records deleted successfully' });
     } catch (err) {
       console.error('DELETE /library/books/:id:', err);
+      res.status(500).json({ message: err.message });
+    }
+  }
+);
+
+/*
+ * Delete transaction
+ */
+router.delete(
+  '/transactions/:id',
+  protect,
+  authorize('Admin', 'Sub Admin', 'HOD', 'Principal', 'Librarian'),
+  collegeScope,
+  async (req, res) => {
+    try {
+      const tx = await LibraryTransaction.findById(req.params.id);
+      if (!tx) {
+        return res.status(404).json({ message: 'Transaction not found' });
+      }
+
+      if (tx.bookCopyId && (tx.status === 'Issued' || tx.status === 'Overdue')) {
+        await BookCopy.findByIdAndUpdate(tx.bookCopyId, { status: 'Available' });
+        if (tx.bookId) {
+          await Book.findByIdAndUpdate(tx.bookId, { $inc: { availableCopies: 1 } });
+        }
+      }
+
+      await LibraryReturnRequest.deleteMany({ transactionId: tx._id });
+      await LibraryFinePayment.deleteMany({ transactionId: tx._id });
+      await LibraryTransaction.findByIdAndDelete(tx._id);
+
+      res.json({ message: 'Transaction record deleted successfully' });
+    } catch (err) {
+      console.error('DELETE /library/transactions/:id:', err);
       res.status(500).json({ message: err.message });
     }
   }
@@ -3449,190 +3224,10 @@ router.post(
   }
 );
 
-
-
-/*
- * Cancel / Delete book request or transaction (Students, Staff, Admins)
- */
-router.delete(
-  '/transactions/:id',
-  protect,
-  collegeScope,
-  async (req, res) => {
-    try {
-      let transaction = await LibraryTransaction.findById(req.params.id);
-
-      if (!transaction) {
-        // Also check if id refers to a reservation
-        const reservation = await LibraryReservation.findById(req.params.id);
-        if (reservation) {
-          await LibraryTransaction.deleteMany({
-            bookId: reservation.bookId,
-            userId: reservation.userId,
-            status: { $in: ['Pending', 'Rejected'] }
-          });
-          await LibraryReservation.findByIdAndDelete(req.params.id);
-          return res.json({ message: 'Request cancelled successfully' });
-        }
-        return res.status(404).json({
-          message: 'Transaction not found'
-        });
-      }
-
-      const isStudent = req.user?.role?.toLowerCase() === 'student';
-      if (isStudent && (transaction.status === 'Issued' || transaction.status === 'Overdue')) {
-        return res.status(400).json({
-          message: 'Active issued or overdue books cannot be cancelled. Please return the book to the library.'
-        });
-      }
-
-      if (transaction.bookCopyId && (transaction.status === 'Issued' || transaction.status === 'Overdue')) {
-        await BookCopy.findByIdAndUpdate(transaction.bookCopyId, { status: 'Available' });
-        if (transaction.bookId) {
-          await Book.findByIdAndUpdate(transaction.bookId, { $inc: { availableCopies: 1 } });
-        }
-      }
-
-      await LibraryReturnRequest.deleteMany({ transactionId: transaction._id });
-      await LibraryFinePayment.deleteMany({ transactionId: transaction._id });
-      await LibraryReservation.deleteMany({
-        bookId: transaction.bookId,
-        userId: transaction.userId,
-        status: { $in: ['Pending', 'Rejected'] }
-      });
-
-      await LibraryTransaction.findByIdAndDelete(req.params.id);
-
-      res.json({
-        message: 'Book request cancelled and removed successfully'
-      });
-    } catch (err) {
-      console.error('DELETE /library/transactions/:id:', err);
-      res.status(500).json({ message: err.message });
-    }
-  }
-);
-
-router.post(
-  '/transactions/:id/cancel',
-  protect,
-  collegeScope,
-  async (req, res) => {
-    try {
-      let transaction = await LibraryTransaction.findById(req.params.id);
-
-      if (!transaction) {
-        const reservation = await LibraryReservation.findById(req.params.id);
-        if (reservation) {
-          await LibraryTransaction.deleteMany({
-            bookId: reservation.bookId,
-            userId: reservation.userId,
-            status: { $in: ['Pending', 'Rejected'] }
-          });
-          await LibraryReservation.findByIdAndDelete(req.params.id);
-          return res.json({ message: 'Request cancelled successfully' });
-        }
-        return res.status(404).json({
-          message: 'Transaction not found'
-        });
-      }
-
-      const isStudent = req.user?.role?.toLowerCase() === 'student';
-      if (isStudent && (transaction.status === 'Issued' || transaction.status === 'Overdue')) {
-        return res.status(400).json({
-          message: 'Active issued or overdue books cannot be cancelled. Please return the book to the library.'
-        });
-      }
-
-      if (transaction.bookCopyId && (transaction.status === 'Issued' || transaction.status === 'Overdue')) {
-        await BookCopy.findByIdAndUpdate(transaction.bookCopyId, { status: 'Available' });
-        if (transaction.bookId) {
-          await Book.findByIdAndUpdate(transaction.bookId, { $inc: { availableCopies: 1 } });
-        }
-      }
-
-      await LibraryReturnRequest.deleteMany({ transactionId: transaction._id });
-      await LibraryFinePayment.deleteMany({ transactionId: transaction._id });
-      await LibraryReservation.deleteMany({
-        bookId: transaction.bookId,
-        userId: transaction.userId,
-        status: { $in: ['Pending', 'Rejected'] }
-      });
-
-      await LibraryTransaction.findByIdAndDelete(req.params.id);
-
-      res.json({
-        message: 'Book request cancelled and removed successfully'
-      });
-    } catch (err) {
-      console.error('POST /library/transactions/:id/cancel:', err);
-      res.status(500).json({ message: err.message });
-    }
-  }
-);
-
-router.delete(
-  '/reservations/:id',
-  protect,
-  collegeScope,
-  async (req, res) => {
-    try {
-      const reservation = await LibraryReservation.findById(req.params.id);
-
-      if (!reservation) {
-        return res.status(404).json({
-          message: 'Reservation not found'
-        });
-      }
-
-      await LibraryTransaction.deleteMany({
-        bookId: reservation.bookId,
-        userId: reservation.userId,
-        status: { $in: ['Pending', 'Rejected'] }
-      });
-
-      await LibraryReservation.findByIdAndDelete(req.params.id);
-
-      res.json({
-        message: 'Reservation cancelled successfully'
-      });
-    } catch (err) {
-      console.error('DELETE /library/reservations/:id:', err);
-      res.status(500).json({ message: err.message });
-    }
-  }
-);
-
-router.post(
-  '/reservations/:id/cancel',
-  protect,
-  collegeScope,
-  async (req, res) => {
-    try {
-      const reservation = await LibraryReservation.findById(req.params.id);
-
-      if (!reservation) {
-        return res.status(404).json({
-          message: 'Reservation not found'
-        });
-      }
-
-      await LibraryTransaction.deleteMany({
-        bookId: reservation.bookId,
-        userId: reservation.userId,
-        status: { $in: ['Pending', 'Rejected'] }
-      });
-
-      await LibraryReservation.findByIdAndDelete(req.params.id);
-
-      res.json({
-        message: 'Reservation cancelled successfully'
-      });
-    } catch (err) {
-      console.error('POST /library/reservations/:id/cancel:', err);
-      res.status(500).json({ message: err.message });
-    }
-  }
-);
-
 export default router;
+
+
+
+
+
+

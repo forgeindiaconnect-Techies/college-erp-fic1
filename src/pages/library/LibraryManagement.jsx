@@ -5,7 +5,7 @@ import {
   AlertCircle, X, Eye, FileText, Download, QrCode, 
   LayoutDashboard, Clock, ArrowRightLeft, Bell, TrendingUp,
   Layers, Plus, Trash2, Edit3, CheckCircle2, Tag, BookMarked,
-  BookmarkCheck, Bookmark, Hash, ShieldAlert, Users, IndianRupee,
+  BookmarkCheck, Bookmark, Hash, ShieldAlert, ShieldCheck, Users, IndianRupee,
   BarChart3, RefreshCw, ChevronRight, UserCheck, AlertTriangle,
   FileCheck2, Check, BookPlus, Sparkles, Building, Calendar,
   GraduationCap, Printer, Receipt, CreditCard, User, XCircle
@@ -39,7 +39,10 @@ import {
   rejectLibraryReturnRequest,
   deleteLibraryBook,
   deleteLibraryTransaction,
-  clearLibraryDummyData
+  clearLibraryDummyData,
+  getLibraryClearanceRequests,
+  approveLibraryClearance,
+  rejectLibraryClearance
 } from '../../api/index';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -65,10 +68,11 @@ const TABS = [
   'Book Inventory', 
   'Issued Books',
   'Returned Books',
-    'Return Requests',
+  'Return Requests',
+  'Clearance Requests',
   'Reservations', 
   'Student Members', 
-  'Fines & Analytics', 
+  'Reports & Analytics', 
   'Digital Library'
 ];
 
@@ -76,12 +80,13 @@ const normalizeTab = (tab) => {
   if (!tab) return 'Dashboard';
   const t = tab.toLowerCase();
   if (t.includes('returned') || t.includes('return history') || t.includes('returns-history') || t.includes('returned-books')) return 'Returned Books';
-  if (t === 'returns' || t.includes('return request') || t.includes('requests')) return 'Return Requests';
+  if (t === 'returns' || t === 'return' || t.includes('return request')) return 'Return Requests';
+  if (t.includes('clearance') || t.includes('no-due') || t.includes('no due')) return 'Clearance Requests';
   if (t.includes('inventory') || t.includes('catalog') || t === 'books' || t.includes('book inventory')) return 'Book Inventory';
   if (t.includes('issue') || t.includes('circulation')) return 'Issued Books';
   if (t.includes('reserv')) return 'Reservations';
   if (t.includes('member') || t.includes('student')) return 'Student Members';
-  if (t.includes('fine') || t.includes('report') || t.includes('analytic')) return 'Fines & Analytics';
+  if (t.includes('fine') || t.includes('report') || t.includes('analytic')) return 'Reports & Analytics';
   if (t.includes('digit')) return 'Digital Library';
   return 'Dashboard';
 };
@@ -93,10 +98,16 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
   const [deptFilter, setDeptFilter] = useState('All Departments');
   const [statusFilter, setStatusFilter] = useState('All');
   const [issuedSubFilter, setIssuedSubFilter] = useState('All');
+  const [issuedSearch, setIssuedSearch] = useState('');
   const [returnSearch, setReturnSearch] = useState('');
   const [returnStatusSubFilter, setReturnStatusSubFilter] = useState('All');
   const [reservationSearch, setReservationSearch] = useState('');
   const [reservationStatusFilter, setReservationStatusFilter] = useState('All');
+  const [clearanceRequests, setClearanceRequests] = useState([]);
+  const [clearanceLoading, setClearanceLoading] = useState(false);
+  const [clearanceActionId, setClearanceActionId] = useState(null);
+  const [clearanceSearch, setClearanceSearch] = useState('');
+  const [clearanceStatusFilter, setClearanceStatusFilter] = useState('All');
 
   // Real-time Academic Structure State
   const [departmentsList, setDepartmentsList] = useState([]);
@@ -105,6 +116,10 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
   // Member search state
   const [memberSearch, setMemberSearch] = useState('');
   const [selectedMemberForDetails, setSelectedMemberForDetails] = useState(null);
+  const [activeReportSubTab, setActiveReportSubTab] = useState('fines');
+  const [reportSearch, setReportSearch] = useState('');
+  const [reportDeptFilter, setReportDeptFilter] = useState('All Departments');
+  const [reportStatusFilter, setReportStatusFilter] = useState('All');
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -116,9 +131,11 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
     'Returned Books': '/librarian/returned-books',
     'Issue & Returns': '/librarian/circulation',
     'Return Requests': '/librarian/returns',
+    'Clearance Requests': '/librarian/clearance',
     'Reservations': '/librarian/reservations',
     'Digital Library': '/librarian/digital',
     'Student Members': '/librarian/members',
+    'Reports & Analytics': '/librarian/reports',
     'Fines & Analytics': '/librarian/reports'
   };
 
@@ -229,6 +246,12 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
     fetchLibraryData();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'Clearance Requests') {
+      fetchLibraryData();
+    }
+  }, [activeTab]);
+
   const fetchLibraryData = async () => {
     try {
       setLoading(true);
@@ -239,6 +262,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
       let cData = [];
       let rData = [];
       let rrData = [];
+      let clData = [];
 
       try {
         const booksRes = await getLibraryBooks();
@@ -295,6 +319,16 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
         console.warn('getLibraryReturnRequests fallback', e);
       }
       try {
+        const clearanceRes = await getLibraryClearanceRequests();
+        clData = Array.isArray(clearanceRes.data)
+          ? clearanceRes.data
+          : (Array.isArray(clearanceRes.data?.clearances)
+              ? clearanceRes.data.clearances
+              : []);
+      } catch (e) {
+        console.warn('getLibraryClearanceRequests fallback', e);
+      }
+      try {
         const deptsRes = await getDepartments();
         dData = Array.isArray(deptsRes.data) ? deptsRes.data : [];
       } catch (e) {
@@ -312,6 +346,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
       setIssues(tData);
       setReservations(rData);
       setReturnRequests(rrData);
+      setClearanceRequests(clData);
 
       try {
         const paymentRes = await getLibraryFinePayments();
@@ -363,6 +398,42 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
     const deptId = selectedDeptObj.id || selectedDeptObj._id;
     const filtered = coursesList.filter(c => c.departmentId === deptId || c.department === deptName || c.department === selectedDeptObj.name);
     return filtered.length > 0 ? filtered : coursesList;
+  };
+
+  const handleApproveClearance = async (id) => {
+    try {
+      setClearanceActionId(id);
+      await approveLibraryClearance(
+        id,
+        'Library dues verified and clearance approved.'
+      );
+      alert('Library clearance approved successfully.');
+      await fetchLibraryData();
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Failed to approve clearance.');
+    } finally {
+      setClearanceActionId(null);
+    }
+  };
+
+  const handleRejectClearance = async (id) => {
+    const remarks = window.prompt(
+      'Enter rejection reason:',
+      'Library dues/return verification is pending.'
+    );
+
+    if (remarks === null) return;
+
+    try {
+      setClearanceActionId(id);
+      await rejectLibraryClearance(id, remarks);
+      alert('Library clearance rejected.');
+      await fetchLibraryData();
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Failed to reject clearance.');
+    } finally {
+      setClearanceActionId(null);
+    }
   };
 
   const handleApproveReturnRequest = async (id) => {
@@ -567,6 +638,8 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
       }));
     }
   };
+
+
 
 
 
@@ -1013,6 +1086,176 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
   const totalDigitalDownloads = digitalList.reduce((acc, curr) => acc + (Number(curr.downloads) || 0), 0);
   const totalDigitalDepts = new Set(digitalList.map(d => d.dept)).size;
 
+  // Date comparison helper for today's transactions
+  const isSameDay = (date1, date2 = new Date()) => {
+    if (!date1) return false;
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    return !isNaN(d1.getTime()) && !isNaN(d2.getTime()) &&
+      d1.getFullYear() === d2.getFullYear() &&
+      d1.getMonth() === d2.getMonth() &&
+      d1.getDate() === d2.getDate();
+  };
+
+  const totalIssuedTodayCount = issues.filter(i => isSameDay(i.issueDate) || isSameDay(i.createdAt)).length;
+  const totalReturnedTodayCount = issues.filter(i => i.status === 'Returned' && (isSameDay(i.returnDate) || isSameDay(i.returnedAt) || isSameDay(i.updatedAt))).length;
+
+  // Real Filtered Datasets for Reports & Analytics
+  const filteredCirculationReport = issues.filter(issue => {
+    const q = reportSearch.toLowerCase();
+    const matchesSearch = !reportSearch ||
+      (issue._id || '').toLowerCase().includes(q) ||
+      (issue.userId || '').toLowerCase().includes(q) ||
+      (issue.bookId?.title || '').toLowerCase().includes(q) ||
+      (issue.bookId?.bookId || '').toLowerCase().includes(q) ||
+      (issue.bookId?.isbn || '').toLowerCase().includes(q);
+    const matchesDept = reportDeptFilter === 'All Departments' || issue.bookId?.department === reportDeptFilter;
+    const matchesStatus = reportStatusFilter === 'All' || issue.status === reportStatusFilter;
+    return matchesSearch && matchesDept && matchesStatus;
+  });
+
+  const filteredIssuedTodayReport = issues.filter(issue => {
+    const isIssuedToday = isSameDay(issue.issueDate) || isSameDay(issue.createdAt);
+    if (!isIssuedToday) return false;
+    const q = reportSearch.toLowerCase();
+    const matchesSearch = !reportSearch ||
+      (issue._id || '').toLowerCase().includes(q) ||
+      (issue.userId || '').toLowerCase().includes(q) ||
+      (issue.bookId?.title || '').toLowerCase().includes(q) ||
+      (issue.bookId?.bookId || '').toLowerCase().includes(q);
+    const matchesDept = reportDeptFilter === 'All Departments' || issue.bookId?.department === reportDeptFilter;
+    return matchesSearch && matchesDept;
+  });
+
+  const filteredReturnedTodayReport = issues.filter(issue => {
+    const isReturned = issue.status === 'Returned';
+    const isReturnedToday = isReturned && (isSameDay(issue.returnDate) || isSameDay(issue.returnedAt) || isSameDay(issue.updatedAt));
+    if (!isReturnedToday) return false;
+    const q = reportSearch.toLowerCase();
+    const matchesSearch = !reportSearch ||
+      (issue._id || '').toLowerCase().includes(q) ||
+      (issue.userId || '').toLowerCase().includes(q) ||
+      (issue.bookId?.title || '').toLowerCase().includes(q);
+    const matchesDept = reportDeptFilter === 'All Departments' || issue.bookId?.department === reportDeptFilter;
+    return matchesSearch && matchesDept;
+  });
+
+  const filteredFineReport = issues.filter(issue => {
+    const fine = Number(issue.fineAmount || 0);
+    const paid = Number(issue.finePaid || 0);
+    const isFineRecord = fine > 0;
+    if (!isFineRecord) return false;
+    const q = reportSearch.toLowerCase();
+    const matchesSearch = !reportSearch ||
+      (issue.userId || '').toLowerCase().includes(q) ||
+      (issue.bookId?.title || '').toLowerCase().includes(q);
+    const matchesDept = reportDeptFilter === 'All Departments' || issue.bookId?.department === reportDeptFilter;
+    const isPaid = paid >= fine;
+    const matchesStatus = reportStatusFilter === 'All' ||
+      (reportStatusFilter === 'Paid' && isPaid) ||
+      (reportStatusFilter === 'Pending' && !isPaid);
+    return matchesSearch && matchesDept && matchesStatus;
+  });
+
+  const filteredDefaultersReport = issues.filter(issue => {
+    const isOverdue = issue.status === 'Overdue';
+    const hasUnpaidFine = Number(issue.fineAmount || 0) > Number(issue.finePaid || 0);
+    if (!isOverdue && !hasUnpaidFine) return false;
+    const q = reportSearch.toLowerCase();
+    const matchesSearch = !reportSearch ||
+      (issue.userId || '').toLowerCase().includes(q) ||
+      (issue.bookId?.title || '').toLowerCase().includes(q);
+    const matchesDept = reportDeptFilter === 'All Departments' || issue.bookId?.department === reportDeptFilter;
+    return matchesSearch && matchesDept;
+  });
+
+  const filteredInventoryReport = books.filter(book => {
+    const q = reportSearch.toLowerCase();
+    const matchesSearch = !reportSearch ||
+      (book.title || '').toLowerCase().includes(q) ||
+      (book.author || '').toLowerCase().includes(q) ||
+      (book.isbn || '').toLowerCase().includes(q) ||
+      (book.bookId || '').toLowerCase().includes(q);
+    const matchesDept = reportDeptFilter === 'All Departments' || book.department === reportDeptFilter;
+    return matchesSearch && matchesDept;
+  });
+
+  // Dynamic Department Analytics derived from live books and circulation
+  const allReportDepts = Array.from(new Set([
+    ...realDeptNames,
+    ...books.map(b => b.department).filter(Boolean),
+    ...issues.map(i => i.bookId?.department).filter(Boolean)
+  ]));
+
+  const deptAnalyticsList = allReportDepts.map(dept => {
+    const deptBooks = books.filter(b => b.department === dept);
+    const deptIssues = issues.filter(i => i.bookId?.department === dept);
+    const activeLoans = deptIssues.filter(i => i.status === 'Issued').length;
+    const overdueCount = deptIssues.filter(i => i.status === 'Overdue').length;
+    const totalFines = deptIssues.reduce((sum, i) => sum + Number(i.fineAmount || 0), 0);
+    const totalCopiesInDept = deptBooks.reduce((sum, b) => sum + (Number(b.totalCopies) || 1), 0);
+
+    return {
+      dept,
+      catalogedTitles: deptBooks.length,
+      catalogedCopies: totalCopiesInDept,
+      totalIssues: deptIssues.length,
+      activeLoans,
+      overdueCount,
+      totalFines,
+      utilizationRate: totalCopiesInDept > 0 ? Math.min(100, Math.round((activeLoans / totalCopiesInDept) * 100)) : 0
+    };
+  }).filter(d => {
+    if (reportDeptFilter !== 'All Departments' && d.dept !== reportDeptFilter) return false;
+    if (reportSearch) {
+      return d.dept.toLowerCase().includes(reportSearch.toLowerCase());
+    }
+    return true;
+  });
+
+  const handleExportReportCSV = () => {
+    let csvContent = '';
+    let filename = '';
+
+    if (activeReportSubTab === 'issuedToday') {
+      filename = `Library_Issued_Today_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+      csvContent = 'Transaction ID,Borrower ID,Borrower Type,Book Title,Issue Date,Due Date,Status\n' +
+        filteredIssuedTodayReport.map(i => `"${i._id}","${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}","${i.issueDate ? new Date(i.issueDate).toLocaleDateString() : ''}","${i.dueDate ? new Date(i.dueDate).toLocaleDateString() : ''}","${i.status}"`).join('\n');
+    } else if (activeReportSubTab === 'returnedToday') {
+      filename = `Library_Returned_Today_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+      csvContent = 'Transaction ID,Borrower ID,Borrower Type,Book Title,Issue Date,Return Date,Fine Paid\n' +
+        filteredReturnedTodayReport.map(i => `"${i._id}","${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}","${i.issueDate ? new Date(i.issueDate).toLocaleDateString() : ''}","${i.returnDate ? new Date(i.returnDate).toLocaleDateString() : ''}","${i.finePaid || 0}"`).join('\n');
+    } else if (activeReportSubTab === 'fines') {
+      filename = `Library_Fine_Ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+      csvContent = 'Borrower ID,User Type,Book Title,Total Fine,Fine Paid,Balance Due,Status\n' +
+        filteredFineReport.map(i => `"${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}","${i.fineAmount || 0}","${i.finePaid || 0}","${Math.max(0, Number(i.fineAmount || 0) - Number(i.finePaid || 0))}","${Number(i.finePaid || 0) >= Number(i.fineAmount || 0) ? 'Paid' : 'Pending'}"`).join('\n');
+    } else if (activeReportSubTab === 'departments') {
+      filename = `Library_Department_Utilization_${new Date().toISOString().slice(0, 10)}.csv`;
+      csvContent = 'Department,Cataloged Titles,Total Copies,Total Issues,Active Loans,Overdue Count,Total Fines Incurred,Utilization %\n' +
+        deptAnalyticsList.map(d => `"${d.dept}","${d.catalogedTitles}","${d.catalogedCopies}","${d.totalIssues}","${d.activeLoans}","${d.overdueCount}","${d.totalFines}","${d.utilizationRate}%"`).join('\n');
+    } else if (activeReportSubTab === 'defaulters') {
+      filename = `Library_Overdue_Defaulters_${new Date().toISOString().slice(0, 10)}.csv`;
+      csvContent = 'Borrower ID,User Type,Book Title,Due Date,Days Overdue,Outstanding Fine\n' +
+        filteredDefaultersReport.map(i => `"${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}","${i.dueDate ? new Date(i.dueDate).toLocaleDateString() : ''}","${Math.max(0, Math.ceil((Date.now() - new Date(i.dueDate).getTime()) / (1000 * 60 * 60 * 24)))}","${Math.max(0, Number(i.fineAmount || 0) - Number(i.finePaid || 0))}"`).join('\n');
+    } else if (activeReportSubTab === 'circulation') {
+      filename = `Library_Circulation_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+      csvContent = 'Transaction ID,Borrower ID,Borrower Type,Book Title,Issue Date,Due Date,Return Date,Status,Fine Amount,Fine Paid\n' +
+        filteredCirculationReport.map(i => `"${i._id}","${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}","${i.issueDate ? new Date(i.issueDate).toLocaleDateString() : ''}","${i.dueDate ? new Date(i.dueDate).toLocaleDateString() : ''}","${i.returnDate ? new Date(i.returnDate).toLocaleDateString() : 'N/A'}","${i.status}","${i.fineAmount || 0}","${i.finePaid || 0}"`).join('\n');
+    } else {
+      filename = `Library_Inventory_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+      csvContent = 'Book ID,ISBN,Title,Author,Department,Category,Total Copies,Rack,Shelf\n' +
+        filteredInventoryReport.map(b => `"${b.bookId || ''}","${b.isbn || ''}","${(b.title || '').replace(/"/g, '""')}","${(b.author || '').replace(/"/g, '""')}","${b.department || ''}","${b.category || ''}","${b.totalCopies || 1}","${b.rackNumber || ''}","${b.shelfNumber || ''}"`).join('\n');
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (isInitialLoading && books.length === 0 && issues.length === 0) {
     return (
       <div className="p-12 text-center text-muted animate-fade-in flex flex-col items-center justify-center gap-3">
@@ -1034,19 +1277,20 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
               {activeTab === 'Issued Books' && <BookDown className="text-primary" size={22} />}
               {activeTab === 'Returned Books' && <CheckCircle2 className="text-primary" size={22} />}
               {activeTab === 'Issue & Returns' && <ArrowRightLeft className="text-primary" size={22} />}
+              {activeTab === 'Clearance Requests' && <ShieldCheck className="text-primary" size={22} />}
               {activeTab === 'Reservations' && <BookmarkCheck className="text-primary" size={22} />}
               {activeTab === 'Student Members' && <Users className="text-primary" size={22} />}
-              {activeTab === 'Fines & Analytics' && <BarChart3 className="text-primary" size={22} />}
+              {(activeTab === 'Reports & Analytics' || activeTab === 'Fines & Analytics') && <BarChart3 className="text-primary" size={22} />}
               {activeTab === 'Digital Library' && <FileText className="text-primary" size={22} />}
-              {activeTab === 'Dashboard' ? 'Library Dashboard' : activeTab}
+              {activeTab === 'Dashboard' ? 'Library Dashboard' : (activeTab === 'Fines & Analytics' || activeTab === 'Reports & Analytics' ? 'Reports & Analytics' : activeTab)}
             </h1>
             <div className="erp-live-sync-pill">
               <span className="erp-live-pulse-dot"></span>
               <span>Live ERP Catalog Synced</span>
             </div>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '9999px', background: 'rgba(79, 70, 229, 0.1)', color: '#4F46E5', border: '1px solid rgba(79, 70, 229, 0.2)' }}>
+            {false && <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '9999px', background: 'rgba(79, 70, 229, 0.1)', color: '#4F46E5', border: '1px solid rgba(79, 70, 229, 0.2)' }}>
               {activeTab}
-            </span>
+            </span>}
           </div>
           <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>
             {activeTab === 'Dashboard' && 'Comprehensive overview of catalog inventory, circulation desk operations, active borrower trends, and overdue fine metrics.'}
@@ -1054,9 +1298,10 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
             {activeTab === 'Issued Books' && 'Active circulation counter, student & staff loan tracking, due date monitoring, and return processing.'}
             {activeTab === 'Returned Books' && 'Historical audit log of completed book returns, settlement status, condition ratings, and fine receipts.'}
             {activeTab === 'Issue & Returns' && 'Circulation counter for manual or barcode issuance, return processing, and overdue tracking.'}
+            {activeTab === 'Clearance Requests' && 'Review student library clearance and no-due certificate requests.'}
             {activeTab === 'Reservations' && 'Student online book requests, approval workflow, and 24-hour reservation hold allocations.'}
             {activeTab === 'Student Members' && 'Directory of registered student library accounts and individual loan histories.'}
-            {activeTab === 'Fines & Analytics' && 'Fine assessment, payment collection receipts, and department circulation analytics.'}
+            {(activeTab === 'Reports & Analytics' || activeTab === 'Fines & Analytics') && 'Comprehensive institutional library reports, circulation audits, fine collection ledgers, department-wise utilization, and inventory analytics.'}
             {activeTab === 'Digital Library' && 'Digital e-books, lecture PDFs, and previous question paper repository.'}
           </p>
         </div>
@@ -1119,6 +1364,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                 {tab === 'Issued Books' && <BookDown size={16} />}
                 {tab === 'Returned Books' && <CheckCircle2 size={16} />}
                 {tab === 'Return Requests' && <Clock size={16} />}
+                {tab === 'Clearance Requests' && <ShieldCheck size={16} />}
                 {tab === 'Issue & Returns' && <ArrowRightLeft size={16} />}
                 {tab === 'Reservations' && <BookmarkCheck size={16} />}
                 {tab === 'Student Members' && <Users size={16} />}
@@ -1450,6 +1696,23 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                     </div>
                     <ChevronRight size={14} className="text-muted group-hover:text-amber-600 shrink-0" />
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('Reports & Analytics')}
+                    className="lib-shortcut-btn group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0">
+                        <BarChart3 size={16} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[var(--text-main)] group-hover:text-primary">Reports & Analytics</div>
+                        <div className="text-[10px] text-muted">Circulation audit & fine revenue ledger</div>
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className="text-muted group-hover:text-primary shrink-0" />
+                  </button>
                 </div>
               </div>
 
@@ -1529,7 +1792,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                 setShowAddModal(true);
               }}
             >
-              <Plus size={16} /> + Add Book
+              <Plus size={16} /> Add Book
             </button>
           </div>
 
@@ -1826,7 +2089,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                       className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3"
                     >
                       <h4 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-primary">
-                        <Plus size={16} /> + Add Copy
+                        <Plus size={16} /> Add Copy
                       </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5">
                         <div className="col-span-2">
@@ -2070,18 +2333,19 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
               </h2>
               <p className="text-xs text-muted">Issue books, approve returns, track condition, and settle overdue fines.</p>
             </div>
-            <div className="flex items-center gap-2">
+            {false && <div className="flex items-center gap-2">
               <button 
                 className="btn-primary shadow-glow flex items-center gap-1.5 text-sm py-2 px-4"
                 onClick={() => handleOpenIssueModal()}
               >
                 <BookDown size={16} /> Issue Book
               </button>
-            </div>
+            </div>}
           </div>
 
           {/* Active Status Sub-Filters */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <div className="lib-circulation-toolbar">
+            <div className="lib-filter-pill-container">
             {[
               { key: 'All', label: 'All Circulations', count: issues.filter(i => ['Pending', 'Issued', 'Overdue'].includes(i.status)).length },
               { key: 'Pending', label: 'Pending Requests', count: issues.filter(i => i.status === 'Pending').length, alert: true },
@@ -2092,26 +2356,52 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                 key={f.key}
                 type="button"
                 onClick={() => setIssuedSubFilter(f.key)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all border ${
-                  issuedSubFilter === f.key
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750'
-                }`}
+                className={`lib-filter-pill ${issuedSubFilter === f.key ? 'active' : ''}`}
+
+
+
+
               >
+                {f.alert && f.count > 0 && issuedSubFilter !== f.key && (
+                  <span className="lib-pulse-indicator" />
+                )}
                 <span>{f.label}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                  issuedSubFilter === f.key
-                    ? 'bg-white/20 text-white'
-                    : f.alert && f.count > 0
-                    ? 'bg-amber-500 text-white animate-pulse'
-                    : f.danger && f.count > 0
-                    ? 'bg-rose-500 text-white'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                }`}>
+                <span className={`lib-filter-badge ${f.danger && f.count > 0 ? 'badge-rose' : f.alert && f.count > 0 ? 'badge-amber' : f.key === 'Issued' ? 'badge-blue' : 'badge-neutral'}`}>
                   {f.count}
                 </span>
+
+
+
+
+
+
+
+
+
+
               </button>
             ))}
+            </div>
+
+            <div className="search-box" style={{ maxWidth: '340px', width: '100%' }}>
+              <Search size={15} className="text-muted" />
+              <input
+                type="text"
+                placeholder="Search borrower, book, copy barcode, rack..."
+                value={issuedSearch}
+                onChange={e => setIssuedSearch(e.target.value)}
+              />
+              {issuedSearch && (
+                <button 
+                  type="button" 
+                  onClick={() => setIssuedSearch('')} 
+                  className="text-xs text-muted hover:text-rose-500 font-bold px-1"
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="table-wrapper">
@@ -2130,7 +2420,56 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {issues.filter(i => ['Pending', 'Issued', 'Overdue'].includes(i.status)).filter(i => issuedSubFilter === 'All' ? true : i.status === issuedSubFilter).map(issue => (
+                  {(() => {
+                    const filteredIssues = issues
+                      .filter(i => ['Pending', 'Issued', 'Overdue'].includes(i.status))
+                      .filter(i => issuedSubFilter === 'All' ? true : i.status === issuedSubFilter)
+                      .filter(issue => {
+                        if (!issuedSearch.trim()) return true;
+                        const q = issuedSearch.toLowerCase().trim();
+                        const student = students.find(s => s.id === issue.userId || s.referenceId === issue.userId);
+                        const studentName = (student?.name || '').toLowerCase();
+                        const userId = (issue.userId || '').toLowerCase();
+                        const bookTitle = (issue.bookId?.title || '').toLowerCase();
+                        const bookId = (issue.bookId?.bookId || '').toLowerCase();
+                        const accessionNo = (issue.bookCopyId?.accessionNumber || '').toLowerCase();
+                        const barcode = (issue.bookCopyId?.barcode || '').toLowerCase();
+                        const rack = (issue.bookCopyId?.rackNumber || '').toLowerCase();
+                        const issueId = (issue._id || '').toLowerCase();
+                        return studentName.includes(q) || userId.includes(q) || bookTitle.includes(q) || bookId.includes(q) || accessionNo.includes(q) || barcode.includes(q) || rack.includes(q) || issueId.includes(q);
+                      });
+
+                    if (filteredIssues.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="8" className="text-center p-8 text-muted">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <AlertCircle size={28} className="text-muted opacity-60" />
+                              <p className="font-semibold text-sm">
+                                {issuedSearch 
+                                  ? `No circulations found matching "${issuedSearch}".` 
+                                  : issuedSubFilter === 'Pending' 
+                                  ? 'No pending book issue requests from students.' 
+                                  : issuedSubFilter === 'Overdue' 
+                                  ? 'Great job! There are no overdue books at this time.' 
+                                  : 'No active books currently issued.'}
+                              </p>
+                              {issuedSearch && (
+                                <button
+                                  type="button"
+                                  onClick={() => setIssuedSearch('')}
+                                  className="btn-secondary text-xs py-1 px-3 mt-1"
+                                >
+                                  Clear Search Filter
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filteredIssues.map(issue => (
                     <tr key={issue._id} className={issue.status === 'Overdue' ? 'bg-red-50 dark:bg-red-900/10' : ''}>
                       <td className="font-mono text-sm font-bold text-primary">{issue._id.substring(issue._id.length - 6)}</td>
                       <td>
@@ -2224,14 +2563,16 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                         )}
                       </td>
                     </tr>
-                  ))}
-                  {issues.filter(i => ['Pending', 'Issued', 'Overdue'].includes(i.status)).filter(i => issuedSubFilter === 'All' ? true : i.status === issuedSubFilter).length === 0 && (
-                    <tr>
-                      <td colSpan="8" className="text-center p-8 text-muted">
-                        {issuedSubFilter === 'Pending' ? 'No pending book issue requests from students.' : issuedSubFilter === 'Overdue' ? 'No overdue books found.' : 'No active books currently issued.'}
-                      </td>
-                    </tr>
-                  )}
+                  ));
+
+                })()}
+
+
+
+
+
+
+
                 </tbody>
               </table>
             </div>
@@ -2438,22 +2779,22 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                   key={f.key}
                   type="button"
                   onClick={() => setReturnStatusSubFilter(f.key)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all border whitespace-nowrap ${
-                    returnStatusSubFilter === f.key
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750'
-                  }`}
+                  className={`lib-filter-pill ${returnStatusSubFilter === f.key ? 'active' : ''}`}
+
+
+
+
                 >
                   <span>{f.label}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                    returnStatusSubFilter === f.key
-                      ? 'bg-white/20 text-white'
-                      : f.alert && f.count > 0
-                      ? 'bg-amber-500 text-white animate-pulse'
-                      : f.danger && f.count > 0
-                      ? 'bg-rose-500 text-white'
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                  }`}>
+                  <span className={`lib-filter-badge ${f.danger && f.count > 0 ? 'badge-rose' : f.alert && f.count > 0 ? 'badge-amber' : 'badge-neutral'}`}>
+
+
+
+
+
+
+
+
                     {f.count}
                   </span>
                 </button>
@@ -2714,6 +3055,345 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
           </div>
         </div>
       )}
+      {activeTab === 'Clearance Requests' && (
+        <div className="lib-tab-content animate-fade-in space-y-5">
+          {/* Desk Summary & Action Bar */}
+          <div className="flex flex-wrap justify-between items-center gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 m-0">
+                <ShieldCheck className="text-primary" size={20} />
+                Student Library Clearance & No-Due Desk
+              </h2>
+              <p className="text-xs text-muted mt-0.5 mb-0">
+                Audit student library book loans, settle outstanding fine balances, and issue digital No-Due clearance certificates.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={fetchLibraryData}
+                className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-3 shadow-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <RefreshCw size={13} /> Refresh Desk
+              </button>
+            </div>
+          </div>
+
+          {/* 4 Clearance KPI Stat Cards */}
+          {(() => {
+            const pendingCount = clearanceRequests.filter(c => (c.status || 'Pending') === 'Pending').length;
+            const approvedCount = clearanceRequests.filter(c => c.status === 'Approved').length;
+            const rejectedCount = clearanceRequests.filter(c => c.status === 'Rejected').length;
+            const totalCount = clearanceRequests.length;
+
+            return (
+              <div className="clearance-kpi-grid">
+                <div className="clearance-kpi-card kpi-amber">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                      Pending Verification
+                    </span>
+                    <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
+                      {pendingCount}
+                    </p>
+                    <span className="text-[11px] text-muted">Awaiting due diligence</span>
+                  </div>
+                  <div className="clearance-icon-bubble bg-amber-500/10 text-amber-600 font-bold">
+                    <Clock size={20} />
+                  </div>
+                </div>
+
+                <div className="clearance-kpi-card kpi-emerald">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                      Approved & Cleared
+                    </span>
+                    <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                      {approvedCount}
+                    </p>
+                    <span className="text-[11px] text-muted">No-due slip generated</span>
+                  </div>
+                  <div className="clearance-icon-bubble bg-emerald-500/10 text-emerald-600 font-bold">
+                    <CheckCircle2 size={20} />
+                  </div>
+                </div>
+
+                <div className="clearance-kpi-card kpi-rose">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
+                      Rejected Requests
+                    </span>
+                    <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
+                      {rejectedCount}
+                    </p>
+                    <span className="text-[11px] text-muted">Due to pending dues/books</span>
+                  </div>
+                  <div className="clearance-icon-bubble bg-rose-500/10 text-rose-600 font-bold">
+                    <XCircle size={20} />
+                  </div>
+                </div>
+
+                <div className="clearance-kpi-card kpi-indigo">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
+                      Total Clearance Flow
+                    </span>
+                    <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
+                      {totalCount}
+                    </p>
+                    <span className="text-[11px] text-muted">Cumulative student submissions</span>
+                  </div>
+                  <div className="clearance-icon-bubble bg-indigo-500/10 text-indigo-600 font-bold">
+                    <ShieldCheck size={20} />
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Search & Filter Toolbar */}
+          <div className="lib-circulation-toolbar">
+            <div className="lib-filter-pill-container">
+              {[
+                { key: 'All', label: 'All Submissions', count: clearanceRequests.length, badgeClass: 'badge-neutral' },
+                { key: 'Pending', label: 'Pending Verification', count: clearanceRequests.filter(c => (c.status || 'Pending') === 'Pending').length, alert: true, badgeClass: 'badge-amber' },
+                { key: 'Approved', label: 'Approved & Cleared', count: clearanceRequests.filter(c => c.status === 'Approved').length, badgeClass: 'badge-emerald' },
+                { key: 'Rejected', label: 'Rejected', count: clearanceRequests.filter(c => c.status === 'Rejected').length, danger: true, badgeClass: 'badge-rose' }
+              ].map(f => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setClearanceStatusFilter(f.key)}
+                  className={`lib-filter-pill ${clearanceStatusFilter === f.key ? 'active' : ''}`}
+                >
+                  {f.alert && f.count > 0 && clearanceStatusFilter !== f.key && (
+                    <span className="lib-pulse-indicator" />
+                  )}
+                  <span>{f.label}</span>
+                  <span className={`lib-filter-badge ${f.badgeClass}`}>
+                    {f.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="search-box" style={{ maxWidth: '340px', width: '100%' }}>
+              <Search size={15} className="text-muted" style={{ flexShrink: 0 }} />
+              <input
+                type="text"
+                value={clearanceSearch}
+                onChange={e => setClearanceSearch(e.target.value)}
+                placeholder="Search student, admission no, dept..."
+              />
+              {clearanceSearch && (
+                <button
+                  type="button"
+                  onClick={() => setClearanceSearch('')}
+                  className="text-xs text-muted hover:text-rose-500"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', fontSize: '13px' }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Clearance Requests Table */}
+          <div className="table-wrapper">
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Student Borrower</th>
+                    <th>Admission / Reg No.</th>
+                    <th>Department & Batch</th>
+                    <th>Requested On</th>
+                    <th>Status</th>
+                    <th>Remarks</th>
+                    <th style={{ textAlign: 'right' }}>Desk Action</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {clearanceLoading ? (
+                    <tr>
+                      <td colSpan="7" className="text-center p-8 text-muted">
+                        <RefreshCw size={20} className="animate-spin inline-block mr-2 text-primary" />
+                        Loading student clearance requests...
+                      </td>
+                    </tr>
+                  ) : (() => {
+                    const filtered = clearanceRequests.filter(req => {
+                      const q = clearanceSearch.toLowerCase().trim();
+                      const name = (req.studentName || req.studentId?.name || '').toLowerCase();
+                      const adm = (req.admissionNumber || req.studentId?.admissionNumber || req.studentId?.rollNo || '').toLowerCase();
+                      const dept = (req.department || req.studentId?.department || '').toLowerCase();
+                      const matchSearch = !q || name.includes(q) || adm.includes(q) || dept.includes(q);
+
+                      const status = req.status || 'Pending';
+                      const matchStatus = clearanceStatusFilter === 'All' || status === clearanceStatusFilter;
+
+                      return matchSearch && matchStatus;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="7" className="text-center p-8 text-muted">
+                            <ShieldCheck size={28} className="mx-auto mb-2 text-muted opacity-40" />
+                            <p className="font-semibold text-sm">No library clearance requests found.</p>
+                            <span className="text-xs text-muted">
+                              {clearanceSearch || clearanceStatusFilter !== 'All'
+                                ? 'Try changing your search keywords or filter tab.'
+                                : 'When students submit No-Due requests from their portal, they will appear here for verification.'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map(request => {
+                      const studentName = request.studentName || request.studentId?.name || 'Student';
+                      const initials = studentName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || 'ST';
+                      const admNo = request.admissionNumber || request.studentId?.admissionNumber || request.studentId?.rollNo || '-';
+                      const dept = request.department || request.studentId?.department || '-';
+
+                      return (
+                        <tr key={request._id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                          {/* Student */}
+                          <td>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                {initials}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-bold text-slate-900 dark:text-white text-xs">
+                                  {studentName}
+                                </span>
+                                <span className="text-[11px] text-muted flex items-center gap-1 font-mono">
+                                  {admNo}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Admission No. */}
+                          <td>
+                            <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 w-max">
+                              {admNo}
+                            </span>
+                          </td>
+
+                          {/* Department */}
+                          <td>
+                            <div className="flex flex-col text-xs">
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                {dept}
+                              </span>
+                              {request.academicYear && (
+                                <span className="text-[10px] text-muted">
+                                  Batch: {request.academicYear}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Requested On */}
+                          <td>
+                            <div className="flex flex-col text-xs">
+                              <span className="text-slate-700 dark:text-slate-300 font-medium">
+                                {request.requestedAt
+                                  ? new Date(request.requestedAt).toLocaleDateString()
+                                  : request.createdAt
+                                  ? new Date(request.createdAt).toLocaleDateString()
+                                  : '—'}
+                              </span>
+                              <span className="text-[10px] text-muted">
+                                {request.requestedAt
+                                  ? new Date(request.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                  : ''}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Status */}
+                          <td>
+                            {request.status === 'Approved' ? (
+                              <span className="text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 font-bold text-xs uppercase px-2.5 py-1 rounded-full inline-flex items-center gap-1 border border-emerald-200 dark:border-emerald-800">
+                                <CheckCircle2 size={12} className="text-emerald-600" /> Cleared & Approved
+                              </span>
+                            ) : request.status === 'Rejected' ? (
+                              <span className="text-rose-700 bg-rose-100 dark:bg-rose-950/40 dark:text-rose-400 font-bold text-xs uppercase px-2.5 py-1 rounded-full inline-flex items-center gap-1 border border-rose-200 dark:border-rose-800">
+                                <XCircle size={12} className="text-rose-600" /> Rejected / Withheld
+                              </span>
+                            ) : (
+                              <span className="text-amber-700 bg-amber-100 dark:bg-amber-950/40 dark:text-amber-400 font-bold text-xs uppercase px-2.5 py-1 rounded-full inline-flex items-center gap-1 border border-amber-200 dark:border-amber-800">
+                                <Clock size={11} className="animate-spin text-amber-600" /> Pending Check
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Remarks */}
+                          <td>
+                            <span className="text-xs text-slate-600 dark:text-slate-400 max-w-[200px] truncate block" title={request.remarks || 'No remarks recorded'}>
+                              {request.remarks || '—'}
+                            </span>
+                          </td>
+
+                          {/* Action */}
+                          <td style={{ textAlign: 'right' }}>
+                            {request.status === 'Pending' || !request.status ? (
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={clearanceActionId === request._id}
+                                  onClick={() => handleApproveClearance(request._id)}
+                                  className="btn-primary text-xs py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1 shadow-sm disabled:opacity-50"
+                                  title="Approve student clearance & issue No-Due Certificate"
+                                >
+                                  {clearanceActionId === request._id ? (
+                                    <RefreshCw size={12} className="animate-spin" />
+                                  ) : (
+                                    <CheckCircle2 size={13} />
+                                  )}
+                                  Approve No-Due
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={clearanceActionId === request._id}
+                                  onClick={() => handleRejectClearance(request._id)}
+                                  className="btn-secondary text-xs py-1.5 px-2.5 text-rose-600 hover:bg-rose-50 border-rose-200 dark:border-rose-900 dark:text-rose-400 font-semibold flex items-center gap-1 disabled:opacity-50"
+                                  title="Reject clearance request with reasons"
+                                >
+                                  <XCircle size={13} />
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted font-semibold flex items-center justify-end gap-1">
+                                {request.status === 'Approved' ? (
+                                  <>
+                                    <CheckCircle2 size={13} className="text-emerald-500" /> No-Due Issued
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle size={13} className="text-rose-500" /> Declined
+                                  </>
+                                )}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
       {activeTab === 'Reservations' && (
         <div className="lib-tab-content animate-fade-in space-y-4">
           <div className="flex justify-between items-center">
@@ -2736,56 +3416,56 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
 
           {/* KPI Stat Cards Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', width: '100%' }}>
-            <div className="glass-card p-4 relative overflow-hidden border-l-4 border-l-blue-500">
+            <div className="glass-card p-4 rounded-xl border border-[var(--border-color)] border-l-4 border-l-blue-500 flex items-center justify-between gap-3 shadow-sm">
               <div>
                 <p className="text-[11px] font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">Total Requests</p>
-                <p className="text-2xl font-extrabold text-blue-900 dark:text-blue-200 mt-1">{reservations.length}</p>
-                <p className="text-[11px] text-blue-600/80 dark:text-blue-400/70 mt-1 font-medium">All student hold submissions</p>
+                <p className="text-2xl font-extrabold text-blue-900 dark:text-blue-200 mt-0.5">{reservations.length}</p>
+                <p className="text-[11px] text-blue-600/80 dark:text-blue-400/70 mt-0.5 font-medium">All student hold submissions</p>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-blue-500/10 dark:bg-blue-400/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-inner">
-                <Bookmark size={22} />
+              <div className="w-11 h-11 shrink-0 rounded-xl bg-blue-500/10 dark:bg-blue-400/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-inner">
+                <Bookmark size={20} />
               </div>
             </div>
 
-            <div className="glass-card p-4 relative overflow-hidden border-l-4 border-l-amber-500">
+            <div className="glass-card p-4 rounded-xl border border-[var(--border-color)] border-l-4 border-l-amber-500 flex items-center justify-between gap-3 shadow-sm">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
                   Pending Review
                 </p>
-                <p className="text-2xl font-extrabold text-amber-900 dark:text-amber-200 mt-1">
+                <p className="text-2xl font-extrabold text-amber-900 dark:text-amber-200 mt-0.5">
                   {reservations.filter(r => r.status === 'Pending' || !r.status).length}
                 </p>
-                <p className="text-[11px] text-amber-600/80 dark:text-amber-400/70 mt-1 font-medium">Awaiting librarian approval</p>
+                <p className="text-[11px] text-amber-600/80 dark:text-amber-400/70 mt-0.5 font-medium">Awaiting librarian approval</p>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-amber-500/10 dark:bg-amber-400/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-inner">
-                <Clock size={22} />
+              <div className="w-11 h-11 shrink-0 rounded-xl bg-amber-500/10 dark:bg-amber-400/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-inner">
+                <Clock size={20} />
               </div>
             </div>
 
-            <div className="glass-card p-4 relative overflow-hidden border-l-4 border-l-emerald-500">
+            <div className="glass-card p-4 rounded-xl border border-[var(--border-color)] border-l-4 border-l-emerald-500 flex items-center justify-between gap-3 shadow-sm">
               <div>
                 <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Approved / Ready</p>
-                <p className="text-2xl font-extrabold text-emerald-900 dark:text-emerald-200 mt-1">
+                <p className="text-2xl font-extrabold text-emerald-900 dark:text-emerald-200 mt-0.5">
                   {reservations.filter(r => r.status === 'Approved').length}
                 </p>
-                <p className="text-[11px] text-emerald-600/80 dark:text-emerald-400/70 mt-1 font-medium">Ready for copy allocation</p>
+                <p className="text-[11px] text-muted mt-0.5 font-medium">Ready for copy allocation</p>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-emerald-500/10 dark:bg-emerald-400/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-inner">
-                <CheckCircle2 size={22} />
+              <div className="w-11 h-11 shrink-0 rounded-xl bg-emerald-500/10 dark:bg-emerald-400/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-inner">
+                <CheckCircle2 size={20} />
               </div>
             </div>
 
-            <div className="glass-card p-4 relative overflow-hidden border-l-4 border-l-purple-500">
+            <div className="glass-card p-4 rounded-xl border border-[var(--border-color)] border-l-4 border-l-purple-500 flex items-center justify-between gap-3 shadow-sm">
               <div>
                 <p className="text-[11px] font-bold text-purple-700 dark:text-purple-400 uppercase tracking-wider">Completed / Issued</p>
-                <p className="text-2xl font-extrabold text-purple-900 dark:text-purple-200 mt-1">
+                <p className="text-2xl font-extrabold text-purple-900 dark:text-purple-200 mt-0.5">
                   {reservations.filter(r => r.status === 'Completed' || r.status === 'Issued').length}
                 </p>
-                <p className="text-[11px] text-purple-600/80 dark:text-purple-400/70 mt-1 font-medium">Physical books handed over</p>
+                <p className="text-[11px] text-muted mt-0.5 font-medium">Physical books handed over</p>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-purple-500/10 dark:bg-purple-400/10 border border-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400 shadow-inner">
-                <BookOpen size={22} />
+              <div className="w-11 h-11 shrink-0 rounded-xl bg-purple-500/10 dark:bg-purple-400/10 border border-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400 shadow-inner">
+                <BookOpen size={20} />
               </div>
             </div>
           </div>
@@ -2804,20 +3484,20 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                   key={f.key}
                   type="button"
                   onClick={() => setReservationStatusFilter(f.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all border ${
-                    reservationStatusFilter === f.key
-                      ? 'bg-primary text-white border-primary shadow-sm'
-                      : 'bg-[var(--bg-main)] text-[var(--text-main)] border-[var(--border-color)] hover:bg-[var(--bg-card)]'
-                  }`}
+                  className={`lib-filter-pill ${reservationStatusFilter === f.key ? 'active' : ''}`}
+
+
+
+
                 >
                   <span>{f.label}</span>
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                    reservationStatusFilter === f.key
-                      ? 'bg-white/20 text-white'
-                      : f.alert && f.count > 0
-                      ? 'bg-amber-500 text-white animate-pulse'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                  }`}>
+                  <span className={`lib-filter-badge ${f.alert && f.count > 0 ? 'badge-amber' : f.key === 'Rejected' && f.count > 0 ? 'badge-rose' : f.key === 'Approved' ? 'badge-blue' : 'badge-neutral'}`}>
+
+
+
+
+
+
                     {f.count}
                   </span>
                 </button>
@@ -3162,12 +3842,12 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
       {/* =========================================================
           TAB 6: FINES & ANALYTICS
           ========================================================= */}
-      {activeTab === 'Fines & Analytics' && (
+      {(activeTab === 'Reports & Analytics' || activeTab === 'Fines & Analytics') && (
         <div className="lib-tab-content animate-fade-in space-y-6">
           
           {/* 4 Financial & Circulation KPI Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', width: '100%' }}>
-            <div className="glass-card p-4 border-l-4 border-l-emerald-500">
+            <div className="glass-card p-4 rounded-xl border border-[var(--border-color)] border-l-4 border-l-emerald-500 flex flex-col justify-between min-h-[125px] shadow-sm cursor-pointer hover:shadow-md transition-all" onClick={() => setActiveReportSubTab('fines')}>
               <div className="flex items-center justify-between text-emerald-600 mb-1">
                 <span className="text-xs font-bold uppercase tracking-wider text-muted">Total Fine Collected</span>
                 <IndianRupee size={20} />
@@ -3176,39 +3856,313 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
               <span className="text-[11px] text-muted">Cleared Receipts Total</span>
             </div>
 
-            <div className="glass-card p-4 border-l-4 border-l-rose-500 bg-rose-500/5">
+            <div className="glass-card p-4 rounded-xl border border-[var(--border-color)] border-l-4 border-l-blue-500 flex flex-col justify-between min-h-[125px] shadow-sm cursor-pointer hover:shadow-md transition-all" onClick={() => setActiveReportSubTab('issuedToday')}>
+              <div className="flex items-center justify-between text-blue-600 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Issued Today</span>
+                <BookDown size={20} />
+              </div>
+              <p className="text-2xl font-black text-blue-600 dark:text-blue-400">{totalIssuedTodayCount}</p>
+              <span className="text-[11px] text-muted font-medium">Daily Loans Processed</span>
+            </div>
+
+            <div className="glass-card p-4 rounded-xl border border-[var(--border-color)] border-l-4 border-l-purple-500 flex flex-col justify-between min-h-[125px] shadow-sm cursor-pointer hover:shadow-md transition-all" onClick={() => setActiveReportSubTab('returnedToday')}>
+              <div className="flex items-center justify-between text-purple-600 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Returned Today</span>
+                <CheckCircle2 size={20} />
+              </div>
+              <p className="text-2xl font-black text-purple-600 dark:text-purple-400">{totalReturnedTodayCount}</p>
+              <span className="text-[11px] text-muted font-medium">Daily Returns Settled</span>
+            </div>
+
+            <div className="glass-card p-4 rounded-xl border border-[var(--border-color)] border-l-4 border-l-rose-500 bg-rose-500/5 flex flex-col justify-between min-h-[125px] shadow-sm cursor-pointer hover:shadow-md transition-all" onClick={() => setActiveReportSubTab('defaulters')}>
               <div className="flex items-center justify-between text-rose-500 mb-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted">Outstanding Fines</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Outstanding Defaulter Fines</span>
                 <AlertTriangle size={20} />
               </div>
-              <p className="text-2xl font-black text-rose-600 dark:text-rose-400">₹{totalOutstandingFines}</p>
-              <span className="text-[11px] text-rose-600 font-semibold">Pending Collection</span>
-            </div>
-
-            <div className="glass-card p-4 border-l-4 border-l-indigo-500">
-              <div className="flex items-center justify-between text-indigo-500 mb-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted">Most Active Dept</span>
-                <Building size={20} />
-              </div>
-              <p className="text-2xl font-black text-primary truncate">{deptCirculationData[0]?.name || (realDeptNames[0] || '—')}</p>
-              <span className="text-[11px] text-muted">Highest Circulation Volume</span>
-            </div>
-
-            <div className="glass-card p-4 border-l-4 border-l-amber-500">
-              <div className="flex items-center justify-between text-amber-500 mb-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted">Overdue Borrowers</span>
-                <Users size={20} />
-              </div>
-              <p className="text-2xl font-black text-amber-600 dark:text-amber-400">
-                {issues.filter(i => Number(i.fineAmount || 0) > Number(i.finePaid || 0)).length}
+              <p className="text-2xl font-black text-rose-600 dark:text-rose-400">
+                ₹{totalOutstandingFines}
               </p>
               <span className="text-[11px] text-muted">Students with Balances</span>
             </div>
           </div>
 
-          {/* Main Fine Collection & Audit Ledger Table */}
-          <div className="glass-card overflow-hidden">
-            <div className="p-4 border-b border-[var(--border-color)] flex flex-wrap items-center justify-between gap-3 bg-[var(--bg-secondary)]/40">
+          {/* ERP Sub-Report Selector Tabs & Actions Header */}
+          <div className="glass-card p-4 rounded-xl border border-[var(--border-color)] flex flex-wrap items-center justify-between gap-3 shadow-sm">
+            {/* Report Selector Pills */}
+            <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-0.5">
+              {[
+                { key: 'fines', label: 'Fine Collection Ledger', icon: Receipt, count: filteredFineReport.length },
+                { key: 'issuedToday', label: 'Issued Today', icon: BookDown, count: filteredIssuedTodayReport.length },
+                { key: 'returnedToday', label: 'Returned Today', icon: CheckCircle2, count: filteredReturnedTodayReport.length },
+                { key: 'circulation', label: 'Circulation & Loans', icon: ArrowRightLeft, count: filteredCirculationReport.length },
+                { key: 'departments', label: 'Department Analytics', icon: Building, count: deptAnalyticsList.length },
+                { key: 'defaulters', label: 'Overdue & Defaulters', icon: AlertTriangle, count: filteredDefaultersReport.length, danger: filteredDefaultersReport.length > 0 },
+                { key: 'inventory', label: 'Catalog & Inventory', icon: BookOpen, count: filteredInventoryReport.length }
+              ].map(subTab => {
+                const Icon = subTab.icon;
+                const isActive = activeReportSubTab === subTab.key;
+                return (
+                  <button
+                    key={subTab.key}
+                    type="button"
+                    onClick={() => setActiveReportSubTab(subTab.key)}
+                    className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${
+                      isActive
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-color)]'
+                    }`}
+                  >
+                    <Icon size={14} />
+                    <span>{subTab.label}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                      isActive 
+                        ? 'bg-white/20 text-white' 
+                        : subTab.danger 
+                          ? 'bg-rose-500/10 text-rose-600' 
+                          : 'bg-primary/10 text-primary'
+                    }`}>
+                      {subTab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Export & Action Buttons */}
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                type="button"
+                onClick={handleExportReportCSV}
+                className="btn-primary flex items-center gap-1.5 text-xs py-2 px-3 shadow-sm"
+                title="Download real live CSV data for the current active report"
+              >
+                <Download size={14} /> Export Report (CSV)
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="btn-secondary flex items-center gap-1.5 text-xs py-2 px-3"
+                title="Print official library report"
+              >
+                <FileText size={14} /> Print Report
+              </button>
+            </div>
+          </div>
+
+          {/* Filter and Live Search Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--bg-card)] p-3.5 rounded-xl border border-[var(--border-color)]">
+            <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+              <div className="search-box" style={{ minWidth: '240px', maxWidth: '360px' }}>
+                <Search size={15} className="text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search student, roll no, book title, accession..."
+                  value={reportSearch}
+                  onChange={e => setReportSearch(e.target.value)}
+                />
+              </div>
+
+              <div style={{ width: '210px' }}>
+                <CustomSelect
+                  options={deptOptions}
+                  value={reportDeptFilter}
+                  onChange={e => setReportDeptFilter(e.target.value)}
+                  icon={Building}
+                />
+              </div>
+
+              {activeReportSubTab === 'circulation' && (
+                <select
+                  className="p-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-semibold"
+                  value={reportStatusFilter}
+                  onChange={e => setReportStatusFilter(e.target.value)}
+                >
+                  <option value="All">All Loan Statuses</option>
+                  <option value="Issued">Active Loans Only</option>
+                  <option value="Overdue">Overdue Loans Only</option>
+                  <option value="Returned">Returned / Completed</option>
+                </select>
+              )}
+
+              {activeReportSubTab === 'fines' && (
+                <select
+                  className="p-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-semibold"
+                  value={reportStatusFilter}
+                  onChange={e => setReportStatusFilter(e.target.value)}
+                >
+                  <option value="All">All Fine Statuses</option>
+                  <option value="Pending">Unpaid / Pending</option>
+                  <option value="Paid">Cleared / Paid</option>
+                </select>
+              )}
+
+              {(reportSearch || reportDeptFilter !== 'All Departments' || reportStatusFilter !== 'All') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportSearch('');
+                    setReportDeptFilter('All Departments');
+                    setReportStatusFilter('All');
+                  }}
+                  className="text-xs text-rose-500 hover:underline font-bold px-2 py-1"
+                >
+                  Reset Filters
+                </button>
+              )}
+            </div>
+
+            <div className="text-xs text-muted font-medium">
+              <span className="font-bold text-[var(--text-main)]">
+                {activeReportSubTab === 'fines' && `${filteredFineReport.length} Fine Ledger Entries`}
+                {activeReportSubTab === 'issuedToday' && `${filteredIssuedTodayReport.length} Books Issued Today`}
+                {activeReportSubTab === 'returnedToday' && `${filteredReturnedTodayReport.length} Books Returned Today`}
+                {activeReportSubTab === 'circulation' && `${filteredCirculationReport.length} Circulation Records`}
+                {activeReportSubTab === 'departments' && `${deptAnalyticsList.length} Departments`}
+                {activeReportSubTab === 'defaulters' && `${filteredDefaultersReport.length} Defaulters`}
+                {activeReportSubTab === 'inventory' && `${filteredInventoryReport.length} Books`}
+              </span>
+            </div>
+          </div>
+          {/* REPORT: ISSUED TODAY */}
+          {activeReportSubTab === 'issuedToday' && (
+            <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-left">
+                    <tr>
+                      <th className="p-3">Borrower (Student / Staff)</th>
+                      <th className="p-3">Book Information</th>
+                      <th className="p-3">Department</th>
+                      <th className="p-3">Issue Time / Date</th>
+                      <th className="p-3">Return Due Date</th>
+                      <th className="p-3 text-center">Status</th>
+                      <th className="p-3 text-right">Accession No</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredIssuedTodayReport.map(issue => (
+                      <tr key={issue._id} className="border-b border-[var(--border-color)]/60 hover:bg-primary/5 transition-colors">
+                        <td className="p-3">
+                          <div className="font-bold font-mono text-[var(--text-main)]">{issue.userId}</div>
+                          <div className="text-[11px] text-muted">{issue.userType || 'Student'}</div>
+                        </td>
+                        <td className="p-3">
+                          <div className="font-semibold text-[var(--text-main)]">{issue.bookId?.title || 'Unknown Book'}</div>
+                          <div className="text-[11px] text-muted font-mono">ID: {issue.bookId?.bookId || '—'}</div>
+                        </td>
+                        <td className="p-3 text-muted">{issue.bookId?.department || '—'}</td>
+                        <td className="p-3 font-semibold text-blue-600">
+                          {issue.issueDate ? new Date(issue.issueDate).toLocaleDateString() : new Date().toLocaleDateString()}
+                          {issue.issueDate && <span className="text-[10px] text-muted block">{new Date(issue.issueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                        </td>
+                        <td className="p-3 font-semibold">
+                          {issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800">
+                            {issue.status || 'Issued'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right font-mono text-muted">
+                          {issue.accessionNumber || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredIssuedTodayReport.length === 0 && (
+                      <tr>
+                        <td colSpan="7" className="p-8 text-center text-muted">
+                          <BookDown size={24} className="mx-auto mb-2 text-blue-500 opacity-70" />
+                          <span className="font-semibold text-[var(--text-main)]">No books issued today yet.</span> Use the "Issue Book" counter button above to issue new books.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* REPORT: RETURNED TODAY */}
+          {activeReportSubTab === 'returnedToday' && (
+            <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-left">
+                    <tr>
+                      <th className="p-3">Borrower (Student / Staff)</th>
+                      <th className="p-3">Book Returned</th>
+                      <th className="p-3">Department</th>
+                      <th className="p-3">Issue Date</th>
+                      <th className="p-3">Return Time / Date</th>
+                      <th className="p-3 text-center">Return Status</th>
+                      <th className="p-3 text-right">Fine Settled</th>
+                      <th className="p-3 text-center">Receipt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredReturnedTodayReport.map(issue => (
+                      <tr key={issue._id} className="border-b border-[var(--border-color)]/60 hover:bg-primary/5 transition-colors">
+                        <td className="p-3">
+                          <div className="font-bold font-mono text-[var(--text-main)]">{issue.userId}</div>
+                          <div className="text-[11px] text-muted">{issue.userType || 'Student'}</div>
+                        </td>
+                        <td className="p-3">
+                          <div className="font-semibold text-[var(--text-main)]">{issue.bookId?.title || 'Unknown Book'}</div>
+                          <div className="text-[11px] text-muted font-mono">ID: {issue.bookId?.bookId || '—'} {issue.accessionNumber ? `· ACC: ${issue.accessionNumber}` : ''}</div>
+                        </td>
+                        <td className="p-3 text-muted">{issue.bookId?.department || '—'}</td>
+                        <td className="p-3 text-muted">{issue.issueDate ? new Date(issue.issueDate).toLocaleDateString() : '—'}</td>
+                        <td className="p-3 font-semibold text-emerald-600">
+                          {issue.returnDate ? new Date(issue.returnDate).toLocaleDateString() : (issue.updatedAt ? new Date(issue.updatedAt).toLocaleDateString() : 'Today')}
+                          {(issue.returnDate || issue.updatedAt) && (
+                            <span className="text-[10px] text-muted block">
+                              {new Date(issue.returnDate || issue.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800">
+                            Returned & Restocked
+                          </span>
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold">
+                          {Number(issue.finePaid || 0) > 0 ? (
+                            <span className="text-emerald-600">₹{issue.finePaid}</span>
+                          ) : (
+                            <span className="text-muted">₹0 (No Fine)</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center">
+                          {Number(issue.finePaid || 0) > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => handleViewFineReceipt(issue._id)}
+                              className="text-primary font-bold text-xs hover:underline flex items-center gap-1 mx-auto"
+                            >
+                              <Receipt size={13} /> View Receipt
+                            </button>
+                          ) : (
+                            <span className="text-xs text-muted">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredReturnedTodayReport.length === 0 && (
+                      <tr>
+                        <td colSpan="8" className="p-8 text-center text-muted">
+                          <CheckCircle2 size={24} className="mx-auto mb-2 text-emerald-500 opacity-70" />
+                          <span className="font-semibold text-[var(--text-main)]">No books returned today yet.</span>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/*
+
               <div>
                 <h3 className="font-bold text-base text-[var(--text-main)] flex items-center gap-2">
                   <Receipt className="text-primary" size={18} /> Fine Collection & Audit Ledger
@@ -3345,7 +4299,330 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                 </tbody>
               </table>
             </div>
-          </div>
+          */}
+
+          {/* REPORT 1: CIRCULATION & LOANS */}
+          {activeReportSubTab === 'circulation' && (
+            <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-left">
+                    <tr>
+                      <th className="p-3">Borrower Details</th>
+                      <th className="p-3">Book & Accession</th>
+                      <th className="p-3">Department</th>
+                      <th className="p-3">Issue Date</th>
+                      <th className="p-3">Due Date</th>
+                      <th className="p-3">Return Date</th>
+                      <th className="p-3 text-center">Status</th>
+                      <th className="p-3 text-right">Fine Accrued</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCirculationReport.map(issue => (
+                      <tr key={issue._id} className="border-b border-[var(--border-color)]/60 hover:bg-primary/5 transition-colors">
+                        <td className="p-3">
+                          <div className="font-bold font-mono text-[var(--text-main)]">{issue.userId}</div>
+                          <div className="text-[11px] text-muted">{issue.userType || 'Student'}</div>
+                        </td>
+                        <td className="p-3">
+                          <div className="font-semibold text-[var(--text-main)]">{issue.bookId?.title || 'Unknown Book'}</div>
+                          <div className="text-[11px] text-muted font-mono">ID: {issue.bookId?.bookId || '—'} {issue.accessionNumber ? `· ACC: ${issue.accessionNumber}` : ''}</div>
+                        </td>
+                        <td className="p-3 text-muted">{issue.bookId?.department || '—'}</td>
+                        <td className="p-3">{issue.issueDate ? new Date(issue.issueDate).toLocaleDateString() : '—'}</td>
+                        <td className={`p-3 font-semibold ${issue.status === 'Overdue' ? 'text-rose-600 font-bold' : ''}`}>
+                          {issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="p-3 text-muted">
+                          {issue.returnDate ? new Date(issue.returnDate).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                            issue.status === 'Returned'
+                              ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800'
+                              : issue.status === 'Overdue'
+                                ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-800 animate-pulse'
+                                : 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800'
+                          }`}>
+                            {issue.status}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right font-bold font-mono">
+                          {Number(issue.fineAmount || 0) > 0 ? (
+                            <span className="text-orange-600">₹{issue.fineAmount}</span>
+                          ) : (
+                            <span className="text-muted">₹0</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredCirculationReport.length === 0 && (
+                      <tr>
+                        <td colSpan="8" className="p-8 text-center text-muted">
+                          <CheckCircle2 size={24} className="mx-auto mb-2 text-emerald-500" />
+                          No circulation records found matching the current filters.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* REPORT 2: FINE COLLECTION LEDGER */}
+          {activeReportSubTab === 'fines' && (
+            <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-left">
+                    <tr>
+                      <th className="p-3">Borrower (Student / Staff)</th>
+                      <th className="p-3">Book Information</th>
+                      <th className="p-3 text-right">Total Fine</th>
+                      <th className="p-3 text-right">Paid</th>
+                      <th className="p-3 text-right">Balance Due</th>
+                      <th className="p-3 text-center">Status</th>
+                      <th className="p-3 text-center">Receipt</th>
+                      <th className="p-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredFineReport.map(issue => {
+                      const fine = Number(issue.fineAmount || 0);
+                      const paid = Number(issue.finePaid || 0);
+                      const balance = Math.max(0, fine - paid);
+
+                      return (
+                        <tr key={issue._id} className="border-b border-[var(--border-color)]/60 hover:bg-primary/5 transition-colors">
+                          <td className="p-3">
+                            <div className="font-bold font-mono text-[var(--text-main)]">{issue.userId}</div>
+                            <div className="text-[11px] text-muted">{issue.userType || 'Student'}</div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-semibold text-[var(--text-main)]">{issue.bookId?.title || 'Unknown Book'}</div>
+                            <div className="text-[11px] text-muted">ID: {issue.bookId?.bookId || '—'}</div>
+                          </td>
+                          <td className="p-3 text-right font-bold text-orange-600">₹{fine}</td>
+                          <td className="p-3 text-right font-bold text-emerald-600">₹{paid}</td>
+                          <td className="p-3 text-right font-bold text-rose-600">₹{balance}</td>
+                          <td className="p-3 text-center">
+                            {balance <= 0 ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-[11px] font-bold border border-emerald-300 dark:border-emerald-800">
+                                Paid
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 text-[11px] font-bold border border-orange-300 dark:border-orange-800">
+                                Pending
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            {paid > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => handleViewFineReceipt(issue._id)}
+                                className="text-primary font-bold text-xs hover:underline flex items-center gap-1 mx-auto"
+                              >
+                                <Receipt size={13} /> View Receipt
+                              </button>
+                            ) : (
+                              <span className="text-xs text-muted">—</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">
+                            {balance > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenCollectFine(issue)}
+                                className="btn-primary text-xs px-3 py-1.5 shadow-sm"
+                              >
+                                Collect Fine
+                              </button>
+                            ) : (
+                              <span className="text-xs font-bold text-emerald-600">✓ Settled</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {filteredFineReport.length === 0 && (
+                      <tr>
+                        <td colSpan="8" className="p-8 text-center text-muted">
+                          <CheckCircle2 size={24} className="mx-auto mb-2 text-emerald-500" />
+                          <span className="font-semibold text-emerald-600">No fine records found.</span> All accounts are in good standing!
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* REPORT 3: DEPARTMENT ANALYTICS */}
+          {activeReportSubTab === 'departments' && (
+            <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-left">
+                    <tr>
+                      <th className="p-3">Academic Department</th>
+                      <th className="p-3 text-center">Cataloged Titles</th>
+                      <th className="p-3 text-center">Total Copies</th>
+                      <th className="p-3 text-center">Total Issues</th>
+                      <th className="p-3 text-center">Active Loans</th>
+                      <th className="p-3 text-center">Overdue</th>
+                      <th className="p-3 text-right">Fines Incurred</th>
+                      <th className="p-3 text-right">Utilization %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deptAnalyticsList.map(dept => (
+                      <tr key={dept.dept} className="border-b border-[var(--border-color)]/60 hover:bg-primary/5 transition-colors">
+                        <td className="p-3 font-bold text-[var(--text-main)] flex items-center gap-2">
+                          <Building size={14} className="text-primary shrink-0" />
+                          <span>{dept.dept}</span>
+                        </td>
+                        <td className="p-3 text-center font-mono font-semibold">{dept.catalogedTitles}</td>
+                        <td className="p-3 text-center font-mono font-semibold">{dept.catalogedCopies}</td>
+                        <td className="p-3 text-center font-mono font-bold text-primary">{dept.totalIssues}</td>
+                        <td className="p-3 text-center font-mono font-bold text-blue-600">{dept.activeLoans}</td>
+                        <td className="p-3 text-center font-mono font-bold text-rose-600">
+                          {dept.overdueCount > 0 ? (
+                            <span className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600">{dept.overdueCount}</span>
+                          ) : (
+                            '0'
+                          )}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-orange-600">₹{dept.totalFines}</td>
+                        <td className="p-3 text-right font-mono">
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="font-bold">{dept.utilizationRate}%</span>
+                            <div className="w-16 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                              <div className="h-full bg-primary rounded-full" style={{ width: `${dept.utilizationRate}%` }}></div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {deptAnalyticsList.length === 0 && (
+                      <tr>
+                        <td colSpan="8" className="p-8 text-center text-muted">
+                          No department analytics data available for selected filter.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* REPORT 4: OVERDUE & DEFAULTERS */}
+          {activeReportSubTab === 'defaulters' && (
+            <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-left">
+                    <tr>
+                      <th className="p-3">Borrower Roll No / ID</th>
+                      <th className="p-3">User Type</th>
+                      <th className="p-3">Overdue Book Title</th>
+                      <th className="p-3">Due Date</th>
+                      <th className="p-3 text-center">Days Overdue</th>
+                      <th className="p-3 text-right">Outstanding Fine</th>
+                      <th className="p-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredDefaultersReport.map(issue => {
+                      const daysOverdue = Math.max(0, Math.ceil((Date.now() - new Date(issue.dueDate).getTime()) / (1000 * 60 * 60 * 24)));
+                      const fine = Number(issue.fineAmount || 0);
+                      const paid = Number(issue.finePaid || 0);
+                      const balance = Math.max(0, fine - paid);
+
+                      return (
+                        <tr key={issue._id} className="border-b border-[var(--border-color)]/60 hover:bg-rose-500/5 transition-colors">
+                          <td className="p-3 font-mono font-bold text-rose-600">{issue.userId}</td>
+                          <td className="p-3 text-muted">{issue.userType || 'Student'}</td>
+                          <td className="p-3 font-semibold text-[var(--text-main)]">{issue.bookId?.title || 'Unknown Book'}</td>
+                          <td className="p-3 font-semibold text-rose-600">{issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : '—'}</td>
+                          <td className="p-3 text-center font-mono font-bold text-rose-600">
+                            <span className="px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20">
+                              {daysOverdue} days
+                            </span>
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold text-rose-600">₹{balance}</td>
+                          <td className="p-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCollectFine(issue)}
+                              className="btn-primary text-xs px-3 py-1.5 shadow-sm"
+                            >
+                              Collect Fine
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {filteredDefaultersReport.length === 0 && (
+                      <tr>
+                        <td colSpan="7" className="p-8 text-center text-muted">
+                          <CheckCircle2 size={24} className="mx-auto mb-2 text-emerald-500" />
+                          <span className="font-semibold text-emerald-600">No overdue defaulters!</span> All student book loans and fines are currently up to date.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* REPORT 5: INVENTORY & ACCESSION */}
+          {activeReportSubTab === 'inventory' && (
+            <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-left">
+                    <tr>
+                      <th className="p-3">Book Code / ISBN</th>
+                      <th className="p-3">Book Title</th>
+                      <th className="p-3">Author</th>
+                      <th className="p-3">Department</th>
+                      <th className="p-3">Category</th>
+                      <th className="p-3 text-center">Total Copies</th>
+                      <th className="p-3 text-center">Shelf Location</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredInventoryReport.map(book => (
+                      <tr key={book._id} className="border-b border-[var(--border-color)]/60 hover:bg-primary/5 transition-colors">
+                        <td className="p-3 font-mono font-bold text-primary">{book.bookId || book.isbn || '—'}</td>
+                        <td className="p-3 font-semibold text-[var(--text-main)]">{book.title}</td>
+                        <td className="p-3 text-muted">{book.author}</td>
+                        <td className="p-3 text-muted">{book.department}</td>
+                        <td className="p-3">{book.category}</td>
+                        <td className="p-3 text-center font-mono font-bold">{book.totalCopies || 1}</td>
+                        <td className="p-3 text-center text-muted font-mono">
+                          Rack {book.rackNumber || 'R01'} / Shelf {book.shelfNumber || 'S01'}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredInventoryReport.length === 0 && (
+                      <tr>
+                        <td colSpan="7" className="p-8 text-center text-muted">
+                          No catalog inventory records match the current filter.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -3852,6 +5129,9 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
 };
 
 export default LibraryManagement;
+
+
+
 
 
 
