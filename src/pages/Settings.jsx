@@ -99,12 +99,25 @@ const Settings = () => {
         if (res.data.secondaryColor) {
           document.documentElement.style.setProperty('--secondary-color', res.data.secondaryColor);
         }
+        if (res.data.collegeName) {
+          const sessionKeys = ['admin_session', 'librarian_session', 'student_session', 'principal_session', 'hod_session', 'staff_session', 'accounts_session', 'superadmin_session', 'hostel_session', 'driver_session', 'parent_session'];
+          for (const k of sessionKeys) {
+            const s = sessionStorage.getItem(k);
+            if (s) {
+              try {
+                const parsed = JSON.parse(s);
+                parsed.collegeName = res.data.collegeName;
+                sessionStorage.setItem(k, JSON.stringify(parsed));
+              } catch (err) {}
+            }
+          }
+        }
       }
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
       console.error('Error saving settings:', err);
-      alert('Failed to save settings');
+      alert('Failed to save settings: ' + (err.response?.data?.message || err.message));
     }
   };
 

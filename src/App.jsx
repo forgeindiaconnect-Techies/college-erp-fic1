@@ -19,7 +19,7 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '20px', background: '#fee', color: '#900', fontFamily: 'monospace' }}>
-          <h2>Frontend Crash!</h2>
+          <h2>Frontend Crash! <button onClick={() => window.location.reload()} style={{ marginLeft: '12px', fontSize: '13px', padding: '4px 10px', cursor: 'pointer' }}>🔄 Reload Page</button></h2>
           <p>{this.state.error?.toString()}</p>
           <pre>{this.state.info?.componentStack}</pre>
         </div>
@@ -312,7 +312,11 @@ const HostelGuard = ({ children }) => {
 
 function App() {
   const [theme, setTheme] = useState('light');
-  const [collegeSettings, setCollegeSettings] = useState(null);
+  const [collegeSettings, setCollegeSettings] = useState({
+    collegeName: 'Marudhar Kesari Jain College for Women',
+    primaryColor: '#0d9488',
+    secondaryColor: '#059669'
+  });
 
   // Derive the active token to re-trigger settings fetch on login / logout
   const getActiveToken = () => {
@@ -344,8 +348,8 @@ function App() {
 
     // Fetch college settings
     const fetchCollegeSettings = async () => {
-      if (!activeToken) {
-        setCollegeSettings(null);
+        if (false) {
+        // fetch settings regardless
         return;
       }
       try {
@@ -364,7 +368,7 @@ function App() {
           setCollegeSettings(null);
         }
       } catch (err) {
-        setCollegeSettings(null);
+        // keep existing collegeSettings on error
       }
     };
 

@@ -84,40 +84,34 @@ export default function StudentWelfare() {
   };
 
   return (
-    <div className="dashboard-container animate-fade-in" style={{ padding: '2rem', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+    <div className="dashboard-container animate-fade-in" style={{ padding: '0 0 2rem 0', minHeight: '100%', background: 'transparent' }}>
       {/* Header Banner */}
-      <div style={{
-        background: 'var(--primary)',
-        borderRadius: '20px',
-        padding: '2rem 2.5rem',
-        marginBottom: '2.5rem',
-        color: '#fff',
-        boxShadow: '0 10px 25px -5px rgba(236, 72, 153, 0.4)',
+      <div className="page-header" style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        position: 'relative',
-        overflow: 'hidden'
+        width: '100%',
+        paddingBottom: '0.85rem',
+        marginBottom: '1.5rem',
+        borderBottom: '1px solid var(--border-color, #e2e8f0)',
+        flexWrap: 'wrap',
+        gap: '1rem'
       }}>
-        {/* Decorative blur */}
-        <div style={{ position: 'absolute', top: '-50%', right: '-10%', width: '300px', height: '300px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', filter: 'blur(40px)' }} />
-        
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: 800, margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Heart size={28} /> Student Support Center
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', maxWidth: '700px' }}>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-main, #1e293b)' }}>
+            <Heart size={24} className="text-primary" /> Student Support Center
           </h1>
-          <p style={{ margin: 0, opacity: 0.9, fontSize: '1rem', fontWeight: 500 }}>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>
             Submit confidential reports, request counseling, or apply for welfare benefits.
           </p>
         </div>
-        <div style={{ position: 'relative', zIndex: 1 }}>
+        <div>
           <button 
             onClick={() => handleOpenForm('Counseling')}
-            style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', padding: '0.8rem 1.5rem', borderRadius: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', backdropFilter: 'blur(10px)', transition: 'all 0.3s' }}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, padding: '0.6rem 1.25rem', borderRadius: '8px', cursor: 'pointer' }}
           >
-            <Plus size={20} /> New Request
+            <Plus size={18} /> New Request
           </button>
         </div>
       </div>

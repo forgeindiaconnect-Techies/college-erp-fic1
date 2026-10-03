@@ -110,16 +110,16 @@ router.post('/login', async (req, res) => {
         }
       }
 
-      let collegeName = null;
-      if (effectiveTenantId && effectiveTenantId !== 'system') {
-        const college = await College.findOne({
+      let collegeName = 'Marudhar Kesari Jain College for Women';
+      try {
+        const colDoc = await College.findOne({
           $or: [
             { tenantId: effectiveTenantId },
             { _id: mongoose.Types.ObjectId.isValid(effectiveTenantId) ? effectiveTenantId : null }
           ]
-        });
-        if (college) collegeName = college.name;
-      }
+        }) || await College.findOne({}).sort({ createdAt: -1 });
+        if (colDoc && colDoc.name) collegeName = colDoc.name;
+      } catch (err) {}
 
       res.json({
         _id: user._id,

@@ -3249,10 +3249,56 @@ router.post(
   }
 );
 
+router.post(
+  '/clearance/direct-issue',
+  protect,
+  authorize('Admin', 'Sub Admin', 'Super Admin', 'Librarian', 'Library', 'Principal', 'Accounts', 'Accountant'),
+  collegeScope,
+  async (req, res) => {
+    try {
+      const { studentId, admissionNumber, studentName, department, academicYear, remarks } = req.body;
+      const tenantFilter = getTenantFilter(req);
+
+      let clearance = await LibraryClearance.findOne({
+        $or: [
+          ...(admissionNumber ? [{ admissionNumber }] : []),
+          ...(studentId ? [{ studentId }] : []),
+          ...(studentName ? [{ studentName }] : [])
+        ]
+      });
+
+      if (!clearance) {
+        clearance = new LibraryClearance({
+          studentId: studentId || undefined,
+          admissionNumber: admissionNumber || 'N/A',
+          studentName: studentName || 'Student',
+          department: department || '',
+          academicYear: academicYear || '2026-2027',
+          collegeId: tenantFilter.collegeId || req.user?.collegeId || 'DEFAULT_COLLEGE'
+        });
+      }
+
+      clearance.status = 'Approved';
+      clearance.approvedAt = new Date();
+      clearance.approvedBy = req.user?._id;
+      clearance.remarks = remarks || 'All library materials verified. Official No-Due Clearance Issued.';
+      await clearance.save();
+
+      res.status(200).json({
+        message: 'Library clearance certificate issued successfully.',
+        clearance
+      });
+    } catch (err) {
+      console.error('POST /library/clearance/direct-issue:', err);
+      res.status(500).json({ message: err.message });
+    }
+  }
+);
+
 router.get(
   '/clearance',
   protect,
-  authorize('Admin', 'Sub Admin', 'Super Admin', 'Librarian', 'Library', 'Principal'),
+  authorize('Admin', 'Sub Admin', 'Super Admin', 'Librarian', 'Library', 'Principal', 'Accounts', 'Accountant'),
   collegeScope,
   async (req, res) => {
     try {
@@ -3270,6 +3316,30 @@ router.get(
       res.json(list);
     } catch (err) {
       console.error('GET /library/clearance:', err);
+      res.status(500).json({ message: err.message });
+    }
+  }
+);
+
+router.get(
+  '/clearance/student/:studentId',
+  protect,
+  authorize('Admin', 'Sub Admin', 'Super Admin', 'Librarian', 'Library', 'Principal', 'Accounts', 'Accountant', 'Staff', 'HOD'),
+  collegeScope,
+  async (req, res) => {
+    try {
+      const q = req.params.studentId;
+      let clearance = await LibraryClearance.findOne({
+        $or: [
+          { admissionNumber: q },
+          { admissionNumber: { $regex: new RegExp(`^${q}$`, 'i') } },
+          ...(mongoose.Types.ObjectId.isValid(q) ? [{ studentId: q }, { _id: q }] : [])
+        ]
+      }).sort({ createdAt: -1 });
+
+      res.json(clearance || null);
+    } catch (err) {
+      console.error('GET /library/clearance/student/:studentId:', err);
       res.status(500).json({ message: err.message });
     }
   }

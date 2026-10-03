@@ -33,7 +33,7 @@ const applySession = (userData) => {
     referenceId: userData.referenceId || null,
     permissions: userData.permissions || [],
     tenantId: userData.tenantId || null,
-    collegeName: userData.collegeName || null,
+    collegeName: userData.collegeName || 'Marudhar Kesari Jain College for Women',
     subscription: userData.subscription || null
   };
   if (role === 'HOD' || role === 'Staff') {

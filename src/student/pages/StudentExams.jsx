@@ -170,7 +170,7 @@ const StudentExams = () => {
                   <img src={collegeSettings.collegeLogo} alt="College Logo" style={{ height: '48px', margin: '0 auto 0.5rem auto' }} />
                 )}
                 <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  {collegeSettings?.collegeName || 'FIC ERP - Autonomous Institution'}
+                  {collegeSettings?.collegeName || 'Marudhar Kesari Jain College for Women'}
                 </h1>
                 <p style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>CONTROLLER OF EXAMINATIONS — HALL TICKET</p>
                 <div style={{ display: 'inline-block', background: '#e0e7ff', color: '#3730a3', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 700, marginTop: '0.5rem' }}>

@@ -1880,12 +1880,13 @@ tbody tr:hover td {
 }
 
 @media print {
-  body * {
+  /* Scope hidden visibility only when receipt overlay modal is active */
+  body:has(.receipt-overlay) * {
     visibility: hidden;
   }
 
-  .receipt-container,
-  .receipt-container * {
+  body:has(.receipt-overlay) .receipt-container,
+  body:has(.receipt-overlay) .receipt-container * {
     visibility: visible;
   }
 

@@ -445,6 +445,7 @@ export const createPlacementSelection = (data) => api.post('/placement/selection
 export const getSettings = () => api.get('/settings');
 export const updateSettings = (data) => api.put('/settings', data);
 export const getLoginLogs = () => api.get('/settings/logs');
+export const getSettingsLogs = () => api.get('/settings/logs');
 
 // Notifications
 export const getNotifications = (params = {}) => api.get('/notifications', { params }).catch(() => ({ data: [] })).then(res => {
@@ -544,17 +545,26 @@ export const getMyLibraryTransactions = () => api.get('/library/my-transactions'
 export const getMyLibraryClearance = () =>
   api.get('/library/clearance/my');
 
-export const requestLibraryClearance = () =>
-  api.post('/library/clearance/request');
+export const requestLibraryClearance = (data = {}) =>
+  api.post('/library/clearance/request', data);
 
 export const getLibraryClearanceRequests = () =>
   api.get('/library/clearance');
 
+export const getLibraryClearances = () =>
+  api.get('/library/clearance');
+
+export const getStudentLibraryClearance = (studentId) =>
+  api.get(`/library/clearance/student/${studentId}`);
+
+export const directIssueLibraryClearance = (data) =>
+  api.post('/library/clearance/direct-issue', data);
+
 export const approveLibraryClearance = (id, remarks = '') =>
-  api.put(`/library/clearance/${id}/approve`, { remarks });
+  api.put(`/library/clearance/${id}/approve`, typeof remarks === 'object' ? remarks : { remarks });
 
 export const rejectLibraryClearance = (id, remarks = '') =>
-  api.put(`/library/clearance/${id}/reject`, { remarks });
+  api.put(`/library/clearance/${id}/reject`, typeof remarks === 'object' ? remarks : { remarks });
 export const getAllLibraryTransactions = (params) => api.get('/library/transactions', { params });
 export const issueLibraryBook = (id) => api.put(`/library/transactions/${id}/issue`);
 export const manualIssueLibraryBook = (data) => api.post('/library/transactions/manual-issue', data);
@@ -734,5 +744,7 @@ export const getMyLibraryReturnRequests = () =>
 export const getLibraryReturnRequests = () => api.get('/library/return-requests');
 export const approveLibraryReturnRequest = (id) => api.put('/library/return-requests/' + id + '/approve');
 export const rejectLibraryReturnRequest = (id, remarks = '') => api.put('/library/return-requests/' + id + '/reject', { remarks });
+
+
 
 

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { SettingsContext } from '../../App';
 import {
   LayoutDashboard, Users, GraduationCap, CalendarCheck,
   BookOpenCheck, Calendar, BookOpen, FileText, ClipboardList, Inbox,
@@ -32,6 +33,7 @@ const DEPT_CODE_MAP = {
 };
 
 const HodSidebar = ({ isOpen, onClose }) => {
+  const { collegeSettings } = useContext(SettingsContext) || {};
   const navigate = useNavigate();
 
   // Read HOD session inside the component to keep it reactive
@@ -111,8 +113,24 @@ const HodSidebar = ({ isOpen, onClose }) => {
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
       {/* Brand */}
-      <div className="sidebar-header" >
-        <img src="/logo.svg?v=1782115707234" alt="ERPSYS Logo" style={{ height: '32px', objectFit: 'contain' }} />
+      <div className="sidebar-header">
+        {collegeSettings?.collegeLogo ? (
+          <img 
+            src={collegeSettings.collegeLogo} 
+            alt={collegeSettings.collegeName || "College Logo"} 
+            style={{ height: '32px', objectFit: 'contain' }} 
+          />
+        ) : collegeSettings?.collegeName ? (
+          <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+            {collegeSettings.collegeName}
+          </div>
+        ) : (
+          <img 
+            src="/logo.svg" 
+            alt="ERPSYS Logo" 
+            style={{ height: '32px', objectFit: 'contain' }} 
+          />
+        )}
       </div>
 
       

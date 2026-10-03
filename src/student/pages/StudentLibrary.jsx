@@ -51,216 +51,66 @@ import {
   getLibraryFinePayments,
   deleteLibraryTransaction
 } from '../../api';
+import LibraryNoDueCertificateModal from '../../components/LibraryNoDueCertificateModal';
 import './StudentLibrary.css';
 
-
 const NoDueCertificate = ({ clearance, studentSession }) => {
-  const refNo = `ERP/LIB-NDC/${new Date().getFullYear()}/${(clearance?._id || '004921').slice(-6).toUpperCase()}`;
-  const issueDate = clearance?.approvedAt
-    ? new Date(clearance.approvedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-    : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  const studentName = clearance?.studentName || studentSession?.name || 'Student';
-  const admissionNo = clearance?.admissionNumber || studentSession?.admissionNumber || studentSession?.rollNo || studentSession?.studentId || '-';
-  const department = clearance?.department || studentSession?.department || studentSession?.dept || '-';
-  const academicYear = clearance?.academicYear || studentSession?.academicYear || `${new Date().getFullYear()} - ${new Date().getFullYear() + 1}`;
+  const item = clearance || {};
+  const studentName = item.studentName || studentSession?.name || 'Student';
+  const admissionNumber = item.admissionNumber || studentSession?.admissionNumber || studentSession?.rollNo || studentSession?.studentId || '—';
+  const department = item.department || studentSession?.department || studentSession?.dept || 'General';
+  const clearedDate = item.approvedAt
+    ? new Date(item.approvedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    : (item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }));
+
+  const certRef = item.certificateRef || `ERP/LIB-NDC/${new Date().getFullYear()}/${(item._id || item.id || 'C00131').toString().slice(-6).toUpperCase()}`;
 
   return (
-    <div className="erp-certificate-container">
-      {/* Corner Security Accents */}
-      <div className="cert-corner cert-corner-tl" />
-      <div className="cert-corner cert-corner-tr" />
-      <div className="cert-corner cert-corner-bl" />
-      <div className="cert-corner cert-corner-br" />
-
-      {/* Watermark */}
-      <div className="cert-watermark">
-        <span>OFFICIAL CLEARANCE RECORD</span>
-      </div>
-
-      {/* Institutional Header */}
-      <div className="cert-header">
-        <div className="cert-logo-section">
-          <div className="cert-emblem">
-            <GraduationCap size={38} className="text-indigo-900" />
-          </div>
-          <div className="cert-institution-meta">
-            <h1 className="cert-college-title">MARUDHAR KESARI JAIN COLLEGE FOR WOMEN</h1>
-            <p className="cert-college-subtitle">Autonomous Institution • Affiliated to Thiruvalluvar University • Re-accredited with 'A+' Grade by NAAC</p>
-            <h2 className="cert-division-title">CENTRAL LIBRARY & LEARNING RESOURCE CENTRE</h2>
-          </div>
-          <div className="cert-seal-mini">
-            <ShieldCheck size={38} className="text-emerald-700" />
-          </div>
+    <div id="print-no-due-certificate" style={{ padding: '28px', background: '#ffffff', color: '#0f172a', textAlign: 'center', borderRadius: '10px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', maxWidth: '620px', margin: '0 auto' }}>
+      <div style={{ border: '3px double #0d9488', padding: '24px', borderRadius: '8px', background: '#fcfdfd' }}>
+        
+        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0d9488', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '4px' }}>
+          Central Library & Information Division
+        </div>
+        
+        <h2 style={{ margin: '6px 0 4px', fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          MARUDHAR KESARI JAIN COLLEGE FOR WOMEN
+        </h2>
+        
+        <div style={{ fontSize: '0.76rem', color: '#64748b', marginBottom: '18px' }}>
+          Autonomous Institution • Accredited with 'A' Grade
         </div>
 
-        <div className="cert-ribbon-bar">
-          <div className="cert-ribbon-line" />
-          <div className="cert-ribbon-badge">OFFICIAL NO-DUE CLEARANCE CERTIFICATE</div>
-          <div className="cert-ribbon-line" />
+        <div style={{ display: 'inline-block', padding: '5px 18px', background: 'rgba(16,185,129,0.12)', border: '1px solid #10b981', color: '#047857', borderRadius: '20px', fontWeight: 800, fontSize: '0.8rem', marginBottom: '22px', letterSpacing: '0.5px' }}>
+          NO DUES & LIBRARY CLEARANCE CERTIFICATE
         </div>
-      </div>
 
-      {/* Metadata Grid */}
-      <div className="cert-meta-grid">
-        <div className="cert-meta-item">
-          <span className="cert-meta-label">Certificate Ref No.</span>
-          <span className="cert-meta-value font-mono">{refNo}</span>
-        </div>
-        <div className="cert-meta-item">
-          <span className="cert-meta-label">Date of Issue</span>
-          <span className="cert-meta-value">{issueDate}</span>
-        </div>
-        <div className="cert-meta-item">
-          <span className="cert-meta-label">Academic Session</span>
-          <span className="cert-meta-value">{academicYear}</span>
-        </div>
-        <div className="cert-meta-item">
-          <span className="cert-meta-label">Verification Status</span>
-          <span className="cert-meta-value text-emerald-700 font-bold">✓ OFFICIALLY CLEARED</span>
-        </div>
-      </div>
-
-      {/* Certification Intro */}
-      <div className="cert-certification-statement">
-        <p>
-          This is to officially certify that the student detailed below has undergone thorough reconciliation across all circulation records, physical accessions, book bank registers, and fine accounts of the Central Library:
+        <p style={{ fontSize: '0.92rem', lineHeight: '1.65', color: '#334155', margin: '0 0 20px', textAlign: 'justify', fontFamily: 'sans-serif' }}>
+          This is to certify that <strong>{studentName}</strong> (Registration No: <strong>{admissionNumber}</strong>), Department of <strong>{department}</strong>, has returned all borrowed library materials, books, and reference volumes. There are <strong>no outstanding dues, book loans, or unpaid overdue fines</strong> against the student's library card account.
         </p>
-      </div>
 
-      {/* Student Details Card */}
-      <div className="cert-student-card">
-        <div className="cert-student-grid">
-          <div className="cert-student-cell">
-            <span className="cell-label">Candidate Name</span>
-            <span className="cell-val text-indigo-950 font-bold">{studentName}</span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '14px', padding: '12px 16px', background: '#f1f5f9', borderRadius: '8px', textAlign: 'left', fontSize: '0.82rem', fontFamily: 'sans-serif', marginBottom: '24px' }}>
+          <div>
+            <span style={{ color: '#64748b' }}>Certificate Ref: </span>
+            <strong style={{ color: '#0f172a' }}>{certRef}</strong>
           </div>
-          <div className="cert-student-cell">
-            <span className="cell-label">Admission / Register No.</span>
-            <span className="cell-val font-mono font-bold">{admissionNo}</span>
-          </div>
-          <div className="cert-student-cell">
-            <span className="cell-label">Department / Discipline</span>
-            <span className="cell-val">{department}</span>
-          </div>
-          <div className="cert-student-cell">
-            <span className="cell-label">Clearance Category</span>
-            <span className="cell-val">Institutional No-Due (All Dues Cleared)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Audit Checklist Table */}
-      <div className="cert-audit-table-wrap">
-        <table className="cert-audit-table">
-          <thead>
-            <tr>
-              <th style={{ width: '32%' }}>Verification Parameter</th>
-              <th style={{ width: '18%' }}>Account Record</th>
-              <th style={{ width: '18%' }}>Clearance Status</th>
-              <th style={{ width: '32%' }}>Authorization Remark</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>
-                <strong>Physical Library Books</strong>
-                <small>Catalog accessions & reference volumes</small>
-              </td>
-              <td>0 Active Loans</td>
-              <td><span className="badge-cleared">✓ ALL RETURNED</span></td>
-              <td>All accessions reconciled & inventoried</td>
-            </tr>
-            <tr>
-              <td>
-                <strong>Overdue Fines & Dues</strong>
-                <small>Late fees, replacement & damages</small>
-              </td>
-              <td>₹ 0.00 Outstanding</td>
-              <td><span className="badge-cleared">✓ NIL OUTSTANDING</span></td>
-              <td>Zero monetary liability on ledger</td>
-            </tr>
-            <tr>
-              <td>
-                <strong>Digital Repository & Smart ID</strong>
-                <small>E-Library, remote pass & RFID card</small>
-              </td>
-              <td>Card Deactivated</td>
-              <td><span className="badge-cleared">✓ VERIFIED</span></td>
-              <td>Cleared for Hall Ticket / Degree Issuance</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Formal Affirmation & Remarks */}
-      <div className="cert-affirmation-box">
-        <p>
-          <strong>OFFICIAL CLEARANCE DECLARATION:</strong> Having fulfilled all institutional library regulations and satisfied all check parameters with zero liability, the Central Library issues this unconditional <strong>NO-DUE CERTIFICATE</strong>. The candidate is declared fully cleared.
-        </p>
-        {clearance?.remarks && (
-          <div className="cert-librarian-remark-box">
-            <span className="remark-tag">Librarian Note:</span>
-            <span className="remark-text">"{clearance.remarks}"</span>
-          </div>
-        )}
-      </div>
-
-      {/* Security Verification & Signatures */}
-      <div className="cert-auth-section">
-        <div className="cert-qr-box">
-          <div className="cert-qr-code">
-            <QrCode size={46} className="text-slate-800" />
-          </div>
-          <div className="cert-qr-meta">
-            <span className="qr-title">ERP Digital Verification</span>
-            <span className="qr-sub">Scan to verify authenticity</span>
-            <span className="qr-hash">UID: {(clearance?._id || '883921').slice(-8).toUpperCase()}</span>
+          <div>
+            <span style={{ color: '#64748b' }}>Cleared Date: </span>
+            <strong style={{ color: '#0f172a' }}>{clearedDate}</strong>
           </div>
         </div>
 
-        <div className="cert-official-seal">
-          <div className="seal-circle">
-            <div className="seal-inner">
-              <span className="seal-top">CENTRAL LIBRARY</span>
-              <ShieldCheck size={20} className="seal-icon" />
-              <span className="seal-center">VERIFIED & CLEARED</span>
-              <span className="seal-bottom">COLLEGE ERP</span>
-            </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', fontFamily: 'sans-serif' }}>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: '0.76rem', color: '#10b981', fontWeight: 800 }}>✓ DIGITALLY VERIFIED BY ERP</div>
+            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Valid for Exam Hall Ticket & Final Clearance</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>Librarian / Authority Signature</div>
+            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Central Library Division</div>
           </div>
         </div>
 
-        <div className="cert-signatures-grid">
-          <div className="cert-sign-col">
-            <div className="cert-digital-sign">
-              <span className="digitally-signed-stamp">Digitally Verified</span>
-              <span className="sign-date">{issueDate}</span>
-            </div>
-            <div className="cert-sign-line" />
-            <strong>Librarian / In-Charge</strong>
-            <span>Central Library Division</span>
-          </div>
-
-          <div className="cert-sign-col">
-            <div className="cert-digital-sign placeholder-space">
-              <span className="countersigned-stamp">Countersigned</span>
-            </div>
-            <div className="cert-sign-line" />
-            <strong>Principal / COE</strong>
-            <span>Authorized Signatory</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Security Footer */}
-      <div className="cert-footer-bar">
-        <div className="cert-footer-left">
-          <span>Document ID: LIB-NDC-{(clearance?._id || '982142').slice(-8).toUpperCase()}</span>
-          <span className="dot">•</span>
-          <span>Central ERP Clearance Vault</span>
-        </div>
-        <div className="cert-footer-right">
-          <span>Authentic System Generated Record • Valid Without Physical Seal</span>
-        </div>
       </div>
     </div>
   );
@@ -2880,49 +2730,12 @@ const StudentLibrary = () => {
       )}
 
       {/* ── Official No-Due Certificate Preview Modal ── */}
-      {showCertificateModal && clearance?.status === 'Approved' && (
-        <div className="receipt-modal-backdrop animate-fade-in" onClick={() => setShowCertificateModal(false)}>
-          <div
-            className="certificate-modal-container scale-up"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Modal Controls Bar (hidden during print) */}
-            <div className="certificate-modal-toolbar">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="text-emerald-400" size={20} />
-                <span className="font-bold text-sm text-white tracking-wide">
-                  Official No-Due Certificate • Central Library Clearance Record
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="cert-btn-print"
-                >
-                  <Printer size={15} />
-                  <span>Print Certificate</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowCertificateModal(false)}
-                  className="cert-btn-close"
-                  aria-label="Close"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Scrollable Certificate Paper Canvas */}
-            <div className="certificate-modal-scroll">
-              <div className="certificate-paper-sheet">
-                <NoDueCertificate clearance={clearance} studentSession={studentSession} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <LibraryNoDueCertificateModal
+        isOpen={showCertificateModal && clearance?.status === 'Approved'}
+        onClose={() => setShowCertificateModal(false)}
+        clearance={clearance}
+        student={studentSession}
+      />
     </div>
   );
 };

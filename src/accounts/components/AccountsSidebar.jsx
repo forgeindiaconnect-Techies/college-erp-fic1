@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { SettingsContext } from '../../App';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, CreditCard, AlertCircle, Banknote,
   Receipt, FileText, LogOut, ChevronRight, ChevronDown,
   History, PieChart, Award, X, Wallet, FileBarChart,
-  UserPlus, Layers
+  UserPlus, Layers, ShieldCheck
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -20,8 +20,20 @@ const getAccountsSession = () => {
 const AccountsSidebar = ({ isOpen, onClose }) => {
   const { collegeSettings } = React.useContext(SettingsContext) || {};
   const navigate = useNavigate();
+  const location = useLocation();
   const account = getAccountsSession();
   const [expandedGroups, setExpandedGroups] = useState({});
+
+  const isItemActive = (itemPath) => {
+    const currentFull = location.pathname + location.search;
+    if (itemPath.includes('?')) {
+      return currentFull === itemPath;
+    }
+    if (itemPath === '/accounts/fees-collection') {
+      return location.pathname === '/accounts/fees-collection' && !location.search.includes('tab=clearance') && !location.search.includes('tab=report');
+    }
+    return location.pathname === itemPath;
+  };
 
   const toggleGroup = (groupName) => {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
@@ -53,6 +65,7 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
         { name: 'Quota Management', path: '/accounts/quota-management', icon: <Award size={20} /> },
         { name: 'Scholarship Management', path: '/accounts/scholarship-management', icon: <Award size={20} /> },
         { name: 'Fees Collection', path: '/accounts/fees-collection', icon: <CreditCard size={20} /> },
+        { name: 'Library Clearance', path: '/accounts/fees-collection?tab=clearance', icon: <ShieldCheck size={20} /> },
         { name: 'Pending Fees', path: '/accounts/pending-fees', icon: <AlertCircle size={20} /> },
         { name: 'Payment History', path: '/accounts/payment-history', icon: <History size={20} /> }
       ]
@@ -133,7 +146,7 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
                     <NavLink 
                       to={item.path} 
                       end={item.exact}
-                      className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
+                      className={() => isItemActive(item.path) ? "nav-link active" : "nav-link"}
                       style={{ paddingLeft: '2.8rem' }}
                     >
                       {item.icon}

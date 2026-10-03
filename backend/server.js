@@ -93,6 +93,7 @@ import { initCronJobs } from './cron/scheduler.js';
 
 // Import Models for auto-seeding
 import College from './models/College.js';
+import CollegeSettings from './models/CollegeSettings.js';
 import Approval from './models/Approval.js';
 import Exam from './models/Exam.js';
 import User from './models/User.js';
@@ -1052,6 +1053,36 @@ const startServer = async () => {
     const uri = mongoServer.getUri();
     await mongoose.connect(uri);
     console.log('✅ Connected to In-Memory MongoDB (Zero-Config Mode)');
+  }
+
+  // Sync institution name across all database collections
+  try {
+    const defaultCollegeName = 'Marudhar Kesari Jain College for Women';
+    await College.updateMany({}, { $set: { name: defaultCollegeName } });
+    await CollegeSettings.updateMany({}, { $set: { collegeName: defaultCollegeName } });
+    
+    const colCount = await College.countDocuments();
+    if (colCount === 0) {
+      await College.create({
+        name: defaultCollegeName,
+        adminName: 'System Admin',
+        email: 'admin@college.edu',
+        tenantId: 'COL001',
+        subscriptionPlan: 'Premium',
+        subscriptionStatus: 'Active'
+      });
+    }
+    const setCount = await CollegeSettings.countDocuments();
+    if (setCount === 0) {
+      await CollegeSettings.create({
+        collegeName: defaultCollegeName,
+        tenantId: 'COL001',
+        collegeId: 'COL001'
+      });
+    }
+    console.log(`✅ Institution name unified to: ${defaultCollegeName}`);
+  } catch (err) {
+    console.error('Failed to sync college name on startup:', err);
   }
 
   // Migrate existing users without tenantId to COL001

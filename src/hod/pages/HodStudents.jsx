@@ -101,9 +101,37 @@ const generateRegNo = (deptCode, existingCount) => {
   return `${deptCode}${year}${String(existingCount + 1).padStart(3, '0')}`;
 };
 
+const isSameDepartment = (candidateDept, hodDept) => {
+  if (!candidateDept || !hodDept) return false;
+  const c = String(candidateDept).trim().toLowerCase();
+  const h = String(hodDept).trim().toLowerCase();
+  if (c === h) return true;
+
+  const cleanTokens = (str) => str.replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(Boolean);
+  const cTokens = cleanTokens(c);
+  const hTokens = cleanTokens(h);
+
+  const isCS = (tokens) => tokens.some(t => ['cs', 'cse', 'computer', 'software', 'bca', 'mca', 'it', 'information'].includes(t));
+  const isCommerce = (tokens) => tokens.some(t => ['commerce', 'bcom', 'mcom', 'finance', 'accounting', 'corporate'].includes(t));
+  const isArts = (tokens) => tokens.some(t => ['arts', 'history', 'tamil', 'english', 'literature', 'economics'].includes(t));
+  const isMath = (tokens) => tokens.some(t => ['math', 'mathematics', 'stats', 'statistics'].includes(t));
+  const isScience = (tokens) => tokens.some(t => ['chemistry', 'physics', 'biotech', 'biotechnology', 'botany', 'zoology', 'biochem'].includes(t));
+  const isManagement = (tokens) => tokens.some(t => ['management', 'bba', 'mba', 'business'].includes(t));
+
+  if (isCS(hTokens)) return isCS(cTokens) && !isCommerce(cTokens) && !isArts(cTokens) && !isScience(cTokens);
+  if (isCommerce(hTokens)) return isCommerce(cTokens) && !isCS(cTokens) && !isArts(cTokens);
+  if (isArts(hTokens)) return isArts(cTokens) && !isCS(cTokens) && !isCommerce(cTokens);
+  if (isMath(hTokens)) return isMath(cTokens);
+  if (isManagement(hTokens)) return isManagement(cTokens) && !isCS(cTokens);
+  
+  const ignoreWords = ['engineering', 'department', 'dept', 'of', 'and', 'bsc', 'btech', 'be', 'bcom', 'ba', 'ma', 'msc', 'program'];
+  const matchedTokens = cTokens.filter(t => hTokens.includes(t) && !ignoreWords.includes(t));
+  return matchedTokens.length > 0;
+};
+
 const HodStudents = () => {
   const hodSession = getHodSession();
-  const HOD_DEPT = hodSession.dept;
+  const HOD_DEPT = hodSession.dept || hodSession.department || 'Computer Science';
   const deptCode = DEPT_CODE_MAP[HOD_DEPT] || hodSession.deptCode || 'CSE';
 
   const [loading, setLoading] = useState(true);
@@ -128,13 +156,23 @@ const HodStudents = () => {
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const res = await getStudents();
-      const mapped = (res.data || []).map(s => {
-        const semVal = s.sem || 'Sem 1';
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const res = await getStudents().catch(() => ({ data: [] }));
+      let raw = Array.isArray(res.data) ? res.data : (res.data?.students || []);
+      
+      if (raw.length === 0) {
+        try {
+          const local = localStorage.getItem(`erp_students_${tenantId}`) || localStorage.getItem('erp_students') || localStorage.getItem('students');
+          if (local) raw = JSON.parse(local);
+        } catch {}
+      }
+
+      const mapped = raw.map(s => {
+        const semVal = s.sem || s.semester || 'Sem 1';
         return {
           id: s.id || s._id,
           name: s.name,
-          rollNo: s.rollNo || s.id || `${deptCode}${String(Math.floor(Math.random() * 900) + 100)}`,
+          rollNo: s.rollNo || s.idNumber || s.id || `${deptCode}${String(Math.floor(Math.random() * 900) + 100)}`,
           sem: semVal,
           year: s.year || deriveYearFromSem(semVal),
           section: s.section || 'A',
@@ -142,8 +180,8 @@ const HodStudents = () => {
           cgpa: s.cgpa != null ? s.cgpa : 0,
           feeStatus: s.feeStatus || 'Paid',
           status: s.status || 'Active',
-          deptCode: DEPT_CODE_MAP[s.dept || s.department] || s.deptCode || 'CSE',
-          dept: s.dept || s.department || HOD_DEPT,
+          deptCode: DEPT_CODE_MAP[s.dept || s.department] || s.deptCode || deptCode,
+          dept: s.dept || s.department || s.course || s.branch || HOD_DEPT,
           email: s.email || '',
           phone: s.phone || '',
           idNumber: s.idNumber || '',
@@ -168,7 +206,7 @@ const HodStudents = () => {
     }
   };
 
-  const myStudents = students.filter(s => s.deptCode === deptCode);
+  const myStudents = students.filter(s => isSameDepartment(s.dept, HOD_DEPT));
 
   const filtered = myStudents
     .filter(s => {

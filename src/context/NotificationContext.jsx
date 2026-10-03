@@ -63,14 +63,33 @@ export const NotificationProvider = ({ children }) => {
     if (!activeSessionKey && !user) return;
 
     try {
-      const { data } = await getNotifications(params);
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      let combined = [];
+
+      const { data } = await getNotifications(params).catch(() => ({ data: [] }));
       if (Array.isArray(data)) {
-        setNotifications(data);
-        setUnreadCount(data.filter(n => !n.isRead).length);
+        combined = [...data];
       } else if (data && Array.isArray(data.notifications)) {
-        setNotifications(data.notifications);
-        setUnreadCount(data.unreadCount ?? data.notifications.filter(n => !n.isRead).length);
+        combined = [...data.notifications];
       }
+
+      // Merge local storage notifications
+      try {
+        const localRaw = localStorage.getItem(`erp_notifications_${tenantId}`) || localStorage.getItem('erp_notifications');
+        if (localRaw) {
+          const localList = JSON.parse(localRaw);
+          if (Array.isArray(localList)) {
+            localList.forEach(ln => {
+              if (!combined.some(n => (n._id || n.id) === (ln._id || ln.id))) {
+                combined.unshift(ln);
+              }
+            });
+          }
+        }
+      } catch (e) {}
+
+      setNotifications(combined);
+      setUnreadCount(combined.filter(n => !n.isRead).length);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
@@ -78,6 +97,18 @@ export const NotificationProvider = ({ children }) => {
 
   useEffect(() => {
     fetchNotifications();
+
+    const handleLocalNotifEvent = (e) => {
+      const notif = e.detail;
+      if (notif) {
+        setNotifications(prev => [notif, ...prev.filter(n => (n._id || n.id) !== (notif._id || notif.id))]);
+        setUnreadCount(prev => prev + 1);
+        showToast(notif);
+      }
+    };
+
+    window.addEventListener('erp_notification_received', handleLocalNotifEvent);
+    window.addEventListener('storage', () => fetchNotifications());
 
     // Determine target socket server URL
     const socketUrl = getBackendURL();
@@ -132,6 +163,7 @@ export const NotificationProvider = ({ children }) => {
     });
 
     return () => {
+      window.removeEventListener('erp_notification_received', handleLocalNotifEvent);
       socket.disconnect();
     };
   }, [user]);

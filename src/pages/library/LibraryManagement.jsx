@@ -50,6 +50,7 @@ import {
 } from 'recharts';
 import CustomSelect from '../../components/CustomSelect';
 import './LibraryManagement.css';
+import LibraryNoDueCertificateModal from '../../components/LibraryNoDueCertificateModal';
 
 // Default Fallback Categories if no courses exist yet
 const FALLBACK_CATEGORIES = ['Computer Science', 'Information Technology', 'Mechanical Engineering', 'Electronics & Communication', 'Electrical Engineering', 'Civil Engineering', 'Mathematics', 'Physics', 'Chemistry', 'Management Studies'];
@@ -108,6 +109,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
   const [clearanceActionId, setClearanceActionId] = useState(null);
   const [clearanceSearch, setClearanceSearch] = useState('');
   const [clearanceStatusFilter, setClearanceStatusFilter] = useState('All');
+  const [selectedClearanceForCert, setSelectedClearanceForCert] = useState(null);
 
   // Real-time Academic Structure State
   const [departmentsList, setDepartmentsList] = useState([]);
@@ -116,7 +118,9 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
   // Member search state
   const [memberSearch, setMemberSearch] = useState('');
   const [selectedMemberForDetails, setSelectedMemberForDetails] = useState(null);
-  const [activeReportSubTab, setActiveReportSubTab] = useState('fines');
+  const [activeReportSubTab, setActiveReportSubTab] = useState('weekly');
+  const [selectedReportWeekDate, setSelectedReportWeekDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedReportMonth, setSelectedReportMonth] = useState(new Date().toISOString().slice(0, 7));
   const [reportSearch, setReportSearch] = useState('');
   const [reportDeptFilter, setReportDeptFilter] = useState('All Departments');
   const [reportStatusFilter, setReportStatusFilter] = useState('All');
@@ -1100,6 +1104,132 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
   const totalIssuedTodayCount = issues.filter(i => isSameDay(i.issueDate) || isSameDay(i.createdAt)).length;
   const totalReturnedTodayCount = issues.filter(i => i.status === 'Returned' && (isSameDay(i.returnDate) || isSameDay(i.returnedAt) || isSameDay(i.updatedAt))).length;
 
+  // Weekly & Monthly Reports Date Helpers & Datasets
+  const getWeekRange = (dateInput) => {
+    const d = dateInput ? new Date(dateInput) : new Date();
+    const validDate = isNaN(d.getTime()) ? new Date() : d;
+    const day = validDate.getDay();
+    const diffToMonday = (day === 0 ? -6 : 1) - day;
+    
+    const monday = new Date(validDate);
+    monday.setDate(validDate.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    return { start: monday, end: sunday };
+  };
+
+  const isDateInWeek = (date, weekStart, weekEnd) => {
+    if (!date) return false;
+    const d = new Date(date);
+    return !isNaN(d.getTime()) && d >= weekStart && d <= weekEnd;
+  };
+
+  const isDateInMonth = (date, yearMonthStr) => {
+    if (!date || !yearMonthStr) return false;
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return false;
+    const [year, month] = yearMonthStr.split('-').map(Number);
+    return d.getFullYear() === year && (d.getMonth() + 1) === month;
+  };
+
+  const currentWeekRange = getWeekRange(selectedReportWeekDate);
+  const weekStartFormatted = currentWeekRange.start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const weekEndFormatted = currentWeekRange.end.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  // Weekly Dataset
+  const weeklyIssuedList = issues.filter(i => isDateInWeek(i.issueDate || i.createdAt, currentWeekRange.start, currentWeekRange.end));
+  const weeklyReturnedList = issues.filter(i => i.status === 'Returned' && isDateInWeek(i.returnDate || i.returnedAt || i.updatedAt, currentWeekRange.start, currentWeekRange.end));
+  const weeklyFineTotal = weeklyReturnedList.reduce((sum, i) => sum + Number(i.finePaid || 0), 0);
+
+  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const weeklyDayBreakdown = dayNames.map((name, index) => {
+    const dayDate = new Date(currentWeekRange.start);
+    dayDate.setDate(currentWeekRange.start.getDate() + index);
+
+    const dayIssues = issues.filter(i => isSameDay(i.issueDate || i.createdAt, dayDate));
+    const dayReturns = issues.filter(i => i.status === 'Returned' && isSameDay(i.returnDate || i.returnedAt || i.updatedAt, dayDate));
+    const dayFine = dayReturns.reduce((sum, r) => sum + Number(r.finePaid || 0), 0);
+
+    return {
+      dayName: name,
+      date: dayDate,
+      dateFormatted: dayDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+      issuedCount: dayIssues.length,
+      returnedCount: dayReturns.length,
+      fineCollected: dayFine,
+      dayIssues,
+      dayReturns
+    };
+  });
+
+  const weeklyActivityList = [
+    ...weeklyIssuedList.map(i => ({ ...i, activityType: 'Issued', activityDate: i.issueDate || i.createdAt })),
+    ...weeklyReturnedList.map(i => ({ ...i, activityType: 'Returned', activityDate: i.returnDate || i.returnedAt || i.updatedAt }))
+  ].filter(item => {
+    const q = reportSearch.toLowerCase();
+    const matchesSearch = !reportSearch ||
+      (item.userId || '').toLowerCase().includes(q) ||
+      (item.bookId?.title || '').toLowerCase().includes(q) ||
+      (item.bookId?.bookId || '').toLowerCase().includes(q);
+    const matchesDept = reportDeptFilter === 'All Departments' || item.bookId?.department === reportDeptFilter;
+    const matchesStatus = reportStatusFilter === 'All' || item.activityType === reportStatusFilter;
+    return matchesSearch && matchesDept && matchesStatus;
+  }).sort((a, b) => new Date(b.activityDate || 0) - new Date(a.activityDate || 0));
+
+  // Monthly Dataset
+  const [selectedYear, selectedMonthNum] = (selectedReportMonth || new Date().toISOString().slice(0, 7)).split('-').map(Number);
+  const monthDateObj = new Date(selectedYear, (selectedMonthNum || 1) - 1, 1);
+  const monthLabel = monthDateObj.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+
+  const monthlyIssuedList = issues.filter(i => isDateInMonth(i.issueDate || i.createdAt, selectedReportMonth));
+  const monthlyReturnedList = issues.filter(i => i.status === 'Returned' && isDateInMonth(i.returnDate || i.returnedAt || i.updatedAt, selectedReportMonth));
+  const monthlyFineTotal = monthlyReturnedList.reduce((sum, i) => sum + Number(i.finePaid || 0), 0);
+  const monthlyUniqueBorrowers = new Set(monthlyIssuedList.map(i => i.userId)).size;
+
+  const daysInSelectedMonth = new Date(selectedYear, selectedMonthNum, 0).getDate();
+  const monthWeekRanges = [
+    { label: 'Week 1', startDay: 1, endDay: 7 },
+    { label: 'Week 2', startDay: 8, endDay: 14 },
+    { label: 'Week 3', startDay: 15, endDay: 21 },
+    { label: 'Week 4', startDay: 22, endDay: 28 },
+    ...(daysInSelectedMonth > 28 ? [{ label: 'Week 5', startDay: 29, endDay: daysInSelectedMonth }] : [])
+  ];
+
+  const monthlyWeekBreakdown = monthWeekRanges.map(w => {
+    const startDate = new Date(selectedYear, selectedMonthNum - 1, w.startDay, 0, 0, 0);
+    const endDate = new Date(selectedYear, selectedMonthNum - 1, w.endDay, 23, 59, 59);
+
+    const weekIssues = issues.filter(i => isDateInWeek(i.issueDate || i.createdAt, startDate, endDate));
+    const weekReturns = issues.filter(i => i.status === 'Returned' && isDateInWeek(i.returnDate || i.returnedAt || i.updatedAt, startDate, endDate));
+    const weekFine = weekReturns.reduce((sum, r) => sum + Number(r.finePaid || 0), 0);
+
+    return {
+      label: w.label,
+      dateRangeStr: `${w.startDay} ${monthDateObj.toLocaleDateString('en-IN', { month: 'short' })} - ${w.endDay} ${monthDateObj.toLocaleDateString('en-IN', { month: 'short' })}`,
+      issuedCount: weekIssues.length,
+      returnedCount: weekReturns.length,
+      fineCollected: weekFine
+    };
+  });
+
+  const monthlyActivityList = [
+    ...monthlyIssuedList.map(i => ({ ...i, activityType: 'Issued', activityDate: i.issueDate || i.createdAt })),
+    ...monthlyReturnedList.map(i => ({ ...i, activityType: 'Returned', activityDate: i.returnDate || i.returnedAt || i.updatedAt }))
+  ].filter(item => {
+    const q = reportSearch.toLowerCase();
+    const matchesSearch = !reportSearch ||
+      (item.userId || '').toLowerCase().includes(q) ||
+      (item.bookId?.title || '').toLowerCase().includes(q) ||
+      (item.bookId?.bookId || '').toLowerCase().includes(q);
+    const matchesDept = reportDeptFilter === 'All Departments' || item.bookId?.department === reportDeptFilter;
+    const matchesStatus = reportStatusFilter === 'All' || item.activityType === reportStatusFilter;
+    return matchesSearch && matchesDept && matchesStatus;
+  }).sort((a, b) => new Date(b.activityDate || 0) - new Date(a.activityDate || 0));
+
   // Real Filtered Datasets for Reports & Analytics
   const filteredCirculationReport = issues.filter(issue => {
     const q = reportSearch.toLowerCase();
@@ -1213,18 +1343,50 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
     return true;
   });
 
+  const monthlyDeptBreakdown = allReportDepts.map(dept => {
+    const deptIssuesInMonth = monthlyIssuedList.filter(i => i.bookId?.department === dept);
+    const deptReturnsInMonth = monthlyReturnedList.filter(i => i.bookId?.department === dept);
+    const deptFinesInMonth = deptReturnsInMonth.reduce((sum, r) => sum + Number(r.finePaid || 0), 0);
+
+    return {
+      dept,
+      issuesCount: deptIssuesInMonth.length,
+      returnsCount: deptReturnsInMonth.length,
+      finesCollected: deptFinesInMonth
+    };
+  }).filter(d => (d.issuesCount > 0 || d.returnsCount > 0 || d.finesCollected > 0 || reportDeptFilter === 'All Departments' || d.dept === reportDeptFilter));
+
   const handleExportReportCSV = () => {
     let csvContent = '';
     let filename = '';
 
-    if (activeReportSubTab === 'issuedToday') {
+    const formatCsvDate = (dateVal) => {
+      if (!dateVal) return '="—"';
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '="—"';
+      const day = String(d.getDate()).padStart(2, '0');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = months[d.getMonth()];
+      const year = d.getFullYear();
+      return `="${day}-${month}-${year}"`;
+    };
+
+    if (activeReportSubTab === 'weekly') {
+      filename = `Library_Weekly_Report_${currentWeekRange.start.toISOString().slice(0, 10)}_to_${currentWeekRange.end.toISOString().slice(0, 10)}.csv`;
+      csvContent = 'Activity Type,Transaction ID,Borrower ID,User Type,Book Title,Department,Date,Due/Return Date,Status,Fine Settled\n' +
+        weeklyActivityList.map(a => `"${a.activityType}","${a._id}","${a.userId}","${a.userType || 'Student'}","${(a.bookId?.title || '').replace(/"/g, '""')}","${a.bookId?.department || ''}",${formatCsvDate(a.activityDate)},${formatCsvDate(a.dueDate || a.returnDate)},"${a.status}","${a.finePaid || 0}"`).join('\n');
+    } else if (activeReportSubTab === 'monthly') {
+      filename = `Library_Monthly_Report_${selectedReportMonth}.csv`;
+      csvContent = 'Activity Type,Transaction ID,Borrower ID,User Type,Book Title,Department,Date,Due/Return Date,Status,Fine Settled\n' +
+        monthlyActivityList.map(a => `"${a.activityType}","${a._id}","${a.userId}","${a.userType || 'Student'}","${(a.bookId?.title || '').replace(/"/g, '""')}","${a.bookId?.department || ''}",${formatCsvDate(a.activityDate)},${formatCsvDate(a.dueDate || a.returnDate)},"${a.status}","${a.finePaid || 0}"`).join('\n');
+    } else if (activeReportSubTab === 'issuedToday') {
       filename = `Library_Issued_Today_Report_${new Date().toISOString().slice(0, 10)}.csv`;
       csvContent = 'Transaction ID,Borrower ID,Borrower Type,Book Title,Issue Date,Due Date,Status\n' +
-        filteredIssuedTodayReport.map(i => `"${i._id}","${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}","${i.issueDate ? new Date(i.issueDate).toLocaleDateString() : ''}","${i.dueDate ? new Date(i.dueDate).toLocaleDateString() : ''}","${i.status}"`).join('\n');
+        filteredIssuedTodayReport.map(i => `"${i._id}","${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}",${formatCsvDate(i.issueDate || i.createdAt)},${formatCsvDate(i.dueDate)},"${i.status}"`).join('\n');
     } else if (activeReportSubTab === 'returnedToday') {
       filename = `Library_Returned_Today_Report_${new Date().toISOString().slice(0, 10)}.csv`;
       csvContent = 'Transaction ID,Borrower ID,Borrower Type,Book Title,Issue Date,Return Date,Fine Paid\n' +
-        filteredReturnedTodayReport.map(i => `"${i._id}","${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}","${i.issueDate ? new Date(i.issueDate).toLocaleDateString() : ''}","${i.returnDate ? new Date(i.returnDate).toLocaleDateString() : ''}","${i.finePaid || 0}"`).join('\n');
+        filteredReturnedTodayReport.map(i => `"${i._id}","${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}",${formatCsvDate(i.issueDate || i.createdAt)},${formatCsvDate(i.returnDate || i.returnedAt || i.updatedAt)},"${i.finePaid || 0}"`).join('\n');
     } else if (activeReportSubTab === 'fines') {
       filename = `Library_Fine_Ledger_${new Date().toISOString().slice(0, 10)}.csv`;
       csvContent = 'Borrower ID,User Type,Book Title,Total Fine,Fine Paid,Balance Due,Status\n' +
@@ -1236,11 +1398,11 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
     } else if (activeReportSubTab === 'defaulters') {
       filename = `Library_Overdue_Defaulters_${new Date().toISOString().slice(0, 10)}.csv`;
       csvContent = 'Borrower ID,User Type,Book Title,Due Date,Days Overdue,Outstanding Fine\n' +
-        filteredDefaultersReport.map(i => `"${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}","${i.dueDate ? new Date(i.dueDate).toLocaleDateString() : ''}","${Math.max(0, Math.ceil((Date.now() - new Date(i.dueDate).getTime()) / (1000 * 60 * 60 * 24)))}","${Math.max(0, Number(i.fineAmount || 0) - Number(i.finePaid || 0))}"`).join('\n');
+        filteredDefaultersReport.map(i => `"${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}",${formatCsvDate(i.dueDate)},"${Math.max(0, Math.ceil((Date.now() - new Date(i.dueDate).getTime()) / (1000 * 60 * 60 * 24)))}","${Math.max(0, Number(i.fineAmount || 0) - Number(i.finePaid || 0))}"`).join('\n');
     } else if (activeReportSubTab === 'circulation') {
       filename = `Library_Circulation_Report_${new Date().toISOString().slice(0, 10)}.csv`;
       csvContent = 'Transaction ID,Borrower ID,Borrower Type,Book Title,Issue Date,Due Date,Return Date,Status,Fine Amount,Fine Paid\n' +
-        filteredCirculationReport.map(i => `"${i._id}","${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}","${i.issueDate ? new Date(i.issueDate).toLocaleDateString() : ''}","${i.dueDate ? new Date(i.dueDate).toLocaleDateString() : ''}","${i.returnDate ? new Date(i.returnDate).toLocaleDateString() : 'N/A'}","${i.status}","${i.fineAmount || 0}","${i.finePaid || 0}"`).join('\n');
+        filteredCirculationReport.map(i => `"${i._id}","${i.userId}","${i.userType || 'Student'}","${(i.bookId?.title || '').replace(/"/g, '""')}",${formatCsvDate(i.issueDate)},${formatCsvDate(i.dueDate)},${formatCsvDate(i.returnDate)},"${i.status}","${i.fineAmount || 0}","${i.finePaid || 0}"`).join('\n');
     } else {
       filename = `Library_Inventory_Report_${new Date().toISOString().slice(0, 10)}.csv`;
       csvContent = 'Book ID,ISBN,Title,Author,Department,Category,Total Copies,Rack,Shelf\n' +
@@ -1254,6 +1416,296 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handlePrintReport = () => {
+    let reportTitle = 'Library Report';
+    let subtitle = '';
+    let kpiHtml = '';
+    let tableHeadersHtml = '';
+    let tableRowsHtml = '';
+
+    const currentDateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const currentTimeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+    if (activeReportSubTab === 'weekly') {
+      reportTitle = 'Library Weekly Circulation Audit';
+      subtitle = `Audit Window: ${weekStartFormatted} to ${weekEndFormatted} | Department: ${reportDeptFilter}`;
+      kpiHtml = `
+        <div style="display:flex;gap:12px;margin-bottom:16px;">
+          <div style="flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;text-align:center;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">Books Issued</div>
+            <div style="font-size:20px;font-weight:800;color:#2563eb;">${weeklyIssuedList.length}</div>
+          </div>
+          <div style="flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;text-align:center;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">Books Returned</div>
+            <div style="font-size:20px;font-weight:800;color:#7c3aed;">${weeklyReturnedList.length}</div>
+          </div>
+          <div style="flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;text-align:center;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">Fines Collected</div>
+            <div style="font-size:20px;font-weight:800;color:#059669;">₹${weeklyFineTotal}</div>
+          </div>
+          <div style="flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;text-align:center;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">Total Transactions</div>
+            <div style="font-size:20px;font-weight:800;color:#0f172a;">${weeklyActivityList.length}</div>
+          </div>
+        </div>
+      `;
+      tableHeadersHtml = `
+        <tr>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Activity Type</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Borrower ID</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">User Type</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Book Title</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Department</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Activity Date</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Due/Return Date</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:right;">Fine Paid</th>
+        </tr>
+      `;
+      tableRowsHtml = weeklyActivityList.map(a => `
+        <tr>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:600;">${a.activityType}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;font-family:monospace;">${a.userId}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${a.userType || 'Student'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${a.bookId?.title || 'Unknown Book'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${a.bookId?.department || '—'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${a.activityDate ? new Date(a.activityDate).toLocaleDateString() : '—'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${a.dueDate ? new Date(a.dueDate).toLocaleDateString() : (a.returnDate ? new Date(a.returnDate).toLocaleDateString() : '—')}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:right;font-weight:600;">₹${a.finePaid || 0}</td>
+        </tr>
+      `).join('');
+    } else if (activeReportSubTab === 'monthly') {
+      reportTitle = 'Library Monthly Performance & Utilization Report';
+      subtitle = `Month: ${monthLabel} | Department: ${reportDeptFilter}`;
+      kpiHtml = `
+        <div style="display:flex;gap:12px;margin-bottom:16px;">
+          <div style="flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;text-align:center;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">Month Issues</div>
+            <div style="font-size:20px;font-weight:800;color:#2563eb;">${monthlyIssuedList.length}</div>
+          </div>
+          <div style="flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;text-align:center;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">Month Returns</div>
+            <div style="font-size:20px;font-weight:800;color:#7c3aed;">${monthlyReturnedList.length}</div>
+          </div>
+          <div style="flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;text-align:center;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">Fine Revenue</div>
+            <div style="font-size:20px;font-weight:800;color:#059669;">₹${monthlyFineTotal}</div>
+          </div>
+          <div style="flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;text-align:center;">
+            <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">Unique Borrowers</div>
+            <div style="font-size:20px;font-weight:800;color:#d97706;">${monthlyUniqueBorrowers}</div>
+          </div>
+        </div>
+      `;
+      tableHeadersHtml = `
+        <tr>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Activity Type</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Borrower ID</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">User Type</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Book Title</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Department</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Activity Date</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Due/Return Date</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:right;">Fine Paid</th>
+        </tr>
+      `;
+      tableRowsHtml = monthlyActivityList.map(a => `
+        <tr>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:600;">${a.activityType}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;font-family:monospace;">${a.userId}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${a.userType || 'Student'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${a.bookId?.title || 'Unknown Book'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${a.bookId?.department || '—'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${a.activityDate ? new Date(a.activityDate).toLocaleDateString() : '—'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${a.dueDate ? new Date(a.dueDate).toLocaleDateString() : (a.returnDate ? new Date(a.returnDate).toLocaleDateString() : '—')}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:right;font-weight:600;">₹${a.finePaid || 0}</td>
+        </tr>
+      `).join('');
+    } else if (activeReportSubTab === 'fines') {
+      reportTitle = 'Library Fine Collection & Audit Ledger';
+      subtitle = `Status: ${reportStatusFilter} | Department: ${reportDeptFilter}`;
+      tableHeadersHtml = `
+        <tr>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Borrower ID</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">User Type</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Book Title</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:right;">Total Fine</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:right;">Paid</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:right;">Balance Due</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:center;">Status</th>
+        </tr>
+      `;
+      tableRowsHtml = filteredFineReport.map(i => {
+        const fine = Number(i.fineAmount || 0);
+        const paid = Number(i.finePaid || 0);
+        const balance = Math.max(0, fine - paid);
+        return `
+          <tr>
+            <td style="padding:6px 8px;border:1px solid #e2e8f0;font-family:monospace;font-weight:bold;">${i.userId}</td>
+            <td style="padding:6px 8px;border:1px solid #e2e8f0;">${i.userType || 'Student'}</td>
+            <td style="padding:6px 8px;border:1px solid #e2e8f0;">${i.bookId?.title || 'Unknown Book'}</td>
+            <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:right;">₹${fine}</td>
+            <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:right;color:#059669;font-weight:bold;">₹${paid}</td>
+            <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:right;color:#e11d48;font-weight:bold;">₹${balance}</td>
+            <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;">${balance <= 0 ? 'Paid' : 'Pending'}</td>
+          </tr>
+        `;
+      }).join('');
+    } else if (activeReportSubTab === 'circulation') {
+      reportTitle = 'Library Circulation & Loans Audit Report';
+      subtitle = `Status: ${reportStatusFilter} | Department: ${reportDeptFilter}`;
+      tableHeadersHtml = `
+        <tr>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Transaction ID</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Borrower ID</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Book Title</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Department</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Issue Date</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Due Date</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Return Date</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:center;">Status</th>
+        </tr>
+      `;
+      tableRowsHtml = filteredCirculationReport.map(i => `
+        <tr>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;font-family:monospace;">${i._id}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;font-family:monospace;font-weight:bold;">${i.userId}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${i.bookId?.title || 'Unknown Book'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${i.bookId?.department || '—'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${i.issueDate ? new Date(i.issueDate).toLocaleDateString() : '—'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${i.dueDate ? new Date(i.dueDate).toLocaleDateString() : '—'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${i.returnDate ? new Date(i.returnDate).toLocaleDateString() : '—'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;">${i.status}</td>
+        </tr>
+      `).join('');
+    } else if (activeReportSubTab === 'departments') {
+      reportTitle = 'Library Academic Department Utilization Report';
+      subtitle = `Department: ${reportDeptFilter}`;
+      tableHeadersHtml = `
+        <tr>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Department</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:center;">Titles</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:center;">Copies</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:center;">Total Issues</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:center;">Active Loans</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:center;">Overdue</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:right;">Fines Incurred</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:right;">Utilization %</th>
+        </tr>
+      `;
+      tableRowsHtml = deptAnalyticsList.map(d => `
+        <tr>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:bold;">${d.dept}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${d.catalogedTitles}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${d.catalogedCopies}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;">${d.totalIssues}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;color:#2563eb;">${d.activeLoans}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;color:#e11d48;">${d.overdueCount}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:right;">₹${d.totalFines}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:right;font-weight:bold;">${d.utilizationRate}%</td>
+        </tr>
+      `).join('');
+    } else {
+      reportTitle = 'Library Catalog & Inventory Report';
+      subtitle = `Department: ${reportDeptFilter}`;
+      tableHeadersHtml = `
+        <tr>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Book ID / ISBN</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Title</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Author</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Department</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:left;">Category</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:center;">Copies</th>
+          <th style="padding:8px;border:1px solid #cbd5e1;background:#f1f5f9;text-align:center;">Shelf Location</th>
+        </tr>
+      `;
+      tableRowsHtml = filteredInventoryReport.map(b => `
+        <tr>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;font-family:monospace;font-weight:bold;">${b.bookId || b.isbn || '—'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:bold;">${b.title}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${b.author}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${b.department || '—'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;">${b.category || '—'}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;">${b.totalCopies || 1}</td>
+          <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">Rack ${b.rackNumber || 'R01'} / Shelf ${b.shelfNumber || 'S01'}</td>
+        </tr>
+      `).join('');
+    }
+
+    const printWindow = window.open('', '_blank', 'width=1000,height=700');
+    if (!printWindow) {
+      alert('Please allow popups to print library reports.');
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${reportTitle}</title>
+          <style>
+            @page { size: A4 portrait; margin: 15mm; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; margin: 0; padding: 20px; font-size: 12px; }
+            .header-box { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
+            .inst-name { font-size: 18px; font-weight: 800; text-transform: uppercase; color: #1e3a8a; }
+            .report-name { font-size: 15px; font-weight: 700; margin-top: 4px; color: #0f172a; }
+            .meta-text { font-size: 11px; color: #64748b; margin-top: 2px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+            th { background-color: #f1f5f9; font-weight: 700; color: #334155; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+            .footer { margin-top: 30px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; border-top: 1px dashed #cbd5e1; padding-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="header-box">
+            <div>
+              <div class="inst-name">${collegeSettings?.collegeName || 'Marudhar Kesari Jain College for Women'}</div>
+              <div class="report-name">${reportTitle}</div>
+              <div class="meta-text">${subtitle}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-weight:700;font-size:12px;">Library Resource Center</div>
+              <div class="meta-text">Printed on: ${currentDateStr} at ${currentTimeStr}</div>
+              <div class="meta-text">Generated by: Librarian Portal</div>
+            </div>
+          </div>
+
+          ${kpiHtml}
+
+          <table>
+            <thead>
+              ${tableHeadersHtml}
+            </thead>
+            <tbody>
+              ${tableRowsHtml || '<tr><td colspan="8" style="padding:20px;text-align:center;color:#64748b;">No records found for the selected criteria.</td></tr>'}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <div>Official Institutional Library Management Report</div>
+            <div>Authorized Librarian Signature: _____________________</div>
+          </div>
+
+          <script>
+            window.addEventListener('load', function() {
+              setTimeout(function() {
+                window.print();
+              }, 250);
+            });
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      try {
+        printWindow.print();
+      } catch (e) {
+        console.error('Print trigger error:', e);
+      }
+    }, 400);
   };
 
   if (isInitialLoading && books.length === 0 && issues.length === 0) {
@@ -3371,17 +3823,27 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                                 </button>
                               </div>
                             ) : (
-                              <span className="text-xs text-muted font-semibold flex items-center justify-end gap-1">
+                              <div className="flex items-center justify-end gap-1.5">
                                 {request.status === 'Approved' ? (
                                   <>
-                                    <CheckCircle2 size={13} className="text-emerald-500" /> No-Due Issued
+                                    <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                                      <CheckCircle2 size={13} className="text-emerald-500" /> Cleared
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedClearanceForCert(request)}
+                                      className="btn-primary text-xs py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1 shadow-sm rounded-md"
+                                      title="View & Print Official Library No-Due Certificate"
+                                    >
+                                      <FileText size={12} /> Certificate
+                                    </button>
                                   </>
                                 ) : (
-                                  <>
+                                  <span className="text-xs text-rose-500 font-semibold flex items-center gap-1">
                                     <XCircle size={13} className="text-rose-500" /> Declined
-                                  </>
+                                  </span>
                                 )}
-                              </span>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -3891,10 +4353,12 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
             {/* Report Selector Pills */}
             <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-0.5">
               {[
+                { key: 'weekly', label: 'Weekly Report', icon: Calendar, count: weeklyActivityList.length },
+                { key: 'monthly', label: 'Monthly Report', icon: TrendingUp, count: monthlyActivityList.length },
                 { key: 'fines', label: 'Fine Collection Ledger', icon: Receipt, count: filteredFineReport.length },
+                { key: 'circulation', label: 'Circulation & Loans', icon: ArrowRightLeft, count: filteredCirculationReport.length },
                 { key: 'issuedToday', label: 'Issued Today', icon: BookDown, count: filteredIssuedTodayReport.length },
                 { key: 'returnedToday', label: 'Returned Today', icon: CheckCircle2, count: filteredReturnedTodayReport.length },
-                { key: 'circulation', label: 'Circulation & Loans', icon: ArrowRightLeft, count: filteredCirculationReport.length },
                 { key: 'departments', label: 'Department Analytics', icon: Building, count: deptAnalyticsList.length },
                 { key: 'defaulters', label: 'Overdue & Defaulters', icon: AlertTriangle, count: filteredDefaultersReport.length, danger: filteredDefaultersReport.length > 0 },
                 { key: 'inventory', label: 'Catalog & Inventory', icon: BookOpen, count: filteredInventoryReport.length }
@@ -3940,7 +4404,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
               </button>
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={handlePrintReport}
                 className="btn-secondary flex items-center gap-1.5 text-xs py-2 px-3"
                 title="Print official library report"
               >
@@ -3952,7 +4416,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
           {/* Filter and Live Search Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--bg-card)] p-3.5 rounded-xl border border-[var(--border-color)]">
             <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
-              <div className="search-box" style={{ minWidth: '240px', maxWidth: '360px' }}>
+              <div className="search-box" style={{ minWidth: '220px', maxWidth: '320px' }}>
                 <Search size={15} className="text-muted" />
                 <input
                   type="text"
@@ -3962,7 +4426,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                 />
               </div>
 
-              <div style={{ width: '210px' }}>
+              <div style={{ width: '200px' }}>
                 <CustomSelect
                   options={deptOptions}
                   value={reportDeptFilter}
@@ -3970,6 +4434,112 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                   icon={Building}
                 />
               </div>
+
+              {/* Weekly Date Selector & Quick Step */}
+              {activeReportSubTab === 'weekly' && (
+                <div className="flex items-center gap-1.5 bg-[var(--bg-secondary)] p-1 rounded-lg border border-[var(--border-color)] flex-wrap">
+                  <span className="text-[11px] font-bold text-muted px-1.5">Week:</span>
+                  <input
+                    type="date"
+                    className="p-1 rounded bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-semibold"
+                    value={selectedReportWeekDate}
+                    onChange={e => setSelectedReportWeekDate(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date(selectedReportWeekDate || new Date());
+                      d.setDate(d.getDate() - 7);
+                      setSelectedReportWeekDate(d.toISOString().slice(0, 10));
+                    }}
+                    className="px-2 py-1 text-xs rounded bg-[var(--bg-card)] hover:bg-primary/10 hover:text-primary font-bold border border-[var(--border-color)]"
+                    title="Previous Week"
+                  >
+                    ◀ Prev
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedReportWeekDate(new Date().toISOString().slice(0, 10))}
+                    className="px-2 py-1 text-xs rounded bg-[var(--bg-card)] hover:bg-primary/10 hover:text-primary font-bold border border-[var(--border-color)]"
+                    title="Jump to Current Week"
+                  >
+                    This Week
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date(selectedReportWeekDate || new Date());
+                      d.setDate(d.getDate() + 7);
+                      setSelectedReportWeekDate(d.toISOString().slice(0, 10));
+                    }}
+                    className="px-2 py-1 text-xs rounded bg-[var(--bg-card)] hover:bg-primary/10 hover:text-primary font-bold border border-[var(--border-color)]"
+                    title="Next Week"
+                  >
+                    Next ▶
+                  </button>
+                </div>
+              )}
+
+              {/* Monthly Date Selector & Quick Step */}
+              {activeReportSubTab === 'monthly' && (
+                <div className="flex items-center gap-1.5 bg-[var(--bg-secondary)] p-1 rounded-lg border border-[var(--border-color)] flex-wrap">
+                  <span className="text-[11px] font-bold text-muted px-1.5">Month:</span>
+                  <input
+                    type="month"
+                    className="p-1 rounded bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-semibold"
+                    value={selectedReportMonth}
+                    onChange={e => setSelectedReportMonth(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const [y, m] = selectedReportMonth.split('-').map(Number);
+                      const d = new Date(y, m - 2, 1);
+                      const prevY = d.getFullYear();
+                      const prevM = String(d.getMonth() + 1).padStart(2, '0');
+                      setSelectedReportMonth(`${prevY}-${prevM}`);
+                    }}
+                    className="px-2 py-1 text-xs rounded bg-[var(--bg-card)] hover:bg-primary/10 hover:text-primary font-bold border border-[var(--border-color)]"
+                    title="Previous Month"
+                  >
+                    ◀ Prev
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedReportMonth(new Date().toISOString().slice(0, 7))}
+                    className="px-2 py-1 text-xs rounded bg-[var(--bg-card)] hover:bg-primary/10 hover:text-primary font-bold border border-[var(--border-color)]"
+                    title="Jump to Current Month"
+                  >
+                    This Month
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const [y, m] = selectedReportMonth.split('-').map(Number);
+                      const d = new Date(y, m, 1);
+                      const nextY = d.getFullYear();
+                      const nextM = String(d.getMonth() + 1).padStart(2, '0');
+                      setSelectedReportMonth(`${nextY}-${nextM}`);
+                    }}
+                    className="px-2 py-1 text-xs rounded bg-[var(--bg-card)] hover:bg-primary/10 hover:text-primary font-bold border border-[var(--border-color)]"
+                    title="Next Month"
+                  >
+                    Next ▶
+                  </button>
+                </div>
+              )}
+
+              {(activeReportSubTab === 'weekly' || activeReportSubTab === 'monthly') && (
+                <select
+                  className="p-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-semibold"
+                  value={reportStatusFilter}
+                  onChange={e => setReportStatusFilter(e.target.value)}
+                >
+                  <option value="All">All Activity Types</option>
+                  <option value="Issued">Issued Loans Only</option>
+                  <option value="Returned">Returns Settled Only</option>
+                </select>
+              )}
 
               {activeReportSubTab === 'circulation' && (
                 <select
@@ -4013,6 +4583,8 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
 
             <div className="text-xs text-muted font-medium">
               <span className="font-bold text-[var(--text-main)]">
+                {activeReportSubTab === 'weekly' && `${weeklyActivityList.length} Week Activities (${weekStartFormatted} - ${weekEndFormatted})`}
+                {activeReportSubTab === 'monthly' && `${monthlyActivityList.length} Month Activities (${monthLabel})`}
                 {activeReportSubTab === 'fines' && `${filteredFineReport.length} Fine Ledger Entries`}
                 {activeReportSubTab === 'issuedToday' && `${filteredIssuedTodayReport.length} Books Issued Today`}
                 {activeReportSubTab === 'returnedToday' && `${filteredReturnedTodayReport.length} Books Returned Today`}
@@ -4023,6 +4595,437 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
               </span>
             </div>
           </div>
+          {/* =========================================================
+              REPORT: WEEKLY REPORT
+              ========================================================= */}
+          {activeReportSubTab === 'weekly' && (
+            <div className="space-y-4">
+              {/* Weekly Header Banner & Metric Strip */}
+              <div className="glass-card p-4 rounded-xl border border-[var(--border-color)] bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                    <Calendar size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-[var(--text-main)] flex items-center gap-2">
+                      Weekly Institutional Circulation Audit
+                    </h3>
+                    <p className="text-xs text-muted">
+                      Audit window: <strong className="text-primary">{weekStartFormatted}</strong> to <strong className="text-primary">{weekEndFormatted}</strong>
+                    </p>
+                  </div>
+                </div>
+                
+                {/* 4 Quick Stat Pills for the Week */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-center min-w-[100px]">
+                    <span className="text-[10px] uppercase font-bold text-muted block">Books Issued</span>
+                    <strong className="text-base font-black text-blue-600 dark:text-blue-400">{weeklyIssuedList.length}</strong>
+                  </div>
+                  <div className="px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-center min-w-[100px]">
+                    <span className="text-[10px] uppercase font-bold text-muted block">Books Returned</span>
+                    <strong className="text-base font-black text-purple-600 dark:text-purple-400">{weeklyReturnedList.length}</strong>
+                  </div>
+                  <div className="px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-center min-w-[100px]">
+                    <span className="text-[10px] uppercase font-bold text-muted block">Fines Collected</span>
+                    <strong className="text-base font-black text-emerald-600 dark:text-emerald-400">₹{weeklyFineTotal}</strong>
+                  </div>
+                  <div className="px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-center min-w-[100px]">
+                    <span className="text-[10px] uppercase font-bold text-muted block">Total Actions</span>
+                    <strong className="text-base font-black text-indigo-600 dark:text-indigo-400">{weeklyIssuedList.length + weeklyReturnedList.length}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Day-by-Day Matrix Table */}
+              <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
+                <div className="p-3 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--text-main)] flex items-center gap-2">
+                    <TrendingUp size={14} className="text-primary" /> Day-by-Day Activity Breakdown ({weekStartFormatted} - {weekEndFormatted})
+                  </h4>
+                  <span className="text-[11px] text-muted font-mono">7 Days Summary</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-[var(--bg-secondary)]/50 border-b border-[var(--border-color)] text-left">
+                      <tr>
+                        <th className="p-3">Day / Date</th>
+                        <th className="p-3 text-center">Books Issued</th>
+                        <th className="p-3 text-center">Books Returned</th>
+                        <th className="p-3 text-right">Fines Collected</th>
+                        <th className="p-3 text-center">Activity Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weeklyDayBreakdown.map(day => {
+                        const totalActivity = day.issuedCount + day.returnedCount;
+                        const isCurrentDay = isSameDay(day.date);
+                        return (
+                          <tr key={day.dayName} className={`border-b border-[var(--border-color)]/60 hover:bg-primary/5 transition-colors ${isCurrentDay ? 'bg-primary/5 font-semibold' : ''}`}>
+                            <td className="p-3">
+                              <div className="font-bold text-[var(--text-main)] flex items-center gap-2">
+                                <span>{day.dayName}</span>
+                                {isCurrentDay && <span className="px-1.5 py-0.2 rounded text-[9px] bg-primary text-white uppercase tracking-wider font-bold">Today</span>}
+                              </div>
+                              <div className="text-[11px] text-muted font-mono">{day.dateFormatted}</div>
+                            </td>
+                            <td className="p-3 text-center font-mono font-bold text-blue-600">
+                              {day.issuedCount > 0 ? (
+                                <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400">
+                                  {day.issuedCount}
+                                </span>
+                              ) : (
+                                <span className="text-muted">0</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-center font-mono font-bold text-purple-600">
+                              {day.returnedCount > 0 ? (
+                                <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-400">
+                                  {day.returnedCount}
+                                </span>
+                              ) : (
+                                <span className="text-muted">0</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-right font-mono font-bold">
+                              {day.fineCollected > 0 ? (
+                                <span className="text-emerald-600">₹{day.fineCollected}</span>
+                              ) : (
+                                <span className="text-muted">₹0</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-center">
+                              {totalActivity > 0 ? (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
+                                  {totalActivity} Transactions
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-muted italic">No Activity</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Weekly Master Activity Log */}
+              <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
+                <div className="p-3 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--text-main)] flex items-center gap-2">
+                    <FileText size={14} className="text-primary" /> Weekly Transaction Audit Log ({weeklyActivityList.length})
+                  </h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-left">
+                      <tr>
+                        <th className="p-3">Type</th>
+                        <th className="p-3">Borrower (Student / Staff)</th>
+                        <th className="p-3">Book Information</th>
+                        <th className="p-3">Department</th>
+                        <th className="p-3">Activity Date & Time</th>
+                        <th className="p-3">Due / Return Date</th>
+                        <th className="p-3 text-center">Status</th>
+                        <th className="p-3 text-right">Fine Settled</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weeklyActivityList.map((item, idx) => (
+                        <tr key={item._id || idx} className="border-b border-[var(--border-color)]/60 hover:bg-primary/5 transition-colors">
+                          <td className="p-3">
+                            <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase ${
+                              item.activityType === 'Issued' 
+                                ? 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-800' 
+                                : 'bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-800'
+                            }`}>
+                              {item.activityType}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-bold font-mono text-[var(--text-main)]">{item.userId}</div>
+                            <div className="text-[11px] text-muted">{item.userType || 'Student'}</div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-semibold text-[var(--text-main)]">{item.bookId?.title || 'Unknown Book'}</div>
+                            <div className="text-[11px] text-muted font-mono">ID: {item.bookId?.bookId || '—'}</div>
+                          </td>
+                          <td className="p-3 text-muted">{item.bookId?.department || '—'}</td>
+                          <td className="p-3 font-semibold text-[var(--text-main)]">
+                            {item.activityDate ? new Date(item.activityDate).toLocaleDateString() : '—'}
+                            {item.activityDate && <span className="text-[10px] text-muted block">{new Date(item.activityDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                          </td>
+                          <td className="p-3 text-muted">
+                            {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : (item.returnDate ? new Date(item.returnDate).toLocaleDateString() : '—')}
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-[var(--text-main)]">
+                              {item.status || item.activityType}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold">
+                            {Number(item.finePaid || 0) > 0 ? (
+                              <span className="text-emerald-600">₹{item.finePaid}</span>
+                            ) : (
+                              <span className="text-muted">₹0</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {weeklyActivityList.length === 0 && (
+                        <tr>
+                          <td colSpan="8" className="p-8 text-center text-muted">
+                            <Calendar size={24} className="mx-auto mb-2 text-primary opacity-70" />
+                            <span className="font-semibold text-[var(--text-main)]">No activity recorded for this week.</span> Use the week navigation buttons above to view other weeks.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* =========================================================
+              REPORT: MONTHLY REPORT
+              ========================================================= */}
+          {activeReportSubTab === 'monthly' && (
+            <div className="space-y-4">
+              {/* Monthly Header Banner & Metric Strip */}
+              <div className="glass-card p-4 rounded-xl border border-[var(--border-color)] bg-gradient-to-r from-purple-500/5 via-indigo-500/5 to-blue-500/5 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center font-bold">
+                    <TrendingUp size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-[var(--text-main)] flex items-center gap-2">
+                      Monthly Library Performance & Utilization Report
+                    </h3>
+                    <p className="text-xs text-muted">
+                      Reporting Month: <strong className="text-purple-600 dark:text-purple-400">{monthLabel}</strong>
+                    </p>
+                  </div>
+                </div>
+                
+                {/* 4 Quick Stat Pills for the Month */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-center min-w-[100px]">
+                    <span className="text-[10px] uppercase font-bold text-muted block">Month Issues</span>
+                    <strong className="text-base font-black text-blue-600 dark:text-blue-400">{monthlyIssuedList.length}</strong>
+                  </div>
+                  <div className="px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-center min-w-[100px]">
+                    <span className="text-[10px] uppercase font-bold text-muted block">Month Returns</span>
+                    <strong className="text-base font-black text-purple-600 dark:text-purple-400">{monthlyReturnedList.length}</strong>
+                  </div>
+                  <div className="px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-center min-w-[100px]">
+                    <span className="text-[10px] uppercase font-bold text-muted block">Fine Revenue</span>
+                    <strong className="text-base font-black text-emerald-600 dark:text-emerald-400">₹{monthlyFineTotal}</strong>
+                  </div>
+                  <div className="px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] text-center min-w-[100px]">
+                    <span className="text-[10px] uppercase font-bold text-muted block">Active Borrowers</span>
+                    <strong className="text-base font-black text-amber-600 dark:text-amber-400">{monthlyUniqueBorrowers}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Week-by-Week Breakdown Matrix for the Month */}
+              <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
+                <div className="p-3 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--text-main)] flex items-center gap-2">
+                    <Calendar size={14} className="text-purple-600" /> Week-by-Week Monthly Trajectory ({monthLabel})
+                  </h4>
+                  <span className="text-[11px] text-muted font-mono">{monthlyWeekBreakdown.length} Weeks Recorded</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-[var(--bg-secondary)]/50 border-b border-[var(--border-color)] text-left">
+                      <tr>
+                        <th className="p-3">Period</th>
+                        <th className="p-3">Calendar Date Range</th>
+                        <th className="p-3 text-center">Loans Issued</th>
+                        <th className="p-3 text-center">Returns Settled</th>
+                        <th className="p-3 text-right">Fine Collection</th>
+                        <th className="p-3 text-right">Volume Share</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyWeekBreakdown.map((wb, i) => {
+                        const totalWb = wb.issuedCount + wb.returnedCount;
+                        const totalMonthAct = monthlyIssuedList.length + monthlyReturnedList.length;
+                        const sharePercent = totalMonthAct > 0 ? Math.round((totalWb / totalMonthAct) * 100) : 0;
+
+                        return (
+                          <tr key={wb.label} className="border-b border-[var(--border-color)]/60 hover:bg-primary/5 transition-colors">
+                            <td className="p-3 font-bold text-[var(--text-main)] flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-full bg-purple-500/10 text-purple-600 flex items-center justify-center font-bold text-[10px]">
+                                W{i + 1}
+                              </span>
+                              <span>{wb.label}</span>
+                            </td>
+                            <td className="p-3 font-mono text-muted">{wb.dateRangeStr}</td>
+                            <td className="p-3 text-center font-mono font-bold text-blue-600">
+                              {wb.issuedCount > 0 ? (
+                                <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400">
+                                  {wb.issuedCount}
+                                </span>
+                              ) : (
+                                <span className="text-muted">0</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-center font-mono font-bold text-purple-600">
+                              {wb.returnedCount > 0 ? (
+                                <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400">
+                                  {wb.returnedCount}
+                                </span>
+                              ) : (
+                                <span className="text-muted">0</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-right font-mono font-bold">
+                              {wb.fineCollected > 0 ? (
+                                <span className="text-emerald-600">₹{wb.fineCollected}</span>
+                              ) : (
+                                <span className="text-muted">₹0</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-right font-mono">
+                              <div className="flex items-center justify-end gap-2">
+                                <span className="font-bold">{sharePercent}%</span>
+                                <div className="w-16 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                                  <div className="h-full bg-purple-600 rounded-full" style={{ width: `${sharePercent}%` }}></div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Monthly Department Breakdown */}
+              <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
+                <div className="p-3 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--text-main)] flex items-center gap-2">
+                    <Building size={14} className="text-primary" /> Department Circulation Distribution ({monthLabel})
+                  </h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-left">
+                      <tr>
+                        <th className="p-3">Academic Department</th>
+                        <th className="p-3 text-center">Books Issued</th>
+                        <th className="p-3 text-center">Books Returned</th>
+                        <th className="p-3 text-right">Fines Collected</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyDeptBreakdown.map(dept => (
+                        <tr key={dept.dept} className="border-b border-[var(--border-color)]/60 hover:bg-primary/5 transition-colors">
+                          <td className="p-3 font-bold text-[var(--text-main)] flex items-center gap-2">
+                            <Building size={13} className="text-primary" />
+                            <span>{dept.dept}</span>
+                          </td>
+                          <td className="p-3 text-center font-mono font-bold text-blue-600">{dept.issuesCount}</td>
+                          <td className="p-3 text-center font-mono font-bold text-purple-600">{dept.returnsCount}</td>
+                          <td className="p-3 text-right font-mono font-bold text-emerald-600">₹{dept.finesCollected}</td>
+                        </tr>
+                      ))}
+                      {monthlyDeptBreakdown.length === 0 && (
+                        <tr>
+                          <td colSpan="4" className="p-6 text-center text-muted">
+                            No departmental circulation recorded for {monthLabel}.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Monthly Master Transaction Log */}
+              <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
+                <div className="p-3 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center justify-between">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--text-main)] flex items-center gap-2">
+                    <FileText size={14} className="text-purple-600" /> Complete Monthly Activity Log ({monthlyActivityList.length})
+                  </h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-left">
+                      <tr>
+                        <th className="p-3">Type</th>
+                        <th className="p-3">Borrower (Student / Staff)</th>
+                        <th className="p-3">Book Information</th>
+                        <th className="p-3">Department</th>
+                        <th className="p-3">Activity Date & Time</th>
+                        <th className="p-3">Due / Return Date</th>
+                        <th className="p-3 text-center">Status</th>
+                        <th className="p-3 text-right">Fine Settled</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyActivityList.map((item, idx) => (
+                        <tr key={item._id || idx} className="border-b border-[var(--border-color)]/60 hover:bg-primary/5 transition-colors">
+                          <td className="p-3">
+                            <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase ${
+                              item.activityType === 'Issued' 
+                                ? 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-800' 
+                                : 'bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-800'
+                            }`}>
+                              {item.activityType}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-bold font-mono text-[var(--text-main)]">{item.userId}</div>
+                            <div className="text-[11px] text-muted">{item.userType || 'Student'}</div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-semibold text-[var(--text-main)]">{item.bookId?.title || 'Unknown Book'}</div>
+                            <div className="text-[11px] text-muted font-mono">ID: {item.bookId?.bookId || '—'}</div>
+                          </td>
+                          <td className="p-3 text-muted">{item.bookId?.department || '—'}</td>
+                          <td className="p-3 font-semibold text-[var(--text-main)]">
+                            {item.activityDate ? new Date(item.activityDate).toLocaleDateString() : '—'}
+                            {item.activityDate && <span className="text-[10px] text-muted block">{new Date(item.activityDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                          </td>
+                          <td className="p-3 text-muted">
+                            {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : (item.returnDate ? new Date(item.returnDate).toLocaleDateString() : '—')}
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-[var(--text-main)]">
+                              {item.status || item.activityType}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold">
+                            {Number(item.finePaid || 0) > 0 ? (
+                              <span className="text-emerald-600">₹{item.finePaid}</span>
+                            ) : (
+                              <span className="text-muted">₹0</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {monthlyActivityList.length === 0 && (
+                        <tr>
+                          <td colSpan="8" className="p-8 text-center text-muted">
+                            <TrendingUp size={24} className="mx-auto mb-2 text-purple-600 opacity-70" />
+                            <span className="font-semibold text-[var(--text-main)]">No activity recorded for {monthLabel}.</span> Use the month navigation buttons above to explore other months.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* REPORT: ISSUED TODAY */}
           {activeReportSubTab === 'issuedToday' && (
             <div className="glass-card overflow-hidden rounded-xl border border-[var(--border-color)] shadow-sm">
@@ -5124,6 +6127,11 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
           </div>
         </div>
       )}
+      <LibraryNoDueCertificateModal
+        isOpen={Boolean(selectedClearanceForCert)}
+        onClose={() => setSelectedClearanceForCert(null)}
+        clearance={selectedClearanceForCert}
+      />
     </div>
   );
 };

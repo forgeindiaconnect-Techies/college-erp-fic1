@@ -8,26 +8,28 @@ const router = express.Router();
 
 // @desc    Get system settings
 // @route   GET /api/settings
-// @access  Private/Admin
-router.get('/', protect, collegeScope, async (req, res) => {
+// @access  Public / Private (Universal)
+router.get('/', async (req, res) => {
   try {
-    let settings = await CollegeSettings.findOne({ tenantId: req.collegeId });
+    let settings = await CollegeSettings.findOne({}).sort({ updatedAt: -1 });
+
+    const college = await College.findOne({}).sort({ createdAt: -1 });
+
+    const defaultName = 'Marudhar Kesari Jain College for Women';
+
     if (!settings) {
-      const college = await College.findOne({ tenantId: req.collegeId });
       settings = await CollegeSettings.create({ 
-        tenantId: req.collegeId, 
-        collegeId: req.collegeId,
-        collegeName: college ? college.name : 'Unknown College'
+        tenantId: 'COL001', 
+        collegeId: 'COL001',
+        collegeName: college?.name || defaultName
       });
     } else if (!settings.collegeName) {
-      const college = await College.findOne({ tenantId: req.collegeId });
-      if (college) {
-        settings.collegeName = college.name;
-        await settings.save();
-      }
+      settings.collegeName = college?.name || defaultName;
+      await settings.save();
     }
     res.json(settings);
   } catch (error) {
+    console.error('Settings GET Error:', error);
     res.status(500).json({ message: 'Server Error fetching settings' });
   }
 });
@@ -35,15 +37,40 @@ router.get('/', protect, collegeScope, async (req, res) => {
 // @desc    Update system settings
 // @route   PUT /api/settings
 // @access  Private/Admin
-router.put('/', protect, authorize('Admin'), collegeScope, async (req, res) => {
+router.put('/', protect, authorize('Admin', 'Super Admin'), collegeScope, async (req, res) => {
   try {
+    const targetTenant = req.collegeId && req.collegeId !== 'system' ? req.collegeId : (req.user?.tenantId || req.user?.collegeId || 'COL001');
+    
     const settings = await CollegeSettings.findOneAndUpdate(
-      { tenantId: req.collegeId },
-      req.body,
+      { 
+        $or: [
+          { tenantId: targetTenant },
+          { collegeId: targetTenant }
+        ]
+      },
+      { ...req.body, tenantId: targetTenant, collegeId: targetTenant },
       { new: true, upsert: true }
     );
+
+    if (req.body.collegeName) {
+      await College.updateMany(
+        {
+          $or: [
+            { tenantId: targetTenant },
+            { _id: (typeof targetTenant === 'string' && targetTenant.length === 24) ? targetTenant : null }
+          ]
+        },
+        { $set: { name: req.body.collegeName } }
+      );
+
+      // Also ensure all college documents and settings reflect this name
+      await College.updateMany({}, { $set: { name: req.body.collegeName } });
+      await CollegeSettings.updateMany({}, { $set: { collegeName: req.body.collegeName } });
+    }
+
     res.json(settings);
   } catch (error) {
+    console.error('Settings PUT Error:', error);
     res.status(500).json({ message: 'Server Error updating settings' });
   }
 });
