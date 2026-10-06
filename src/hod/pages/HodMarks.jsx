@@ -910,7 +910,7 @@ const HodMarks = () => {
       </head>
       <body>
         <div class="header">
-          <h1 class="title">Marudhar Kesari Jain College for Women</h1>
+          <h1 class="title">${getHodSession()?.collegeName || 'Institution'}</h1>
           <p class="sub">Department of ${selectedStudentForCard.dept} — Continuous Assessment & Semester Transcript</p>
         </div>
         <div class="student-box">

@@ -13,21 +13,28 @@ const emitUpdate = (req, action, data) => {
   }
 };
 
+const getCollegeId = (req) => {
+  return (
+    req.collegeId ||
+    req.user?.tenantId ||
+    req.user?.collegeId ||
+    "unassigned_college"
+  );
+};
+
 // @desc    Get all quotas
 // @route   GET /api/quotas
 // @access  Private
 export const getQuotas = async (req, res) => {
   try {
     const { department, academicYear, status, search, course } = req.query;
-    const collegeId = req.collegeId || req.user?.collegeId || "COL001";
-    const organization = req.user?.organization || collegeId;
+    const collegeId = getCollegeId(req);
 
     const query = {};
-    if (collegeId && collegeId !== "all") {
+    if (req.user?.role !== "Super Admin" && collegeId && collegeId !== "system") {
       query.$or = [
         { collegeId: collegeId },
-        { collegeId: { $exists: false } },
-        { organization: organization }
+        { tenantId: collegeId }
       ];
     }
 
@@ -97,9 +104,18 @@ export const getQuotas = async (req, res) => {
 // @access  Private
 export const getQuotaById = async (req, res) => {
   try {
-    const quota = await Quota.findById(req.params.id).populate("department", "name departmentName code");
+    const collegeId = getCollegeId(req);
+    const filter = { _id: req.params.id };
+    if (req.user?.role !== "Super Admin" && collegeId && collegeId !== "system") {
+      filter.$or = [
+        { collegeId: collegeId },
+        { tenantId: collegeId }
+      ];
+    }
+
+    const quota = await Quota.findOne(filter).populate("department", "name departmentName code");
     if (!quota) {
-      return res.status(404).json({ success: false, message: "Quota not found" });
+      return res.status(404).json({ success: false, message: "Quota not found or access denied" });
     }
     return res.status(200).json({ success: true, quota, data: quota });
   } catch (error) {
@@ -199,7 +215,7 @@ export const createQuota = async (req, res) => {
       else resolvedDeptName = String(department);
     }
 
-    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId || "COL001";
+    const collegeId = getCollegeId(req);
     const organization = req.user?.organization || collegeId;
 
     const quota = await Quota.create({
@@ -217,6 +233,7 @@ export const createQuota = async (req, res) => {
       academicYear: academicYear.trim(),
       status: status || "active",
       collegeId,
+      tenantId: collegeId,
       organization,
     });
 
@@ -243,9 +260,18 @@ export const createQuota = async (req, res) => {
 // @access  Private
 export const updateQuota = async (req, res) => {
   try {
-    const quota = await Quota.findById(req.params.id);
+    const collegeId = getCollegeId(req);
+    const filter = { _id: req.params.id };
+    if (req.user?.role !== "Super Admin" && collegeId && collegeId !== "system") {
+      filter.$or = [
+        { collegeId: collegeId },
+        { tenantId: collegeId }
+      ];
+    }
+
+    const quota = await Quota.findOne(filter);
     if (!quota) {
-      return res.status(404).json({ success: false, message: "Quota not found" });
+      return res.status(404).json({ success: false, message: "Quota not found or access denied" });
     }
 
     const {
@@ -344,12 +370,19 @@ export const updateQuota = async (req, res) => {
 // @access  Private
 export const deleteQuota = async (req, res) => {
   try {
-    const quota = await Quota.findById(req.params.id);
-    if (!quota) {
-      return res.status(404).json({ success: false, message: "Quota not found" });
+    const collegeId = getCollegeId(req);
+    const filter = { _id: req.params.id };
+    if (req.user?.role !== "Super Admin" && collegeId && collegeId !== "system") {
+      filter.$or = [
+        { collegeId: collegeId },
+        { tenantId: collegeId }
+      ];
     }
 
-    await Quota.findByIdAndDelete(req.params.id);
+    const quota = await Quota.findOneAndDelete(filter);
+    if (!quota) {
+      return res.status(404).json({ success: false, message: "Quota not found or access denied" });
+    }
 
     emitUpdate(req, "deleted", { id: req.params.id });
 

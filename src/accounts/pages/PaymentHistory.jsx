@@ -512,7 +512,12 @@ const PaymentHistory = () => {
             {/* Header with College Brand */}
             <div style={{ textAlign: 'center', borderBottom: '2px dashed #cbd5e1', paddingBottom: '16px', marginBottom: '16px' }}>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '0.5px' }}>
-                MARUDHAR KESARI JAIN COLLEGE
+                {(() => {
+                  try {
+                    const s = JSON.parse(sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || '{}');
+                    return (s.collegeName || 'Institution').toUpperCase();
+                  } catch(e) { return 'INSTITUTION'; }
+                })()}
               </h2>
               <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
                 VANIYAMBADI, TAMIL NADU — 635751 · ACCOUNTS DEPARTMENT

@@ -17,7 +17,8 @@ import {
   getMyTimetable,
   startClassSession,
   getAssignments,
-  getMyFacultyAllocations
+  getMyFacultyAllocations,
+  getSubjects
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import LiveClassModal from '../components/LiveClassModal';
@@ -95,7 +96,8 @@ const StaffDashboard = () => {
         scheduleRes,
         timetableRes,
         assignmentRes,
-        allocationRes
+        allocationRes,
+        subjectRes
       ] = await Promise.all([
         getStudents().catch(() => ({ data: [] })),
         getAllMarks().catch(() => ({ data: [] })),
@@ -106,7 +108,8 @@ const StaffDashboard = () => {
         getStaffTodaySchedule().catch(() => ({ data: [] })),
         getMyTimetable().catch(() => ({ data: [] })),
         getAssignments().catch(() => ({ data: [] })),
-        getMyFacultyAllocations().catch(() => ({ data: [] }))
+        getMyFacultyAllocations().catch(() => ({ data: [] })),
+        getSubjects().catch(() => ({ data: [] }))
       ]);
 
       if (notifRes?.data && Array.isArray(notifRes.data)) setNotifications(notifRes.data);
@@ -135,11 +138,23 @@ const StaffDashboard = () => {
       setAssignments(realAssignments);
 
       const allocations = Array.isArray(allocationRes?.data) ? allocationRes.data : [];
-      const subjectNames = allocations
+      const allocatedNames = allocations
         .map(alloc => alloc.subjectId?.subjectName || alloc.subjectId?.name || alloc.subject)
         .filter(Boolean);
 
-      setMySubjects([...new Set(subjectNames)]);
+      const rawSubjects = Array.isArray(subjectRes?.data) ? subjectRes.data : (subjectRes?.data?.data || []);
+      const activeSession = JSON.parse(sessionStorage.getItem('staff_session') || '{}');
+      const staffDeptClean = (activeSession.dept || activeSession.department || '').toLowerCase().trim();
+      const dbSubjectNames = rawSubjects
+        .filter(s => {
+          const sDept = (s.department || s.dept || '').toLowerCase().trim();
+          return !staffDeptClean || !sDept || sDept.includes(staffDeptClean) || staffDeptClean.includes(sDept);
+        })
+        .map(s => s.name || s.subjectName || s.subjectCode || s.code)
+        .filter(Boolean);
+
+      const combinedSubjects = [...new Set([...allocatedNames, ...(activeSession.subjects || []), ...dbSubjectNames])].filter(Boolean);
+      setMySubjects(combinedSubjects);
       setLoadingSchedule(false);
 
       if (marksRes?.data) {
@@ -209,6 +224,27 @@ const StaffDashboard = () => {
       return d === target || d.includes('computer') || target.includes(d);
     });
   }, [students, staffDept]);
+
+  const myInvigilationDuties = useMemo(() => {
+    if (!staffSession) return [];
+    const sName = (staffSession.name || '').toLowerCase().trim();
+    const sId = String(staffSession.id || staffSession._id || staffSession.staffId || '').toLowerCase().trim();
+    const sClean = sName.replace(/^(dr\.|prof\.|mr\.|mrs\.|ms\.)\s*/i, '');
+
+    return exams.filter(ex => {
+      const invName = (ex.invigilatorName || ex.invigilator || '').toLowerCase().trim();
+      const invId = String(ex.invigilatorId || '').toLowerCase().trim();
+      
+      const idMatch = sId && (invId === sId || invName.includes(sId));
+      const nameMatch = (
+        invName.includes(sName) ||
+        sName.includes(invName) ||
+        (sClean && invName.includes(sClean)) ||
+        (sClean && invName.split(/[-—\s]/).some(part => part.trim() && sClean.includes(part.trim()) && part.trim().length > 3))
+      );
+      return idMatch || nameMatch;
+    });
+  }, [exams, staffSession]);
 
   const totalAssignedStudentsCount = departmentStudents.length || 45;
 
@@ -358,6 +394,32 @@ const StaffDashboard = () => {
         </div>
       </div>
 
+      {/* Exam Duty Invigilation Alert Banner */}
+      {myInvigilationDuties.length > 0 && (
+        <div style={{ background: 'linear-gradient(135deg, #0f766e, #0d9488)', color: 'white', padding: '1.1rem 1.5rem', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '1.25rem', boxShadow: '0 4px 15px rgba(13,148,136, 0.25)' }}>
+          <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.65rem', borderRadius: '12px' }}>
+            <ShieldAlert size={26} color="white" />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>Exam Duty Assigned: {myInvigilationDuties.length} Scheduled Slot{myInvigilationDuties.length > 1 ? 's' : ''}</h2>
+              <span style={{ background: 'rgba(255,255,255,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 800 }}>ACTIVE ROSTER</span>
+            </div>
+            <p style={{ margin: '0.2rem 0 0 0', opacity: 0.95, fontSize: '0.84rem' }}>
+              Upcoming: <strong>{myInvigilationDuties[0].name}</strong> ({myInvigilationDuties[0].subject}) • Venue: <strong>{myInvigilationDuties[0].room || myInvigilationDuties[0].hallName || 'Main Hall'}</strong> • Slot: <strong>{myInvigilationDuties[0].date} ({myInvigilationDuties[0].time})</strong>
+            </p>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.6rem' }}>
+            <button 
+              onClick={() => navigate('/staff/exams')}
+              style={{ background: '#ffffff', color: '#0f766e', border: 'none', padding: '8px 18px', borderRadius: '8px', fontWeight: 800, fontSize: '0.84rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              Exam Duty Center →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Class Advisor Alert Banner if designated */}
       {advisingClass && (
         <div style={{ background: 'linear-gradient(135deg, #1e40af, #3b82f6)', color: 'white', padding: '1.1rem 1.5rem', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '1.25rem', boxShadow: '0 4px 15px rgba(37,99,235, 0.2)' }}>
@@ -493,6 +555,12 @@ const StaffDashboard = () => {
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', color: '#1e293b' }}
           >
             <Users size={16} color="#0284c7" /> Scholar Directory
+          </button>
+          <button 
+            onClick={() => navigate('/staff/exams')}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '10px', background: '#f0fdfa', border: '1px solid #ccfbf1', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', color: '#0f766e' }}
+          >
+            <ShieldAlert size={16} color="#0d9488" /> Exam Duty Center
           </button>
           <button 
             onClick={() => navigate('/staff/library')}

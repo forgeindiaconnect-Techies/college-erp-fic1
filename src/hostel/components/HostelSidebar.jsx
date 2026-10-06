@@ -58,6 +58,16 @@ const HostelSidebar = ({ isOpen, onClose }) => {
     }
   ];
 
+  const getHostelSession = () => {
+    try {
+      return JSON.parse(sessionStorage.getItem('hostel_session') || '{}');
+    } catch(e) {
+      return {};
+    }
+  };
+  const hostelSession = getHostelSession();
+  const displayCollegeName = hostelSession?.collegeName || collegeSettings?.collegeName || 'Institution Portal';
+
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
       {/* Brand */}
@@ -65,19 +75,13 @@ const HostelSidebar = ({ isOpen, onClose }) => {
         {collegeSettings?.collegeLogo ? (
           <img 
             src={collegeSettings.collegeLogo} 
-            alt={collegeSettings.collegeName || "College Logo"} 
+            alt={displayCollegeName} 
             style={{ height: '32px', objectFit: 'contain' }} 
           />
-        ) : collegeSettings?.collegeName ? (
-          <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
-            {collegeSettings.collegeName}
-          </div>
         ) : (
-          <img 
-            src="/logo.svg" 
-            alt="ERPSYS Logo" 
-            style={{ height: '32px', objectFit: 'contain' }} 
-          />
+          <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+            {displayCollegeName}
+          </div>
         )}
       </div>
 

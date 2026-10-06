@@ -270,8 +270,17 @@ const ParentsManagement = () => {
       </div>
 
       {modalOpen && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-card glass-card" onClick={e => e.stopPropagation()}>
+        <div 
+          className="modal-overlay" 
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
+        >
+          <div 
+            className="modal-card glass-card" 
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>{editTarget ? 'Edit Parent Profile' : 'Register Parent'}</h2>
               <button className="btn-icon" onClick={closeModal}><X size={20} /></button>

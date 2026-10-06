@@ -536,8 +536,13 @@ const AccountsReports = () => {
       </head>
       <body>
         <div class="header-box">
-          <h1 class="college-name">Marudhar Kesari Jain College for Women</h1>
-          <p class="college-sub">Recognized under Sec. 2(f) & 12(B) of UGC Act 1956 • Permanently Affiliated to Thiruvalluvar University • Re-accredited by NAAC with 'A' Grade</p>
+          <h1 class="college-name">${(() => {
+            try {
+              const s = JSON.parse(sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || '{}');
+              return s.collegeName || 'Institution';
+            } catch(e) { return 'Institution'; }
+          })()}</h1>
+          <p class="college-sub">Central ERP Financial Management System • Accounts & Audit Division</p>
           <div class="audit-title">Official Financial Audit & Revenue Intelligence Statement</div>
         </div>
 
@@ -665,8 +670,13 @@ const AccountsReports = () => {
 
   // Export Master CSV
   const handleExportMasterCSV = () => {
+    let collegeName = 'INSTITUTION';
+    try {
+      const s = JSON.parse(sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || '{}');
+      if (s.collegeName) collegeName = s.collegeName.toUpperCase();
+    } catch(e) {}
     let csvContent = 'data:text/csv;charset=utf-8,';
-    csvContent += `MARUDHAR KESARI JAIN COLLEGE - FINANCIAL AUDIT REPORT\n`;
+    csvContent += `${collegeName} - FINANCIAL AUDIT REPORT\n`;
     csvContent += `Generated: ${new Date().toLocaleString('en-IN')}\n\n`;
     csvContent += `Total Revenue Collected,INR ${metrics.totalCollectedFee}\n`;
     csvContent += `Total Operational Expenses,INR ${metrics.totalPaidExpenses}\n`;

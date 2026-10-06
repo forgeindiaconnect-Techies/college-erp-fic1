@@ -33,16 +33,14 @@ const getTenantFilter = (req) => {
   }
 
   const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
+  if (!collegeId || collegeId === 'system') {
+    return {};
+  }
 
   return {
     $or: [
       { collegeId: collegeId },
-      { tenantId: collegeId },
-      { collegeId: 'COL002-8379189' },
-      { collegeId: 'COL001' },
-      { collegeId: 'unassigned_college' },
-      { collegeId: { $exists: false } },
-      { collegeId: null }
+      { tenantId: collegeId }
     ]
   };
 };

@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Fee from '../models/Fee.js';
 import Student from '../models/Student.js';
 import FeeStructure from '../models/FeeStructure.js';
@@ -10,9 +11,9 @@ import { sendNotification } from '../utils/notificationHelper.js';
 const router = express.Router();
 
 const processFeePayload = (data) => {
-  const total = Number(data.totalFees) || 0;
-  const paid = Number(data.paidAmount) || 0;
-  const pending = total - paid;
+  const total = Number(data.totalFees !== undefined ? data.totalFees : (data.totalAmount || data.amount || 0)) || 0;
+  const paid = Number(data.paidAmount !== undefined ? data.paidAmount : (data.amount || 0)) || 0;
+  const pending = Math.max(0, total - paid);
   
   let status = 'Pending';
   if (paid >= total && total > 0) status = 'Paid';
@@ -29,32 +30,48 @@ const processFeePayload = (data) => {
 
 const updateStudentFeeStatus = async (studentId) => {
   try {
-    const fees = await Fee.find({ studentId });
-    if (fees.length === 0) return;
+    if (!studentId) return;
+    const isValidObjId = mongoose.Types.ObjectId.isValid(studentId);
     
-    let totalPaid = 0;
-    let hasPending = false;
-    let hasPartial = false;
+    // Query all fee transactions for this student
+    const feeFilter = [
+      { studentId: studentId },
+      { studentId: String(studentId) },
+      { registerNo: studentId }
+    ];
+    if (isValidObjId) {
+      feeFilter.push({ studentId: new mongoose.Types.ObjectId(studentId) });
+    }
 
+    const fees = await Fee.find({ $or: feeFilter });
+    
+    let totalPaidFromReceipts = 0;
     for (const f of fees) {
-      totalPaid += Number(f.paidAmount) || 0;
-      if (f.status === 'Pending') hasPending = true;
-      if (f.status === 'Partial') hasPartial = true;
+      totalPaidFromReceipts += Number(f.paidAmount !== undefined ? f.paidAmount : (f.amount || 0)) || 0;
     }
     
-    let globalStatus = 'Paid';
-    if (hasPending) globalStatus = 'Pending';
-    else if (hasPartial) globalStatus = 'Partial';
-    
-    const student = await Student.findOne({ $or: [{ id: studentId }, { _id: studentId }] });
+    const studentQuery = [
+      { id: studentId },
+      { admissionNo: studentId }
+    ];
+    if (isValidObjId) {
+      studentQuery.push({ _id: studentId });
+    }
+
+    const student = await Student.findOne({ $or: studentQuery });
     if (student) {
-      const studentTotalFee = Number(student.totalFee || student.totalAmount) || 0;
-      const newPaid = totalPaid;
+      const studentTotalFee = Number(
+        student.finalFee !== undefined && Number(student.finalFee) > 0
+          ? student.finalFee
+          : (student.totalFee || student.totalAmount || 0)
+      );
+      
+      const newPaid = totalPaidFromReceipts > 0 ? totalPaidFromReceipts : Number(student.paidAmount || student.amountPaid || 0);
       const newBal = Math.max(0, studentTotalFee - newPaid);
       const computedStatus = (newBal === 0 && studentTotalFee > 0) ? 'Paid' : (newPaid > 0 ? 'Partial' : 'Pending');
 
-      await Student.findOneAndUpdate(
-        { $or: [{ id: studentId }, { _id: studentId }] },
+      await Student.updateOne(
+        { _id: student._id },
         { 
           feeStatus: computedStatus,
           amountPaid: newPaid,
@@ -64,8 +81,6 @@ const updateStudentFeeStatus = async (studentId) => {
           paymentStatus: computedStatus
         }
       );
-    } else {
-      await Student.findOneAndUpdate({ id: studentId }, { feeStatus: globalStatus });
     }
   } catch (err) {
     console.error('Failed to update student fee status:', err);
@@ -97,20 +112,16 @@ const notifyFeeUpdate = async (req, feeRecord) => {
 // Get fee structures for college (combines FeeStructure & FeePlan)
 router.get('/structures', protect, authorize('Admin', 'Principal', 'Accounts', 'HOD', 'Super Admin'), collegeScope, async (req, res) => {
   try {
-    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId || 'unassigned_college';
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
     const { academicYear, course, department, semester } = req.query;
 
-    const collegeMatch = {
-      $or: [
+    const collegeMatch = {};
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      collegeMatch.$or = [
         { collegeId },
-        { collegeId: 'COL002-8379189' },
-        { collegeId: 'COL001' },
-        { collegeId: 'mock_college_id' },
-        { collegeId: 'unassigned_college' },
-        { collegeId: null },
-        { collegeId: { $exists: false } }
-      ]
-    };
+        { tenantId: collegeId }
+      ];
+    }
 
     const filter = { ...collegeMatch };
     if (academicYear) filter.academicYear = academicYear;
@@ -320,7 +331,16 @@ router.delete('/structures/:id', protect, authorize('Admin', 'Principal', 'Accou
 router.get('/', protect, authorize('Admin', 'Principal', 'Accounts', 'HOD'), departmentScope, collegeScope, async (req, res) => {
   try {
     const dept = req.dept || req.query.dept;
-    const query = dept ? { department: dept } : {};
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const query = {};
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      query.$or = [{ collegeId }, { tenantId: collegeId }];
+    }
+    if (dept) {
+      const deptFilter = { department: dept };
+      if (query.$or) query.$and = [{ $or: query.$or }, deptFilter];
+      else query.department = dept;
+    }
     const fees = await Fee.find(query).sort({ createdAt: -1 });
     res.json(fees);
   } catch (err) {
@@ -486,8 +506,13 @@ router.get('/structure/:studentId', protect, collegeScope, async (req, res) => {
 // Record new fee transaction
 router.post('/', protect, authorize('Admin', 'Principal', 'Accounts', 'Student'), collegeScope, async (req, res) => {
   try {
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId || 'unassigned_college';
     if (Array.isArray(req.body)) {
-      const processed = req.body.map(processFeePayload);
+      const processed = req.body.map(item => ({
+        ...processFeePayload(item),
+        collegeId,
+        tenantId: collegeId
+      }));
       const newRecords = await Fee.insertMany(processed);
       
       const studentIds = [...new Set(newRecords.map(r => r.studentId))];
@@ -497,14 +522,18 @@ router.post('/', protect, authorize('Admin', 'Principal', 'Accounts', 'Student')
       for (const record of newRecords) {
         await notifyFeeUpdate(req, record);
       }
-      req.app.get('io').emit('dataUpdated', { module: 'fees', action: 'created', studentId: newRecord.studentId });
+      req.app.get('io')?.emit('dataUpdated', { module: 'fees', action: 'created' });
       return res.status(201).json(newRecords);
     } else {
-      const fee = new Fee(processFeePayload(req.body));
+      const fee = new Fee({
+        ...processFeePayload(req.body),
+        collegeId,
+        tenantId: collegeId
+      });
       const newRecord = await fee.save();
       await updateStudentFeeStatus(newRecord.studentId);
       await notifyFeeUpdate(req, newRecord);
-      req.app.get('io').emit('dataUpdated', { module: 'fees', action: 'created', studentId: newRecord.studentId });
+      req.app.get('io')?.emit('dataUpdated', { module: 'fees', action: 'created', studentId: newRecord.studentId });
       return res.status(201).json(newRecord);
     }
   } catch (err) {

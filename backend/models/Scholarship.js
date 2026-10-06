@@ -46,7 +46,6 @@ const ScholarshipSchema = new mongoose.Schema(
 
     collegeId: {
       type: mongoose.Schema.Types.Mixed,
-      default: "COL001",
       index: true,
     },
 

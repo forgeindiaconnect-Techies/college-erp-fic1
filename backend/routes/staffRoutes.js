@@ -13,12 +13,21 @@ import { sendNotification } from '../utils/notificationHelper.js';
 const router = express.Router();
 
 // Get all staff
-router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), requirePermission('manage_staff'), departmentScope, collegeScope, async (req, res) => {
+router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), departmentScope, collegeScope, async (req, res) => {
   try {
     const dept = req.dept || req.query.dept;
-    const query = { collegeId: req.collegeId || 'unassigned_college' };
+    const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
+    let query = {};
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      query.$or = [{ collegeId }, { tenantId: collegeId }];
+    }
     if (dept) {
-      query.$or = [{ dept: dept }, { department: dept }];
+      const deptFilter = { $or: [{ dept: dept }, { department: dept }] };
+      if (query.$or) {
+        query = { $and: [query, deptFilter] };
+      } else {
+        query = deptFilter;
+      }
     }
     const staff = await Staff.find(query);
     res.json(staff);
@@ -30,10 +39,13 @@ router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), re
 // Get staff for payroll (Comprehensive Personnel Roster: HOD, Staff, Drivers, Hostel, Accounts)
 router.get('/payroll-list', protect, authorize('Admin', 'Principal', 'Accounts'), collegeScope, async (req, res) => {
   try {
-    const collegeId = req.collegeId || 'unassigned_college';
-    const flexCollegeFilter = { 
-      $or: [{ collegeId }, { collegeId: { $exists: false } }, { collegeId: null }, { collegeId: '' }] 
-    };
+    const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
+    let flexCollegeFilter = {};
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      flexCollegeFilter = {
+        $or: [{ collegeId }, { tenantId: collegeId }]
+      };
+    }
     
     // 1. Fetch from Staff collection
     const staffList = await Staff.find(flexCollegeFilter).lean();

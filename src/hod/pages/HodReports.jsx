@@ -304,7 +304,7 @@ const HodReports = () => {
       </head>
       <body>
         <div class="header">
-          <h1 class="title">Marudhar Kesari Jain College for Women</h1>
+          <h1 class="title">${getHodSession()?.collegeName || 'Institution'}</h1>
           <p class="sub">Department of ${DEPT} — Real-Time Academic, Attendance & Financial Performance Audit</p>
           <div class="badge">Official Department Audit Report</div>
         </div>

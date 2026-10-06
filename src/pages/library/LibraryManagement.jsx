@@ -1660,7 +1660,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
         <body>
           <div class="header-box">
             <div>
-              <div class="inst-name">${collegeSettings?.collegeName || 'Marudhar Kesari Jain College for Women'}</div>
+              <div class="inst-name">${collegeSettings?.collegeName || 'Institution'}</div>
               <div class="report-name">${reportTitle}</div>
               <div class="meta-text">${subtitle}</div>
             </div>

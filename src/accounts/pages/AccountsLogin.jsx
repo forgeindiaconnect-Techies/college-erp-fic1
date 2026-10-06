@@ -21,18 +21,33 @@ const AccountsLogin = () => {
       const res = await loginUser({ email, password });
       const userData = res.data;
 
-      if (userData.role !== 'Accounts') {
+      const roleLower = (userData.role || '').toLowerCase();
+      if (roleLower !== 'accounts' && roleLower !== 'accountant') {
         setError('Unauthorized role for this portal.');
         setLoading(false);
         return;
       }
 
+      sessionStorage.setItem('accounts_token', userData.token);
       sessionStorage.setItem('token', userData.token);
-      sessionStorage.setItem('user_session', JSON.stringify({
+      if (userData.tenantId) {
+        sessionStorage.setItem('tenantId', userData.tenantId);
+      }
+
+      const sessionPayload = {
+        _id: userData._id,
         name: userData.name,
         email: userData.email,
-        role: 'Accounts Dept.'
-      }));
+        role: 'Accounts',
+        department: userData.department || null,
+        referenceId: userData.referenceId || null,
+        tenantId: userData.tenantId || null,
+        collegeId: userData.collegeId || userData.tenantId || null,
+        collegeName: userData.collegeName || 'Institution Portal',
+        subscription: userData.subscription || null
+      };
+
+      sessionStorage.setItem('accounts_session', JSON.stringify(sessionPayload));
       navigate('/accounts/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid credentials. Try accounts@college.edu / password123');

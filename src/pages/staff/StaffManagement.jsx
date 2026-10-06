@@ -259,41 +259,93 @@ const StaffManagement = () => {
 
       {/* Modal */}
       {modalOpen && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-card glass-card" onClick={e => e.stopPropagation()}>
+        <div 
+          className="modal-overlay" 
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
+        >
+          <div 
+            className="modal-card glass-card" 
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>{editTarget ? 'Edit Staff Member' : 'Add New Staff'}</h2>
-              <button className="btn-icon" onClick={closeModal}><X size={20} /></button>
+              <button className="btn-icon" type="button" onClick={closeModal}><X size={20} /></button>
             </div>
-            <form onSubmit={handleSubmit} className="modal-form">
+            <form 
+              onSubmit={handleSubmit} 
+              className="modal-form"
+              autoComplete="off"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'submit') {
+                  e.preventDefault();
+                }
+              }}
+            >
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Full Name</label>
-                  <input required placeholder="e.g. Dr. Ananya Rao" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Email</label>
-                  <input type="email" required placeholder="staff@college.edu" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Login Password</label>
+                  <label>Full Name *</label>
                   <input 
-                    type="text" 
+                    required 
+                    placeholder="e.g. Dr. Ananya Rao" 
+                    value={form.name || ''} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, name: val }));
+                    }}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email *</label>
+                  <input 
+                    type="email" 
+                    required 
+                    placeholder="staff@college.edu" 
+                    value={form.email || ''} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, email: val }));
+                    }}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Login Password {editTarget ? '' : '*'}</label>
+                  <input 
+                    type="password" 
                     required={!editTarget} 
                     placeholder={editTarget ? "Leave blank to keep current" : "e.g. password123"} 
                     value={form.password || ''} 
-                    onChange={e => setForm({ ...form, password: e.target.value })} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, password: val }));
+                    }}
+                    autoComplete="new-password"
                   />
                 </div>
                 <div className="form-group">
                   <label><Phone size={13} /> Phone</label>
-                  <input placeholder="10-digit number" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                  <input 
+                    placeholder="10-digit number" 
+                    value={form.phone || ''} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, phone: val }));
+                    }}
+                    autoComplete="off"
+                  />
                 </div>
                 <div className="form-group">
-                  <label>Department</label>
+                  <label>Department *</label>
                   <CustomSelect 
                     value={form.dept}
-                    onChange={e => setForm({ ...form, dept: e.target.value })}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, dept: val }));
+                    }}
                     options={dbDepartments.map(d => ({ value: d.name, label: d.name }))}
                     placeholder="Select Department"
                     required
@@ -301,13 +353,26 @@ const StaffManagement = () => {
                 </div>
                 <div className="form-group">
                   <label>Weekly Workload (hrs)</label>
-                  <input type="number" min="1" max="30" placeholder="e.g. 16" value={form.workload} onChange={e => setForm({ ...form, workload: e.target.value })} />
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="30" 
+                    placeholder="e.g. 16" 
+                    value={form.workload || ''} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, workload: val }));
+                    }}
+                  />
                 </div>
                 <div className="form-group">
                   <label>Status</label>
                   <CustomSelect 
-                    value={form.status}
-                    onChange={e => setForm({ ...form, status: e.target.value })}
+                    value={form.status || 'Active'}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, status: val }));
+                    }}
                     options={[
                       { value: 'Active', label: 'Active' },
                       { value: 'Inactive', label: 'Inactive' }

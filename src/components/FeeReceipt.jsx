@@ -1,12 +1,31 @@
 import React from 'react';
 import { Printer, X, CheckCircle2 } from 'lucide-react';
 
+const getLoggedInCollegeName = () => {
+  try {
+    const keys = ['accounts_session', 'admin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'superadmin_session'];
+    for (const k of keys) {
+      const s = sessionStorage.getItem(k);
+      if (s) {
+        const parsed = JSON.parse(s);
+        if (parsed?.collegeName && parsed.collegeName !== 'Institution Portal' && parsed.collegeName !== 'Royal College') {
+          return parsed.collegeName;
+        }
+      }
+    }
+  } catch (e) {}
+  return 'College Administration';
+};
+
 const FeeReceipt = ({
   selectedFeeRecord,
   selectedPayment,
   onClose,
-  institutionName = "Royal College"
+  institutionName
 }) => {
+  const resolvedInstitutionName = institutionName && institutionName !== 'Royal College' 
+    ? institutionName 
+    : getLoggedInCollegeName();
   const formatCurrency = (amount) => {
     return `₹${Number(amount || 0).toLocaleString("en-IN")}`;
   };
@@ -77,7 +96,7 @@ const FeeReceipt = ({
   return (
     <div className="receipt-container">
       <div className="receipt-header">
-        <h1>{institutionName}</h1>
+        <h1>{resolvedInstitutionName}</h1>
         <p>Student Fee Payment Receipt</p>
       </div>
 

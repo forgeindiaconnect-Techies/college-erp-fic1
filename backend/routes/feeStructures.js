@@ -1,12 +1,14 @@
 import express from "express";
 import FeeStructure from "../models/FeeStructure.js";
 import Course from "../models/Course.js";
+import { protect, authorize, collegeScope } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 // Add Fee Structure
-router.post("/", async (req, res) => {
+router.post("/", protect, collegeScope, async (req, res) => {
   try {
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId || "unassigned_college";
     const {
       academicYear,
       department,
@@ -18,7 +20,6 @@ router.post("/", async (req, res) => {
       fees,
       totalFee,
       totalAmount,
-      collegeId,
     } = req.body;
 
     if (!course) {
@@ -28,9 +29,15 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Check if fee structure already exists for this course (and quota/year if provided)
+    // Check if fee structure already exists for this course (and quota/year if provided) within this college
     const duplicateQuery = {
       $and: [
+        {
+          $or: [
+            { collegeId: collegeId },
+            { tenantId: collegeId }
+          ]
+        },
         {
           $or: [
             { course: course },
@@ -70,7 +77,7 @@ router.post("/", async (req, res) => {
     if (existingFee) {
       return res.status(400).json({
         success: false,
-        message: "A fee structure already exists for this course and semester. Please edit the existing fee structure instead.",
+        message: "A fee structure already exists for this course and semester in your college. Please edit the existing fee structure instead.",
       });
     }
 
@@ -87,7 +94,7 @@ router.post("/", async (req, res) => {
       fees: Array.isArray(fees) ? fees : [],
       totalFee: calculatedTotal,
       totalAmount: calculatedTotal,
-      collegeId: collegeId || "COL001",
+      collegeId: collegeId,
     });
 
     req.app.get('io')?.emit('dataUpdated', { module: 'feeStructure', action: 'created' });
@@ -107,6 +114,7 @@ router.post("/", async (req, res) => {
             await feeCol.dropIndex(idx.name).catch(() => {});
           }
         }
+        const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId || "unassigned_college";
         const calculatedTotal = Number(req.body.totalFee || req.body.totalAmount) || (Number(req.body.tuitionFee || 0) + Number(req.body.otherFees || 0));
         const feeStructure = await FeeStructure.create({
           academicYear: req.body.academicYear,
@@ -119,7 +127,7 @@ router.post("/", async (req, res) => {
           fees: Array.isArray(req.body.fees) ? req.body.fees : [],
           totalFee: calculatedTotal,
           totalAmount: calculatedTotal,
-          collegeId: req.body.collegeId || "COL001",
+          collegeId: collegeId,
         });
         req.app.get('io')?.emit('dataUpdated', { module: 'feeStructure', action: 'created' });
         return res.status(201).json({
@@ -140,20 +148,35 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Get Fee Structures
-router.get("/", async (req, res) => {
+// Get Fee Structures strictly isolated by college
+router.get("/", protect, collegeScope, async (req, res) => {
   try {
     const { academicYear, course, department, quota } = req.query;
+    const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
     const filter = {};
+
+    if (req.user?.role !== 'Super Admin') {
+      const targetCollegeId = collegeId && collegeId !== 'system' ? collegeId : 'unassigned_college';
+      filter.$or = [
+        { collegeId: targetCollegeId },
+        { tenantId: targetCollegeId }
+      ];
+    }
 
     if (academicYear) filter.academicYear = academicYear;
     if (quota) filter.quota = new RegExp(`^${quota.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i');
     if (department) filter.department = new RegExp(department.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i');
     if (course) {
-      filter.$or = [
+      const courseFilter = [
         { course: course },
         { course: new RegExp(course.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i') }
       ];
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { $or: courseFilter }];
+        delete filter.$or;
+      } else {
+        filter.$or = courseFilter;
+      }
     }
 
     let feeStructures = await FeeStructure.find(filter)
@@ -174,9 +197,10 @@ router.get("/", async (req, res) => {
 });
 
 // Update Fee Structure
-router.put("/:id", async (req, res) => {
+router.put("/:id", protect, collegeScope, async (req, res) => {
   try {
     const { id } = req.params;
+    const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId || "unassigned_college";
     const {
       academicYear,
       department,
@@ -188,7 +212,6 @@ router.put("/:id", async (req, res) => {
       fees,
       totalFee,
       totalAmount,
-      collegeId,
     } = req.body;
 
     if (!course) {
@@ -198,57 +221,15 @@ router.put("/:id", async (req, res) => {
       });
     }
 
-    // Check for duplicate fee structure excluding current record
-    const duplicateQuery = {
-      _id: { $ne: id },
-      $and: [
-        {
-          $or: [
-            { course: course },
-            { course: new RegExp(`^${String(course).replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
-          ]
-        }
-      ]
-    };
-
-    if (department) {
-      duplicateQuery.$and.push({
-        $or: [
-          { department: department },
-          { department: new RegExp(`^${String(department).replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
-          { department: "" },
-          { department: null },
-          { department: { $exists: false } }
-        ]
-      });
-    }
-
-    if (semester) {
-      duplicateQuery.$and.push({ semester: Number(semester) || 1 });
-    }
-
-    if (quota) {
-      duplicateQuery.$and.push({
-        quota: new RegExp(`^${String(quota).replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i')
-      });
-    }
-
-    if (academicYear) {
-      duplicateQuery.$and.push({ academicYear });
-    }
-
-    const existingFee = await FeeStructure.findOne(duplicateQuery);
-    if (existingFee) {
-      return res.status(400).json({
-        success: false,
-        message: "A fee structure already exists for this course and semester. Please edit the existing fee structure instead.",
-      });
-    }
-
     const calculatedTotal = Number(totalFee || totalAmount) || (Number(tuitionFee || 0) + Number(otherFees || 0));
 
-    const updated = await FeeStructure.findByIdAndUpdate(
-      id,
+    const updateQuery = { _id: id };
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      updateQuery.$or = [{ collegeId }, { tenantId: collegeId }];
+    }
+
+    const updated = await FeeStructure.findOneAndUpdate(
+      updateQuery,
       {
         academicYear,
         department: department || "",
@@ -260,7 +241,8 @@ router.put("/:id", async (req, res) => {
         fees: Array.isArray(fees) ? fees : [],
         totalFee: calculatedTotal,
         totalAmount: calculatedTotal,
-        collegeId: collegeId || "COL001",
+        collegeId: collegeId,
+        tenantId: collegeId,
       },
       { new: true, runValidators: true }
     );
@@ -268,7 +250,7 @@ router.put("/:id", async (req, res) => {
     if (!updated) {
       return res.status(404).json({
         success: false,
-        message: "Fee structure not found",
+        message: "Fee structure not found or access denied.",
       });
     }
 
@@ -289,11 +271,25 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// Delete Fee Structure (Helper endpoint for management)
-router.delete("/:id", async (req, res) => {
+// Delete Fee Structure
+router.delete("/:id", protect, collegeScope, async (req, res) => {
   try {
     const { id } = req.params;
-    await FeeStructure.findByIdAndDelete(id);
+    const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId || "unassigned_college";
+    
+    const deleteQuery = { _id: id };
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      deleteQuery.$or = [{ collegeId }, { tenantId: collegeId }];
+    }
+
+    const deleted = await FeeStructure.findOneAndDelete(deleteQuery);
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: "Fee structure not found or access denied.",
+      });
+    }
+
     req.app.get('io')?.emit('dataUpdated', { module: 'feeStructure', action: 'deleted' });
     res.json({
       success: true,

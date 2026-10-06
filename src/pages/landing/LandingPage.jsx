@@ -21,7 +21,8 @@ import {
   TrendingUp,
   Award,
   Layers,
-  Sparkles
+  Sparkles,
+  Calendar
 } from 'lucide-react';
 import './LandingPage.css';
 
@@ -256,184 +257,82 @@ const LandingPage = () => {
             </div>
           </div>
 
-          {/* Right Hero Visual (Campus Frame + Interactive Laptop Mockup + 4 Orbit Badges) */}
+          {/* Right Hero Visual: Clean Glassmorphic ERP Ecosystem Showcase */}
           <div className="landing-hero-right">
-            
-            <div className="landing-campus-backdrop">
-              
-              {/* Floating Badge 1: Admissions */}
-              <div className="landing-floating-badge landing-badge-admissions">
-                <div className="landing-badge-icon-wrap" style={{ background: '#eff6ff', color: '#2563eb' }}>
-                  <Users size={16} />
-                </div>
-                <span>Admissions</span>
-              </div>
-
-              {/* Floating Badge 2: Fees & Accounts */}
-              <div className="landing-floating-badge landing-badge-fees">
-                <div className="landing-badge-icon-wrap" style={{ background: '#ecfdf5', color: '#10b981' }}>
-                  <CreditCard size={16} />
-                </div>
-                <span>Fees & Accounts</span>
-              </div>
-
-              {/* Floating Badge 3: Hostel */}
-              <div className="landing-floating-badge landing-badge-hostel">
-                <div className="landing-badge-icon-wrap" style={{ background: '#fff7ed', color: '#f97316' }}>
-                  <Building size={16} />
-                </div>
-                <span>Hostel</span>
-              </div>
-
-              {/* Floating Badge 4: Transport */}
-              <div className="landing-floating-badge landing-badge-transport">
-                <div className="landing-badge-icon-wrap" style={{ background: '#ecfeff', color: '#06b6d4' }}>
-                  <Bus size={16} />
-                </div>
-                <span>Transport</span>
-              </div>
-
-              {/* Central Laptop Device Mockup */}
-              <div className="landing-laptop-frame">
-                
-                <div className="landing-laptop-screen">
-                  
-                  {/* Mock Sidebar */}
-                  <div className="landing-mock-sidebar">
-                    <div className="landing-mock-brand">
-                      <GraduationCap size={13} />
-                      <span>CollegeERP</span>
-                    </div>
-
-                    <div className="landing-mock-link active">
-                      <span>Dashboard</span>
-                    </div>
-                    <div className="landing-mock-link">
-                      <span>Admissions</span>
-                    </div>
-                    <div className="landing-mock-link">
-                      <span>Students</span>
-                    </div>
-                    <div className="landing-mock-link">
-                      <span>Academics</span>
-                    </div>
-                    <div className="landing-mock-link">
-                      <span>Fees & Accounts</span>
-                    </div>
-                    <div className="landing-mock-link">
-                      <span>Hostel</span>
-                    </div>
-                    <div className="landing-mock-link">
-                      <span>Transport</span>
-                    </div>
-                    <div className="landing-mock-link">
-                      <span>Reports</span>
-                    </div>
-                    <div className="landing-mock-link">
-                      <span>Settings</span>
-                    </div>
+            <div className="landing-hero-feature-card" style={{
+              background: 'rgba(15, 23, 42, 0.85)',
+              backdropFilter: 'blur(16px)',
+              borderRadius: '20px',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              padding: '28px',
+              color: '#ffffff',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              width: '100%',
+              maxWidth: '520px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <GraduationCap size={20} color="#ffffff" />
                   </div>
-
-                  {/* Mock Content */}
-                  <div className="landing-mock-content">
-                    
-                    <div className="landing-mock-header">
-                      <div className="landing-mock-greeting">
-                        <h4>Welcome Back, Admin</h4>
-                        <span>Real-time Institutional Portal</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '8px', color: '#64748b' }}>
-                        <span>Today • 28 Sep 2026</span>
-                      </div>
-                    </div>
-
-                    {/* KPI 3 Cards */}
-                    <div className="landing-mock-kpi-grid">
-                      <div className="landing-mock-kpi-card">
-                        <span className="landing-mock-kpi-label">Total Students</span>
-                        <span className="landing-mock-kpi-val">1,248</span>
-                        <span className="landing-mock-kpi-badge">▲ 12%</span>
-                      </div>
-                      <div className="landing-mock-kpi-card">
-                        <span className="landing-mock-kpi-label">Total Admissions</span>
-                        <span className="landing-mock-kpi-val">326</span>
-                        <span className="landing-mock-kpi-badge">▲ 8%</span>
-                      </div>
-                      <div className="landing-mock-kpi-card">
-                        <span className="landing-mock-kpi-label">Fees Collected</span>
-                        <span className="landing-mock-kpi-val">₹18,45,000</span>
-                        <span className="landing-mock-kpi-badge">▲ 15%</span>
-                      </div>
-                    </div>
-
-                    {/* Bottom Split: Chart & Quick Actions */}
-                    <div className="landing-mock-bottom-grid">
-                      
-                      {/* Trend Curve SVG */}
-                      <div className="landing-mock-chart-box">
-                        <span style={{ fontSize: '8px', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
-                          Student Admission Trend
-                        </span>
-                        <svg viewBox="0 0 100 40" style={{ width: '100%', height: '50px', overflow: 'visible' }}>
-                          <defs>
-                            <linearGradient id="gradMock" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
-                              <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-                            </linearGradient>
-                          </defs>
-                          <path
-                            d="M 5,32 Q 25,28 40,18 T 75,12 T 95,6 L 95,38 L 5,38 Z"
-                            fill="url(#gradMock)"
-                          />
-                          <path
-                            d="M 5,32 Q 25,28 40,18 T 75,12 T 95,6"
-                            fill="none"
-                            stroke="#2563eb"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6.5px', color: '#94a3b8' }}>
-                          <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
-                        </div>
-                      </div>
-
-                      {/* Quick Actions */}
-                      <div className="landing-mock-actions-box">
-                        <span style={{ fontSize: '8px', fontWeight: 700, color: '#0f172a' }}>Quick Actions</span>
-                        <div className="landing-mock-action-item">
-                          <Plus size={8} color="#2563eb" />
-                          <span>Add Student</span>
-                        </div>
-                        <div className="landing-mock-action-item">
-                          <CreditCard size={8} color="#10b981" />
-                          <span>Collect Fees</span>
-                        </div>
-                        <div className="landing-mock-action-item">
-                          <Building size={8} color="#f97316" />
-                          <span>Hostel Allotment</span>
-                        </div>
-                        <div className="landing-mock-action-item">
-                          <Bus size={8} color="#06b6d4" />
-                          <span>Transport Route</span>
-                        </div>
-                      </div>
-
-                    </div>
-
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#ffffff' }}>ERPSYS Cloud Platform</h3>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Multi-Campus Institutional Engine</span>
                   </div>
-
                 </div>
-
-                {/* Laptop Base & Notch */}
-                <div className="landing-laptop-base">
-                  <div className="landing-laptop-notch"></div>
-                </div>
-
+                <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700 }}>
+                  🟢 LIVE
+                </span>
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginBottom: '4px' }}>Role-Based Portals</div>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#60a5fa' }}>9 Portals</div>
+                  <span style={{ fontSize: '0.7rem', color: '#cbd5e1' }}>Admin, Student, Faculty +</span>
+                </div>
+
+                <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginBottom: '4px' }}>System Uptime</div>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#34d399' }}>99.99%</div>
+                  <span style={{ fontSize: '0.7rem', color: '#cbd5e1' }}>Enterprise Grade SLA</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#e2e8f0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Integrated Modules
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '0.82rem' }}>
+                  {[
+                    { icon: <Users size={14} color="#60a5fa" />, label: 'Admissions & Enrollment' },
+                    { icon: <CreditCard size={14} color="#34d399" />, label: 'Fee Collection & Ledgers' },
+                    { icon: <Calendar size={14} color="#f472b6" />, label: 'Live Attendance & Timetable' },
+                    { icon: <Bus size={14} color="#38bdf8" />, label: 'Smart Fleet & GPS Tracking' },
+                    { icon: <Building size={14} color="#fb923c" />, label: 'Hostel & Mess Management' },
+                    { icon: <BarChart2 size={14} color="#a78bfa" />, label: 'Examination & Marks Portal' }
+                  ].map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255, 255, 255, 0.04)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)', color: '#f1f5f9' }}>
+                      {item.icon}
+                      <span style={{ fontSize: '0.78rem', fontWeight: 500 }}>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Real-time institutional sync</span>
+                <button 
+                  onClick={() => navigate('/login')}
+                  style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)', color: '#ffffff', border: 'none', padding: '6px 14px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  Access Portals &rarr;
+                </button>
+              </div>
             </div>
-
           </div>
 
         </div>

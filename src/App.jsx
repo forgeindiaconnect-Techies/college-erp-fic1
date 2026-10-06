@@ -313,7 +313,7 @@ const HostelGuard = ({ children }) => {
 function App() {
   const [theme, setTheme] = useState('light');
   const [collegeSettings, setCollegeSettings] = useState({
-    collegeName: 'Marudhar Kesari Jain College for Women',
+    collegeName: '',
     primaryColor: '#0d9488',
     secondaryColor: '#059669'
   });

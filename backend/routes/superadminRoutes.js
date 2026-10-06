@@ -73,6 +73,50 @@ router.put('/college/:id/activate', protect, authorize('Super Admin'), async (re
   }
 });
 
+// Update College Details
+router.put('/college/:id', protect, authorize('Super Admin'), async (req, res) => {
+  try {
+    const { name, collegeName, adminName, email, phone, principalName, principalEmail, subscriptionPlan, subscriptionStatus } = req.body;
+    const finalName = name || collegeName;
+
+    let college = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      college = await College.findById(req.params.id);
+    }
+    if (!college) {
+      college = await College.findOne({ tenantId: req.params.id });
+    }
+    if (!college) return res.status(404).json({ success: false, message: 'College not found' });
+
+    if (finalName) college.name = finalName.trim();
+    if (adminName) college.adminName = adminName.trim();
+    if (email) college.email = email.trim().toLowerCase();
+    if (phone) college.phone = phone.trim();
+    if (principalName) college.principalName = principalName.trim();
+    if (principalEmail) college.principalEmail = principalEmail.trim().toLowerCase();
+    if (subscriptionPlan) college.subscriptionPlan = subscriptionPlan;
+    if (subscriptionStatus) college.subscriptionStatus = subscriptionStatus;
+
+    await college.save();
+
+    // Sync CollegeSettings for this specific tenant only
+    if (finalName) {
+      const CollegeSettings = (await import('../models/CollegeSettings.js')).default;
+      await CollegeSettings.updateOne(
+        { $or: [{ tenantId: college.tenantId }, { collegeId: college._id }] },
+        { $set: { collegeName: finalName.trim() } }
+      );
+    }
+
+    req.app.get('io')?.emit('dataUpdated', { module: 'colleges', action: 'updated' });
+
+    res.json({ success: true, message: `College '${college.name}' updated successfully.`, college });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+
 // Get all subscriptions
 router.get('/subscriptions', protect, authorize('Super Admin'), collegeScope, async (req, res) => {
   try {

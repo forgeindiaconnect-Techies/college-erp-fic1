@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ClipboardList, Search, Calendar, Users, FileText, ArrowLeft, BookOpen, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getAssignments, getAssignmentSubmissions, getStudents, getDepartments } from '../../api/index';
+import useRealtimeSync from '../../hooks/useRealtimeSync';
 
 const AdminAssignments = () => {
   const navigate = useNavigate();
@@ -39,37 +40,35 @@ const AdminAssignments = () => {
     }
   };
 
+  const loadData = useCallback(async () => {
+    try {
+      const [res, deptsRes] = await Promise.all([
+        getAssignments().catch(() => ({ data: [] })),
+        getDepartments().catch(() => ({ data: [] }))
+      ]);
+      setAssignments(res.data || []);
+      setDbDepartments(Array.isArray(deptsRes?.data) ? deptsRes.data : []);
+    } catch (err) {
+      console.error('Failed to load assignments', err);
+      const savedAssignments = localStorage.getItem(`erp_assignments_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
+      if (savedAssignments) {
+        setAssignments(JSON.parse(savedAssignments));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    // 1. Session check
     const session = sessionStorage.getItem('admin_session');
     if (!session) {
       navigate('/login');
       return;
     }
-
-    // 2. Load assignments from backend API
-    const loadData = async () => {
-      try {
-        const [res, deptsRes] = await Promise.all([
-          getAssignments().catch(() => ({ data: [] })),
-          getDepartments().catch(() => ({ data: [] }))
-        ]);
-        setAssignments(res.data || []);
-        setDbDepartments(Array.isArray(deptsRes?.data) ? deptsRes.data : []);
-      } catch (err) {
-        console.error('Failed to load assignments', err);
-        // Fallback to local storage if API fails completely
-        const savedAssignments = localStorage.getItem(`erp_assignments_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
-        if (savedAssignments) {
-          setAssignments(JSON.parse(savedAssignments));
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     loadData();
-  }, [navigate]);
+  }, [navigate, loadData]);
+
+  useRealtimeSync(loadData, 'assignments');
 
   const departments = [
     'All Departments',

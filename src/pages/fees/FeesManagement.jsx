@@ -135,7 +135,7 @@ const printOfficialReceipt = (student) => {
     <body>
       <div class="receipt-container">
         <div class="receipt-header">
-          <h1 class="college-title">Marudhar Kesari Jain College for Women</h1>
+          <h1 class="college-title">Central Institutional Portal</h1>
           <p class="college-sub">Accredited by NAAC with 'A' Grade · Central ERP Financial Management</p>
           <p class="college-sub">Vaniyambadi, Tirupattur District, Tamil Nadu — 635751</p>
           <div class="receipt-banner">Official Student Fee Payment Receipt</div>

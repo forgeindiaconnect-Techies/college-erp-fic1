@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Search, Edit2, Trash2, X, MapPin, Clock, BookOpen } from 'lucide-react';
+import { Calendar, Plus, Search, Edit2, Trash2, X, MapPin, Clock, BookOpen, UserCheck, Users, ShieldAlert } from 'lucide-react';
 import {
   getExams,
   getSubjects,
@@ -7,6 +7,7 @@ import {
   getAcademicYears,
   getCourses,
   getSemesters,
+  getStaff,
   createExam,
   updateExam,
   deleteExam
@@ -84,14 +85,40 @@ const HodExams = () => {
   const [semesters, setSemesters] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [courses, setCourses] = useState([]);
+  const [staffMembers, setStaffMembers] = useState([]);
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({ name:'Internal Assessment 1 (IA-1)', academicYearId:'', courseId:'', subjectId:'', subject:'', sem:'Sem 3', section:'A', date:'', time:'10:00 AM – 12:00 PM', room:'', maxMarks:100 });
+  const [form, setForm] = useState({
+    name: 'Internal Assessment 1 (IA-1)',
+    academicYearId: '',
+    courseId: '',
+    subjectId: '',
+    subject: '',
+    sem: 'Sem 3',
+    section: 'A',
+    date: '',
+    time: '10:00 AM – 12:00 PM',
+    room: '',
+    maxMarks: 100,
+    invigilatorId: '',
+    invigilatorName: ''
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchExams();
+
+    const fetchLiveStaff = async () => {
+      try {
+        const res = await getStaff();
+        const list = Array.isArray(res?.data) ? res.data : (res?.data?.data || []);
+        setStaffMembers(list);
+      } catch (err) {
+        console.error('Failed to load staff list for invigilation:', err);
+      }
+    };
+    fetchLiveStaff();
 
     const fetchLiveSubjects = async () => {
       try {
@@ -208,8 +235,45 @@ const HodExams = () => {
     }
   };
 
-  const openAdd = () => { setForm({ name:'Internal Assessment 1 (IA-1)', academicYearId:'', courseId: '', subjectId: '', subject:subjects[0]?.name||'', sem:'Sem 3', section:'A', date:new Date().toISOString().split('T')[0], time:'10:00 AM – 12:00 PM', room:'', maxMarks:100 }); setEditId(null); setModal(true); };
-  const openEdit = (ex) => { setForm({ name:ex.name, academicYearId: ex.academicYearId?._id || ex.academicYearId || '', courseId: ex.courseId?._id || ex.courseId || '', subjectId: ex.subjectId?._id || ex.subjectId || '', subject:ex.subject, sem:ex.sem || 'Sem 3', section:ex.section || 'A', date:ex.date, time:ex.time, room:ex.room, maxMarks:ex.maxMarks }); setEditId(ex._id || ex.id); setModal(true); };
+  const openAdd = () => {
+    setForm({
+      name: 'Internal Assessment 1 (IA-1)',
+      academicYearId: '',
+      courseId: '',
+      subjectId: '',
+      subject: subjects[0]?.name || '',
+      sem: 'Sem 3',
+      section: 'A',
+      date: new Date().toISOString().split('T')[0],
+      time: '10:00 AM – 12:00 PM',
+      room: '',
+      maxMarks: 100,
+      invigilatorId: '',
+      invigilatorName: ''
+    });
+    setEditId(null);
+    setModal(true);
+  };
+
+  const openEdit = (ex) => {
+    setForm({
+      name: ex.name,
+      academicYearId: ex.academicYearId?._id || ex.academicYearId || '',
+      courseId: ex.courseId?._id || ex.courseId || '',
+      subjectId: ex.subjectId?._id || ex.subjectId || '',
+      subject: ex.subject,
+      sem: ex.sem || 'Sem 3',
+      section: ex.section || 'A',
+      date: ex.date,
+      time: ex.time,
+      room: ex.room || ex.hallName || '',
+      maxMarks: ex.maxMarks || 100,
+      invigilatorId: ex.invigilatorId || '',
+      invigilatorName: ex.invigilatorName || ex.invigilator || ''
+    });
+    setEditId(ex._id || ex.id);
+    setModal(true);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -217,7 +281,11 @@ const HodExams = () => {
       ...form,
       examType: getExamType(form.name),
       dept: hod.dept,
-      maxMarks: Number(form.maxMarks)
+      maxMarks: Number(form.maxMarks),
+      invigilator: form.invigilatorName,
+      invigilatorName: form.invigilatorName,
+      invigilatorId: form.invigilatorId,
+      hallName: form.room
     };
     try {
       if (editId) {
@@ -331,27 +399,28 @@ const HodExams = () => {
   return (
     <div className="animate-fade-in" style={{ padding:'1.5rem' }}>
       <div className="page-header">
-        <div><h1>Exam Timetable (Semester & Internal Exams) — {hod.dept}</h1><p className="text-muted">Schedule semester examination dates, time slots, exam halls, and internal tests.</p></div>
+        <div><h1>Exam Duty Center & Timetable — {hod.dept}</h1><p className="text-muted">Schedule semester examinations, invigilation duties, hall assignments, and internal test rosters.</p></div>
         <button className="btn-primary shadow-glow" onClick={openAdd}><Plus size={16}/> Schedule Exam</button>
       </div>
 
       <div className="sm-summary-row" style={{ marginTop:'1.5rem' }}>
         <div className="sm-summary-card glass-card"><span className="sm-summary-label">Scheduled Exams</span><span className="sm-summary-value">{exams.length}</span></div>
-        <div className="sm-summary-card glass-card"><span className="sm-summary-label">Unique Venues</span><span className="sm-summary-value text-success">{new Set(exams.map(e=>e.room).filter(Boolean)).size}</span></div>
+        <div className="sm-summary-card glass-card"><span className="sm-summary-label">Unique Venues</span><span className="sm-summary-value text-success">{new Set(exams.map(e=>e.room || e.hallName).filter(Boolean)).size}</span></div>
+        <div className="sm-summary-card glass-card"><span className="sm-summary-label">Duty Staff Assigned</span><span className="sm-summary-value text-primary">{exams.filter(e => e.invigilatorName || e.invigilator).length}</span></div>
         <div className="sm-summary-card glass-card"><span className="sm-summary-label">Upcoming (Next 7d)</span><span className="sm-summary-value gradient-text">{exams.filter(e=>{const d=new Date(e.date);const n=new Date();return d>=n && d<=new Date(n.getTime()+7*86400000);}).length}</span></div>
       </div>
 
       <div className="glass-card table-wrapper" style={{ marginTop:'1.5rem' }}>
         <div className="filters-row">
-          <div className="search-box"><Search size={16} className="text-muted"/><input placeholder="Search by exam, subject or room..." value={search} onChange={e=>setSearch(e.target.value)}/></div>
+          <div className="search-box"><Search size={16} className="text-muted"/><input placeholder="Search by exam, subject, invigilator or room..." value={search} onChange={e=>setSearch(e.target.value)}/></div>
         </div>
 
         <div className="table-container">
           <table>
-            <thead><tr><th>Exam Type</th><th>Subject</th><th>Semester</th><th>Date</th><th>Time</th><th>Venue</th><th>Marks</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Exam Type</th><th>Subject</th><th>Semester</th><th>Date</th><th>Time</th><th>Venue</th><th>Invigilator / Duty Officer</th><th>Marks</th><th>Actions</th></tr></thead>
             <tbody>
               {filtered.length===0 ? (
-                <tr><td colSpan={8} className="text-center text-muted" style={{padding:'2rem'}}>No exams scheduled yet.</td></tr>
+                <tr><td colSpan={9} className="text-center text-muted" style={{padding:'2rem'}}>No exams scheduled yet.</td></tr>
               ) : filtered.map(ex => (
                 <tr key={ex._id || ex.id}>
                   <td className="font-semibold">{ex.name}</td>
@@ -359,7 +428,16 @@ const HodExams = () => {
                   <td><span className="badge-outline">{ex.sem}</span></td>
                   <td><div style={{display:'flex',alignItems:'center',gap:5}}><Calendar size={13} className="text-muted"/><span className="text-sm">{ex.date}</span></div></td>
                   <td><div style={{display:'flex',alignItems:'center',gap:5}}><Clock size={13} className="text-muted"/><span className="text-sm font-semibold">{ex.time}</span></div></td>
-                  <td><div style={{display:'flex',alignItems:'center',gap:5}}><MapPin size={13} className="text-muted"/><span style={{background:'rgba(59,130,246,0.1)',color:'#3b82f6',padding:'0.15rem 0.45rem',borderRadius:4,fontSize:'0.78rem',fontWeight:700}}>{ex.room}</span></div></td>
+                  <td><div style={{display:'flex',alignItems:'center',gap:5}}><MapPin size={13} className="text-muted"/><span style={{background:'rgba(59,130,246,0.1)',color:'#3b82f6',padding:'0.15rem 0.45rem',borderRadius:4,fontSize:'0.78rem',fontWeight:700}}>{ex.room || ex.hallName}</span></div></td>
+                  <td>
+                    {ex.invigilatorName || ex.invigilator ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700 }}>
+                        <UserCheck size={13} /> {ex.invigilatorName || ex.invigilator}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#94a3b8', fontSize: '0.78rem', fontStyle: 'italic' }}>Unassigned</span>
+                    )}
+                  </td>
                   <td><span style={{background:'rgba(236,72,153,0.1)',color:'#ec4899',padding:'0.15rem 0.45rem',borderRadius:4,fontSize:'0.78rem',fontWeight:700}}>{ex.maxMarks} Marks</span></td>
                   <td><div className="action-buttons"><button className="btn-icon" onClick={()=>openEdit(ex)}><Edit2 size={14}/></button><button className="btn-icon btn-icon-danger" onClick={()=>handleDelete(ex._id || ex.id)}><Trash2 size={14}/></button></div></td>
                 </tr>
@@ -515,6 +593,35 @@ const HodExams = () => {
                 <div className="form-group"><label>Time Window *</label><input required placeholder="10:00 AM – 01:00 PM" value={form.time} onChange={e=>setForm({...form,time:e.target.value})}/></div>
                 <div className="form-group"><label>Venue / Hall *</label><input required placeholder="e.g. Block A – 301" value={form.room} onChange={e=>setForm({...form,room:e.target.value})}/></div>
                 <div className="form-group"><label>Max Marks</label><input type="number" min={10} max={100} value={form.maxMarks} onChange={e=>setForm({...form,maxMarks:e.target.value})}/></div>
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label>Assigned Invigilator / Duty Staff</label>
+                  <select
+                    value={form.invigilatorId || ''}
+                    onChange={e => {
+                      const selectedId = e.target.value;
+                      const staffObj = staffMembers.find(s => String(s._id || s.id) === String(selectedId));
+                      const name = staffObj ? (staffObj.name + (staffObj.designation ? ` — ${staffObj.designation}` : '')) : '';
+                      setForm({
+                        ...form,
+                        invigilatorId: selectedId,
+                        invigilatorName: name,
+                        invigilator: name
+                      });
+                    }}
+                  >
+                    <option value="">Select Faculty for Invigilation</option>
+                    {staffMembers.map(st => {
+                      const sId = st._id || st.id;
+                      const sName = st.name || st.facultyName;
+                      const sDesig = st.designation || st.role || 'Faculty';
+                      return (
+                        <option key={sId} value={sId}>
+                          {sName} ({sDesig})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               </div>
               <div className="modal-actions"><button type="button" className="btn-ghost" onClick={()=>setModal(false)}>Cancel</button><button type="submit" className="btn-primary">{editId?'Save Changes':'Schedule'}</button></div>
             </form>

@@ -3,8 +3,9 @@ import Scholarship from "../models/Scholarship.js";
 const getCollegeId = (req) => {
   return (
     req.collegeId ||
+    req.user?.tenantId ||
     req.user?.collegeId ||
-    "COL001"
+    "unassigned_college"
   );
 };
 
@@ -12,10 +13,16 @@ const getCollegeId = (req) => {
 export const getScholarships = async (req, res) => {
   try {
     const collegeId = getCollegeId(req);
+    const filter = {};
 
-    const scholarships = await Scholarship.find({
-      collegeId,
-    }).sort({ createdAt: -1 });
+    if (req.user?.role !== "Super Admin" && collegeId && collegeId !== "system") {
+      filter.$or = [
+        { collegeId: collegeId },
+        { tenantId: collegeId }
+      ];
+    }
+
+    const scholarships = await Scholarship.find(filter).sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -35,14 +42,22 @@ export const getScholarships = async (req, res) => {
 // GET single scholarship
 export const getScholarshipById = async (req, res) => {
   try {
-    const scholarship = await Scholarship.findById(
-      req.params.id
-    );
+    const collegeId = getCollegeId(req);
+    const filter = { _id: req.params.id };
+
+    if (req.user?.role !== "Super Admin" && collegeId && collegeId !== "system") {
+      filter.$or = [
+        { collegeId: collegeId },
+        { tenantId: collegeId }
+      ];
+    }
+
+    const scholarship = await Scholarship.findOne(filter);
 
     if (!scholarship) {
       return res.status(404).json({
         success: false,
-        message: "Scholarship not found",
+        message: "Scholarship not found or access denied",
       });
     }
 
@@ -77,8 +92,7 @@ export const createScholarship = async (req, res) => {
     if (!scholarshipName || !academicYear) {
       return res.status(400).json({
         success: false,
-        message:
-          "Scholarship name and academic year are required",
+        message: "Scholarship name and academic year are required",
       });
     }
 
@@ -91,50 +105,33 @@ export const createScholarship = async (req, res) => {
       });
     }
 
-    if (
-      scholarshipType === "Percentage" &&
-      value > 100
-    ) {
+    if (scholarshipType === "Percentage" && value > 100) {
       return res.status(400).json({
         success: false,
-        message:
-          "Percentage scholarship cannot exceed 100%",
+        message: "Percentage scholarship cannot exceed 100%",
       });
     }
 
-    const scholarship =
-      await Scholarship.create({
-        scholarshipName:
-          scholarshipName.trim(),
+    const collegeId = getCollegeId(req);
 
-        academicYear:
-          academicYear.trim(),
+    const scholarship = await Scholarship.create({
+      scholarshipName: scholarshipName.trim(),
+      academicYear: academicYear.trim(),
+      scholarshipType: scholarshipType || "Fixed Amount",
+      scholarshipValue: value,
+      maximumAmount: Number(maximumAmount || 0),
+      eligibility: eligibility || "",
+      status: status || "active",
+      collegeId: collegeId,
+      tenantId: collegeId,
+      organization: req.user?.organization || null,
+    });
 
-        scholarshipType:
-          scholarshipType || "Fixed Amount",
-
-        scholarshipValue: value,
-
-        maximumAmount:
-          Number(maximumAmount || 0),
-
-        eligibility:
-          eligibility || "",
-
-        status:
-          status || "active",
-
-        collegeId:
-          getCollegeId(req),
-
-        organization:
-          req.user?.organization || null,
-      });
+    req.app.get("io")?.emit("dataUpdated", { module: "scholarships", action: "created" });
 
     res.status(201).json({
       success: true,
-      message:
-        "Scholarship created successfully",
+      message: "Scholarship created successfully",
       data: scholarship,
     });
   } catch (error) {
@@ -151,15 +148,22 @@ export const createScholarship = async (req, res) => {
 // UPDATE scholarship
 export const updateScholarship = async (req, res) => {
   try {
-    const scholarship =
-      await Scholarship.findById(
-        req.params.id
-      );
+    const collegeId = getCollegeId(req);
+    const filter = { _id: req.params.id };
+
+    if (req.user?.role !== "Super Admin" && collegeId && collegeId !== "system") {
+      filter.$or = [
+        { collegeId: collegeId },
+        { tenantId: collegeId }
+      ];
+    }
+
+    const scholarship = await Scholarship.findOne(filter);
 
     if (!scholarship) {
       return res.status(404).json({
         success: false,
-        message: "Scholarship not found",
+        message: "Scholarship not found or access denied",
       });
     }
 
@@ -178,31 +182,23 @@ export const updateScholarship = async (req, res) => {
         ? Number(scholarshipValue)
         : scholarship.scholarshipValue;
 
-    if (
-      scholarshipType === "Percentage" &&
-      value > 100
-    ) {
+    if (scholarshipType === "Percentage" && value > 100) {
       return res.status(400).json({
         success: false,
-        message:
-          "Percentage scholarship cannot exceed 100%",
+        message: "Percentage scholarship cannot exceed 100%",
       });
     }
 
     scholarship.scholarshipName =
-      scholarshipName ??
-      scholarship.scholarshipName;
+      scholarshipName ?? scholarship.scholarshipName;
 
     scholarship.academicYear =
-      academicYear ??
-      scholarship.academicYear;
+      academicYear ?? scholarship.academicYear;
 
     scholarship.scholarshipType =
-      scholarshipType ??
-      scholarship.scholarshipType;
+      scholarshipType ?? scholarship.scholarshipType;
 
-    scholarship.scholarshipValue =
-      value;
+    scholarship.scholarshipValue = value;
 
     scholarship.maximumAmount =
       maximumAmount !== undefined
@@ -210,19 +206,18 @@ export const updateScholarship = async (req, res) => {
         : scholarship.maximumAmount;
 
     scholarship.eligibility =
-      eligibility ??
-      scholarship.eligibility;
+      eligibility ?? scholarship.eligibility;
 
     scholarship.status =
-      status ??
-      scholarship.status;
+      status ?? scholarship.status;
 
     await scholarship.save();
 
+    req.app.get("io")?.emit("dataUpdated", { module: "scholarships", action: "updated" });
+
     res.json({
       success: true,
-      message:
-        "Scholarship updated successfully",
+      message: "Scholarship updated successfully",
       data: scholarship,
     });
   } catch (error) {
@@ -239,22 +234,30 @@ export const updateScholarship = async (req, res) => {
 // DELETE scholarship
 export const deleteScholarship = async (req, res) => {
   try {
-    const scholarship =
-      await Scholarship.findByIdAndDelete(
-        req.params.id
-      );
+    const collegeId = getCollegeId(req);
+    const filter = { _id: req.params.id };
+
+    if (req.user?.role !== "Super Admin" && collegeId && collegeId !== "system") {
+      filter.$or = [
+        { collegeId: collegeId },
+        { tenantId: collegeId }
+      ];
+    }
+
+    const scholarship = await Scholarship.findOneAndDelete(filter);
 
     if (!scholarship) {
       return res.status(404).json({
         success: false,
-        message: "Scholarship not found",
+        message: "Scholarship not found or access denied",
       });
     }
 
+    req.app.get("io")?.emit("dataUpdated", { module: "scholarships", action: "deleted" });
+
     res.json({
       success: true,
-      message:
-        "Scholarship deleted successfully",
+      message: "Scholarship deleted successfully",
     });
   } catch (error) {
     console.error("Error deleting scholarship:", error);

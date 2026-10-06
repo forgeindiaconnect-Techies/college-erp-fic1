@@ -27,57 +27,24 @@ router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'St
     const dept = req.dept || req.query.dept;
     const targetCollegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
     
-    let query = {
-      $or: [
+    let query = {};
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      query.$or = [
         { collegeId: targetCollegeId },
-        { collegeId: 'COL002-8379189' },
-        { collegeId: 'COL001' },
-        { collegeId: 'unassigned_college' },
-        { collegeId: null },
-        { collegeId: { $exists: false } }
-      ]
-    };
+        { tenantId: targetCollegeId }
+      ];
+    }
 
     if (dept) {
-      query = {
-        $and: [
-          query,
-          { $or: [{ dept: dept }, { department: dept }] }
-        ]
-      };
+      const deptFilter = { $or: [{ dept: dept }, { department: dept }] };
+      if (query.$or) {
+        query = { $and: [query, deptFilter] };
+      } else {
+        query = deptFilter;
+      }
     }
 
-    let students = await Student.find(query).lean();
-    if (!students || students.length === 0) {
-      students = await Student.find(dept ? { $or: [{ dept: dept }, { department: dept }] } : {}).lean();
-    }
-
-    // If Student collection is empty, check Student users
-    if (!students || students.length === 0) {
-      const studentUsers = await User.find({ 
-        role: 'Student',
-        $or: [
-          { collegeId: targetCollegeId },
-          { tenantId: targetCollegeId },
-          { collegeId: 'COL002-8379189' },
-          { collegeId: 'COL001' },
-          { collegeId: null },
-          { collegeId: { $exists: false } }
-        ]
-      }).lean();
-
-      students = studentUsers.map(u => ({
-        _id: u._id,
-        id: u.referenceId || u.studentId || u.id || u.rollNo || String(u._id),
-        name: u.name,
-        email: u.email,
-        dept: u.department || u.dept || 'Computer Science',
-        department: u.department || u.dept || 'Computer Science',
-        sem: u.semester || u.sem || 'Sem 1',
-        collegeId: u.collegeId || u.tenantId
-      }));
-    }
-
+    const students = await Student.find(query).lean();
     res.json(students);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -203,8 +170,24 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
     return res.status(400).json({ message: "Remaining fee cannot be negative" });
   }
 
+  const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId || 'unassigned_college';
+  const autoStudentId = req.body.id || req.body.admissionNo || `STU-${Date.now().toString().slice(-6)}`;
+  const autoStudentName = req.body.name || [req.body.firstName, req.body.lastName].filter(Boolean).join(' ') || 'Student';
+  const autoStudentEmail = (req.body.email && req.body.email.trim()) || `${autoStudentId.toLowerCase().replace(/[^a-z0-9]/g, '')}@student.college.edu`;
+  const autoStudentDept = req.body.dept || req.body.department || 'General';
+  const cleanBody = { ...req.body };
+  delete cleanBody._id;
+
   const student = new Student({
-    ...req.body,
+    ...cleanBody,
+    id: autoStudentId,
+    admissionNo: autoStudentId,
+    name: autoStudentName,
+    email: autoStudentEmail,
+    dept: autoStudentDept,
+    department: autoStudentDept,
+    sem: autoStudentSem,
+    semester: Number(String(req.body.semester || 1).replace(/\D/g, '')) || 1,
     course: req.body.course || '',
     feeType: req.body.feeType || 'all',
     quota,
@@ -223,12 +206,13 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
     amountPaid: paidAmount,
     remainingFee,
     balanceFee: remainingFee,
-    paymentStatus
+    paymentStatus,
+    collegeId,
+    tenantId: collegeId,
   });
   try {
     const newStudent = await student.save();
     let studentUser = null;
-    const collegeId = req.collegeId || req.user.collegeId || req.user.tenantId || 'unassigned_college';
     
     // Create a User account for login with default password
     try {

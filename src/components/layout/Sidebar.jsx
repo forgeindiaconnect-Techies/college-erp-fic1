@@ -114,6 +114,16 @@ const Sidebar = ({ isOpen, onClose }) => {
     }
   ];
 
+  const getAdminSession = () => {
+    try {
+      return JSON.parse(sessionStorage.getItem('admin_session') || '{}');
+    } catch(e) {
+      return {};
+    }
+  };
+  const adminSession = getAdminSession();
+  const displayCollegeName = adminSession?.collegeName || collegeSettings?.collegeName || 'Institution Portal';
+
   return (
     <>
       {isOpen && <div className="sidebar-overlay" onClick={onClose} />}
@@ -123,19 +133,13 @@ const Sidebar = ({ isOpen, onClose }) => {
           {collegeSettings?.collegeLogo ? (
             <img 
               src={collegeSettings.collegeLogo} 
-              alt={collegeSettings.collegeName || "College Logo"} 
+              alt={displayCollegeName} 
               style={{ height: '32px', objectFit: 'contain' }} 
             />
-          ) : collegeSettings?.collegeName ? (
-            <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
-              {collegeSettings.collegeName}
-            </div>
           ) : (
-            <img 
-              src="/logo.svg?v=1782115707199" 
-              alt="ERPSYS Logo" 
-              style={{ height: '32px', objectFit: 'contain' }} 
-            />
+            <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+              {displayCollegeName}
+            </div>
           )}
           <button className="sidebar-close-btn" onClick={onClose}>
             <X size={20} />

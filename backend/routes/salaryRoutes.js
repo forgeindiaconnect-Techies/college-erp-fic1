@@ -60,7 +60,12 @@ const notifyStaffSalary = async (req, salaryRecord) => {
 // GET all salaries — Admin, Principal, Accounts
 router.get('/', protect, authorize('Admin', 'Principal', 'Accounts'), collegeScope, async (req, res) => {
   try {
-    const salaries = await Salary.find().sort({ createdAt: -1 });
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = {};
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      filter.$or = [{ collegeId }, { tenantId: collegeId }];
+    }
+    const salaries = await Salary.find(filter).sort({ createdAt: -1 });
     res.json(salaries);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -70,7 +75,13 @@ router.get('/', protect, authorize('Admin', 'Principal', 'Accounts'), collegeSco
 // GET salaries for a specific staff member
 router.get('/staff/:staffId', protect, collegeScope, async (req, res) => {
   try {
-    const salaries = await Salary.find({ staffId: req.params.staffId }).sort({ createdAt: -1 });
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = { staffId: req.params.staffId };
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      filter.$and = [{ $or: [{ collegeId }, { tenantId: collegeId }] }, { staffId: req.params.staffId }];
+      delete filter.staffId;
+    }
+    const salaries = await Salary.find(filter).sort({ createdAt: -1 });
     res.json(salaries);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -80,19 +91,28 @@ router.get('/staff/:staffId', protect, collegeScope, async (req, res) => {
 // POST — Create new payroll record
 router.post('/', protect, authorize('Admin', 'Principal', 'Accounts'), collegeScope, async (req, res) => {
   try {
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId || 'unassigned_college';
     if (Array.isArray(req.body)) {
-      const docs = req.body.map(processPayload);
+      const docs = req.body.map(item => ({
+        ...processPayload(item),
+        collegeId,
+        tenantId: collegeId
+      }));
       const created = await Salary.insertMany(docs);
       for (const rec of created) {
         await notifyStaffSalary(req, rec);
       }
-      req.app.get('io').emit('dataUpdated', { module: 'salaries', action: 'created' });
+      req.app.get('io')?.emit('dataUpdated', { module: 'salaries', action: 'created' });
       return res.status(201).json(created);
     }
-    const salary = new Salary(processPayload(req.body));
+    const salary = new Salary({
+      ...processPayload(req.body),
+      collegeId,
+      tenantId: collegeId
+    });
     const saved = await salary.save();
     await notifyStaffSalary(req, saved);
-    req.app.get('io').emit('dataUpdated', { module: 'salaries', action: 'created' });
+    req.app.get('io')?.emit('dataUpdated', { module: 'salaries', action: 'created' });
     res.status(201).json(saved);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -102,15 +122,20 @@ router.post('/', protect, authorize('Admin', 'Principal', 'Accounts'), collegeSc
 // PUT — Update salary record (e.g. Disburse)
 router.put('/:id', protect, authorize('Admin', 'Principal', 'Accounts'), collegeScope, async (req, res) => {
   try {
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = { _id: req.params.id };
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      filter.$or = [{ collegeId }, { tenantId: collegeId }];
+    }
     const payload = processPayload(req.body);
     if (req.body.status === 'Disbursed' && !payload.paymentDate) {
       payload.paymentDate = new Date();
     }
-    const updated = await Salary.findByIdAndUpdate(req.params.id, payload, { new: true });
+    const updated = await Salary.findOneAndUpdate(filter, payload, { new: true });
     if (updated) {
       await notifyStaffSalary(req, updated);
     }
-    req.app.get('io').emit('dataUpdated', { module: 'salaries', action: 'updated' });
+    req.app.get('io')?.emit('dataUpdated', { module: 'salaries', action: 'updated' });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -120,8 +145,13 @@ router.put('/:id', protect, authorize('Admin', 'Principal', 'Accounts'), college
 // DELETE — Remove payroll record
 router.delete('/:id', protect, authorize('Admin', 'Principal', 'Accounts'), collegeScope, async (req, res) => {
   try {
-    await Salary.findByIdAndDelete(req.params.id);
-    req.app.get('io').emit('dataUpdated', { module: 'salaries', action: 'deleted' });
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = { _id: req.params.id };
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      filter.$or = [{ collegeId }, { tenantId: collegeId }];
+    }
+    await Salary.findOneAndDelete(filter);
+    req.app.get('io')?.emit('dataUpdated', { module: 'salaries', action: 'deleted' });
     res.json({ message: 'Salary record deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });

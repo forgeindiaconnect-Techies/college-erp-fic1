@@ -24,7 +24,10 @@ import {
   Home,
   Bus,
   ShieldCheck,
-  Check
+  Check,
+  Award,
+  Sparkles,
+  Calculator
 } from 'lucide-react';
 import {
   createStudent,
@@ -34,62 +37,40 @@ import {
   getDepartments,
   getCourses,
   getQuotas,
+  getFeeStructures,
+  getScholarships,
   createFee
 } from '../../api/index';
 import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
 import './StudentRegistration.css';
 
-const REAL_COLLEGE_DEPARTMENTS = [
-  { id: '1', name: 'History and Arts', code: 'HAA', degree: 'B.A', courses: ['B.A. - History and Arts', 'B.A. - History', 'B.A. - Arts'] },
-  { id: '2', name: 'Computer Science Engineering', code: 'CSE', degree: 'B.E', courses: ['B.E. - Computer Science Engineering', 'B.Tech - Computer Science Engineering'] },
-  { id: '3', name: 'FOOD AND NUTRITION', code: 'FN', degree: 'B.Sc', courses: ['B.Sc. - Food and Nutrition', 'B.Sc. - Food Science & Nutrition'] },
-  { id: '4', name: 'MATHEMATICS', code: 'MATH', degree: 'B.Sc', courses: ['B.Sc. - Mathematics'] },
-  { id: '5', name: 'BA TAMIL', code: 'BAT', degree: 'B.A', courses: ['B.A. - Tamil', 'BA Tamil'] }
-];
-
-const getDepartmentCourses = (deptName) => {
-  const norm = (deptName || '').toLowerCase().trim();
-  const match = REAL_COLLEGE_DEPARTMENTS.find(d => 
-    d.name.toLowerCase() === norm || 
-    norm.includes(d.name.toLowerCase()) || 
-    d.name.toLowerCase().includes(norm)
-  );
-  if (match && match.courses && match.courses.length > 0) return match.courses;
-  if (norm.includes('history') || norm.includes('arts')) return ['B.A. - History and Arts', 'B.A. - History', 'B.A. - Arts'];
-  if (norm.includes('computer')) return ['B.E. - Computer Science Engineering', 'B.Tech - Computer Science Engineering'];
-  if (norm.includes('food') || norm.includes('nutrition')) return ['B.Sc. - Food and Nutrition'];
-  if (norm.includes('math')) return ['B.Sc. - Mathematics'];
-  if (norm.includes('tamil')) return ['B.A. - Tamil', 'BA Tamil'];
-  return [deptName ? `B.A. - ${deptName}` : 'B.A. - History and Arts'];
-};
-
-const getDepartmentCourse = (deptName) => {
-  const courses = getDepartmentCourses(deptName);
-  return courses[0] || 'B.A. - History and Arts';
-};
-
 const getDepartmentDegree = (deptName) => {
   const norm = (deptName || '').toLowerCase().trim();
-  if (norm.includes('history') || norm.includes('tamil') || norm.includes('arts')) return 'B.A';
-  if (norm.includes('computer') || norm.includes('engineering')) return 'B.E';
-  if (norm.includes('food') || norm.includes('nutrition') || norm.includes('math')) return 'B.Sc';
-  return 'B.A';
+  if (norm.includes('history') || norm.includes('tamil') || norm.includes('arts') || norm.includes('english')) return 'B.A';
+  if (norm.includes('computer') || norm.includes('engineering') || norm.includes('tech') || norm.includes('mech') || norm.includes('civil') || norm.includes('ece') || norm.includes('eee')) return 'B.E';
+  if (norm.includes('science') || norm.includes('food') || norm.includes('nutrition') || norm.includes('math') || norm.includes('physics') || norm.includes('chem') || norm.includes('botany') || norm.includes('bio')) return 'B.Sc';
+  if (norm.includes('commerce') || norm.includes('accounting') || norm.includes('finance') || norm.includes('bank') || norm.includes('bcom')) return 'B.Com';
+  if (norm.includes('business') || norm.includes('admin') || norm.includes('bba')) return 'BBA';
+  return 'UG';
 };
 
 const getDeptCode = (deptName) => {
-  const norm = (deptName || '').toLowerCase().trim();
-  if (norm.includes('history')) return 'HAA';
-  if (norm.includes('computer')) return 'CSE';
-  if (norm.includes('food') || norm.includes('nutrition')) return 'FN';
-  if (norm.includes('math')) return 'MATH';
-  if (norm.includes('tamil')) return 'BAT';
-  return (deptName || 'HAA').substring(0, 3).toUpperCase();
+  if (!deptName) return 'STU';
+  const clean = String(deptName).trim();
+  const words = clean.split(/[\s-]+/).filter(Boolean);
+  if (words.length >= 2) {
+    return words.map(w => w[0]).join('').toUpperCase().slice(0, 4);
+  }
+  return clean.replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() || 'STU';
 };
 
 const DEGREE_OPTIONS = [
   { code: 'B.A', name: 'B.A (Bachelor of Arts)' },
   { code: 'B.Sc', name: 'B.Sc (Bachelor of Science)' },
-  { code: 'B.E', name: 'B.E (Bachelor of Engineering)' }
+  { code: 'B.E', name: 'B.E (Bachelor of Engineering)' },
+  { code: 'B.Tech', name: 'B.Tech (Bachelor of Technology)' },
+  { code: 'B.Com', name: 'B.Com (Bachelor of Commerce)' },
+  { code: 'BBA', name: 'BBA (Bachelor of Business Admin)' }
 ];
 
 const DEFAULT_QUALIFICATIONS = [
@@ -99,28 +80,30 @@ const DEFAULT_QUALIFICATIONS = [
 
 const DEFAULT_FEE_BREAKDOWN = {
   admissionFee: 5000,
-  tuitionFee: 30000,
-  specialFee: 4000,
-  labFee: 2200,
-  otherFee: 0
+  tuitionFee: 35000,
+  specialFee: 5000,
+  labFee: 3000,
+  otherFee: 2000
 };
 
 const EMPTY_FORM = {
-  _id: '',
   id: '',
   admissionNo: '',
   admissionDate: new Date().toISOString().split('T')[0],
   academicYear: '2026-2027',
   degreeType: 'UG',
-  degreeCode: 'B.A',
-  dept: 'History and Arts',
-  department: 'History and Arts',
-  course: 'B.A. - History and Arts',
+  degreeCode: 'B.E',
+  dept: '',
+  department: '',
+  course: '',
   semester: 1,
+  sem: 'Sem 1',
   section: 'A',
   admissionQuota: 'General Quota',
   quotaName: 'General Quota',
   discountAmount: 0,
+  scholarshipName: 'None',
+  scholarshipAmount: 0,
 
   // Personal Info
   firstName: '',
@@ -155,7 +138,7 @@ const EMPTY_FORM = {
   email: '',
   address: '',
   city: '',
-  district: 'Tirupattur',
+  district: '',
   state: 'Tamil Nadu',
   pincode: '',
 
@@ -171,11 +154,11 @@ const EMPTY_FORM = {
 
   // Fees
   feeBreakdown: { ...DEFAULT_FEE_BREAKDOWN },
-  totalFee: 51500,
-  amountPaid: 35000,
-  balanceFee: 16500,
+  totalFee: 50000,
+  amountPaid: 0,
+  balanceFee: 50000,
   paymentMode: 'Cash',
-  paymentStatus: 'Partial',
+  paymentStatus: 'Pending',
   receiptNo: '',
 
   applicationStatus: 'Approved',
@@ -183,7 +166,7 @@ const EMPTY_FORM = {
 };
 
 const generateStudentRegNo = (deptName, studentsList) => {
-  const code = getDeptCode(deptName);
+  const code = getDeptCode(deptName || 'STU');
   const year = new Date().getFullYear();
   const matching = (studentsList || []).filter(s => (s.id || '').startsWith(`${code}${year}`) || (s.dept === deptName && s.id));
   let maxSeq = 0;
@@ -206,9 +189,11 @@ const StudentRegistration = () => {
 
   // Master Data
   const [studentsList, setStudentsList] = useState([]);
-  const [departmentsList, setDepartmentsList] = useState(REAL_COLLEGE_DEPARTMENTS);
+  const [departmentsList, setDepartmentsList] = useState([]);
   const [coursesList, setCoursesList] = useState([]);
   const [quotasList, setQuotasList] = useState([]);
+  const [feeStructuresList, setFeeStructuresList] = useState([]);
+  const [scholarshipsList, setScholarshipsList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -225,37 +210,65 @@ const StudentRegistration = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [stuRes, deptRes, coursesRes, quotaRes] = await Promise.all([
+      const [stuRes, deptRes, coursesRes, quotaRes, structRes, scholarRes] = await Promise.all([
         getStudents().catch(() => ({ data: [] })),
         getDepartments().catch(() => ({ data: [] })),
         getCourses ? getCourses().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
-        getQuotas ? getQuotas().catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
+        getQuotas ? getQuotas().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+        getFeeStructures ? getFeeStructures().catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+        getScholarships ? getScholarships().catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
       ]);
 
       const fetchedStudents = Array.isArray(stuRes?.data) ? stuRes.data : (stuRes?.data?.students || []);
       setStudentsList(fetchedStudents);
 
-      if (Array.isArray(deptRes?.data) && deptRes.data.length > 0) {
-        setDepartmentsList(deptRes.data);
+      let loadedDepts = [];
+      if (Array.isArray(deptRes?.data)) {
+        loadedDepts = deptRes.data;
       } else if (deptRes?.data?.departments && Array.isArray(deptRes.data.departments)) {
-        setDepartmentsList(deptRes.data.departments);
-      } else {
-        setDepartmentsList(REAL_COLLEGE_DEPARTMENTS);
+        loadedDepts = deptRes.data.departments;
+      } else if (deptRes?.data?.data && Array.isArray(deptRes.data.data)) {
+        loadedDepts = deptRes.data.data;
       }
+      setDepartmentsList(loadedDepts);
 
+      let loadedCourses = [];
       if (coursesRes?.data) {
-        const loadedCourses = Array.isArray(coursesRes.data?.courses) 
+        loadedCourses = Array.isArray(coursesRes.data?.courses) 
           ? coursesRes.data.courses 
           : Array.isArray(coursesRes.data) 
           ? coursesRes.data 
           : coursesRes.data?.data || [];
-        setCoursesList(loadedCourses);
       }
+      setCoursesList(loadedCourses);
 
       if (quotaRes?.data) {
         const loadedQuotas = quotaRes.data.quotas || quotaRes.data.data || (Array.isArray(quotaRes.data) ? quotaRes.data : []);
         setQuotasList(Array.isArray(loadedQuotas) ? loadedQuotas : []);
       }
+
+      if (structRes?.data) {
+        const loadedStructs = structRes.data.structures || structRes.data.data || (Array.isArray(structRes.data) ? structRes.data : []);
+        setFeeStructuresList(Array.isArray(loadedStructs) ? loadedStructs : []);
+      }
+
+      if (scholarRes?.data) {
+        const loadedScholarships = Array.isArray(scholarRes.data) ? scholarRes.data : (scholarRes.data?.scholarships || scholarRes.data?.data || []);
+        setScholarshipsList(Array.isArray(loadedScholarships) ? loadedScholarships : []);
+      }
+
+      // If initial form is blank, select first active department if available
+      setForm(prev => {
+        const activeDept = prev.dept || (loadedDepts.length > 0 ? loadedDepts[0].name : '');
+        const autoRegId = prev.id || generateStudentRegNo(activeDept, fetchedStudents);
+        return {
+          ...prev,
+          dept: activeDept,
+          department: activeDept,
+          id: prev.id || autoRegId,
+          admissionNo: prev.admissionNo || autoRegId
+        };
+      });
     } catch (err) {
       console.error('Error loading real-time student registration data:', err);
     } finally {
@@ -265,20 +278,13 @@ const StudentRegistration = () => {
 
   useEffect(() => {
     loadData();
-    // Generate initial auto reg id
-    const count = studentsList.length + 1;
-    setForm(prev => ({
-      ...prev,
-      id: `HAA2026-${String(count).padStart(3, '0')}`,
-      admissionNo: `HAA2026-${String(count).padStart(3, '0')}`
-    }));
   }, []);
 
-  useRealtimeSync(['students', 'fees', 'hostel', 'transport', 'quotas', 'departments', 'courses', 'admissions'], () => {
+  useRealtimeSync(() => {
     loadData();
-  });
+  }, ['students', 'fees', 'hostel', 'transport', 'quotas', 'departments', 'courses', 'admissions', 'scholarships', 'fee-structures']);
 
-  // Dynamic Courses for Department (Real-time DB + fallback)
+  // Dynamic Courses for Department (Real-time DB only)
   const getDepartmentCourses = (deptName) => {
     if (Array.isArray(coursesList) && coursesList.length > 0) {
       const dbCourses = coursesList.filter(c => {
@@ -293,29 +299,51 @@ const StudentRegistration = () => {
         return dbCourses.map(c => c.name || c.courseName);
       }
     }
-
-    const norm = (deptName || '').toLowerCase().trim();
-    const match = REAL_COLLEGE_DEPARTMENTS.find(d => 
-      d.name.toLowerCase() === norm || 
-      norm.includes(d.name.toLowerCase()) || 
-      d.name.toLowerCase().includes(norm)
-    );
-    if (match && match.courses && match.courses.length > 0) return match.courses;
-    if (norm.includes('history') || norm.includes('arts')) return ['B.A. - History and Arts', 'B.A. - History', 'B.A. - Arts'];
-    if (norm.includes('computer')) return ['B.E. - Computer Science Engineering', 'B.Tech - Computer Science Engineering'];
-    if (norm.includes('food') || norm.includes('nutrition')) return ['B.Sc. - Food and Nutrition', 'B.Sc. - Food Science & Nutrition'];
-    if (norm.includes('math')) return ['B.Sc. - Mathematics'];
-    if (norm.includes('tamil')) return ['B.A. - Tamil', 'BA Tamil'];
-    return [deptName ? `B.A. - ${deptName}` : 'B.A. - History and Arts'];
+    return deptName ? [`${form.degreeCode || 'Degree'} - ${deptName}`] : [];
   };
 
-  // KPI Calculations
+  // Helper to resolve the baseline fee for a selected department and course
+  const resolveBaseFee = (deptName, courseName) => {
+    const normDept = (deptName || '').toLowerCase().trim();
+    const normCourse = (courseName || '').toLowerCase().trim();
+
+    // 1. Check Fee Structure Collection
+    const matchStruct = (feeStructuresList || []).find(fs => {
+      const fsDept = (fs.department || fs.departmentName || '').toLowerCase().trim();
+      const fsCourse = (fs.course || fs.courseName || '').toLowerCase().trim();
+      const deptMatch = !fsDept || fsDept === 'all' || fsDept === normDept || normDept.includes(fsDept) || fsDept.includes(normDept);
+      const courseMatch = !fsCourse || fsCourse === 'all' || fsCourse === normCourse || normCourse.includes(fsCourse) || fsCourse.includes(normCourse);
+      return deptMatch && courseMatch;
+    });
+
+    if (matchStruct) {
+      const val = Number(matchStruct.totalAmount || matchStruct.totalFee || 0);
+      if (val > 0) return val;
+    }
+
+    // 2. Check Quotas Collection for normalFee
+    const matchQuota = (quotasList || []).find(q => {
+      const qDept = (q.departmentName || (typeof q.department === 'object' ? q.department?.name : q.department) || '').toLowerCase().trim();
+      const qCourse = (q.courseName || (typeof q.course === 'object' ? q.course?.name : q.course) || '').toLowerCase().trim();
+      const deptMatch = !qDept || qDept === 'all' || qDept === normDept || normDept.includes(qDept) || qDept.includes(normDept);
+      const courseMatch = !qCourse || qCourse === 'all' || qCourse === normCourse || normCourse.includes(qCourse) || qCourse.includes(normCourse);
+      return deptMatch && courseMatch && Number(q.normalFee) > 0;
+    });
+
+    if (matchQuota && Number(matchQuota.normalFee) > 0) {
+      return Number(matchQuota.normalFee);
+    }
+
+    return 50000;
+  };
+
+  // KPI Calculations (Real live synthesis without hardcoded phantom values)
   const totalEnrolled = studentsList.length;
   const totalFeesAssessed = useMemo(() => {
-    return studentsList.reduce((acc, s) => acc + (Number(s.totalFee || s.totalAmount || 41200)), 0) || 41200;
+    return studentsList.reduce((acc, s) => acc + (Number(s.totalFee || s.totalAmount || 0)), 0);
   }, [studentsList]);
   const totalCollections = useMemo(() => {
-    return studentsList.reduce((acc, s) => acc + (Number(s.amountPaid || s.paidAmount || 35000)), 0) || 35000;
+    return studentsList.reduce((acc, s) => acc + (Number(s.amountPaid || s.paidAmount || 0)), 0);
   }, [studentsList]);
   const totalOutstanding = Math.max(0, totalFeesAssessed - totalCollections);
 
@@ -367,14 +395,7 @@ const StudentRegistration = () => {
     const selectedCourse = (form.course || '').toLowerCase().trim();
     const selectedDept = (form.dept || form.department || '').toLowerCase().trim();
 
-    const list = [
-      {
-        quotaName: 'General Quota',
-        discountType: 'fixed',
-        discountValue: 0,
-        description: 'Standard admission'
-      }
-    ];
+    const list = [];
 
     if (Array.isArray(quotasList) && quotasList.length > 0) {
       const matched = quotasList.filter(q => {
@@ -385,6 +406,11 @@ const StudentRegistration = () => {
 
         const hasSpecificCourse = qCourse && qCourse !== 'all' && qCourse !== 'all courses' && qCourse !== '';
         const hasSpecificDept = qDept && qDept !== 'all' && qDept !== 'all departments' && qDept !== '';
+
+        if (hasSpecificCourse && hasSpecificDept) {
+          return (qCourse === selectedCourse || selectedCourse.includes(qCourse) || qCourse.includes(selectedCourse)) &&
+                 (qDept === selectedDept || selectedDept.includes(qDept) || qDept.includes(selectedDept));
+        }
 
         if (hasSpecificCourse) {
           return (
@@ -406,24 +432,109 @@ const StudentRegistration = () => {
       });
 
       matched.forEach(q => {
-        if (!list.some(existing => existing.quotaName.toLowerCase() === q.quotaName.toLowerCase())) {
-          const val = Number(q.discountValue || q.discountAmount || 0);
-          const desc = q.discountType === 'percentage'
-            ? `${val}% concession`
-            : `₹${val.toLocaleString()} concession`;
+        const val = Number(q.discountValue || q.discountAmount || 0);
+        const desc = q.discountType === 'percentage'
+          ? `${val}% concession`
+          : `₹${val.toLocaleString('en-IN')} concession`;
 
-          list.push({
-            quotaName: q.quotaName,
-            discountType: q.discountType || 'fixed',
-            discountValue: val,
-            description: desc
-          });
-        }
+        list.push({
+          quotaName: q.quotaName,
+          discountType: q.discountType || 'fixed',
+          discountValue: val,
+          normalFee: Number(q.normalFee || 0),
+          description: desc
+        });
+      });
+    }
+
+    // Include standard "General Quota" if not already present
+    if (!list.some(existing => existing.quotaName.toLowerCase() === 'general quota')) {
+      list.unshift({
+        quotaName: 'General Quota',
+        discountType: 'fixed',
+        discountValue: 0,
+        normalFee: 50000,
+        description: 'Standard admission'
       });
     }
 
     return list;
   }, [quotasList, form.course, form.dept]);
+
+  // Available Scholarships in real-time
+  const availableScholarships = useMemo(() => {
+    const list = [
+      {
+        scholarshipName: 'None',
+        scholarshipType: 'Fixed Amount',
+        scholarshipValue: 0,
+        maximumAmount: 0,
+        description: 'No scholarship scheme applied'
+      }
+    ];
+
+    if (Array.isArray(scholarshipsList) && scholarshipsList.length > 0) {
+      scholarshipsList.forEach(sc => {
+        if (sc.status && sc.status.toLowerCase() !== 'active') return;
+        const val = Number(sc.scholarshipValue || 0);
+        const max = Number(sc.maximumAmount || 0);
+        const desc = (sc.scholarshipType === 'Percentage' || sc.type === 'Percentage')
+          ? `${val}% deduction (Max ₹${max.toLocaleString('en-IN')})`
+          : `₹${val.toLocaleString('en-IN')} fixed waiver`;
+
+        list.push({
+          scholarshipName: sc.scholarshipName,
+          scholarshipType: sc.scholarshipType || 'Fixed Amount',
+          scholarshipValue: val,
+          maximumAmount: max,
+          description: desc
+        });
+      });
+    }
+
+    return list;
+  }, [scholarshipsList]);
+
+  // Dynamic live recalculation of fees
+  const computeLedgerValues = (baseFee, quotaNameVal, scholarshipNameVal, paidVal) => {
+    const qObj = availableQuotas.find(q => (q.quotaName || '').toLowerCase() === (quotaNameVal || '').toLowerCase());
+    const scObj = availableScholarships.find(s => (s.scholarshipName || '').toLowerCase() === (scholarshipNameVal || '').toLowerCase());
+
+    let quotaDisc = 0;
+    if (qObj) {
+      if (qObj.discountType === 'percentage') {
+        quotaDisc = Math.round((baseFee * Number(qObj.discountValue || 0)) / 100);
+      } else {
+        quotaDisc = Number(qObj.discountValue || 0);
+      }
+    }
+
+    let scDisc = 0;
+    if (scObj && scObj.scholarshipName !== 'None') {
+      if (scObj.scholarshipType === 'Percentage' || scObj.type === 'Percentage') {
+        scDisc = Math.round((baseFee * Number(scObj.scholarshipValue || 0)) / 100);
+      } else {
+        scDisc = Number(scObj.scholarshipValue || 0);
+      }
+      const max = Number(scObj.maximumAmount || 0);
+      if (max > 0 && scDisc > max) scDisc = max;
+    }
+
+    const netPayable = Math.max(0, baseFee - quotaDisc - scDisc);
+    const paid = Number(paidVal || 0);
+    const balance = Math.max(0, netPayable - paid);
+    const status = balance === 0 && netPayable > 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Pending';
+
+    return {
+      totalFee: baseFee,
+      discountAmount: quotaDisc,
+      scholarshipAmount: scDisc,
+      netPayable,
+      amountPaid: paid,
+      balanceFee: balance,
+      paymentStatus: status
+    };
+  };
 
   // Field change handler
   const handleChange = (field, value) => {
@@ -441,7 +552,7 @@ const StudentRegistration = () => {
 
       if (field === 'degreeCode' || field === 'degreeType') {
         const matchingDepts = departmentsList.filter(d => getDepartmentDegree(d.name) === value);
-        const firstDept = matchingDepts[0]?.name || (value === 'B.Sc' ? 'FOOD AND NUTRITION' : value === 'B.E' ? 'Computer Science Engineering' : 'History and Arts');
+        const firstDept = matchingDepts[0]?.name || (value === 'B.Sc' ? 'FOOD AND NUTRITION' : value === 'B.E' ? 'Computer Science Engineering' : 'BA TAMIL');
         const availableCourses = getDepartmentCourses(firstDept);
         const firstCourse = availableCourses[0] || getDepartmentCourse(firstDept);
 
@@ -450,6 +561,10 @@ const StudentRegistration = () => {
         updated.dept = firstDept;
         updated.department = firstDept;
         updated.course = firstCourse;
+
+        const resolvedBase = resolveBaseFee(firstDept, firstCourse);
+        const ledger = computeLedgerValues(resolvedBase, updated.admissionQuota, updated.scholarshipName, updated.amountPaid);
+        Object.assign(updated, ledger);
 
         if (!selectedStudentId) {
           const autoId = generateStudentRegNo(firstDept, studentsList);
@@ -474,6 +589,10 @@ const StudentRegistration = () => {
         updated.degreeType = deptDegree.startsWith('M') ? 'PG' : 'UG';
         updated.course = defaultCourse;
 
+        const resolvedBase = resolveBaseFee(value, defaultCourse);
+        const ledger = computeLedgerValues(resolvedBase, updated.admissionQuota, updated.scholarshipName, updated.amountPaid);
+        Object.assign(updated, ledger);
+
         if (!selectedStudentId) {
           const autoId = generateStudentRegNo(value, studentsList);
           updated.id = autoId;
@@ -481,39 +600,31 @@ const StudentRegistration = () => {
         }
       }
 
+      if (field === 'course') {
+        const resolvedBase = resolveBaseFee(updated.dept, value);
+        const ledger = computeLedgerValues(resolvedBase, updated.admissionQuota, updated.scholarshipName, updated.amountPaid);
+        Object.assign(updated, ledger);
+      }
+
       if (field === 'admissionQuota' || field === 'quotaName') {
-        const selectedQuotaObj = availableQuotas.find(q => q.quotaName.toLowerCase() === (value || '').toLowerCase());
-        let discount = 0;
-        const baseTotal = Number(updated.totalFee || 41200);
-
-        if (selectedQuotaObj) {
-          if (selectedQuotaObj.discountType === 'percentage') {
-            discount = Math.round((baseTotal * Number(selectedQuotaObj.discountValue || 0)) / 100);
-          } else {
-            discount = Number(selectedQuotaObj.discountValue || 0);
-          }
-        } else if (value.toLowerCase().includes('sports') || value.toLowerCase().includes('merit')) {
-          discount = 15000;
-        } else if (value.toLowerCase().includes('government')) {
-          discount = 10000;
-        } else {
-          discount = 0;
-        }
-
         updated.admissionQuota = value;
         updated.quotaName = value;
-        updated.discountAmount = discount;
+        const resolvedBase = Number(updated.totalFee || resolveBaseFee(updated.dept, updated.course));
+        const ledger = computeLedgerValues(resolvedBase, value, updated.scholarshipName, updated.amountPaid);
+        Object.assign(updated, ledger);
+      }
 
-        const net = Math.max(0, baseTotal - discount);
-        updated.amountPaid = net;
-        updated.balanceFee = 0;
+      if (field === 'scholarshipName') {
+        updated.scholarshipName = value;
+        const resolvedBase = Number(updated.totalFee || resolveBaseFee(updated.dept, updated.course));
+        const ledger = computeLedgerValues(resolvedBase, updated.admissionQuota, value, updated.amountPaid);
+        Object.assign(updated, ledger);
       }
 
       if (field === 'amountPaid') {
-        const paid = Number(value || 0);
-        const netTotal = Math.max(0, Number(updated.totalFee || 41200) - Number(updated.discountAmount || 0));
-        updated.balanceFee = Math.max(0, netTotal - paid);
-        updated.paymentStatus = updated.balanceFee === 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Pending';
+        const resolvedBase = Number(updated.totalFee || resolveBaseFee(updated.dept, updated.course));
+        const ledger = computeLedgerValues(resolvedBase, updated.admissionQuota, updated.scholarshipName, value);
+        Object.assign(updated, ledger);
       }
 
       return updated;
@@ -523,12 +634,15 @@ const StudentRegistration = () => {
   // Reset / Blank Form
   const handleBlankForm = () => {
     setSelectedStudentId(null);
-    const count = studentsList.length + 1;
-    const newId = `HAA2026-${String(count).padStart(3, '0')}`;
+    const activeDept = departmentsList[0]?.name || '';
+    const newId = generateStudentRegNo(activeDept, studentsList);
     setForm({
       ...EMPTY_FORM,
       id: newId,
       admissionNo: newId,
+      dept: activeDept,
+      department: activeDept,
+      course: getDepartmentCourses(activeDept)[0] || '',
       firstName: '',
       lastName: '',
       name: '',
@@ -543,14 +657,15 @@ const StudentRegistration = () => {
   // Select student from directory for editing
   const handleSelectStudent = (student) => {
     setSelectedStudentId(student.id || student._id);
+    const studentDept = student.dept || student.department || (departmentsList[0]?.name || '');
     setForm({
       ...EMPTY_FORM,
       ...student,
       firstName: student.firstName || (student.name ? student.name.split(' ')[0] : ''),
       lastName: student.lastName || (student.name ? student.name.split(' ').slice(1).join(' ') : ''),
-      dept: student.dept || student.department || 'Computer Science Engineering',
-      department: student.dept || student.department || 'Computer Science Engineering',
-      course: student.course || 'B.E - Computer Science Engineering',
+      dept: studentDept,
+      department: studentDept,
+      course: student.course || getDepartmentCourses(studentDept)[0] || '',
       qualifications: student.qualifications?.length ? student.qualifications : [...DEFAULT_QUALIFICATIONS]
     });
     setActiveStep(1);
@@ -559,8 +674,9 @@ const StudentRegistration = () => {
 
   // Final Save / Register
   const handleSaveRegistration = async () => {
-    if (!form.firstName.trim()) {
-      setErrorMsg('First Name is required.');
+    const studentFirstName = (form.firstName || form.name || '').trim();
+    if (!studentFirstName) {
+      setErrorMsg('Student First Name is required.');
       setActiveStep(1);
       return;
     }
@@ -570,41 +686,75 @@ const StudentRegistration = () => {
       setErrorMsg('');
       setSuccessMsg('');
 
-      const fullName = [form.firstName, form.midName, form.lastName].filter(Boolean).join(' ');
+      const fullName = [form.firstName, form.midName, form.lastName].filter(Boolean).join(' ') || form.name || studentFirstName;
+      const deptName = form.dept || form.department || (departmentsList[0]?.name || 'General');
+      const courseName = form.course || getDepartmentCourses(deptName)[0] || `${form.degreeCode || 'UG'} - ${deptName}`;
+      const autoId = form.id || form.admissionNo || generateStudentRegNo(deptName, studentsList);
+      const autoEmail = (form.email && form.email.trim()) || `${autoId.toLowerCase().replace(/[^a-z0-9]/g, '')}@student.college.edu`;
+
+      const totalAssessed = Number(form.totalFee || resolveBaseFee(deptName, courseName));
+      const quotaDisc = Number(form.discountAmount || 0);
+      const scholarDisc = Number(form.scholarshipAmount || 0);
+      const netAssessed = Math.max(0, totalAssessed - quotaDisc - scholarDisc);
+      const paidRealized = Number(form.amountPaid || 0);
+      const balanceDue = Math.max(0, netAssessed - paidRealized);
+
+      const { _id: formObjectId, ...cleanFormData } = form;
       const payload = {
-        ...form,
+        ...cleanFormData,
+        id: autoId,
+        admissionNo: autoId,
         name: fullName,
-        firstName: form.firstName,
-        lastName: form.lastName,
-        dept: form.dept || form.department,
-        department: form.dept || form.department,
-        course: form.course || `${form.degreeCode} - ${form.dept}`,
-        status: 'Active'
+        firstName: form.firstName || fullName.split(' ')[0],
+        lastName: form.lastName || '',
+        email: autoEmail,
+        dept: deptName,
+        department: deptName,
+        course: courseName,
+        sem: String(form.sem || form.semester || 'Sem 1'),
+        semester: Number(String(form.semester || 1).replace(/\D/g, '')) || 1,
+        totalFee: totalAssessed,
+        normalFee: totalAssessed,
+        discountAmount: quotaDisc,
+        scholarshipAmount: scholarDisc,
+        finalFee: netAssessed,
+        amountPaid: paidRealized,
+        paidAmount: paidRealized,
+        balanceFee: balanceDue,
+        remainingFee: balanceDue,
+        feeStatus: balanceDue === 0 && paidRealized > 0 ? 'Paid' : paidRealized > 0 ? 'Partial' : 'Pending',
+        paymentStatus: balanceDue === 0 && paidRealized > 0 ? 'Paid' : paidRealized > 0 ? 'Partial' : 'Pending',
+        status: 'Active',
+        admissionStatus: 'Confirmed'
       };
 
       if (selectedStudentId) {
         await updateStudent(selectedStudentId, payload);
         setSuccessMsg(`Student registration updated: ${fullName}`);
       } else {
-        const created = await createStudent(payload);
-        const newId = created?.data?.id || payload.id || `HAA2026-${String(studentsList.length + 1).padStart(3, '0')}`;
-        setSuccessMsg(`New Admission Confirmed! Registration ID: ${newId}`);
+        delete payload._id;
+        await createStudent(payload);
+        setSuccessMsg(`New Admission Confirmed! Registration ID: ${autoId}`);
 
         // Auto create fee record
         try {
           await createFee({
-            studentId: newId,
+            studentId: autoId,
             studentName: fullName,
-            department: payload.dept,
-            course: payload.course,
-            academicYear: payload.academicYear,
-            totalAmount: Number(payload.totalFee || 41200),
-            paidAmount: Number(payload.amountPaid || 35000),
-            remainingFee: Number(payload.balanceFee || 6200),
-            paymentMode: payload.paymentMode || 'Cash',
+            department: deptName,
+            course: courseName,
+            academicYear: form.academicYear || '2026-2027',
+            totalAmount: totalAssessed,
+            discountAmount: quotaDisc,
+            scholarshipAmount: scholarDisc,
+            scholarshipName: form.scholarshipName || 'None',
+            netAmount: netAssessed,
+            paidAmount: paidRealized,
+            remainingFee: balanceDue,
+            paymentMode: form.paymentMode || 'Cash',
             receiptNo: `REC-${Date.now().toString().slice(-6)}`,
             paymentDate: new Date(),
-            status: Number(payload.balanceFee || 0) <= 0 ? 'Paid' : 'Partial'
+            status: balanceDue === 0 && paidRealized > 0 ? 'Paid' : paidRealized > 0 ? 'Partial' : 'Pending'
           });
         } catch (feeErr) {
           console.warn('Fee note:', feeErr);
@@ -613,10 +763,10 @@ const StudentRegistration = () => {
 
       emitERPDataUpdate(['students', 'fees', 'hostel', 'transport'], 'saved', payload);
       await loadData();
-      setActiveStep(6); // Go to directory
+      setActiveStep(6); // Switch directly to Confirmed Student Directory
     } catch (err) {
       console.error('Error saving student:', err);
-      setErrorMsg(err?.response?.data?.message || 'Failed to save student admission.');
+      setErrorMsg(err?.response?.data?.message || err?.message || 'Failed to save student admission.');
     } finally {
       setSubmitting(false);
     }
@@ -642,6 +792,13 @@ const StudentRegistration = () => {
   // Direct Printable Fee Receipt
   const handlePrintReceipt = (stu) => {
     const data = stu || form;
+    const baseFee = Number(data.totalFee || 50000);
+    const quotaDisc = Number(data.discountAmount || 0);
+    const scholarDisc = Number(data.scholarshipAmount || 0);
+    const netFee = Math.max(0, baseFee - quotaDisc - scholarDisc);
+    const paid = Number(data.amountPaid || 0);
+    const balance = Math.max(0, netFee - paid);
+
     const win = window.open('', '_blank', 'width=800,height=850');
     if (!win) return;
 
@@ -668,13 +825,16 @@ const StudentRegistration = () => {
       <body>
         <div class="receipt">
           <div class="header">
-            <h2>COLLEGE ERP — OFFICIAL ADMISSION FEE RECEIPT</h2>
-            <p>Academic Year: ${data.academicYear} | Reg No: <strong>${data.id || data.admissionNo || 'N/A'}</strong></p>
+            <h2>${(typeof window !== 'undefined' && (JSON.parse(sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || '{}')?.collegeName)) || 'INSTITUTION PORTAL'}</h2>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #475569; font-weight: 600;">OFFICIAL ADMISSION & FEE RECEIPT</p>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #64748b;">Academic Year: ${data.academicYear || '2026-2027'} | Reg No: <strong>${data.id || data.admissionNo || 'N/A'}</strong></p>
           </div>
           <div class="grid">
             <div><span class="label">Student Name:</span><span class="val">${data.name || data.firstName}</span></div>
             <div><span class="label">Department:</span><span class="val">${data.dept || data.department}</span></div>
+            <div><span class="label">Course:</span><span class="val">${data.course || 'N/A'}</span></div>
             <div><span class="label">Admission Quota:</span><span class="val">${data.admissionQuota || 'General Quota'}</span></div>
+            <div><span class="label">Scholarship Scheme:</span><span class="val">${data.scholarshipName || 'None'}</span></div>
             <div><span class="label">Payment Mode:</span><span class="val">${data.paymentMode || 'Cash'}</span></div>
           </div>
           <table>
@@ -682,10 +842,12 @@ const StudentRegistration = () => {
               <tr><th>Description</th><th>Amount (₹)</th></tr>
             </thead>
             <tbody>
-              <tr><td>Total Assessed Fee</td><td>₹${data.totalFee || 41200}</td></tr>
-              <tr><td>Quota Concession / Discount</td><td>-₹${data.discountAmount || 0}</td></tr>
-              <tr><td><strong>Amount Paid Realized</strong></td><td><strong>₹${data.amountPaid || 35000}</strong></td></tr>
-              <tr><td><strong>Outstanding Balance</strong></td><td><strong>₹${data.balanceFee || 6200}</strong></td></tr>
+              <tr><td>Standard Baseline Course Fee</td><td>₹${baseFee.toLocaleString('en-IN')}</td></tr>
+              <tr><td>Quota Concession (${data.admissionQuota || 'General Quota'})</td><td style="color: #16a34a;">-₹${quotaDisc.toLocaleString('en-IN')}</td></tr>
+              <tr><td>Scholarship Waiver (${data.scholarshipName || 'None'})</td><td style="color: #16a34a;">-₹${scholarDisc.toLocaleString('en-IN')}</td></tr>
+              <tr style="background: #f1f5f9; font-weight: 700;"><td><strong>Net Assessed Payable Fee</strong></td><td><strong>₹${netFee.toLocaleString('en-IN')}</strong></td></tr>
+              <tr><td><strong>Amount Paid Realized</strong></td><td style="color: #1e40af;"><strong>₹${paid.toLocaleString('en-IN')}</strong></td></tr>
+              <tr><td><strong>Outstanding Balance Due</strong></td><td style="color: ${balance > 0 ? '#dc2626' : '#16a34a'};"><strong>₹${balance.toLocaleString('en-IN')}</strong></td></tr>
             </tbody>
           </table>
           <div class="footer">
@@ -1556,7 +1718,7 @@ const StudentRegistration = () => {
                 <div className="step-icon-bubble"><CreditCard size={18} /></div>
                 <div>
                   <h2 className="erp-card-title">Step 4: Fee Structure & Payment Ledger</h2>
-                  <p className="erp-card-subtitle">Tuition, special fee assessments, quota concessions and payment realization</p>
+                  <p className="erp-card-subtitle">Tuition, quota concessions, scholarship waivers, and payment realization</p>
                 </div>
               </div>
             </div>
@@ -1568,18 +1730,65 @@ const StudentRegistration = () => {
                   <span>Fee Assessment Summary</span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
-                    <span style={{ color: '#64748b' }}>Standard Tuition & Admission Fee:</span>
-                    <span style={{ fontWeight: 700 }}>₹41,200</span>
+                    <span style={{ color: '#64748b' }}>Standard Tuition & Baseline Fee:</span>
+                    <span style={{ fontWeight: 700 }}>₹{Number(form.totalFee || 50000).toLocaleString('en-IN')}</span>
                   </div>
+
+                  <div className="erp-field" style={{ marginTop: '4px', marginBottom: '4px' }}>
+                    <label className="erp-field-label" style={{ fontSize: '12px' }}>
+                      <Award size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                      Admission Quota Concession
+                    </label>
+                    <select 
+                      className="erp-select" 
+                      style={{ fontSize: '13px', padding: '6px 10px' }}
+                      value={form.admissionQuota} 
+                      onChange={(e) => handleChange('admissionQuota', e.target.value)}
+                    >
+                      {availableQuotas.map(q => (
+                        <option key={q.quotaName} value={q.quotaName}>
+                          {q.quotaName} {q.description ? `(${q.description})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
                     <span style={{ color: '#64748b' }}>Quota Concession ({form.admissionQuota}):</span>
-                    <span style={{ fontWeight: 700, color: '#16a34a' }}>-₹{form.discountAmount || 0}</span>
+                    <span style={{ fontWeight: 700, color: '#16a34a' }}>-₹{Number(form.discountAmount || 0).toLocaleString('en-IN')}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #e2e8f0', paddingBottom: '8px', fontSize: '14px' }}>
+
+                  <div className="erp-field" style={{ marginTop: '4px', marginBottom: '4px' }}>
+                    <label className="erp-field-label" style={{ fontSize: '12px' }}>
+                      <Sparkles size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                      Institutional Scholarship Scheme
+                    </label>
+                    <select 
+                      className="erp-select" 
+                      style={{ fontSize: '13px', padding: '6px 10px' }}
+                      value={form.scholarshipName || 'None'} 
+                      onChange={(e) => handleChange('scholarshipName', e.target.value)}
+                    >
+                      {availableScholarships.map(s => (
+                        <option key={s.scholarshipName} value={s.scholarshipName}>
+                          {s.scholarshipName} {s.description && s.scholarshipName !== 'None' ? `(${s.description})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
+                    <span style={{ color: '#64748b' }}>Scholarship Waiver ({form.scholarshipName || 'None'}):</span>
+                    <span style={{ fontWeight: 700, color: '#16a34a' }}>-₹{Number(form.scholarshipAmount || 0).toLocaleString('en-IN')}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #e2e8f0', paddingBottom: '8px', fontSize: '14px', background: '#f8fafc', padding: '8px', borderRadius: '6px' }}>
                     <span style={{ fontWeight: 800 }}>Net Assessed Fee Payable:</span>
-                    <span style={{ fontWeight: 800, color: '#1e40af' }}>₹{Math.max(0, 41200 - (form.discountAmount || 0)).toLocaleString('en-IN')}</span>
+                    <span style={{ fontWeight: 800, color: '#1e40af', fontSize: '16px' }}>
+                      ₹{Math.max(0, Number(form.totalFee || 50000) - Number(form.discountAmount || 0) - Number(form.scholarshipAmount || 0)).toLocaleString('en-IN')}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1591,12 +1800,37 @@ const StudentRegistration = () => {
                 </div>
 
                 <div className="erp-field" style={{ marginBottom: '12px' }}>
-                  <label className="erp-field-label">Amount Paid Realized (₹) <span className="req">*</span></label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label className="erp-field-label" style={{ marginBottom: 0 }}>Amount Paid Realized (₹) <span className="req">*</span></label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          const net = Math.max(0, Number(form.totalFee || 50000) - Number(form.discountAmount || 0) - Number(form.scholarshipAmount || 0));
+                          handleChange('amountPaid', net);
+                        }}
+                        style={{ fontSize: '11px', background: '#e0e7ff', color: '#3730a3', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        Full Pay
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          const net = Math.max(0, Number(form.totalFee || 50000) - Number(form.discountAmount || 0) - Number(form.scholarshipAmount || 0));
+                          handleChange('amountPaid', Math.round(net / 2));
+                        }}
+                        style={{ fontSize: '11px', background: '#f1f5f9', color: '#475569', border: 'none', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        50%
+                      </button>
+                    </div>
+                  </div>
                   <input 
                     type="number" 
                     className="erp-input" 
                     value={form.amountPaid} 
                     onChange={(e) => handleChange('amountPaid', e.target.value)} 
+                    placeholder="e.g. 35000"
                   />
                 </div>
 
@@ -1614,9 +1848,9 @@ const StudentRegistration = () => {
                   </select>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px', borderRadius: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <span style={{ fontSize: '13px', fontWeight: 600 }}>Balance Due:</span>
-                  <span style={{ fontSize: '14px', fontWeight: 800, color: form.balanceFee > 0 ? '#dc2626' : '#16a34a' }}>
+                  <span style={{ fontSize: '16px', fontWeight: 800, color: form.balanceFee > 0 ? '#dc2626' : '#16a34a' }}>
                     ₹{Number(form.balanceFee || 0).toLocaleString('en-IN')}
                   </span>
                 </div>
@@ -1656,6 +1890,7 @@ const StudentRegistration = () => {
                     <div><span style={{ color: '#64748b' }}>Student Name:</span> <strong>{form.name || form.firstName}</strong></div>
                     <div><span style={{ color: '#64748b' }}>Registration ID:</span> <strong>{form.id}</strong></div>
                     <div><span style={{ color: '#64748b' }}>Department:</span> <strong>{form.dept}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Course:</span> <strong>{form.course}</strong></div>
                     <div><span style={{ color: '#64748b' }}>Degree / Program:</span> <strong>{form.degreeCode}</strong></div>
                     <div><span style={{ color: '#64748b' }}>Gender & DOB:</span> <strong>{form.gender} ({form.dob || 'N/A'})</strong></div>
                   </div>
@@ -1663,10 +1898,12 @@ const StudentRegistration = () => {
 
                 <div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
-                    <div><span style={{ color: '#64748b' }}>Admission Quota:</span> <strong>{form.admissionQuota}</strong></div>
-                    <div><span style={{ color: '#64748b' }}>Net Fee Assessed:</span> <strong>₹{form.totalFee - form.discountAmount}</strong></div>
-                    <div><span style={{ color: '#64748b' }}>Amount Paid:</span> <strong style={{ color: '#16a34a' }}>₹{form.amountPaid}</strong></div>
-                    <div><span style={{ color: '#64748b' }}>Balance Outstanding:</span> <strong style={{ color: form.balanceFee > 0 ? '#dc2626' : '#16a34a' }}>₹{form.balanceFee}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Baseline Course Fee:</span> <strong>₹{Number(form.totalFee || 50000).toLocaleString('en-IN')}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Admission Quota:</span> <strong>{form.admissionQuota} (-₹{Number(form.discountAmount || 0).toLocaleString('en-IN')})</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Scholarship:</span> <strong>{form.scholarshipName || 'None'} (-₹{Number(form.scholarshipAmount || 0).toLocaleString('en-IN')})</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Net Fee Assessed:</span> <strong style={{ color: '#1e40af' }}>₹{Math.max(0, Number(form.totalFee || 50000) - Number(form.discountAmount || 0) - Number(form.scholarshipAmount || 0)).toLocaleString('en-IN')}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Amount Paid:</span> <strong style={{ color: '#16a34a' }}>₹{Number(form.amountPaid || 0).toLocaleString('en-IN')}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Balance Due:</span> <strong style={{ color: form.balanceFee > 0 ? '#dc2626' : '#16a34a' }}>₹{Number(form.balanceFee || 0).toLocaleString('en-IN')}</strong></div>
                     <div><span style={{ color: '#64748b' }}>Hostel / Transport:</span> <strong>Hostel: {form.hostel}, Bus: {form.transport}</strong></div>
                   </div>
                 </div>
@@ -1745,8 +1982,8 @@ const StudentRegistration = () => {
                         <td>{stu.name || `${stu.firstName || ''} ${stu.lastName || ''}`}</td>
                         <td>{stu.dept || stu.department}</td>
                         <td>{stu.admissionQuota || stu.quotaName || 'General'}</td>
-                        <td>₹{stu.totalFee || 41200}</td>
-                        <td style={{ color: '#16a34a', fontWeight: 600 }}>₹{stu.amountPaid || 35000}</td>
+                        <td>₹{Number(stu.totalFee || stu.totalAmount || 0).toLocaleString('en-IN')}</td>
+                        <td style={{ color: '#16a34a', fontWeight: 600 }}>₹{Number(stu.amountPaid || stu.paidAmount || 0).toLocaleString('en-IN')}</td>
                         <td>
                           <span style={{ 
                             background: '#ecfdf5', 

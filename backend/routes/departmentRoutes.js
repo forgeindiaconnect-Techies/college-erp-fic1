@@ -8,20 +8,17 @@ const router = express.Router();
 router.get('/', protect, collegeScope, async (req, res) => {
   try {
     const targetCollegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
-    let departments = await Department.find({
+    if (req.user?.role === 'Super Admin' || targetCollegeId === 'system') {
+      const departments = await Department.find({}).sort({ name: 1 });
+      return res.json(departments);
+    }
+
+    const departments = await Department.find({
       $or: [
         { collegeId: targetCollegeId },
-        { collegeId: 'COL002-8379189' },
-        { collegeId: 'COL001' },
-        { collegeId: 'unassigned_college' },
-        { collegeId: null },
-        { collegeId: { $exists: false } }
+        { tenantId: targetCollegeId }
       ]
     }).sort({ name: 1 });
-
-    if (!departments || departments.length === 0) {
-      departments = await Department.find({}).sort({ name: 1 });
-    }
 
     res.json(departments);
   } catch (err) {

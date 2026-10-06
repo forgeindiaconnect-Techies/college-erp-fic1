@@ -38,7 +38,8 @@ const HodPayroll = () => {
   const [selectedPayroll, setSelectedPayroll] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const collegeName = collegeSettings?.collegeName || 'Marudhar Kesari Jain College for Women';
+  const hodSession = JSON.parse(sessionStorage.getItem('hod_session') || '{}');
+  const collegeName = collegeSettings?.collegeName || hodSession?.collegeName || 'Institution';
   const collegeLogo = collegeSettings?.collegeLogo;
 
   useEffect(() => {

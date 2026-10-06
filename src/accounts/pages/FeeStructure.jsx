@@ -957,30 +957,28 @@ const FeeStructure = () => {
 
         {/* Global Toolbar */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={handleOpenAddModal}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "7px",
-                padding: "10px 18px",
-                borderRadius: "10px",
-                background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
-                color: "#ffffff",
-                fontWeight: "700",
-                fontSize: "13.5px",
-                cursor: "pointer",
-                border: "none",
-                boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
-                transition: "all 0.15s ease"
-              }}
-            >
-              <Plus size={16} />
-              Define Fee Schedule
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleOpenAddModal}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "7px",
+              padding: "10px 18px",
+              borderRadius: "10px",
+              background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+              color: "#ffffff",
+              fontWeight: "700",
+              fontSize: "13.5px",
+              cursor: "pointer",
+              border: "none",
+              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+              transition: "all 0.15s ease"
+            }}
+          >
+            <Plus size={16} />
+            Define Fee Schedule
+          </button>
 
           <button
             type="button"

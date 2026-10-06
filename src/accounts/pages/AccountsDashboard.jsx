@@ -249,9 +249,16 @@ const AccountsDashboard = () => {
       {/* Welcome Banner */}
       <div className="accounts-welcome-banner glass-card" style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-main, #1e293b)', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <div className="banner-left" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <h1 style={{ fontSize: '1.35rem', fontWeight: '700', margin: 0, lineHeight: 1.2, color: 'var(--text-main, #0f172a)' }}>Finance & Accounts Dashboard</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Building2 size={22} color="#3b82f6" />
+            <h1 style={{ fontSize: '1.35rem', fontWeight: '700', margin: 0, lineHeight: 1.2, color: 'var(--text-main, #0f172a)' }}>
+              {accountsSession?.collegeName && accountsSession.collegeName !== 'Institution Portal'
+                ? `${accountsSession.collegeName} – Accounts Dashboard`
+                : 'Finance & Accounts Dashboard'}
+            </h1>
+          </div>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)', margin: 0, lineHeight: 1.4, fontWeight: 500 }}>
-            Welcome back, {accountsSession?.name || 'Accounts Admin'}. Real-time department-level fee analytics & collections.
+            Welcome back, {accountsSession?.name || 'Accounts Admin'}. Real-time financial management, fee collection & payroll.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

@@ -38,7 +38,8 @@ const DriverPayroll = () => {
   const [selectedPayroll, setSelectedPayroll] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const collegeName = collegeSettings?.collegeName || 'Marudhar Kesari Jain College for Women';
+  const driverSession = JSON.parse(sessionStorage.getItem('driver_session') || '{}');
+  const collegeName = collegeSettings?.collegeName || driverSession?.collegeName || 'Institution';
   const collegeLogo = collegeSettings?.collegeLogo;
 
   useEffect(() => {

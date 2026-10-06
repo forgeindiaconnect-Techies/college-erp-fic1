@@ -102,27 +102,20 @@ export default function PrincipalDashboard() {
   return (
     <div className="dashboard-container animate-fade-in" style={{ padding: '2rem', background: 'var(--bg-primary)', minHeight: '100vh' }}>
       
-      {/* Welcome Banner */}
+      {/* Welcome Header */}
       <div style={{
-        background: '#3730A5',
-        borderRadius: '12px',
-        padding: '1.25rem 1.5rem',
         marginBottom: '1.5rem',
-        color: '#fff',
-        boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)',
         display: 'flex',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
-        gap: '1rem',
-        position: 'relative',
-        overflow: 'hidden'
+        gap: '1rem'
       }}>
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
             Institution Overview
           </h1>
-          <p style={{ margin: 0, opacity: 0.9, fontSize: '0.85rem', fontWeight: 500 }}>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
             Welcome back, {userName}. Real-time academic execution, faculty schedules, and student engagement.
           </p>
         </div>

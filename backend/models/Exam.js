@@ -104,8 +104,18 @@ const examSchema = new mongoose.Schema({
   },
 
   invigilatorId: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.Mixed,
     ref: 'Staff'
+  },
+
+  invigilator: {
+    type: String,
+    default: ''
+  },
+
+  invigilatorName: {
+    type: String,
+    default: ''
   },
 
   passMarks: {
@@ -131,6 +141,10 @@ const examSchema = new mongoose.Schema({
     default: 'System'
   },
   collegeId: {
+    type: String,
+    required: false
+  },
+  tenantId: {
     type: String,
     required: false
   }

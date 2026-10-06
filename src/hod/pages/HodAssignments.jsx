@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   ClipboardList, Search, Calendar, Users, FileText, ArrowLeft, 
   BookOpen, CheckCircle2, Clock, AlertCircle, Download, User, X, Eye 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getAssignments, getAssignmentSubmissions, getStudents } from '../../api/index';
+import useRealtimeSync from '../../hooks/useRealtimeSync';
 
 const getHodSession = () => {
   try { return JSON.parse(sessionStorage.getItem('hod_session')) || { dept: 'Computer Science' }; }
@@ -50,20 +51,23 @@ const HodAssignments = () => {
     }
   };
 
+  const fetchAssignments = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await getAssignments();
+      setAssignments(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.warn('Failed to fetch hod assignments');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const init = async () => {
-      try {
-        setLoading(true);
-        const res = await getAssignments({ department: DEPT });
-        setAssignments(Array.isArray(res.data) ? res.data : []);
-      } catch (err) {
-        console.warn('Failed to fetch hod assignments');
-      } finally {
-        setLoading(false);
-      }
-    };
-    init();
-  }, [DEPT]);
+    fetchAssignments();
+  }, [fetchAssignments]);
+
+  useRealtimeSync(fetchAssignments, 'assignments');
 
   const formatDate = (dateString) => {
     if (!dateString) return 'No due date';

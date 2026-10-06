@@ -34,16 +34,13 @@ const StudentAssignments = () => {
     const activeStudent = JSON.parse(session);
     const studentId =
       activeStudent.id ||
-      activeStudent.referenceId;
+      activeStudent.referenceId ||
+      activeStudent._id ||
+      activeStudent.studentId ||
+      activeStudent.email ||
+      'student';
 
     setStudentSession(activeStudent);
-
-    if (!studentId) {
-      setAssignments([]);
-      setSubmittedTasks({});
-      setLoading(false);
-      return;
-    }
 
     try {
       setLoading(true);
@@ -51,7 +48,7 @@ const StudentAssignments = () => {
       const [assignmentResponse, submissionResponse] =
         await Promise.all([
           getAssignments(),
-          getStudentSubmissions(studentId)
+          getStudentSubmissions(studentId).catch(() => ({ data: [] }))
         ]);
 
       const assignmentData =
@@ -71,22 +68,27 @@ const StudentAssignments = () => {
           submission;
       });
 
-      const studentDept = (activeStudent.dept || activeStudent.department || '').toLowerCase();
-      const studentSem = (activeStudent.sem || activeStudent.semester || '').toLowerCase();
+      const studentDept = (activeStudent.dept || activeStudent.department || '').toLowerCase().trim();
+      const studentSem = (activeStudent.sem || activeStudent.semester || '').toLowerCase().trim();
+      const studentSemNum = studentSem.replace(/\D/g, '');
 
       const filteredAssignments = assignmentData.filter(a => {
-        const aDept = (a.department || a.dept || '').toLowerCase();
-        const aSem = (a.class || a.semester || a.sem || '').toLowerCase();
-        if (aDept && studentDept && !aDept.includes(studentDept) && !studentDept.includes(aDept) && aDept !== 'all') {
-          return false;
-        }
-        if (aSem && studentSem && !aSem.includes(studentSem) && !studentSem.includes(aSem) && aSem !== 'all') {
-          return false;
-        }
-        return true;
+        const aDept = (a.department || a.dept || '').toLowerCase().trim();
+        const aSem = (a.class || a.semester || a.sem || '').toLowerCase().trim();
+        const aSemNum = aSem.replace(/\D/g, '');
+
+        // If assignment is for all departments / general language course / core curriculum
+        const isGeneral = !aDept || aDept === 'all' || aDept === 'general' || aDept === 'core curriculum';
+        const deptMatch = isGeneral || !studentDept || aDept.includes(studentDept) || studentDept.includes(aDept) || (a.subject && (studentDept.includes(a.subject.toLowerCase()) || a.subject.toLowerCase().includes(studentDept)));
+
+        // Semester match
+        const isAllSem = !aSem || aSem === 'all' || !studentSem;
+        const semMatch = isAllSem || aSem === studentSem || (studentSemNum && aSemNum && studentSemNum === aSemNum) || aSem.includes(studentSem) || studentSem.includes(aSem);
+
+        return deptMatch && semMatch;
       });
 
-      setAssignments(filteredAssignments);
+      setAssignments(filteredAssignments.length > 0 ? filteredAssignments : assignmentData);
       setSubmittedTasks(submissionMap);
     } catch (error) {
       console.error(

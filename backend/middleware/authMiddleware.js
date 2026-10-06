@@ -50,10 +50,18 @@ export const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'Not authorized, user not found' });
       }
 
-      // Check college.isActive on every protected API call
-      if (req.user.role !== 'Super Admin') {
+      // Scope tenant context immediately upon authentication
+      if (req.user.role === 'Super Admin') {
+        req.collegeId = 'system';
+        const store = context.getStore();
+        if (store) store.set('collegeId', 'system');
+      } else {
         const tenantId = req.user.tenantId || req.user.collegeId;
         if (tenantId && tenantId !== 'system') {
+          req.collegeId = tenantId;
+          const store = context.getStore();
+          if (store) store.set('collegeId', tenantId);
+
           const college = await College.findOne({
             $or: [
               { tenantId: tenantId },
@@ -127,13 +135,15 @@ export const requirePermission = (moduleName) => {
 };
 
 export const collegeScope = (req, res, next) => {
-  if (req.user && req.user.role !== 'Super Admin') {
-    req.collegeId = req.user.tenantId || req.user.collegeId || 'unassigned_college';
-    
-    // Store in global context for Mongoose plugin to access
-    const store = context.getStore();
-    if (store) {
-      store.set('collegeId', req.collegeId);
+  if (req.user) {
+    if (req.user.role === 'Super Admin') {
+      req.collegeId = 'system';
+      const store = context.getStore();
+      if (store) store.set('collegeId', 'system');
+    } else {
+      req.collegeId = req.user.tenantId || req.user.collegeId || 'unassigned_college';
+      const store = context.getStore();
+      if (store) store.set('collegeId', req.collegeId);
     }
   }
   next();

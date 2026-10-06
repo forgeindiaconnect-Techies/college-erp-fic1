@@ -5,7 +5,7 @@ import Student from "../models/Student.js";
 import Fee from "../models/Fee.js";
 
 const getCollegeId = (req) => {
-  return req.collegeId || req.user?.collegeId || req.headers?.['x-college-id'] || "COL001";
+  return req.collegeId || req.user?.tenantId || req.user?.collegeId || req.headers?.['x-college-id'] || "unassigned_college";
 };
 
 // GET all scholarship applications
@@ -14,8 +14,8 @@ export const getScholarshipApplications = async (req, res) => {
     const collegeId = getCollegeId(req);
 
     let query = {};
-    if (collegeId && collegeId !== "all") {
-      query.$or = [{ collegeId }, { collegeId: { $exists: false } }, { collegeId: null }, { collegeId: "" }, { collegeId: "COL001" }];
+    if (req.user?.role !== "Super Admin" && collegeId && collegeId !== "system") {
+      query.$or = [{ collegeId }, { tenantId: collegeId }];
     }
 
     const applications = await ScholarshipApplication.find(query)

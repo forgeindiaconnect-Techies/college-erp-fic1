@@ -34,7 +34,7 @@ const StaffSidebar = ({ isOpen, onClose }) => {
       icon: <BookOpenCheck size={20} />,
       items: [
         { name: 'Class Timetable', path: '/staff/timetable', icon: <Calendar size={20} /> },
-        { name: 'Exam Timetable', path: '/staff/exams', icon: <GraduationCap size={20} /> },
+        { name: 'Exam Duty Center', path: '/staff/exams', icon: <GraduationCap size={20} /> },
         { name: 'Take Attendance', path: '/staff/attendance', icon: <CalendarCheck size={20} /> },
         { name: 'Upload Marks', path: '/staff/marks', icon: <BookOpenCheck size={20} /> },
         { name: 'Assignments', path: '/staff/assignments', icon: <ClipboardList size={20} /> }
@@ -79,6 +79,8 @@ const StaffSidebar = ({ isOpen, onClose }) => {
     navigate('/login');
   };
 
+  const displayCollegeName = staffSession?.collegeName || collegeSettings?.collegeName || 'Institution Portal';
+
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
       {/* Brand */}
@@ -86,19 +88,13 @@ const StaffSidebar = ({ isOpen, onClose }) => {
         {collegeSettings?.collegeLogo ? (
           <img 
             src={collegeSettings.collegeLogo} 
-            alt={collegeSettings.collegeName || "College Logo"} 
+            alt={displayCollegeName} 
             style={{ height: '32px', objectFit: 'contain' }} 
           />
-        ) : collegeSettings?.collegeName ? (
-          <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
-            {collegeSettings.collegeName}
-          </div>
         ) : (
-          <img 
-            src="/logo.svg" 
-            alt="ERPSYS Logo" 
-            style={{ height: '32px', objectFit: 'contain' }} 
-          />
+          <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+            {displayCollegeName}
+          </div>
         )}
       </div>
 

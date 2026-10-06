@@ -501,8 +501,17 @@ const StudentManagement = () => {
 
       {/* ═══════════════ ADD / EDIT MODAL ═══════════════ */}
       {modalOpen && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-box glass-card" onClick={e => e.stopPropagation()}>
+        <div 
+          className="modal-overlay" 
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
+        >
+          <div 
+            className="modal-box glass-card" 
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+          >
 
             {/* Header */}
             <div className="modal-hd">

@@ -1,4 +1,5 @@
 import express from "express";
+import { protect, collegeScope } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 import {
@@ -13,6 +14,9 @@ import {
   getScholarshipApplications,
   createScholarshipApplication,
 } from "../controllers/scholarshipApplicationController.js";
+
+// Apply multi-tenant protection to all scholarship endpoints
+router.use(protect, collegeScope);
 
 // Scholarship applications
 router.get("/applications", getScholarshipApplications);

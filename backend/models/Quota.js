@@ -83,7 +83,6 @@ const quotaSchema = new mongoose.Schema(
     collegeId: {
       type: mongoose.Schema.Types.Mixed,
       ref: "College",
-      default: "COL001",
       index: true,
     },
 

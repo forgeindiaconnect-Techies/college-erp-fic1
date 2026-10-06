@@ -56,9 +56,11 @@ router.get(
   collegeScope,
   async (req, res) => {
     try {
-      const query = {
-        collegeId: req.collegeId || req.user?.collegeId || 'unassigned_college'
-      };
+      const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId || 'unassigned_college';
+      const query = {};
+      if (req.user?.role !== 'Super Admin') {
+        query.$or = [{ collegeId }, { tenantId: collegeId }];
+      }
 
       const andConditions = [];
 

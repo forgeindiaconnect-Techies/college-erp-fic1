@@ -34,11 +34,7 @@
 }
 
 .navbar-logo {
-  width: auto;
-  max-width: 120px;
-  height: 34px;
-  object-fit: contain;
-  filter: brightness(0) invert(1);
+  display: none !important;
 }
 
 .navbar-greeting {

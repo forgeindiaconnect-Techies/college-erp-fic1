@@ -3,7 +3,21 @@ import { FileText, Search, Printer, Download, RefreshCw, Eye } from 'lucide-reac
 import { getAllFees } from '../../api/index';
 import FeeReceipt from '../../components/FeeReceipt';
 
+const getLoggedInCollegeName = () => {
+  try {
+    const s = sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || sessionStorage.getItem('user_session');
+    if (s) {
+      const p = JSON.parse(s);
+      if (p?.collegeName && p.collegeName !== 'Institution Portal' && p.collegeName !== 'Royal College') {
+        return p.collegeName;
+      }
+    }
+  } catch (e) {}
+  return 'College Administration';
+};
+
 const printReceipt = (rec) => {
+  const collegeName = rec?.collegeName || getLoggedInCollegeName();
   const normalFee = Number(rec?.normalFee ?? rec?.totalFees ?? rec?.totalFee ?? 0);
   const discountAmount = Number(rec?.discountAmount ?? 0);
   const finalFee = Number(rec?.finalFee ?? rec?.totalFees ?? rec?.totalFee ?? normalFee);
@@ -48,7 +62,7 @@ const printReceipt = (rec) => {
     <body>
       <div class="receipt-container">
         <div class="receipt-header">
-          <h1>Royal College</h1>
+          <h1>${collegeName}</h1>
           <p>Student Fee Payment Receipt</p>
         </div>
         <div class="receipt-metadata">
@@ -226,7 +240,7 @@ const Receipts = () => {
               selectedFeeRecord={selectedReceipt}
               selectedPayment={selectedReceipt}
               onClose={() => setSelectedReceipt(null)}
-              institutionName="Royal College"
+              institutionName={getLoggedInCollegeName()}
             />
           </div>
         </div>

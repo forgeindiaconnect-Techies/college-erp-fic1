@@ -7,12 +7,14 @@ import Staff from '../models/Staff.js';
 // Create a new Assignment
 export const createAssignment = async (req, res) => {
   try {
-    const collegeId = req.collegeId || req.user?.collegeId;
+    const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId || 'unassigned_college';
     const {
       title,
       subject,
       department,
       class: targetClass,
+      semester,
+      course,
       description,
       dueDate,
       faculty,
@@ -25,29 +27,44 @@ export const createAssignment = async (req, res) => {
       facultyId
     } = req.body;
 
+    let parsedDueDate;
+    if (dueDate) {
+      const d = new Date(dueDate);
+      parsedDueDate = isNaN(d.getTime()) ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : d;
+    } else {
+      parsedDueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    }
+
     const newAssignment = new Assignment({
       collegeId,
-      title,
-      subject,
-      department,
-      class: targetClass,
-      description,
-      dueDate,
-      faculty,
+      tenantId: collegeId,
+      title: title || 'Untitled Coursework',
+      subject: subject || 'General Subject',
+      department: department || req.user?.department || 'General',
+      class: targetClass || semester || 'Semester 1',
+      semester: semester || targetClass || 'Semester 1',
+      course: course || '',
+      description: description || '',
+      dueDate: parsedDueDate,
+      faculty: faculty || req.user?.name || 'Faculty',
+      facultyId: facultyId || (req.user?._id ? String(req.user._id) : null),
       departmentId: departmentId || null,
       courseId: courseId || null,
       semesterId: semesterId || null,
       sectionId: sectionId || null,
-      section: section || null,
-      subjectId: subjectId || null,
-      facultyId: facultyId || null
+      section: section || 'All',
+      subjectId: subjectId || null
     });
 
     await newAssignment.save();
 
-    req.app.get('io').emit('dataUpdated', {
+    req.app.get('io')?.emit('dataUpdated', {
       module: 'assignments',
       action: 'created'
+    });
+    req.app.get('io')?.emit('assignments', {
+      action: 'created',
+      data: newAssignment
     });
 
     // Log Activity
@@ -59,7 +76,7 @@ export const createAssignment = async (req, res) => {
         role: req.user?.role || 'Staff',
         action: `Posted new assignment: ${title}`,
         moduleName: 'Assignments',
-        dept: department,
+        dept: department || req.user?.department,
         ip: req.ip || req.connection.remoteAddress
       });
     } catch (logErr) {
@@ -68,6 +85,7 @@ export const createAssignment = async (req, res) => {
 
     res.status(201).json(newAssignment);
   } catch (err) {
+    console.error('Error in createAssignment:', err);
     res.status(500).json({ message: 'Error creating assignment', error: err.message });
   }
 };
@@ -75,13 +93,62 @@ export const createAssignment = async (req, res) => {
 // Get all assignments (optionally filter by dept/class/college)
 export const getAssignments = async (req, res) => {
   try {
-    const collegeId = req.collegeId || req.user?.collegeId;
-    const { department, class: targetClass, departmentId, semesterId, sectionId } = req.query;
+    const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
+    const { department, class: targetClass, departmentId, semesterId, sectionId, faculty } = req.query;
     let query = {};
-    if (collegeId) query.collegeId = collegeId;
-    if (department) query.department = department;
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      query.$or = [
+        { collegeId },
+        { tenantId: collegeId },
+        { collegeId: 'unassigned_college' },
+        { tenantId: 'unassigned_college' },
+        { collegeId: 'mock_college_id' },
+        { tenantId: 'mock_college_id' },
+        { collegeId: null },
+        { tenantId: null },
+        { collegeId: { $exists: false } }
+      ];
+    }
+
+    if (department && department !== 'all' && department !== 'All') {
+      const deptRegex = new RegExp(department.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i');
+      const deptCond = {
+        $or: [
+          { department: department },
+          { department: deptRegex },
+          { course: deptRegex }
+        ]
+      };
+      if (query.$or) {
+        query.$and = [{ $or: query.$or }, deptCond];
+        delete query.$or;
+      } else {
+        query.$or = deptCond.$or;
+      }
+    }
+
+    if (faculty) {
+      const facRegex = new RegExp(faculty.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i');
+      if (query.$and) {
+        query.$and.push({ faculty: facRegex });
+      } else {
+        query.faculty = facRegex;
+      }
+    }
+
     if (departmentId) query.departmentId = departmentId;
-    if (targetClass) query.class = targetClass;
+    if (targetClass) {
+      const semNum = String(targetClass).replace(/\D/g, '');
+      query.$and = query.$and || [];
+      query.$and.push({
+        $or: [
+          { class: targetClass },
+          { class: new RegExp(targetClass.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i') },
+          { semester: targetClass },
+          ...(semNum ? [{ class: new RegExp(`sem.*${semNum}`, 'i') }, { semester: new RegExp(`sem.*${semNum}`, 'i') }] : [])
+        ]
+      });
+    }
     if (semesterId) query.semesterId = semesterId;
     if (sectionId) query.sectionId = sectionId;
 

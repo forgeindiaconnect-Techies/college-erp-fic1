@@ -35,7 +35,9 @@
 
 .sidebar-header img {
   flex-shrink: 0;
-  max-width: 34px;
+  max-width: 140px;
+  height: 36px;
+  object-fit: contain;
 }
 
 .sidebar-header > div {

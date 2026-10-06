@@ -16,9 +16,9 @@ async function updateCollegeName() {
 
     const collegeName = 'Marudhar Kesari Jain College for Women';
 
-    // 1. Update all College documents
-    const collegeRes = await College.updateMany({}, { $set: { name: collegeName } });
-    console.log(`Updated College documents: ${collegeRes.modifiedCount}`);
+    // 1. Update only default tenant COL001
+    const collegeRes = await College.updateMany({ tenantId: 'COL001' }, { $set: { name: collegeName } });
+    console.log(`Updated COL001 College documents: ${collegeRes.modifiedCount}`);
 
     // If no college exists, create one
     const count = await College.countDocuments();
@@ -34,9 +34,9 @@ async function updateCollegeName() {
       console.log('Created primary College document');
     }
 
-    // 2. Update all CollegeSettings documents
-    const settingsRes = await CollegeSettings.updateMany({}, { $set: { collegeName } });
-    console.log(`Updated CollegeSettings documents: ${settingsRes.modifiedCount}`);
+    // 2. Update only COL001 CollegeSettings
+    const settingsRes = await CollegeSettings.updateMany({ tenantId: 'COL001' }, { $set: { collegeName } });
+    console.log(`Updated COL001 CollegeSettings documents: ${settingsRes.modifiedCount}`);
 
     // If no settings exist, create one
     const settingsCount = await CollegeSettings.countDocuments();

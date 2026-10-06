@@ -77,8 +77,8 @@ const printReceipt = (record, receiptNoOrPayment, feeTypeArg, semesterArg, amoun
     <body>
       <div class="receipt-container">
         <div class="receipt-header">
-          <h1>Royal College</h1>
-          <p>Student Fee Payment Receipt</p>
+          <h1>${(typeof window !== 'undefined' && (JSON.parse(sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || '{}')?.collegeName)) || 'Institution Portal'}</h1>
+          <p>Official Student Fee Payment Receipt</p>
         </div>
         <div class="receipt-metadata">
           <div><strong>Receipt Number:</strong><span>${receiptNo}</span></div>
@@ -531,7 +531,7 @@ const FeesCollection = () => {
         const studentFees = fees.filter(f => f.studentId === studentKey || f.studentId === r._id || f.studentId === r.id);
         const feePaymentsSum = studentFees.reduce((acc, curr) => acc + (Number(curr.paidAmount || curr.amount) || 0), 0);
         
-        const paidAmount = Number(r.paidAmount !== undefined ? r.paidAmount : (r.amountPaid !== undefined ? r.amountPaid : feePaymentsSum));
+        const paidAmount = feePaymentsSum > 0 ? feePaymentsSum : Number(r.paidAmount !== undefined ? r.paidAmount : (r.amountPaid !== undefined ? r.amountPaid : 0));
         const remainingFee = Math.max(0, finalFee - paidAmount);
         const paymentStatus = (remainingFee === 0 && finalFee > 0) ? "Paid" : (paidAmount > 0 ? "Partial" : "Pending");
 
@@ -658,7 +658,7 @@ const FeesCollection = () => {
                 ? Number(admission.finalFee)
                 : Math.max(0, normalFee - totalDiscount))
         );
-        const paidAmount = Number(admission.paidAmount !== undefined ? admission.paidAmount : (admission.amountPaid !== undefined ? admission.amountPaid : feePaymentsSum));
+        const paidAmount = feePaymentsSum > 0 ? feePaymentsSum : Number(admission.paidAmount !== undefined ? admission.paidAmount : (admission.amountPaid !== undefined ? admission.amountPaid : 0));
         const remainingFee = Math.max(0, finalFee - paidAmount);
 
         let paymentStatus = (remainingFee === 0 && finalFee > 0) ? "Paid" : (paidAmount > 0 ? "Partial" : "Pending");
@@ -4632,7 +4632,6 @@ const FeesCollection = () => {
               selectedFeeRecord={selectedReceipt}
               selectedPayment={selectedReceipt}
               onClose={() => setSelectedReceipt(null)}
-              institutionName="Royal College"
             />
           </div>
         </div>
@@ -5157,7 +5156,6 @@ const FeesCollection = () => {
               selectedFeeRecord={receiptData}
               selectedPayment={receiptData}
               onClose={() => setShowReceipt(false)}
-              institutionName="Royal College"
             />
           </div>
         </div>
@@ -5183,7 +5181,6 @@ const FeesCollection = () => {
               selectedFeeRecord={selectedPayment}
               selectedPayment={selectedPayment}
               onClose={closeReceiptModal}
-              institutionName="Royal College"
             />
           </div>
         </div>

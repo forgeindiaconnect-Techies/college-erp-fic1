@@ -26,9 +26,10 @@ import {
   updateSalary, 
   createSalary, 
   getStaff, 
+  getStaffForPayroll,
   getTransportDrivers, 
   getHostelBlocks, 
-  getAccountsOfficers,
+  getAccountsOfficers, 
   getUsers 
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
@@ -112,8 +113,9 @@ const Salary = () => {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [salRes, staffRes, driverRes, hostelRes, accountsRes, usersRes] = await Promise.all([
+      const [salRes, payrollStaffRes, staffRes, driverRes, hostelRes, accountsRes, usersRes] = await Promise.all([
         getSalaries().catch(() => ({ data: [] })),
+        getStaffForPayroll().catch(() => ({ data: [] })),
         getStaff().catch(() => ({ data: [] })),
         getTransportDrivers().catch(() => ({ data: [] })),
         getHostelBlocks().catch(() => ({ data: [] })),
@@ -126,6 +128,30 @@ const Salary = () => {
       const list = [];
       const seenIds = new Set();
       const seenNames = new Set();
+
+      // 0. Unified Payroll Personnel from DB (/payroll-list)
+      if (payrollStaffRes?.data && Array.isArray(payrollStaffRes.data)) {
+        payrollStaffRes.data.forEach(s => {
+          const id = s.id || s.staffId || s._id;
+          if (id && !seenIds.has(id)) {
+            seenIds.add(id);
+            if (s.name) seenNames.add(s.name.toLowerCase().trim());
+            list.push({
+              _id: s._id,
+              id,
+              staffId: id,
+              name: s.name || s.staffName,
+              staffName: s.name || s.staffName,
+              designation: s.designation || 'Staff Member',
+              department: s.department || s.dept || 'General',
+              category: s.category || getCategoryKey(s),
+              email: s.email || '',
+              phone: s.phone || '',
+              joinDate: s.joinDate || s.createdAt
+            });
+          }
+        });
+      }
 
       // 1. Original Staff & HODs from DB
       if (staffRes?.data && Array.isArray(staffRes.data)) {

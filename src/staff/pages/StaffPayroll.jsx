@@ -38,7 +38,8 @@ const StaffPayroll = () => {
   const [selectedPayroll, setSelectedPayroll] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const collegeName = collegeSettings?.collegeName || 'Marudhar Kesari Jain College for Women';
+  const staffSession = JSON.parse(sessionStorage.getItem('staff_session') || '{}');
+  const collegeName = collegeSettings?.collegeName || staffSession?.collegeName || 'Institution';
   const collegeLogo = collegeSettings?.collegeLogo;
 
   useEffect(() => {

@@ -198,13 +198,18 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Expires']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Expires', 'x-tenant-id', 'X-Tenant-Id']
 }));
 app.use(express.json());
 
 // Context Middleware for Multi-Tenancy
 app.use((req, res, next) => {
   context.run(new Map(), () => {
+    const tenantHeader = req.headers['x-tenant-id'] || req.headers['X-Tenant-Id'];
+    if (tenantHeader && tenantHeader !== 'system') {
+      const store = context.getStore();
+      if (store) store.set('collegeId', tenantHeader);
+    }
     next();
   });
 });
@@ -324,38 +329,13 @@ const autoSeedIfEmpty = async () => {
         } else {
           u.role = cred.role;
           u.password = cred.password;
-          u.tenantId = resolvedTenantId;
-          u.collegeId = resolvedTenantId;
+          if (!u.tenantId || u.tenantId === 'undefined') {
+            u.tenantId = resolvedTenantId;
+            u.collegeId = resolvedTenantId;
+          }
           u.markModified('password');
           await u.save();
-          console.log(`✅ Restored custom user: ${cred.email} to resolved tenantId: ${resolvedTenantId}`);
-        }
-      }
-
-      if (defaultTenantId) {
-        try {
-          await User.updateMany(
-            { role: { $in: ['Accounts', 'Staff', 'HOD', 'Student', 'Parent'] } },
-            { $set: { tenantId: defaultTenantId, collegeId: defaultTenantId } }
-          );
-        } catch (e) {
-          console.warn('User multi-tenant update warning:', e.message);
-        }
-        try {
-          await Department.updateMany(
-            { collegeId: { $in: ['COL001', 'unassigned_college', null] } },
-            { $set: { collegeId: defaultTenantId } }
-          );
-        } catch (e) {
-          console.warn('Department multi-tenant note (duplicate skipped):', e.message);
-        }
-        try {
-          await Course.updateMany(
-            { collegeId: { $in: ['COL001', 'unassigned_college', null] } },
-            { $set: { collegeId: defaultTenantId } }
-          );
-        } catch (e) {
-          console.warn('Course multi-tenant note:', e.message);
+          console.log(`✅ Verified custom user: ${cred.email} with tenantId: ${u.tenantId}`);
         }
       }
 
@@ -1055,14 +1035,11 @@ const startServer = async () => {
     console.log('✅ Connected to In-Memory MongoDB (Zero-Config Mode)');
   }
 
-  // Sync institution name across all database collections
+  // Auto-seed/repair specific colleges without overwriting other colleges
   try {
-    const defaultCollegeName = 'Marudhar Kesari Jain College for Women';
-    await College.updateMany({}, { $set: { name: defaultCollegeName } });
-    await CollegeSettings.updateMany({}, { $set: { collegeName: defaultCollegeName } });
-    
     const colCount = await College.countDocuments();
     if (colCount === 0) {
+      const defaultCollegeName = 'Marudhar Kesari Jain College for Women';
       await College.create({
         name: defaultCollegeName,
         adminName: 'System Admin',
@@ -1071,18 +1048,33 @@ const startServer = async () => {
         subscriptionPlan: 'Premium',
         subscriptionStatus: 'Active'
       });
-    }
-    const setCount = await CollegeSettings.countDocuments();
-    if (setCount === 0) {
       await CollegeSettings.create({
         collegeName: defaultCollegeName,
         tenantId: 'COL001',
         collegeId: 'COL001'
       });
     }
-    console.log(`✅ Institution name unified to: ${defaultCollegeName}`);
+
+    // Repair specific colleges whose names got overwritten by previous bug
+    await College.updateOne(
+      { $or: [{ email: 'dhanush@gmail.com' }, { principalEmail: 'ramoorthy@gmail.com' }, { tenantId: 'COL004-3190860' }] },
+      { $set: { name: 'Arignar Anna College of Arts and Science' } }
+    );
+    const arignarCol = await College.findOne({ $or: [{ email: 'dhanush@gmail.com' }, { principalEmail: 'ramoorthy@gmail.com' }, { tenantId: 'COL004-3190860' }] });
+    if (arignarCol) {
+      await CollegeSettings.updateOne(
+        { $or: [{ tenantId: arignarCol.tenantId }, { collegeId: arignarCol._id }] },
+        { $set: { collegeName: 'Arignar Anna College of Arts and Science' } }
+      );
+    }
+
+    // Repair COL002 and COL003 if they exist
+    await College.updateOne({ tenantId: 'COL002', name: { $ne: 'St. Xavier Technology Institute' } }, { $set: { name: 'St. Xavier Technology Institute' } });
+    await College.updateOne({ tenantId: 'COL003', name: { $ne: 'National College of Arts & Science' } }, { $set: { name: 'National College of Arts & Science' } });
+
+    console.log('✅ College multi-tenant names verified and protected.');
   } catch (err) {
-    console.error('Failed to sync college name on startup:', err);
+    console.error('Failed to verify college names on startup:', err);
   }
 
   // Migrate existing users without tenantId to COL001

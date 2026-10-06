@@ -91,7 +91,7 @@ const StudentDashboard = () => {
         getFeesByStudent(targetStudentId).catch(() => null),
         getMyLibraryTransactions().catch(() => null),
         getClassAdvisorInfo().catch(() => null),
-        getAssignments({ department: targetDept, class: targetSem }).catch(() => null),
+        getAssignments().catch(() => null),
         getSubjects({ department: targetDept }).catch(() => null),
         getTimetable(targetDept, targetSem, targetSec).catch(() => null)
       ]);
@@ -169,16 +169,14 @@ const StudentDashboard = () => {
       resolvedStudent.pendingFeeAmount = bal;
       resolvedStudent.feeStatus = (bal === 0 && netPayable > 0) ? 'Paid' : (paid > 0 ? 'Partial' : 'Pending');
 
-
       setStudentDetails(resolvedStudent);
 
-      // 5. Original Assignments Count
+      // 5. Assignments Count
       if (assignRes?.data && Array.isArray(assignRes.data)) {
         setAssignmentsCount(assignRes.data.length);
       } else {
         const localAssigns = JSON.parse(localStorage.getItem(`erp_assignments_${tenantId}`) || '[]');
-        const deptAssigns = localAssigns.filter(a => (a.dept || a.department || '').toLowerCase() === resolvedStudent.dept.toLowerCase());
-        setAssignmentsCount(deptAssigns.length);
+        setAssignmentsCount(localAssigns.length);
       }
 
       // 6. Original Library Data

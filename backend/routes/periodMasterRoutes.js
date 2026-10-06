@@ -27,12 +27,11 @@ const parseTimeToMinutes = (timeStr) => {
 
 router.get('/', protect, collegeScope, async (req, res) => {
   try {
-    const collegeId = req.collegeId || req.user?.collegeId || 'COL002-8379189';
+    const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
     let periods = await PeriodMaster.find({
       $or: [
         { collegeId: collegeId },
-        { collegeId: { $exists: false } },
-        { collegeId: null }
+        { tenantId: collegeId }
       ]
     });
 
@@ -58,7 +57,7 @@ router.get('/', protect, collegeScope, async (req, res) => {
 
 router.post('/', protect, authorize('Admin', 'Super Admin', 'SuperAdmin', 'CollegeAdmin', 'HOD', 'Principal'), collegeScope, async (req, res) => {
   try {
-    const collegeId = req.collegeId || req.user?.collegeId || 'COL002-8379189';
+    const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
     const period = await PeriodMaster.create({ ...req.body, collegeId });
     res.status(201).json(period);
   } catch (error) {

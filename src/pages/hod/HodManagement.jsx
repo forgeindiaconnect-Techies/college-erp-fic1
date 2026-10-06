@@ -29,12 +29,16 @@ const HodManagement = () => {
   const [availableDepartments, setAvailableDepartments] = useState([]);
 
   useEffect(() => {
-    fetchHods();
+    fetchHods(true);
     fetchDepts();
   }, []);
 
-  // Auto-refresh when staff data changes on another dashboard
-  useRealtimeSync(useCallback(() => { fetchHods(); }, []), 'staff');
+  // Auto-refresh when staff data changes on another dashboard, guarded when modal is open
+  useRealtimeSync(useCallback(() => { 
+    if (!modalOpen) {
+      fetchHods(false);
+    }
+  }, [modalOpen]), 'staff');
 
   const fetchDepts = async () => {
     try {
@@ -50,37 +54,70 @@ const HodManagement = () => {
     }
   };
 
-  const fetchHods = async () => {
+  const fetchHods = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const res = await getStaff();
       const staffList = Array.isArray(res.data) ? res.data : (res.data?.staff || []);
       const allHods = staffList.filter(s => s.designation === 'HOD' || s.role === 'HOD');
       setHods(allHods);
     } catch (err) {
       console.error('Failed to fetch HODs:', err);
-      setHods([]);
+      if (showLoading) setHods([]);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   const filtered = hods.filter(h => 
-    h.name.toLowerCase().includes(search.toLowerCase()) || 
-    h.dept.toLowerCase().includes(search.toLowerCase()) ||
-    h.id.toLowerCase().includes(search.toLowerCase())
+    (h.name || '').toLowerCase().includes(search.toLowerCase()) || 
+    (h.dept || '').toLowerCase().includes(search.toLowerCase()) ||
+    (h.id || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const openAdd = () => { 
-    setForm({ ...EMPTY_FORM, dept: availableDepartments[0]?.name || '' }); 
+    let maxSuffix = 0;
+    hods.forEach(h => {
+      if (h.id && typeof h.id === 'string' && h.id.startsWith('HOD')) {
+        const num = parseInt(h.id.replace('HOD', ''), 10);
+        if (!isNaN(num) && num > maxSuffix) maxSuffix = num;
+      }
+    });
+    const nextNum = Math.max(maxSuffix + 1, hods.length + 1);
+    const newId = `HOD${String(nextNum).padStart(3, '0')}`;
+
+    setForm({ 
+      ...EMPTY_FORM, 
+      id: newId,
+      dept: availableDepartments[0]?.name || '',
+      qualification: 'M.E., Ph.D.',
+      experience: '5+ yrs',
+      joinDate: new Date().toISOString().split('T')[0],
+      status: 'Active'
+    }); 
     setEditTarget(null); 
     setModalOpen(true); 
   };
-  const openEdit = (h) => { setForm({ ...h }); setEditTarget(h.id); setModalOpen(true); };
-  const closeModal = () => { setModalOpen(false); setEditTarget(null); setForm(EMPTY_FORM); };
+
+  const openEdit = (h) => { 
+    setForm({ 
+      ...h,
+      joinDate: h.joinDate ? String(h.joinDate).split('T')[0] : new Date().toISOString().split('T')[0],
+      qualification: h.qualification || 'M.E., Ph.D.',
+      experience: h.experience || '5+ yrs'
+    }); 
+    setEditTarget(h.id || h._id); 
+    setModalOpen(true); 
+  };
+
+  const closeModal = () => { 
+    setModalOpen(false); 
+    setEditTarget(null); 
+    setForm(EMPTY_FORM); 
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
 
     if (!form.id?.trim()) {
       alert("Please provide the HOD Employee ID.");
@@ -119,30 +156,17 @@ const HodManagement = () => {
       if (editTarget) {
         const payload = { ...form, deptCode: deptInfo.code, designation: 'HOD' };
         await updateStaff(editTarget, payload);
-        setHods(hods.map(h => h.id === editTarget ? { ...h, ...payload } : h));
+        setHods(prev => prev.map(h => (h.id === editTarget || h._id === editTarget) ? { ...h, ...payload } : h));
       } else {
-        // Safe ID generation: find max HOD id and increment, fallback to length + 1
-        let maxSuffix = 0;
-        hods.forEach(h => {
-          if (h.id && h.id.startsWith('HOD')) {
-            const num = parseInt(h.id.replace('HOD', ''), 10);
-            if (!isNaN(num) && num > maxSuffix) maxSuffix = num;
-          }
-        });
-        const nextNum = Math.max(maxSuffix + 1, hods.length + 1);
-        const newId = `HOD${String(nextNum).padStart(3, '0')}`;
-        
         const newHod = {
           ...form,
-          id: form.id || newId,
           deptCode: deptInfo.code,
-          designation: 'HOD'
+          designation: 'HOD',
+          role: 'HOD'
         };
         const res = await createStaff(newHod);
-        
-        // The backend automatically creates a User account during createStaff()
-
-        setHods([...hods, res.data]);
+        const createdRecord = res.data || newHod;
+        setHods(prev => [...prev, createdRecord]);
       }
       closeModal();
     } catch (err) {
@@ -298,66 +322,112 @@ const HodManagement = () => {
 
       {/* Manage HOD Modal */}
       {modalOpen && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-card glass-card" onClick={e => e.stopPropagation()}>
+        <div 
+          className="modal-overlay" 
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              closeModal();
+            }
+          }}
+        >
+          <div 
+            className="modal-card glass-card" 
+            onMouseDown={(e) => e.stopPropagation()} 
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '650px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+          >
             <div className="modal-header">
               <h2>{editTarget ? 'Edit HOD Account' : 'Register New HOD'}</h2>
-              <button className="btn-icon" onClick={closeModal}><X size={20} /></button>
+              <button className="btn-icon" type="button" onClick={closeModal}><X size={20} /></button>
             </div>
-            <form onSubmit={handleSubmit} className="modal-form">
+            <form 
+              onSubmit={handleSubmit} 
+              className="modal-form"
+              autoComplete="off"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'submit') {
+                  e.preventDefault();
+                }
+              }}
+            >
               <div className="form-grid">
                 <div className="form-group">
                   <label>Employee ID *</label>
                   <input
                     required
                     placeholder="e.g. HOD001"
-                    value={form.id}
-                    onChange={e => setForm({ ...form, id: e.target.value.toUpperCase() })}
+                    value={form.id || ''}
+                    onChange={e => {
+                      const val = e.target.value.toUpperCase();
+                      setForm(prev => ({ ...prev, id: val }));
+                    }}
                     disabled={Boolean(editTarget)}
+                    autoComplete="off"
                   />
                 </div>
                 <div className="form-group">
-                  <label>Full Name</label>
+                  <label>Full Name *</label>
                   <input 
                     required 
                     placeholder="e.g. Dr. Ananya Rao" 
-                    value={form.name} 
-                    onChange={e => setForm({ ...form, name: e.target.value })} 
+                    value={form.name || ''} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, name: val }));
+                    }}
+                    autoComplete="off"
                   />
                 </div>
                 <div className="form-group">
-                  <label>Email Address</label>
+                  <label>Email Address *</label>
                   <input 
                     type="email"
                     required 
-                    placeholder="csehod@gmail.com" 
-                    value={form.email} 
-                    onChange={e => setForm({ ...form, email: e.target.value })} 
+                    placeholder="e.g. poojasree@gmail.com" 
+                    value={form.email || ''} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, email: val }));
+                    }}
+                    autoComplete="off"
+                    name="hod_registration_email"
                   />
                 </div>
                 <div className="form-group">
-                  <label>Login Password</label>
+                  <label>Login Password {editTarget ? '' : '*'}</label>
                   <input 
                     type="password"
                     required={!editTarget}
                     placeholder={editTarget ? "Leave blank to keep current" : "e.g. password123"}
                     value={form.password || ''} 
-                    onChange={e => setForm({ ...form, password: e.target.value })} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, password: val }));
+                    }}
+                    autoComplete="new-password"
+                    name="hod_registration_pwd"
                   />
                 </div>
                 <div className="form-group">
                   <label>Phone Number</label>
                   <input 
                     placeholder="e.g. 9876543210" 
-                    value={form.phone} 
-                    onChange={e => setForm({ ...form, phone: e.target.value })} 
+                    value={form.phone || ''} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, phone: val }));
+                    }}
+                    autoComplete="off"
                   />
                 </div>
                 <div className="form-group">
-                  <label>Department</label>
+                  <label>Department *</label>
                   <CustomSelect 
-                    value={form.dept}
-                    onChange={e => setForm({ ...form, dept: e.target.value })}
+                    value={form.dept || ''}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, dept: val }));
+                    }}
                     options={availableDepartments.map(d => ({ value: d.name, label: d.name }))}
                     placeholder="Select Department"
                   />
@@ -365,8 +435,11 @@ const HodManagement = () => {
                 <div className="form-group">
                   <label>Status</label>
                   <CustomSelect 
-                    value={form.status}
-                    onChange={e => setForm({ ...form, status: e.target.value })}
+                    value={form.status || 'Active'}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, status: val }));
+                    }}
                     options={[
                       { value: 'Active', label: 'Active' },
                       { value: 'Inactive', label: 'Inactive' }
@@ -381,17 +454,27 @@ const HodManagement = () => {
                 
                 <div className="form-group">
                   <label>Experience (e.g. '10 yrs')</label>
-                  <input placeholder="10 yrs" value={form.experience} onChange={e => setForm({ ...form, experience: e.target.value })} />
+                  <input 
+                    placeholder="10 yrs" 
+                    value={form.experience || ''} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, experience: val }));
+                    }} 
+                    autoComplete="off"
+                  />
                 </div>
                 <div className="form-group">
                   <label>Qualification *</label>
                   <input
                     required
                     placeholder="e.g. M.E., Ph.D."
-                    value={form.qualification}
-                    onChange={e =>
-                      setForm({ ...form, qualification: e.target.value })
-                    }
+                    value={form.qualification || ''}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, qualification: val }));
+                    }}
+                    autoComplete="off"
                   />
                 </div>
                 <div className="form-group">
@@ -400,9 +483,10 @@ const HodManagement = () => {
                     type="date"
                     required
                     value={form.joinDate ? String(form.joinDate).split('T')[0] : ''}
-                    onChange={e =>
-                      setForm({ ...form, joinDate: e.target.value })
-                    }
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, joinDate: val }));
+                    }}
                   />
                 </div>
               </div>

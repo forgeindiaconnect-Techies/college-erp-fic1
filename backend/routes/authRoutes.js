@@ -110,15 +110,19 @@ router.post('/login', async (req, res) => {
         }
       }
 
-      let collegeName = 'Marudhar Kesari Jain College for Women';
+      let collegeName = user.role === 'Super Admin' ? 'System Super Admin' : 'Institution Portal';
       try {
-        const colDoc = await College.findOne({
-          $or: [
-            { tenantId: effectiveTenantId },
-            { _id: mongoose.Types.ObjectId.isValid(effectiveTenantId) ? effectiveTenantId : null }
-          ]
-        }) || await College.findOne({}).sort({ createdAt: -1 });
-        if (colDoc && colDoc.name) collegeName = colDoc.name;
+        if (effectiveTenantId && effectiveTenantId !== 'system') {
+          const colDoc = await College.findOne({
+            $or: [
+              { tenantId: effectiveTenantId },
+              { _id: mongoose.Types.ObjectId.isValid(effectiveTenantId) ? effectiveTenantId : null }
+            ]
+          });
+          if (colDoc && colDoc.name) {
+            collegeName = colDoc.name;
+          }
+        }
       } catch (err) {}
 
       res.json({
@@ -132,7 +136,7 @@ router.post('/login', async (req, res) => {
         parentOf: user.parentOf || null,
         subjects: user.subjects || [],
         permissions: user.permissions || [],
-        tenantId: user.tenantId || null,
+        tenantId: user.tenantId || user.collegeId || null,
         subscription: subscriptionDetails,
         collegeName: collegeName,
         token: generateToken(user._id),
@@ -465,7 +469,54 @@ router.put('/colleges/:id/status', protect, collegeScope, async (req, res) => {
   }
 });
 
-// Get Current User
+// Update College Details (Super Admin only)
+router.put('/colleges/:id', protect, collegeScope, async (req, res) => {
+  try {
+    if (req.user.role !== 'Super Admin') {
+      return res.status(403).json({ message: 'Not authorized as Super Admin' });
+    }
+
+    const { name, collegeName, adminName, email, phone, principalName, principalEmail, subscriptionPlan, subscriptionStatus } = req.body;
+    const finalName = name || collegeName;
+
+    let college = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      college = await College.findById(req.params.id);
+    }
+    if (!college) {
+      college = await College.findOne({ tenantId: req.params.id });
+    }
+    if (!college) {
+      return res.status(404).json({ message: 'College not found' });
+    }
+
+    if (finalName) college.name = finalName.trim();
+    if (adminName) college.adminName = adminName.trim();
+    if (email) college.email = email.trim().toLowerCase();
+    if (phone) college.phone = phone.trim();
+    if (principalName) college.principalName = principalName.trim();
+    if (principalEmail) college.principalEmail = principalEmail.trim().toLowerCase();
+    if (subscriptionPlan) college.subscriptionPlan = subscriptionPlan;
+    if (subscriptionStatus) college.subscriptionStatus = subscriptionStatus;
+
+    await college.save();
+
+    // Sync CollegeSettings for this specific tenant only
+    if (finalName) {
+      await CollegeSettings.updateOne(
+        { $or: [{ tenantId: college.tenantId }, { collegeId: college._id }] },
+        { $set: { collegeName: finalName.trim() } }
+      );
+    }
+
+    req.app.get('io').emit('dataUpdated', { module: 'colleges', action: 'updated' });
+
+    res.json({ message: `College '${college.name}' updated successfully.`, college });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.get('/me', protect, collegeScope, async (req, res) => {
   try {
     let collegeName = null;
@@ -476,8 +527,15 @@ router.get('/me', protect, collegeScope, async (req, res) => {
     let expiryDate = null;
     let daysExpired = 0;
 
-    if (req.user.tenantId && req.user.tenantId !== 'system') {
-      const college = await College.findOne({ tenantId: req.user.tenantId });
+    const effectiveTenantId = req.user.tenantId || req.user.collegeId;
+    if (effectiveTenantId && effectiveTenantId !== 'system') {
+      const isValidObjId = mongoose.Types.ObjectId.isValid(effectiveTenantId);
+      const college = await College.findOne({
+        $or: [
+          { tenantId: effectiveTenantId },
+          { _id: isValidObjId ? effectiveTenantId : null }
+        ]
+      });
       if (college) {
         collegeName = college.name;
         const { calculateSubscriptionStatus } = await import('../utils/subscriptionHelper.js');
@@ -503,6 +561,7 @@ router.get('/me', protect, collegeScope, async (req, res) => {
       email: req.user.email,
       role: req.user.role,
       department: req.user.department,
+      tenantId: effectiveTenantId || null,
       collegeName: collegeName,
       referenceId: req.user.referenceId,
       subscriptionStatus,

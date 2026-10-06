@@ -14,8 +14,9 @@ const router = express.Router();
 // @access  Private/Principal
 router.get('/ai-insights', protect, authorize('Admin', 'Sub Admin', 'Principal'), collegeScope, async (req, res) => {
   try {
-    const lowAttCount = await Student.countDocuments({ attendance: { $lt: 75 } });
-    const lowCgpaCount = await Student.countDocuments({ cgpa: { $lt: 8.0 } });
+    const targetFilter = req.collegeId && req.collegeId !== 'system' ? { $or: [{ collegeId: req.collegeId }, { tenantId: req.collegeId }] } : {};
+    const lowAttCount = await Student.countDocuments({ ...targetFilter, attendance: { $lt: 75 } });
+    const lowCgpaCount = await Student.countDocuments({ ...targetFilter, cgpa: { $lt: 8.0 } });
 
     const insights = [
       {
@@ -51,8 +52,11 @@ router.get('/ai-insights', protect, authorize('Admin', 'Sub Admin', 'Principal')
 // @access  Private/Admin
 router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal'), collegeScope, async (req, res) => {
   try {
+    const targetFilter = req.collegeId && req.collegeId !== 'system' ? { $or: [{ collegeId: req.collegeId }, { tenantId: req.collegeId }] } : {};
+
     // 1. Fee Revenue (Total Paid vs Pending)
     const feeStats = await Fee.aggregate([
+      ...(Object.keys(targetFilter).length ? [{ $match: targetFilter }] : []),
       {
         $group: {
           _id: null,
@@ -63,10 +67,11 @@ router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal'), collegeSc
     ]);
 
     // 2. Department Rankings (by total students for simplicity)
-    const deptStats = await Department.find({}, 'name totalStudents').sort({ totalStudents: -1 });
+    const deptStats = await Department.find(targetFilter, 'name totalStudents').sort({ totalStudents: -1 });
 
     // 3. Placement Stats (Count by Company)
     const placementStats = await PlacementSelection.aggregate([
+      ...(Object.keys(targetFilter).length ? [{ $match: targetFilter }] : []),
       {
         $group: {
           _id: "$company",
@@ -78,6 +83,7 @@ router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal'), collegeSc
 
     // 4. Attendance Trends (Overall Present vs Absent)
     const attendanceStats = await Attendance.aggregate([
+      ...(Object.keys(targetFilter).length ? [{ $match: targetFilter }] : []),
       {
         $group: {
           _id: "$status",
@@ -92,7 +98,7 @@ router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal'), collegeSc
     sevenDaysAgo.setUTCHours(0,0,0,0);
 
     const studentAtt = await Attendance.aggregate([
-      { $match: { attendanceDate: { $gte: sevenDaysAgo } } },
+      { $match: { ...targetFilter, attendanceDate: { $gte: sevenDaysAgo } } },
       { $group: {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$attendanceDate" } },
           total: { $sum: 1 },
@@ -103,7 +109,7 @@ router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal'), collegeSc
     ]);
 
     const staffAtt = await EmployeeAttendance.aggregate([
-      { $match: { date: { $gte: sevenDaysAgo } } },
+      { $match: { ...targetFilter, date: { $gte: sevenDaysAgo } } },
       { $group: {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
           total: { $sum: 1 },

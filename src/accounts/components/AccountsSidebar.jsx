@@ -10,11 +10,19 @@ import {
 import '../../components/layout/Sidebar.css';
 
 const getAccountsSession = () => {
-  return JSON.parse(sessionStorage.getItem('accounts_session') || 'null') || {
-    name: 'Finance Admin',
-    role: 'Accounts Dept.',
-    email: 'finance@college.edu',
-  };
+  try {
+    return JSON.parse(sessionStorage.getItem('accounts_session') || '{}') || {
+      name: 'Finance Admin',
+      role: 'Accounts Dept.',
+      email: 'finance@college.edu',
+    };
+  } catch (e) {
+    return {
+      name: 'Finance Admin',
+      role: 'Accounts Dept.',
+      email: 'finance@college.edu',
+    };
+  }
 };
 
 const AccountsSidebar = ({ isOpen, onClose }) => {
@@ -89,26 +97,21 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
     }
   ];
 
+  const displayCollegeName = (account?.collegeName && account.collegeName !== 'Institution Portal') 
+    ? account.collegeName 
+    : (collegeSettings?.collegeName && collegeSettings.collegeName !== 'Campus ERP Portal' ? collegeSettings.collegeName : 'Accounts Department');
+
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
-      <div className="sidebar-header">
-        {collegeSettings?.collegeLogo ? (
-          <img 
-            src={collegeSettings.collegeLogo} 
-            alt={collegeSettings.collegeName || "College Logo"} 
-            style={{ height: '32px', objectFit: 'contain' }} 
-          />
-        ) : collegeSettings?.collegeName ? (
-          <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
-            {collegeSettings.collegeName}
+      <div className="sidebar-header" style={{ padding: '1rem 1.25rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+          <div style={{ fontWeight: '700', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }} title={displayCollegeName}>
+            {displayCollegeName}
           </div>
-        ) : (
-          <img 
-            src="/logo.svg?v=1782115707199" 
-            alt="ERPSYS Logo" 
-            style={{ height: '32px', objectFit: 'contain' }} 
-          />
-        )}
+          <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 500, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+            Accounts Portal
+          </span>
+        </div>
         <button className="sidebar-close-btn" onClick={onClose}>
           <X size={20} />
         </button>

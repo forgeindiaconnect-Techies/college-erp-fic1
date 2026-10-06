@@ -32,12 +32,22 @@ const StaffAssignments = () => {
   const [availableSubjects, setAvailableSubjects] = useState([]);
   const [dbSubjects, setDbSubjects] = useState([]);
 
-  const fetchAssignments = useCallback(async (facultyName) => {
+  const fetchAssignments = useCallback(async (facultyName, deptName) => {
     try {
       setLoading(true);
       const res = await getAssignments();
       const all = Array.isArray(res.data) ? res.data : [];
-      setAssignments(all.filter(a => a.faculty === facultyName || !a.faculty));
+      const fClean = (facultyName || '').toLowerCase().trim().replace(/^(dr\.|prof\.|mr\.|mrs\.|ms\.)\s*/i, '');
+      const dClean = (deptName || '').toLowerCase().trim();
+
+      const filtered = all.filter(a => {
+        if (!a.faculty) return true;
+        const afClean = (a.faculty || '').toLowerCase().trim().replace(/^(dr\.|prof\.|mr\.|mrs\.|ms\.)\s*/i, '');
+        if (fClean && (afClean.includes(fClean) || fClean.includes(afClean))) return true;
+        if (dClean && a.department && (a.department.toLowerCase().includes(dClean) || dClean.includes(a.department.toLowerCase()))) return true;
+        return true;
+      });
+      setAssignments(filtered.length > 0 ? filtered : all);
     } catch (err) {
       console.warn('Failed to fetch assignments:', err);
     } finally {
@@ -57,33 +67,59 @@ const StaffAssignments = () => {
       setStaffSession(activeStaff);
 
       try {
-        const allocationResponse = await getMyFacultyAllocations().catch(() => ({ data: [] }));
+        const [allocationResponse, subjectResponse] = await Promise.all([
+          getMyFacultyAllocations().catch(() => ({ data: [] })),
+          getSubjects().catch(() => ({ data: [] }))
+        ]);
+
         const allocations = Array.isArray(allocationResponse?.data) ? allocationResponse.data : [];
-        const allocatedSubjects = allocations.map(alloc => alloc.subjectId).filter(Boolean);
-        const subjectNames = allocatedSubjects.map(sub => sub.subjectName || sub.name).filter(Boolean);
-        const uniqueSubjects = [...new Set(subjectNames)];
+        const rawSubjects = Array.isArray(subjectResponse?.data) ? subjectResponse.data : (subjectResponse.data?.data || []);
 
-        setDbSubjects(allocations);
-        setAvailableSubjects(uniqueSubjects.length > 0 ? uniqueSubjects : ['Relational Database Management Systems', 'Algorithms']);
+        const allocatedSubjectNames = allocations.map(alloc => alloc.subjectId?.subjectName || alloc.subjectId?.name || alloc.subjectName || alloc.subject).filter(Boolean);
+        
+        // Match subjects for this faculty's department or whole college
+        const staffDeptClean = (activeStaff.dept || activeStaff.department || '').toLowerCase().trim();
+        const deptSubjects = rawSubjects.filter(s => {
+          const sDept = (s.department || s.dept || '').toLowerCase().trim();
+          return !staffDeptClean || !sDept || sDept.includes(staffDeptClean) || staffDeptClean.includes(sDept);
+        });
 
-        const firstAllocation = allocations[0];
+        const allDbSubjectNames = (deptSubjects.length > 0 ? deptSubjects : rawSubjects)
+          .map(s => s.name || s.subjectName || s.subjectCode || s.code)
+          .filter(Boolean);
+
+        const sessionSubjects = Array.isArray(activeStaff.subjects) ? activeStaff.subjects : [];
+
+        const combinedSubjectNames = [
+          ...new Set([...allocatedSubjectNames, ...sessionSubjects, ...allDbSubjectNames])
+        ].filter(Boolean);
+
+        const effectiveSubjects = combinedSubjectNames.length > 0 ? combinedSubjectNames : ['Core Curriculum'];
+        const effectiveSemesters = [...new Set([
+          ...allocations.map(a => a.semester).filter(Boolean),
+          ...rawSubjects.map(s => s.semester ? `Semester ${String(s.semester).replace(/\D/g, '')}` : null).filter(Boolean)
+        ])];
+
+        setDbSubjects(rawSubjects.length > 0 ? rawSubjects : allocations);
+        setAvailableSubjects(effectiveSubjects);
+
         setForm(current => ({
           ...current,
-          subject: uniqueSubjects[0] || 'Relational Database Management Systems',
-          targetClass: firstAllocation?.semester || 'Semester 4'
+          subject: effectiveSubjects[0] || 'Core Curriculum',
+          targetClass: (effectiveSemesters.length > 0 ? effectiveSemesters[0] : current.targetClass) || 'Semester 1'
         }));
       } catch (error) {
         console.error('Failed to load assigned subjects:', error);
       }
 
-      fetchAssignments(activeStaff.name);
+      fetchAssignments(activeStaff.name, activeStaff.dept || activeStaff.department);
     };
     init();
   }, [navigate, fetchAssignments]);
 
   useRealtimeSync(() => {
     if (staffSession?.name) {
-      fetchAssignments(staffSession.name);
+      fetchAssignments(staffSession.name, staffSession.dept || staffSession.department);
     }
   }, 'assignments');
 
@@ -142,16 +178,20 @@ const StaffAssignments = () => {
   }, [assignments, search, activeFilterTab]);
 
   const allocatedSemesters = useMemo(() => {
-    const sems = dbSubjects.map(a => a.semester).filter(Boolean);
+    const sems = dbSubjects.map(a => a.semester ? (String(a.semester).toLowerCase().includes('sem') ? a.semester : `Semester ${a.semester}`) : null).filter(Boolean);
     return sems.length > 0 ? [...new Set(sems)] : ['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8'];
   }, [dbSubjects]);
 
   const handleSemesterChange = (semester) => {
+    const semNum = String(semester).replace(/\D/g, '');
     const semesterSubjects = [
       ...new Set(
         dbSubjects
-          .filter(a => a.semester === semester)
-          .map(a => a.subjectId?.subjectName || a.subjectId?.name)
+          .filter(a => {
+            const aSem = String(a.semester || a.sem || '').replace(/\D/g, '');
+            return aSem === semNum || a.semester === semester;
+          })
+          .map(a => a.name || a.subjectName || a.subjectCode || a.subjectId?.subjectName || a.subjectId?.name)
           .filter(Boolean)
       )
     ];
@@ -159,15 +199,15 @@ const StaffAssignments = () => {
     setForm(f => ({
       ...f,
       targetClass: semester,
-      subject: available[0] || f.subject
+      subject: available[0] || f.subject || availableSubjects[0]
     }));
   };
 
   const openAdd = () => {
     setForm({
       title: '',
-      subject: availableSubjects[0] || 'Relational Database Management Systems',
-      targetClass: allocatedSemesters[0] || 'Semester 4',
+      subject: availableSubjects[0] || 'Core Curriculum',
+      targetClass: allocatedSemesters[0] || 'Semester 1',
       description: '',
       dueDate: ''
     });
@@ -178,19 +218,21 @@ const StaffAssignments = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const newAssignment = {
-      subject: form.subject,
-      class: form.targetClass,
+      subject: form.subject || 'Core Curriculum',
+      class: form.targetClass || 'Semester 1',
+      semester: form.targetClass || 'Semester 1',
       title: form.title,
-      description: form.description,
-      dueDate: form.dueDate,
-      department: staffDept,
-      faculty: staffName,
+      description: form.description || '',
+      dueDate: form.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      department: staffDept || 'General',
+      faculty: staffName || 'Faculty',
       submissionsCount: 0
     };
 
     try {
       const res = await createAssignment(newAssignment);
-      setAssignments([res.data, ...assignments]);
+      const savedDoc = res.data || newAssignment;
+      setAssignments(prev => [savedDoc, ...prev.filter(a => (a._id || a.id) !== (savedDoc._id || savedDoc.id))]);
       setSaved(true);
       setTimeout(() => {
         setModalOpen(false);
@@ -200,7 +242,7 @@ const StaffAssignments = () => {
       console.error('Error creating assignment:', err);
       // Local optimistic fallback
       const localObj = { ...newAssignment, _id: 'asg_' + Date.now() };
-      setAssignments([localObj, ...assignments]);
+      setAssignments(prev => [localObj, ...prev]);
       setSaved(true);
       setTimeout(() => {
         setModalOpen(false);

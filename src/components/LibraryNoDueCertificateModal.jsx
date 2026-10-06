@@ -73,7 +73,19 @@ const LibraryNoDueCertificateModal = ({ isOpen, onClose, clearance, student }) =
               </div>
               
               <h2 style={{ margin: '6px 0 4px', fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                MARUDHAR KESARI JAIN COLLEGE FOR WOMEN
+                {(() => {
+                  try {
+                    const keys = ['student_session', 'librarian_session', 'admin_session', 'staff_session'];
+                    for (const k of keys) {
+                      const val = sessionStorage.getItem(k);
+                      if (val) {
+                        const s = JSON.parse(val);
+                        if (s.collegeName) return s.collegeName.toUpperCase();
+                      }
+                    }
+                  } catch(e) {}
+                  return 'CENTRAL INSTITUTIONAL LIBRARY';
+                })()}
               </h2>
               
               <div style={{ fontSize: '0.76rem', color: '#64748b', marginBottom: '18px' }}>

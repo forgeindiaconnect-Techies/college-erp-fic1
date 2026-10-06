@@ -33,11 +33,9 @@ const feeStructureSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Multitenancy & legacy compatibility support
     collegeId: {
       type: mongoose.Schema.Types.Mixed,
       ref: "College",
-      default: "COL001",
       index: true,
     },
     department: {

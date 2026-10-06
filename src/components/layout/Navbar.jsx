@@ -80,7 +80,6 @@ const Navbar = ({ role = 'Admin', onMenuToggle }) => {
             <Menu size={20} />
           </button>
         )}
-        <img src="/logo.svg" alt="ERPSYS Logo" className="navbar-logo" />
         <div className="navbar-greeting" style={{ display: 'flex', flexDirection: 'column' }}>
           <h3 style={{ fontSize: '1.15rem', fontWeight: 600, margin: 0, color: 'var(--text-main)', marginTop: '2px' }}>
             Welcome back, {userName}! 👋

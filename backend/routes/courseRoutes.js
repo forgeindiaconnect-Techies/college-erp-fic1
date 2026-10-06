@@ -3,7 +3,8 @@ import Course from "../models/Course.js";
 import Department from "../models/Department.js";
 import {
   protect,
-  authorize
+  authorize,
+  collegeScope
 } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -13,30 +14,23 @@ const getCollegeId = (user) => {
 };
 
 // Get courses belonging to the logged-in college
-router.get("/", protect, async (req, res) => {
+router.get("/", protect, collegeScope, async (req, res) => {
   try {
-    const collegeId = getCollegeId(req.user);
+    const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
 
     const filter = {};
     if (req.query.departmentId) {
       filter.departmentId = req.query.departmentId;
     }
 
-    let courses = await Course.find({
-      ...filter,
-      $or: [
-        { collegeId },
-        { collegeId: 'COL002-8379189' },
-        { collegeId: 'COL001' },
-        { collegeId: 'unassigned_college' },
-        { collegeId: null },
-        { collegeId: { $exists: false } }
-      ]
-    }).sort({ createdAt: -1 });
-
-    if (!courses || courses.length === 0) {
-      courses = await Course.find(filter).sort({ createdAt: -1 });
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      filter.$or = [
+        { collegeId: collegeId },
+        { tenantId: collegeId }
+      ];
     }
+
+    const courses = await Course.find(filter).sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,

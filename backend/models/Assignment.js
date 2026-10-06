@@ -3,30 +3,50 @@ import mongoose from 'mongoose';
 const assignmentSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   subject: {
     type: String,
-    required: true
+    default: 'General Subject',
+    trim: true
   },
   department: {
     type: String,
-    required: true
+    default: 'General',
+    trim: true
   },
-  class: { // Target Semester (e.g. "Sem 6")
+  class: { // Target Semester (e.g. "Sem 1", "Semester 1")
     type: String,
-    required: true
+    default: 'Semester 1',
+    trim: true
+  },
+  semester: {
+    type: String,
+    default: 'Semester 1',
+    trim: true
+  },
+  course: {
+    type: String,
+    default: '',
+    trim: true
   },
   description: {
-    type: String
+    type: String,
+    default: ''
   },
   dueDate: {
     type: Date,
-    required: true
+    default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   },
   faculty: {
     type: String,
-    required: true
+    default: 'Faculty',
+    trim: true
+  },
+  facultyId: {
+    type: String,
+    default: null
   },
   departmentId: {
     type: String,
@@ -42,11 +62,11 @@ const assignmentSchema = new mongoose.Schema({
   },
   section: {
     type: String,
-    required: true
+    default: 'All'
   },
   sectionId: {
     type: String,
-    required: true
+    default: null
   },
   submissionsCount: {
     type: Number,
@@ -54,7 +74,11 @@ const assignmentSchema = new mongoose.Schema({
   },
   collegeId: {
     type: String,
-    required: true
+    default: 'unassigned_college'
+  },
+  tenantId: {
+    type: String,
+    default: 'unassigned_college'
   }
 }, { timestamps: true });
 
