@@ -27,12 +27,11 @@ const ParentLogin = () => {
         return;
       }
 
-      sessionStorage.setItem('token', userData.token);
-      sessionStorage.setItem('user_session', JSON.stringify({
+      sessionStorage.setItem('parent_session', JSON.stringify({
         name: userData.name,
         email: userData.email,
-        childId: userData.referenceId,
-        childName: 'John Doe', // ideally fetched
+        childId: userData.referenceId || userData.parentOf,
+        childName: userData.childName || userData.studentName || '',
         role: 'Parent'
       }));
 

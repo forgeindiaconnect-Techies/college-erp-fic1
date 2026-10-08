@@ -86,11 +86,15 @@ const bookSchema = new mongoose.Schema({
 
   collegeId: {
     type: String,
-    required: true,
+    index: true
+  },
+  tenantId: {
+    type: String,
     index: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  strict: false
 });
 
 bookSchema.index({ collegeId: 1, bookId: 1 }, { unique: true });

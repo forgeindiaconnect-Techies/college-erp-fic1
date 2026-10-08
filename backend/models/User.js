@@ -15,7 +15,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Super Admin', 'Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff', 'Student', 'Parent', 'Accounts', 'Hostel', 'Driver', 'Watchman', 'Librarian', 'Library'],
+    enum: ['Super Admin', 'Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff', 'Student', 'Parent', 'Accounts', 'Hostel', 'Driver', 'Watchman', 'Librarian', 'Library', 'Placement', 'Placement Officer', 'Placement Cell'],
     required: true
   },
   name: {
@@ -65,8 +65,14 @@ const userSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Hash password before saving
+// Hash password and sync college identifiers before saving
 userSchema.pre('save', async function() {
+  if (!this.collegeId && this.tenantId) {
+    this.collegeId = this.tenantId;
+  }
+  if (!this.tenantId && this.collegeId) {
+    this.tenantId = this.collegeId;
+  }
   if (!this.isModified('password')) return;
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);

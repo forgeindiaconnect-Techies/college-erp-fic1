@@ -44,11 +44,14 @@ const libraryReturnRequestSchema = new mongoose.Schema(
     },
     collegeId: {
       type: String,
-      required: true,
+      index: true
+    },
+    tenantId: {
+      type: String,
       index: true
     }
   },
-  { timestamps: true }
+  { timestamps: true, strict: false }
 );
 
 libraryReturnRequestSchema.index({

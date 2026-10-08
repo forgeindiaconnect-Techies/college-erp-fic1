@@ -76,7 +76,7 @@ router.put('/college/:id/activate', protect, authorize('Super Admin'), async (re
 // Update College Details
 router.put('/college/:id', protect, authorize('Super Admin'), async (req, res) => {
   try {
-    const { name, collegeName, adminName, email, phone, principalName, principalEmail, subscriptionPlan, subscriptionStatus } = req.body;
+    const { name, collegeName, adminName, email, phone, principalName, principalEmail, subscriptionPlan, subscriptionStatus, subscriptionAmount, billingCycle } = req.body;
     const finalName = name || collegeName;
 
     let college = null;
@@ -96,6 +96,10 @@ router.put('/college/:id', protect, authorize('Super Admin'), async (req, res) =
     if (principalEmail) college.principalEmail = principalEmail.trim().toLowerCase();
     if (subscriptionPlan) college.subscriptionPlan = subscriptionPlan;
     if (subscriptionStatus) college.subscriptionStatus = subscriptionStatus;
+    if (subscriptionAmount !== undefined && subscriptionAmount !== null && subscriptionAmount !== '') {
+      college.subscriptionAmount = Number(subscriptionAmount);
+    }
+    if (billingCycle) college.billingCycle = billingCycle;
 
     await college.save();
 
@@ -123,14 +127,23 @@ router.get('/subscriptions', protect, authorize('Super Admin'), collegeScope, as
     const colleges = await College.find().sort({ createdAt: -1 });
     const subscriptions = colleges.map(c => {
       const liveStatus = calculateSubscriptionStatus(c);
+      const defaultAmount = liveStatus.planName === 'Elite' ? 35000 : (liveStatus.planName === 'Premium' ? 20000 : (liveStatus.planName === 'Basic' || liveStatus.planName === 'Starter' ? 10000 : 0));
+      const amount = (c.subscriptionAmount !== undefined && c.subscriptionAmount !== null && c.subscriptionAmount > 0)
+        ? c.subscriptionAmount
+        : defaultAmount;
       return {
-        _id: c._id, // we use collegeId as the primary identifier for these actions
+        _id: c._id,
         collegeId: c._id,
         collegeName: c.name,
         planName: liveStatus.planName,
+        amount,
+        billingCycle: c.billingCycle || 'Monthly',
         status: liveStatus.status,
         endDate: liveStatus.expiryDate,
-        daysRemaining: liveStatus.daysRemaining
+        daysRemaining: liveStatus.daysRemaining,
+        email: c.email,
+        phone: c.phone,
+        adminName: c.adminName
       };
     });
     res.json(subscriptions);
@@ -145,29 +158,64 @@ router.get('/subscriptions/:id', protect, authorize('Super Admin'), collegeScope
     const college = await College.findById(req.params.id);
     if (!college) return res.status(404).json({ message: 'College not found' });
     const liveStatus = calculateSubscriptionStatus(college);
+    const defaultAmount = liveStatus.planName === 'Elite' ? 35000 : (liveStatus.planName === 'Premium' ? 20000 : (liveStatus.planName === 'Basic' || liveStatus.planName === 'Starter' ? 10000 : 0));
+    const amount = (college.subscriptionAmount !== undefined && college.subscriptionAmount !== null && college.subscriptionAmount > 0)
+      ? college.subscriptionAmount
+      : defaultAmount;
     res.json({
       _id: college._id,
       collegeId: college._id,
       collegeName: college.name,
       planName: liveStatus.planName,
+      amount,
+      billingCycle: college.billingCycle || 'Monthly',
       status: liveStatus.status,
       endDate: liveStatus.expiryDate,
-      daysRemaining: liveStatus.daysRemaining
+      daysRemaining: liveStatus.daysRemaining,
+      email: college.email,
+      phone: college.phone,
+      adminName: college.adminName
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// Upgrade Subscription
+// Upgrade / Change Subscription Plan & Amount
 router.put('/subscriptions/:id/upgrade', protect, authorize('Super Admin'), collegeScope, async (req, res) => {
   try {
-    const { planName } = req.body;
-    const college = await College.findById(req.params.id);
+    const { planName, amount, billingCycle, durationMonths, customExpiryDate } = req.body || {};
+    let college = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      college = await College.findById(req.params.id);
+    }
+    if (!college) {
+      college = await College.findOne({ $or: [{ tenantId: req.params.id }, { name: req.params.id }] });
+    }
     if (!college) return res.status(404).json({ message: 'College not found' });
 
-    college.subscriptionPlan = planName;
+    const finalPlan = planName || college.subscriptionPlan || 'Premium';
+    let defaultAmount = finalPlan === 'Elite' ? 35000 : (finalPlan === 'Premium' ? 20000 : 10000);
+    const finalAmount = (amount !== undefined && amount !== null && amount !== '') ? Number(amount) : defaultAmount;
+    const months = durationMonths ? Number(durationMonths) : (billingCycle === 'Annually' ? 12 : (billingCycle === 'Quarterly' ? 3 : 1));
+
+    college.subscriptionPlan = finalPlan;
     college.subscriptionStatus = 'Active';
+    college.isActive = true;
+    college.subscriptionAmount = finalAmount;
+    college.billingCycle = billingCycle || (months === 12 ? 'Annually' : 'Monthly');
+    college.convertedToPaid = true;
+
+    // Calculate new expiration date
+    let newEnd;
+    if (customExpiryDate) {
+      newEnd = new Date(customExpiryDate);
+    } else {
+      const baseDate = new Date();
+      baseDate.setMonth(baseDate.getMonth() + months);
+      newEnd = baseDate;
+    }
+    college.trialEndDate = newEnd;
     await college.save();
 
     // Create or update subscription record
@@ -175,27 +223,36 @@ router.put('/subscriptions/:id/upgrade', protect, authorize('Super Admin'), coll
       tenantId: college.tenantId,
       collegeId: college._id,
       collegeName: college.name,
-      planName: planName,
-      amount: planName === 'Premium' ? 699 : (planName === 'Elite' ? 999 : 599),
+      planName: finalPlan,
+      amount: finalAmount,
       startDate: new Date(),
-      endDate: college.trialEndDate,
+      endDate: newEnd,
       status: 'Active',
       paymentStatus: 'Success',
-      transactionId: `TXN-UPG-${Date.now()}`
+      transactionId: `TXN-PLAN-${Date.now()}`
     });
     await subscription.save();
 
-    await sendNotification(req, {
-      tenantId: college.tenantId,
-      collegeId: college._id,
-      targetRoles: ['Admin', 'Principal'],
-      title: 'Plan Upgraded',
-      message: `Your subscription plan for ${college.name} has been upgraded to ${planName}.`,
-      type: 'Success'
-    });
+    try {
+      await sendNotification(req, {
+        tenantId: college.tenantId,
+        collegeId: college._id,
+        targetRoles: ['Admin', 'Principal'],
+        title: 'Plan Updated',
+        message: `Your subscription plan for ${college.name} has been set to ${finalPlan} (₹${finalAmount.toLocaleString('en-IN')}).`,
+        type: 'Success'
+      });
+    } catch (notifErr) {
+      console.error('[superadminRoutes] Notification send failed:', notifErr.message);
+    }
 
-    res.json({ message: 'Subscription upgraded successfully', subscription });
+    req.app.get('io')?.emit('dataUpdated', { module: 'subscriptions', action: 'updated', collegeId: college._id, planName: finalPlan });
+    req.app.get('io')?.emit('dataUpdated', { module: 'colleges', action: 'updated', collegeId: college._id, planName: finalPlan });
+    req.app.get('io')?.emit('dataUpdated', { module: 'trials', action: 'updated', collegeId: college._id, planName: finalPlan });
+
+    res.json({ message: 'Subscription plan and amount updated successfully', subscription, college });
   } catch (error) {
+    console.error('Upgrade subscription error:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -366,43 +423,73 @@ router.put('/trials/:collegeId/expire', protect, authorize('Super Admin'), colle
 // Convert Trial to Paid
 router.put('/trials/:collegeId/convert-to-paid', protect, authorize('Super Admin'), collegeScope, async (req, res) => {
   try {
-    const college = await College.findById(req.params.collegeId);
+    const { planName, amount, billingCycle, durationMonths, customExpiryDate } = req.body || {};
+    let college = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.collegeId)) {
+      college = await College.findById(req.params.collegeId);
+    }
+    if (!college) {
+      college = await College.findOne({ $or: [{ tenantId: req.params.collegeId }, { name: req.params.collegeId }] });
+    }
     if (!college) return res.status(404).json({ message: 'College not found' });
 
-    college.subscriptionPlan = 'Premium'; // Defaulting to premium on quick convert
+    const finalPlan = planName || 'Premium';
+    const defaultAmount = finalPlan === 'Elite' ? 35000 : (finalPlan === 'Premium' ? 20000 : 10000);
+    const finalAmount = (amount !== undefined && amount !== null && amount !== '') ? Number(amount) : defaultAmount;
+    const months = durationMonths ? Number(durationMonths) : (billingCycle === 'Annually' ? 12 : (billingCycle === 'Quarterly' ? 3 : 1));
+
+    college.subscriptionPlan = finalPlan;
     college.subscriptionStatus = 'Active';
+    college.isActive = true;
+    college.subscriptionAmount = finalAmount;
+    college.billingCycle = billingCycle || (months === 12 ? 'Annually' : 'Monthly');
     college.convertedToPaid = true;
     
-    // Add 1 year
-    const currentEnd = new Date();
-    college.trialEndDate = new Date(currentEnd.setFullYear(currentEnd.getFullYear() + 1));
+    let newEnd;
+    if (customExpiryDate) {
+      newEnd = new Date(customExpiryDate);
+    } else {
+      const currentStart = new Date();
+      currentStart.setMonth(currentStart.getMonth() + months);
+      newEnd = currentStart;
+    }
+    college.trialEndDate = newEnd;
     await college.save();
 
     const subscription = new Subscription({
       tenantId: college.tenantId,
       collegeId: college._id,
       collegeName: college.name,
-      planName: 'Premium',
-      amount: 699,
+      planName: finalPlan,
+      amount: finalAmount,
       startDate: new Date(),
-      endDate: college.trialEndDate,
+      endDate: newEnd,
       status: 'Active',
       paymentStatus: 'Success',
       transactionId: `TXN-CONV-${Date.now()}`
     });
     await subscription.save();
 
-    await sendNotification(req, {
-      tenantId: college.tenantId,
-      collegeId: college._id,
-      targetRoles: ['Admin', 'Principal'],
-      title: 'Subscription Upgraded',
-      message: 'Your college trial has been successfully converted to a Premium Paid Subscription.',
-      type: 'Success'
-    });
+    try {
+      await sendNotification(req, {
+        tenantId: college.tenantId,
+        collegeId: college._id,
+        targetRoles: ['Admin', 'Principal'],
+        title: 'Subscription Activated',
+        message: `Your college trial has been successfully converted to ${finalPlan} plan (₹${finalAmount.toLocaleString('en-IN')}).`,
+        type: 'Success'
+      });
+    } catch (notifErr) {
+      console.error('[superadminRoutes] Notification send failed:', notifErr.message);
+    }
 
-    res.json({ message: 'Trial converted to Paid successfully', college });
+    req.app.get('io')?.emit('dataUpdated', { module: 'subscriptions', action: 'updated', collegeId: college._id, planName: finalPlan });
+    req.app.get('io')?.emit('dataUpdated', { module: 'colleges', action: 'updated', collegeId: college._id, planName: finalPlan });
+    req.app.get('io')?.emit('dataUpdated', { module: 'trials', action: 'updated', collegeId: college._id, planName: finalPlan });
+
+    res.json({ message: 'Trial converted to Paid successfully', college, subscription });
   } catch (error) {
+    console.error('Convert trial error:', error);
     res.status(500).json({ message: error.message });
   }
 });

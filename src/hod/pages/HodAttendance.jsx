@@ -7,15 +7,13 @@ import './HodAttendance.css';
 // Try to grab logged in HOD session
 const getHodSession = () => {
   try {
-    return JSON.parse(sessionStorage.getItem('hod_session')) || {
-      name: 'Prof. Rajan Iyer', dept: 'Electrical Engg.', deptCode: 'EE', role: 'HOD'
-    };
+    const raw = sessionStorage.getItem('hod_session') || localStorage.getItem('erp_user');
+    if (raw) return JSON.parse(raw);
+    return { name: 'HOD', dept: 'TAMIL', role: 'HOD' };
   } catch (e) {
-    return { name: 'Prof. Rajan Iyer', dept: 'Electrical Engg.', deptCode: 'EE', role: 'HOD' };
+    return { name: 'HOD', dept: 'TAMIL', role: 'HOD' };
   }
 };
-
-const MOCK_STUDENTS_FALLBACK = [];
 
 const SEMESTERS = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6', 'Sem 7', 'Sem 8'];
 

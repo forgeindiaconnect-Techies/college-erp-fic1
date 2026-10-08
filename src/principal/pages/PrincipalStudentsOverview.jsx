@@ -89,7 +89,7 @@ export default function PrincipalStudentsOverview() {
           name: s.name || 'Enrolled Student',
           dept: s.dept || s.department || 'General',
           sem: s.sem || s.semester || 'Semester 1',
-          cgpa: s.cgpa != null ? Number(s.cgpa) : 8.2,
+          cgpa: s.cgpa != null ? Number(s.cgpa) : 0,
           attendance: attendancePercentage,
           arrears: arrearsMap[sid] || 0,
           status: s.status || 'Active',

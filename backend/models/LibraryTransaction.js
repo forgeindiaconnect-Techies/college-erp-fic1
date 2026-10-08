@@ -1,4 +1,4 @@
-﻿import mongoose from 'mongoose';
+import mongoose from 'mongoose';
 
 const libraryTransactionSchema = new mongoose.Schema({
   bookId: {
@@ -12,8 +12,9 @@ const libraryTransactionSchema = new mongoose.Schema({
     index: true
   },
   userId: { type: String, required: true }, // referenceId for student/staff
-  userType: { type: String, enum: ['Student', 'Staff'], required: true },
+  userType: { type: String, default: 'Student' },
   requestDate: { type: Date, default: Date.now },
+  approvedDate: { type: Date },
   issueDate: { type: Date },
   dueDate: { type: Date },
   returnDate: { type: Date },
@@ -21,11 +22,11 @@ const libraryTransactionSchema = new mongoose.Schema({
   finePaid: { type: Number, default: 0 },
   fineStatus: { type: String, enum: ['No Fine', 'Pending', 'Paid'], default: 'No Fine' },
   finePaidDate: { type: Date },
-  status: { type: String, enum: ['Pending', 'Issued', 'Returned', 'Overdue', 'Rejected'], default: 'Pending' },
-  collegeId: { type: String, index: true }
-}, { timestamps: true });
+  status: { type: String, enum: ['Pending', 'Approved', 'Reserved', 'Issued', 'Returned', 'Overdue', 'Rejected', 'Cancelled', 'Completed'], default: 'Pending' },
+  collegeId: { type: String, index: true },
+  tenantId: { type: String, index: true }
+}, { timestamps: true, strict: false });
 
 const LibraryTransaction = mongoose.model('LibraryTransaction', libraryTransactionSchema);
 
 export default LibraryTransaction;
-

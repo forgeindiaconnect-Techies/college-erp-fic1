@@ -14,7 +14,7 @@ async function updateCollegeName() {
     await mongoose.connect(MONGO_URI);
     console.log('Connected to Database successfully!');
 
-    const collegeName = 'Marudhar Kesari Jain College for Women';
+    const collegeName = 'TEST';
 
     // 1. Update only default tenant COL001
     const collegeRes = await College.updateMany({ tenantId: 'COL001' }, { $set: { name: collegeName } });

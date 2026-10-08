@@ -9,7 +9,9 @@ const placementApplicationSchema = new mongoose.Schema({
   cgpa: { type: Number }, // CGPA
   company: { type: String, required: true },
   role: { type: String, required: true },
-  status: { type: String, enum: ['Applied', 'Shortlisted', 'Waitlisted', 'Rejected'], default: 'Applied' }
+  status: { type: String, default: 'Applied' },
+  currentRound: { type: Number, default: 1 },
+  roundEvaluations: { type: mongoose.Schema.Types.Mixed, default: {} }
 , collegeId: { type: String } }, { timestamps: true });
 
 export default mongoose.model('PlacementApplication', placementApplicationSchema);

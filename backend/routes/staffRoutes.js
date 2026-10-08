@@ -13,7 +13,7 @@ import { sendNotification } from '../utils/notificationHelper.js';
 const router = express.Router();
 
 // Get all staff
-router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), departmentScope, collegeScope, async (req, res) => {
+router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts', 'Librarian', 'Library'), departmentScope, collegeScope, async (req, res) => {
   try {
     const dept = req.dept || req.query.dept;
     const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
@@ -313,14 +313,30 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), r
 // Approve staff
 router.put('/:id/approve', protect, authorize('Admin', 'Principal'), collegeScope, checkSubscription, async (req, res) => {
   try {
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    let query = {
+      $or: [
+        { id: req.params.id },
+        ...(mongoose.Types.ObjectId.isValid(req.params.id) ? [{ _id: req.params.id }] : [])
+      ]
+    };
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      query = {
+        $and: [
+          query,
+          { $or: [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }] }
+        ]
+      };
+    }
+
     const updatedStaff = await Staff.findOneAndUpdate(
-      { id: req.params.id },
+      query,
       { status: 'Active' },
       { new: true }
     );
     
     if (!updatedStaff) return res.status(404).json({ message: 'Staff not found' });
-    const collegeId = req.collegeId || req.user.collegeId || 'unassigned_college';
+    const collegeId = targetCollegeId || 'unassigned_college';
 
     // Update approval document if exists
     await Approval.findOneAndUpdate(
@@ -342,8 +358,8 @@ router.put('/:id/approve', protect, authorize('Admin', 'Principal'), collegeScop
       });
     }
 
-    req.app.get('io').emit('staffUpdated', { action: 'approved', staff: updatedStaff });
-    req.app.get('io').emit('dataUpdated', { module: 'staff', action: 'updated' });
+    req.app.get('io')?.emit('staffUpdated', { action: 'approved', staff: updatedStaff });
+    req.app.get('io')?.emit('dataUpdated', { module: 'staff', action: 'updated' });
 
     res.json({ message: 'Staff approved successfully', staff: updatedStaff });
   } catch (err) {
@@ -354,13 +370,30 @@ router.put('/:id/approve', protect, authorize('Admin', 'Principal'), collegeScop
 // Update staff
 router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), requirePermission('manage_staff'), collegeScope, checkSubscription, async (req, res) => {
   try {
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    let query = {
+      $or: [
+        { id: req.params.id },
+        ...(mongoose.Types.ObjectId.isValid(req.params.id) ? [{ _id: req.params.id }] : [])
+      ]
+    };
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      query = {
+        $and: [
+          query,
+          { $or: [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }] }
+        ]
+      };
+    }
+
     const updatedStaff = await Staff.findOneAndUpdate(
-      { id: req.params.id },
+      query,
       req.body,
       { new: true }
     );
     
-    const collegeId = req.collegeId || req.user.collegeId || 'unassigned_college';
+    if (!updatedStaff) return res.status(404).json({ message: 'Staff not found' });
+    const collegeId = targetCollegeId || 'unassigned_college';
 
     if (updatedStaff && updatedStaff.email) {
       const user = await User.findOne({ referenceId: updatedStaff.id });
@@ -382,8 +415,8 @@ router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'),
       }
     }
 
-    req.app.get('io').emit('staffUpdated', { action: 'updated', staff: updatedStaff });
-    req.app.get('io').emit('dataUpdated', { module: 'staff', action: 'updated' });
+    req.app.get('io')?.emit('staffUpdated', { action: 'updated', staff: updatedStaff });
+    req.app.get('io')?.emit('dataUpdated', { module: 'staff', action: 'updated' });
     res.json(updatedStaff);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -393,8 +426,25 @@ router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'),
 // Delete staff
 router.delete('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), requirePermission('manage_staff'), collegeScope, checkSubscription, async (req, res) => {
   try {
-    const deletedStaff = await Staff.findOneAndDelete({ id: req.params.id });
-    const collegeId = req.collegeId || req.user.collegeId || 'unassigned_college';
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    let query = {
+      $or: [
+        { id: req.params.id },
+        ...(mongoose.Types.ObjectId.isValid(req.params.id) ? [{ _id: req.params.id }] : [])
+      ]
+    };
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      query = {
+        $and: [
+          query,
+          { $or: [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }] }
+        ]
+      };
+    }
+
+    const deletedStaff = await Staff.findOneAndDelete(query);
+    if (!deletedStaff) return res.status(404).json({ message: 'Staff not found' });
+    const collegeId = targetCollegeId || 'unassigned_college';
 
     if (deletedStaff && deletedStaff.email) {
       await User.findOneAndDelete({ email: deletedStaff.email });
@@ -410,8 +460,8 @@ router.delete('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD
         });
       }
     }
-    req.app.get('io').emit('staffUpdated', { action: 'deleted', id: req.params.id });
-    req.app.get('io').emit('dataUpdated', { module: 'staff', action: 'deleted' });
+    req.app.get('io')?.emit('staffUpdated', { action: 'deleted', id: req.params.id });
+    req.app.get('io')?.emit('dataUpdated', { module: 'staff', action: 'deleted' });
     res.json({ message: 'Staff deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });

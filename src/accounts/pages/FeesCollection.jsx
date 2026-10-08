@@ -77,7 +77,7 @@ const printReceipt = (record, receiptNoOrPayment, feeTypeArg, semesterArg, amoun
     <body>
       <div class="receipt-container">
         <div class="receipt-header">
-          <h1>${(typeof window !== 'undefined' && (JSON.parse(sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || '{}')?.collegeName)) || 'Institution Portal'}</h1>
+          <h1>${(typeof window !== 'undefined' && (JSON.parse(sessionStorage.getItem('accounts_session') || '{}')?.collegeName)) || 'Institution Portal'}</h1>
           <p>Official Student Fee Payment Receipt</p>
         </div>
         <div class="receipt-metadata">

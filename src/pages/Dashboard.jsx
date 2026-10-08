@@ -38,22 +38,14 @@ import api from '../api';
 import './Dashboard.css';
 import CollegeInfoCard from '../components/common/CollegeInfoCard';
 
-const MOCK_ATTENDANCE = [
-  { name: 'Mon', students: 95, staff: 98 },
-  { name: 'Tue', students: 92, staff: 97 },
-  { name: 'Wed', students: 96, staff: 99 },
-  { name: 'Thu', students: 89, staff: 95 },
-  { name: 'Fri', students: 98, staff: 100 },
-  { name: 'Sat', students: 85, staff: 90 },
-];
-
-const MOCK_CGPA = [
-  { semester: 'Sem 1', avg: 7.8, top: 9.5 },
-  { semester: 'Sem 2', avg: 8.1, top: 9.6 },
-  { semester: 'Sem 3', avg: 7.9, top: 9.4 },
-  { semester: 'Sem 4', avg: 8.3, top: 9.8 },
-  { semester: 'Sem 5', avg: 8.5, top: 9.9 },
-  { semester: 'Sem 6', avg: 8.4, top: 9.7 },
+// Real-time zeroed weekly structure
+const DEFAULT_WEEK_ATTENDANCE = [
+  { name: 'Mon', students: 0, staff: 0 },
+  { name: 'Tue', students: 0, staff: 0 },
+  { name: 'Wed', students: 0, staff: 0 },
+  { name: 'Thu', students: 0, staff: 0 },
+  { name: 'Fri', students: 0, staff: 0 },
+  { name: 'Sat', students: 0, staff: 0 },
 ];
 
 const Dashboard = () => {
@@ -222,14 +214,21 @@ const Dashboard = () => {
     };
   });
 
-  // Use real attendance trends, fallback to MOCK if totally empty
-  const attendanceData = attendanceTrends && attendanceTrends.length > 0 ? attendanceTrends : MOCK_ATTENDANCE;
+  // Use real attendance trends, fallback to zeroed week if empty
+  const attendanceData = attendanceTrends && attendanceTrends.length > 0 ? attendanceTrends : DEFAULT_WEEK_ATTENDANCE;
 
-  // Dynamically calculate CGPA data if students exist, else use MOCK data
-  const cgpaData = students.length > 0 ? [
-    ...MOCK_CGPA.slice(0, 5),
-    { semester: 'Current', avg: Number((students.reduce((sum, s) => sum + (s.cgpa || 0), 0) / students.length).toFixed(1)), top: Math.max(...students.map(s => s.cgpa || 0)) }
-  ] : MOCK_CGPA;
+  // Dynamically calculate CGPA data from real student records
+  const semestersList = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6'];
+  const cgpaData = semestersList.map(sem => {
+    const semStudents = students.filter(s => (s.sem || s.semester) === sem);
+    const avg = semStudents.length > 0 
+      ? Number((semStudents.reduce((sum, s) => sum + (Number(s.cgpa) || 0), 0) / semStudents.length).toFixed(1))
+      : 0;
+    const top = semStudents.length > 0 
+      ? Math.max(...semStudents.map(s => Number(s.cgpa) || 0))
+      : 0;
+    return { semester: sem, avg, top };
+  });
 
   // Always use live subscription from backend API
   const isTrial = subscription?.isTrial ?? false;

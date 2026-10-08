@@ -75,7 +75,22 @@ const AccountsDashboard = () => {
   useEffect(() => {
     const session = sessionStorage.getItem('accounts_session');
     if (!session) { navigate('/accounts/login'); return; }
-    setAccountsSession(JSON.parse(session));
+    try {
+      const parsed = JSON.parse(session);
+      setAccountsSession(parsed);
+
+      import('../../api/index').then(({ getMyProfile }) => {
+        getMyProfile().then(res => {
+          if (res?.data?.collegeName && res.data.collegeName !== parsed.collegeName) {
+            parsed.collegeName = res.data.collegeName;
+            setAccountsSession({ ...parsed });
+            sessionStorage.setItem('accounts_session', JSON.stringify(parsed));
+          }
+        }).catch(() => {});
+      });
+    } catch (e) {
+      setAccountsSession({});
+    }
     fetchAll().finally(() => setLoading(false));
   }, [navigate]);
 

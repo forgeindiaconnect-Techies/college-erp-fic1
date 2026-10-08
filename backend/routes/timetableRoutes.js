@@ -4,6 +4,7 @@ import Timetable from '../models/Timetable.js';
 import FacultyAllocation from '../models/FacultyAllocation.js';
 import Staff from '../models/Staff.js';
 import Substitution from '../models/Substitution.js';
+import ClassSession from '../models/ClassSession.js';
 import { protect, authorize, collegeScope } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -11,14 +12,25 @@ const router = express.Router();
 router.get('/my-schedule', protect, collegeScope, async (req, res) => {
   try {
     // 1. Find matching Staff documents for logged-in user
-    const staffDocs = await Staff.find({
-      $or: [
-        { id: req.user.referenceId },
-        { staffId: req.user.referenceId },
-        { email: req.user.email },
-        { name: new RegExp('^' + (req.user.name || '').trim() + '$', 'i') }
-      ]
-    });
+    const orConditions = [];
+    if (req.user.referenceId) {
+      orConditions.push({ id: req.user.referenceId });
+      orConditions.push({ staffId: req.user.referenceId });
+    }
+    if (req.user.email) {
+      orConditions.push({ email: req.user.email });
+    }
+    if (req.user.name && req.user.name.trim()) {
+      orConditions.push({ name: new RegExp('^' + req.user.name.trim() + '$', 'i') });
+    }
+
+    let staffDocs = [];
+    if (orConditions.length > 0) {
+      staffDocs = await Staff.find({
+        collegeId: req.collegeId,
+        $or: orConditions
+      });
+    }
 
     const targetStaffIds = staffDocs.map(s => s._id);
     if (req.user.referenceId && mongoose.Types.ObjectId.isValid(req.user.referenceId)) {
@@ -28,12 +40,60 @@ router.get('/my-schedule', protect, collegeScope, async (req, res) => {
       targetStaffIds.push(new mongoose.Types.ObjectId(req.user._id));
     }
 
+    if (targetStaffIds.length === 0) {
+      return res.json([]);
+    }
+
     // 2. Find Faculty Allocations
     const allocations = await FacultyAllocation.find({
       staffId: { $in: targetStaffIds }
     });
 
     const allocIds = allocations.map(a => a._id);
+    if (allocIds.length === 0) {
+      // Check for active substitutions before returning
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todaySubstitutions = await Substitution.find({
+        collegeId: req.collegeId,
+        substituteStaffId: { $in: targetStaffIds },
+        status: 'Active'
+      })
+      .populate('periodId')
+      .populate({
+        path: 'timetableId',
+        populate: ['subjectId']
+      })
+      .populate('originalStaffId')
+      .populate('substituteStaffId');
+
+      const todaySessions = await ClassSession.find({
+        collegeId: { $in: [req.collegeId, 'unassigned_college', 'mock_college_id'] },
+        date: todayStr
+      });
+
+      const subArray = todaySubstitutions
+        .filter(sub => sub.timetableId)
+        .map(sub => {
+          const sess = todaySessions.find(s => s.timetableId?.toString() === sub.timetableId._id?.toString());
+          return {
+            ...sub.timetableId.toObject(),
+            isSubstitution: true,
+            originalStaffName: sub.originalStaffId?.name,
+            substituteStaffName: sub.substituteStaffId?.name,
+            substitutionReason: sub.reason,
+            session: sess ? {
+              _id: sess._id,
+              status: sess.status,
+              startTime: sess.startTime,
+              endTime: sess.endTime,
+              attendanceSubmitted: sess.attendanceSubmitted || false
+            } : null,
+            status: sess ? sess.status : 'Pending'
+          };
+        });
+
+      return res.json(subArray);
+    }
 
     // 3. Find Regular Timetable slots
     let schedule = await Timetable.find({ 
@@ -84,8 +144,29 @@ router.get('/my-schedule', protect, collegeScope, async (req, res) => {
         }
       }
     }
+
+    // Attach real-time session status for today
+    const todaySessions = await ClassSession.find({
+      collegeId: { $in: [req.collegeId, 'unassigned_college', 'mock_college_id'] },
+      date: todayStr
+    });
+
+    const enrichedSchedule = scheduleArray.map(slot => {
+      const sess = todaySessions.find(s => s.timetableId?.toString() === slot._id.toString());
+      return {
+        ...slot,
+        session: sess ? {
+          _id: sess._id,
+          status: sess.status,
+          startTime: sess.startTime,
+          endTime: sess.endTime,
+          attendanceSubmitted: sess.attendanceSubmitted || false
+        } : null,
+        status: sess ? sess.status : 'Pending'
+      };
+    });
     
-    res.json(scheduleArray);
+    res.json(enrichedSchedule);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -94,10 +175,12 @@ router.get('/my-schedule', protect, collegeScope, async (req, res) => {
 router.get('/', protect, collegeScope, async (req, res) => {
   try {
     const filter = { collegeId: req.collegeId };
-    if (req.query.department) filter.department = req.query.department;
-    if (req.query.semester) filter.semester = req.query.semester;
-    if (req.query.section) filter.section = req.query.section;
-    if (req.query.day) filter.day = req.query.day;
+    if (req.query.department && req.query.department !== 'All') {
+      filter.department = new RegExp('^' + req.query.department.trim() + '$', 'i');
+    }
+    if (req.query.semester && req.query.semester !== 'All') filter.semester = req.query.semester;
+    if (req.query.section && req.query.section !== 'All') filter.section = req.query.section;
+    if (req.query.day && req.query.day !== 'All') filter.day = req.query.day;
 
     const timetables = await Timetable.find(filter)
       .populate('periodId')
@@ -110,8 +193,30 @@ router.get('/', protect, collegeScope, async (req, res) => {
         ]
       })
       .sort({ day: 1 });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todaySessions = await ClassSession.find({
+      collegeId: { $in: [req.collegeId, 'unassigned_college', 'mock_college_id'] },
+      date: todayStr
+    });
+
+    const enrichedTimetables = timetables.map(t => {
+      const tObj = t.toObject();
+      const sess = todaySessions.find(s => s.timetableId?.toString() === tObj._id.toString());
+      return {
+        ...tObj,
+        session: sess ? {
+          _id: sess._id,
+          status: sess.status,
+          startTime: sess.startTime,
+          endTime: sess.endTime,
+          attendanceSubmitted: sess.attendanceSubmitted || false
+        } : null,
+        status: sess ? sess.status : 'Pending'
+      };
+    });
       
-    res.json(timetables);
+    res.json(enrichedTimetables);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

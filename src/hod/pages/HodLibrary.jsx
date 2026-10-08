@@ -25,7 +25,10 @@ import {
   GraduationCap,
   Filter,
   Eye,
-  FileCheck
+  FileCheck,
+  Briefcase,
+  UserCheck,
+  Award
 } from 'lucide-react';
 import {
   AreaChart,
@@ -42,6 +45,8 @@ import {
   issueLibraryBook,
   rejectLibraryRequest,
   getStudents,
+  getStaff,
+  getAllStaff,
   getLibraryBorrowers,
   getLibraryReturnRequests,
   approveLibraryReturnRequest,
@@ -97,16 +102,21 @@ const HodLibrary = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [circulationSearch, setCirculationSearch] = useState('');
+  const [staffCirculationSearch, setStaffCirculationSearch] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
   const [activeTab, setActiveTab] = useState('Department Catalog');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [circulationStatus, setCirculationStatus] = useState('All');
+  const [staffCirculationStatus, setStaffCirculationStatus] = useState('All');
   const [catalogScope, setCatalogScope] = useState('department'); // 'department' | 'all'
+  const [circulationScope, setCirculationScope] = useState('department'); // 'department' | 'all'
+  const [staffCirculationScope, setStaffCirculationScope] = useState('department'); // 'department' | 'all'
 
   const [books, setBooks] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [students, setStudents] = useState([]);
+  const [staffList, setStaffList] = useState([]);
   const [returnRequests, setReturnRequests] = useState([]);
   const [clearances, setClearances] = useState([]);
   const [processingId, setProcessingId] = useState(null);
@@ -126,11 +136,12 @@ const HodLibrary = () => {
     try {
       setLoading(true);
 
-      const [booksRes, txRes, resRes, stdRes, borrowersRes, returnRes, clearanceRes] = await Promise.all([
+      const [booksRes, txRes, resRes, stdRes, staffRes, borrowersRes, returnRes, clearanceRes] = await Promise.all([
         getLibraryBooks().catch(() => ({ data: [] })),
         getAllLibraryTransactions().catch(() => ({ data: [] })),
         getLibraryReservations().catch(() => ({ data: [] })),
         getStudents().catch(() => ({ data: [] })),
+        getAllStaff ? getAllStaff().catch(() => ({ data: [] })) : getStaff().catch(() => ({ data: [] })),
         getLibraryBorrowers().catch(() => ({ data: [] })),
         getLibraryReturnRequests().catch(() => ({ data: [] })),
         getLibraryClearanceRequests().catch(() => ({ data: [] }))
@@ -144,6 +155,7 @@ const HodLibrary = () => {
         : Array.isArray(stdRes.data?.students)
         ? stdRes.data.students
         : [];
+      const rawStaff = Array.isArray(staffRes.data) ? staffRes.data : [];
       const rawBorrowers = Array.isArray(borrowersRes.data) ? borrowersRes.data : [];
       const rawReturn = Array.isArray(returnRes.data) ? returnRes.data : [];
       const rawClearance = Array.isArray(clearanceRes.data) ? clearanceRes.data : [];
@@ -167,6 +179,7 @@ const HodLibrary = () => {
       setTransactions(rawTx);
       setReservations(rawRes);
       setStudents(combinedStudents);
+      setStaffList(rawStaff);
       setReturnRequests(rawReturn);
       setClearances(rawClearance);
     } catch (err) {
@@ -285,11 +298,38 @@ const HodLibrary = () => {
     });
   };
 
+  const getStaffObj = (userId) => {
+    if (!userId) return null;
+    const uidStr = String(userId).trim().toLowerCase();
+    return staffList.find((s) => {
+      const sId = String(s.id || '').trim().toLowerCase();
+      const sStaffId = String(s.staffId || '').trim().toLowerCase();
+      const sMongo = String(s._id || '').trim().toLowerCase();
+      const sEmail = String(s.email || '').trim().toLowerCase();
+      const sName = String(s.name || '').trim().toLowerCase();
+      return (
+        (sId && sId === uidStr) ||
+        (sStaffId && sStaffId === uidStr) ||
+        (sMongo && sMongo === uidStr) ||
+        (sEmail && sEmail === uidStr) ||
+        (sName && sName === uidStr)
+      );
+    });
+  };
+
   const getStudentDisplay = (userId) => {
     const student = getStudentObj(userId);
     return {
       name: student?.name || student?.fullName || userId,
       details: `${student?.rollNo || student?.studentId || userId} • ${student?.dept || student?.department || 'Student'}`
+    };
+  };
+
+  const getStaffDisplay = (userId) => {
+    const staff = getStaffObj(userId);
+    return {
+      name: staff?.name || userId,
+      details: `${staff?.id || staff?.staffId || userId} • ${staff?.designation || staff?.role || staff?.dept || 'Faculty Member'}`
     };
   };
 
@@ -311,13 +351,14 @@ const HodLibrary = () => {
     reservations.forEach((r) => {
       if (['Pending', 'Approved', 'Reserved'].includes(r.status)) {
         const student = getStudentObj(r.userId);
-        const stdDept = student?.department || student?.dept || '';
+        const staff = getStaffObj(r.userId);
+        const userDept = student?.department || student?.dept || staff?.department || staff?.dept || '';
         const bkDept = r.bookId?.department || r.bookId?.category || '';
 
         const matchDept =
           !hodDept ||
           hodDept === 'All' ||
-          matchesDepartment(stdDept, hodDept) ||
+          matchesDepartment(userDept, hodDept) ||
           matchesDepartment(bkDept, hodDept);
 
         if (matchDept) {
@@ -334,13 +375,14 @@ const HodLibrary = () => {
     transactions.forEach((t) => {
       if (['Pending', 'Approved', 'Reserved'].includes(t.status)) {
         const student = getStudentObj(t.userId);
-        const stdDept = student?.department || student?.dept || '';
+        const staff = getStaffObj(t.userId);
+        const userDept = student?.department || student?.dept || staff?.department || staff?.dept || '';
         const bkDept = t.bookId?.department || t.bookId?.category || '';
 
         const matchDept =
           !hodDept ||
           hodDept === 'All' ||
-          matchesDepartment(stdDept, hodDept) ||
+          matchesDepartment(userDept, hodDept) ||
           matchesDepartment(bkDept, hodDept);
 
         if (matchDept) {
@@ -356,24 +398,25 @@ const HodLibrary = () => {
     });
 
     return Array.from(map.values());
-  }, [reservations, transactions, students, hodDept]);
+  }, [reservations, transactions, students, staffList, hodDept]);
 
   /* Filtered Return Requests */
   const pendingReturnRequests = useMemo(() => {
     return returnRequests.filter((r) => {
       const student = getStudentObj(r.userId);
-      const stdDept = student?.department || student?.dept || '';
+      const staff = getStaffObj(r.userId);
+      const userDept = student?.department || student?.dept || staff?.department || staff?.dept || '';
       const bkDept = r.bookId?.department || r.bookId?.category || '';
 
       const matchDept =
         !hodDept ||
         hodDept === 'All' ||
-        matchesDepartment(stdDept, hodDept) ||
+        matchesDepartment(userDept, hodDept) ||
         matchesDepartment(bkDept, hodDept);
 
       return matchDept;
     });
-  }, [returnRequests, students, hodDept]);
+  }, [returnRequests, students, staffList, hodDept]);
 
   /* Dynamic KPI Metrics */
   const totalBookCopies = useMemo(() => {
@@ -386,36 +429,39 @@ const HodLibrary = () => {
       const s = String(t.status || '').toLowerCase();
       if (!['issued', 'overdue', 'return requested', 'return pending', 'active', 'borrowed'].includes(s)) return false;
       const student = getStudentObj(t.userId);
-      const stdDept = student?.department || student?.dept || '';
+      const staff = getStaffObj(t.userId);
+      const userDept = student?.department || student?.dept || staff?.department || staff?.dept || '';
       const bkDept = t.bookId?.department || t.bookId?.category || '';
-      return !hodDept || hodDept === 'All' || matchesDepartment(stdDept, hodDept) || matchesDepartment(bkDept, hodDept);
+      return !hodDept || hodDept === 'All' || matchesDepartment(userDept, hodDept) || matchesDepartment(bkDept, hodDept);
     }).length;
-  }, [transactions, students, hodDept]);
+  }, [transactions, students, staffList, hodDept]);
 
   const overdueCount = useMemo(() => {
     return transactions.filter((t) => {
       const s = String(t.status || '').toLowerCase();
       if (s !== 'overdue') return false;
       const student = getStudentObj(t.userId);
-      const stdDept = student?.department || student?.dept || '';
+      const staff = getStaffObj(t.userId);
+      const userDept = student?.department || student?.dept || staff?.department || staff?.dept || '';
       const bkDept = t.bookId?.department || t.bookId?.category || '';
-      return !hodDept || hodDept === 'All' || matchesDepartment(stdDept, hodDept) || matchesDepartment(bkDept, hodDept);
+      return !hodDept || hodDept === 'All' || matchesDepartment(userDept, hodDept) || matchesDepartment(bkDept, hodDept);
     }).length;
-  }, [transactions, students, hodDept]);
+  }, [transactions, students, staffList, hodDept]);
 
   const activeReadersCount = useMemo(() => {
     const uniqueBorrowers = new Set(
       transactions
         .filter((t) => {
           const student = getStudentObj(t.userId);
-          const stdDept = student?.department || student?.dept || '';
+          const staff = getStaffObj(t.userId);
+          const userDept = student?.department || student?.dept || staff?.department || staff?.dept || '';
           const bkDept = t.bookId?.department || t.bookId?.category || '';
-          return !hodDept || hodDept === 'All' || matchesDepartment(stdDept, hodDept) || matchesDepartment(bkDept, hodDept);
+          return !hodDept || hodDept === 'All' || matchesDepartment(userDept, hodDept) || matchesDepartment(bkDept, hodDept);
         })
         .map((t) => t.userId)
     );
     return uniqueBorrowers.size;
-  }, [transactions, students, hodDept]);
+  }, [transactions, students, staffList, hodDept]);
 
   /* Dynamic Top Books */
   const topBooks = useMemo(() => {
@@ -499,16 +545,19 @@ const HodLibrary = () => {
     });
   }, [displayBooksList, search, selectedCategory]);
 
-  const [circulationScope, setCirculationScope] = useState('department'); // 'department' | 'all'
-
-  /* Filtered Live Circulation */
-  const filteredCirculation = useMemo(() => {
+  /* Filtered Student Circulation (Dedicated Tab) */
+  const filteredStudentCirculation = useMemo(() => {
     const activeStatuses = [
       'issued', 'overdue', 'returned', 'return requested', 
-      'return pending', 'active', 'borrowed', 'approved'
+      'return pending', 'active', 'borrowed', 'approved', 'completed'
     ];
 
     return transactions
+      .filter((t) => {
+        // Exclude staff transactions
+        const isStaff = t.userType === 'Staff' || Boolean(getStaffObj(t.userId));
+        return !isStaff;
+      })
       .filter((t) => {
         const s = String(t.status || '').trim().toLowerCase();
         return activeStatuses.includes(s) || s.includes('issue') || s.includes('return') || s.includes('overdue');
@@ -520,12 +569,7 @@ const HodLibrary = () => {
         const stdDept = student?.department || student?.dept || '';
         const bkDept = t.bookId?.department || t.bookId?.category || '';
 
-        const matchDept =
-          matchesDepartment(stdDept, hodDept) ||
-          matchesDepartment(bkDept, hodDept);
-
-        // If department match found keep it; otherwise allow if scope is all
-        return matchDept;
+        return matchesDepartment(stdDept, hodDept) || matchesDepartment(bkDept, hodDept);
       })
       .filter((t) => {
         const student = getStudentObj(t.userId);
@@ -542,14 +586,76 @@ const HodLibrary = () => {
           String(t.bookCopyId?.accessionNumber || '').toLowerCase().includes(q);
 
         const tStatus = String(t.status || '').toLowerCase();
-        const matchStatus =
-          circulationStatus === 'All' ||
-          tStatus === circulationStatus.toLowerCase() ||
-          (circulationStatus === 'Return Requested' && (tStatus.includes('return') && !tStatus.includes('returned')));
+        let matchStatus = true;
+        if (circulationStatus === 'Active') {
+          matchStatus = ['issued', 'active', 'borrowed'].includes(tStatus);
+        } else if (circulationStatus === 'Returned') {
+          matchStatus = tStatus === 'returned' || Boolean(t.returnDate);
+        } else if (circulationStatus === 'Overdue') {
+          matchStatus = tStatus === 'overdue';
+        } else if (circulationStatus === 'Return Requested') {
+          matchStatus = tStatus.includes('return') && !tStatus.includes('returned');
+        }
 
         return matchSearch && matchStatus;
       });
-  }, [transactions, students, hodDept, circulationSearch, circulationStatus, circulationScope]);
+  }, [transactions, students, staffList, hodDept, circulationSearch, circulationStatus, circulationScope]);
+
+  /* Filtered Faculty / Staff Circulation (Dedicated Tab) */
+  const filteredStaffCirculation = useMemo(() => {
+    const activeStatuses = [
+      'issued', 'overdue', 'returned', 'return requested', 
+      'return pending', 'active', 'borrowed', 'approved', 'completed'
+    ];
+
+    return transactions
+      .filter((t) => {
+        // Include only staff transactions
+        const isStaff = t.userType === 'Staff' || Boolean(getStaffObj(t.userId));
+        return isStaff;
+      })
+      .filter((t) => {
+        const s = String(t.status || '').trim().toLowerCase();
+        return activeStatuses.includes(s) || s.includes('issue') || s.includes('return') || s.includes('overdue');
+      })
+      .filter((t) => {
+        if (staffCirculationScope === 'all' || !hodDept || hodDept === 'All') return true;
+
+        const staff = getStaffObj(t.userId);
+        const staffDept = staff?.department || staff?.dept || '';
+        const bkDept = t.bookId?.department || t.bookId?.category || '';
+
+        return matchesDepartment(staffDept, hodDept) || matchesDepartment(bkDept, hodDept);
+      })
+      .filter((t) => {
+        const staff = getStaffObj(t.userId);
+        const name = (staff?.name || String(t.userId || '')).toLowerCase();
+        const title = (t.bookId?.title || '').toLowerCase();
+        const q = staffCirculationSearch.toLowerCase();
+
+        const matchSearch =
+          !staffCirculationSearch ||
+          name.includes(q) ||
+          title.includes(q) ||
+          String(t.userId || '').toLowerCase().includes(q) ||
+          String(t.bookCopyId?.barcode || '').toLowerCase().includes(q) ||
+          String(t.bookCopyId?.accessionNumber || '').toLowerCase().includes(q);
+
+        const tStatus = String(t.status || '').toLowerCase();
+        let matchStatus = true;
+        if (staffCirculationStatus === 'Active') {
+          matchStatus = ['issued', 'active', 'borrowed'].includes(tStatus);
+        } else if (staffCirculationStatus === 'Returned') {
+          matchStatus = tStatus === 'returned' || Boolean(t.returnDate);
+        } else if (staffCirculationStatus === 'Overdue') {
+          matchStatus = tStatus === 'overdue';
+        } else if (staffCirculationStatus === 'Return Requested') {
+          matchStatus = tStatus.includes('return') && !tStatus.includes('returned');
+        }
+
+        return matchSearch && matchStatus;
+      });
+  }, [transactions, staffList, hodDept, staffCirculationSearch, staffCirculationStatus, staffCirculationScope]);
 
   /* Department Students Library Roster */
   const departmentStudentsRoster = useMemo(() => {
@@ -572,7 +678,7 @@ const HodLibrary = () => {
         const overdueHeld = studentTx.filter((t) => t.status === 'Overdue');
         const pendingReqs = reservations.filter((r) => {
           const rid = String(r.userId || '');
-          return rid && (rid === sId || rid === sRoll || rid === String(s._id)) && ['Pending', 'Reserved'].includes(r.status);
+          return rid && (rid === sId || rid === sRoll || rid === String(r._id)) && ['Pending', 'Reserved'].includes(r.status);
         });
 
         const totalFine = studentTx.reduce((sum, t) => {
@@ -619,7 +725,7 @@ const HodLibrary = () => {
             Department Library Operations
           </h1>
           <p>
-            Monitor department catalog inventory, active circulations, and process student book requests & returns.
+            Monitor department catalog inventory, student & faculty circulation, return timelines, and process loan requests.
           </p>
         </div>
 
@@ -681,7 +787,7 @@ const HodLibrary = () => {
           <div className="hod-kpi-info">
             <span className="hod-kpi-label">Currently Issued</span>
             <span className="hod-kpi-value">{currentlyIssuedCount}</span>
-            <span className="hod-kpi-sub">In circulation with students</span>
+            <span className="hod-kpi-sub">Students & faculty loans</span>
           </div>
           <div className="hod-kpi-icon teal">
             <BookOpen size={22} />
@@ -808,14 +914,15 @@ const HodLibrary = () => {
         </div>
       </div>
 
-      {/* TABS BAR */}
+      {/* SEPARATED TABS BAR */}
       <div className="hod-tabs-bar">
         {[
-          { key: 'Department Catalog', label: 'Department Catalog', count: displayBooksList.length },
-          { key: 'Live Circulation', label: 'Live Circulation', count: filteredCirculation.length },
-          { key: 'Reservations', label: 'Issue Requests', count: pendingIssueRequests.length, alert: pendingIssueRequests.length > 0 },
-          { key: 'Return Requests', label: 'Return Requests', count: pendingReturnRequests.length, alertAmber: pendingReturnRequests.length > 0 },
-          { key: 'Department Students', label: 'Department Students', count: departmentStudentsRoster.length }
+          { key: 'Department Catalog', label: 'Department Catalog', count: displayBooksList.length, icon: <Book size={15} /> },
+          { key: 'Student Circulation', label: 'Student Circulation', count: filteredStudentCirculation.length, icon: <GraduationCap size={15} /> },
+          { key: 'Faculty Circulation', label: 'Faculty / Staff Circulation', count: filteredStaffCirculation.length, icon: <Briefcase size={15} /> },
+          { key: 'Reservations', label: 'Issue Requests', count: pendingIssueRequests.length, alert: pendingIssueRequests.length > 0, icon: <Clock size={15} /> },
+          { key: 'Return Requests', label: 'Return Requests', count: pendingReturnRequests.length, alertAmber: pendingReturnRequests.length > 0, icon: <RotateCcw size={15} /> },
+          { key: 'Department Students', label: 'Department Students Roster', count: departmentStudentsRoster.length, icon: <Users size={15} /> }
         ].map((tab) => (
           <button
             key={tab.key}
@@ -824,7 +931,10 @@ const HodLibrary = () => {
               activeTab === tab.key ? 'active' : ''
             }`}
           >
-            <span>{tab.label}</span>
+            <span className="flex items-center gap-1.5">
+              {tab.icon}
+              {tab.label}
+            </span>
             <span
               className={`badge-counter ${
                 tab.alert
@@ -1001,8 +1111,8 @@ const HodLibrary = () => {
           </div>
         )}
 
-        {/* TAB 2: LIVE CIRCULATION */}
-        {activeTab === 'Live Circulation' && (
+        {/* TAB 2: STUDENT CIRCULATION (SEPARATE STUDENT SECTION) */}
+        {activeTab === 'Student Circulation' && (
           <div className="animate-fade-in flex flex-col gap-4">
             <div className="hod-table-toolbar">
               <div className="hod-search-box">
@@ -1023,14 +1133,14 @@ const HodLibrary = () => {
                     onClick={() => setCirculationScope('department')}
                     className={`px-3 py-1.5 rounded-md transition-all ${circulationScope === 'department' ? 'bg-indigo-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-indigo-600'}`}
                   >
-                    Department Circulation
+                    Department Students
                   </button>
                   <button
                     type="button"
                     onClick={() => setCirculationScope('all')}
                     className={`px-3 py-1.5 rounded-md transition-all ${circulationScope === 'all' ? 'bg-indigo-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-indigo-600'}`}
                   >
-                    All College Circulation ({transactions.length})
+                    All College Students ({transactions.filter(t => t.userType !== 'Staff').length})
                   </button>
                 </div>
 
@@ -1040,10 +1150,10 @@ const HodLibrary = () => {
                   onChange={(e) => setCirculationStatus(e.target.value)}
                 >
                   <option value="All">All Statuses</option>
-                  <option value="Issued">Issued</option>
+                  <option value="Active">Not Returned (Active Loans)</option>
+                  <option value="Returned">Returned Books</option>
                   <option value="Overdue">Overdue</option>
                   <option value="Return Requested">Return Requested</option>
-                  <option value="Returned">Returned</option>
                 </select>
               </div>
             </div>
@@ -1053,37 +1163,45 @@ const HodLibrary = () => {
                 <table className="hod-erp-table">
                   <thead>
                     <tr>
-                      <th>Borrower Info</th>
-                      <th>Book Title</th>
+                      <th>Borrower Student</th>
+                      <th>Book Title & Details</th>
                       <th>Physical Copy</th>
                       <th>Issue Date</th>
                       <th>Due Date</th>
+                      <th>Return Status & Date</th>
                       <th>Fine Status</th>
-                      <th>Circulation Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCirculation.length === 0 ? (
+                    {filteredStudentCirculation.length === 0 ? (
                       <tr>
                         <td colSpan="7" className="p-8 text-center text-muted">
-                          <BookOpen size={28} className="mx-auto text-slate-400 mb-2" />
-                          <p className="font-semibold text-slate-700">No circulation records matching the filter.</p>
-                          {circulationScope === 'department' && transactions.length > 0 && (
+                          <GraduationCap size={28} className="mx-auto text-slate-400 mb-2" />
+                          <p className="font-semibold text-slate-700">No student circulation records found matching the filter.</p>
+                          {circulationScope === 'department' && (
                             <button
                               type="button"
                               onClick={() => setCirculationScope('all')}
                               className="mt-2 text-xs font-bold text-indigo-600 underline"
                             >
-                              Switch to All College Circulation ({transactions.length} Records)
+                              Switch to All College Students
                             </button>
                           )}
                         </td>
                       </tr>
                     ) : (
-                      filteredCirculation.map((issue) => {
+                      filteredStudentCirculation.map((issue) => {
                         const borrower = getStudentDisplay(issue.userId);
+                        const isReturned = issue.status === 'Returned' || Boolean(issue.returnDate);
                         const isOverdue = issue.status === 'Overdue';
+                        const isIssued = issue.status === 'Issued';
+                        const isReturnRequested = issue.status === 'Return Requested' || issue.status === 'Return Pending';
+                        const isApproved = issue.status === 'Approved';
                         const fine = Number(issue.fineAmount || 0);
+
+                        const returnDateFormatted = issue.returnDate ? new Date(issue.returnDate).toLocaleDateString('en-GB') : null;
+                        const issueDateFormatted = issue.issueDate ? new Date(issue.issueDate).toLocaleDateString('en-GB') : (issue.requestDate ? new Date(issue.requestDate).toLocaleDateString('en-GB') : '-');
+                        const dueDateFormatted = issue.dueDate ? new Date(issue.dueDate).toLocaleDateString('en-GB') : '-';
 
                         return (
                           <tr key={issue._id}>
@@ -1099,8 +1217,11 @@ const HodLibrary = () => {
                             </td>
 
                             <td style={{ minWidth: '200px' }}>
-                              <span className="font-semibold text-[var(--text-main)]">
+                              <span className="font-semibold text-[var(--text-main)] block">
                                 {issue.bookId?.title || 'Catalog Book'}
+                              </span>
+                              <span className="text-xs text-muted">
+                                {issue.bookId?.author ? `By ${issue.bookId.author}` : ''}
                               </span>
                             </td>
 
@@ -1111,9 +1232,7 @@ const HodLibrary = () => {
                             </td>
 
                             <td className="text-sm text-muted">
-                              {issue.issueDate
-                                ? new Date(issue.issueDate).toLocaleDateString()
-                                : '-'}
+                              {issueDateFormatted}
                             </td>
 
                             <td className="text-sm">
@@ -1124,10 +1243,41 @@ const HodLibrary = () => {
                                     : 'text-muted'
                                 }
                               >
-                                {issue.dueDate
-                                  ? new Date(issue.dueDate).toLocaleDateString()
-                                  : '-'}
+                                {dueDateFormatted}
                               </span>
+                            </td>
+
+                            {/* RETURN STATUS & EXACT RETURN DATE */}
+                            <td>
+                              {isReturned ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+                                  <CheckCircle2 size={12} className="text-emerald-600" />
+                                  Returned on {returnDateFormatted || issueDateFormatted}
+                                </span>
+                              ) : isOverdue ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 bg-red-500/10 text-red-600 border border-red-500/20">
+                                  <AlertTriangle size={12} />
+                                  Not Returned (Overdue)
+                                </span>
+                              ) : isIssued ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 bg-blue-500/10 text-blue-700 border border-blue-500/20">
+                                  <Clock size={12} className="text-blue-600" />
+                                  Not Returned (Active Loan)
+                                </span>
+                              ) : isReturnRequested ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 bg-amber-500/10 text-amber-700 border border-amber-500/20">
+                                  <RotateCcw size={12} className="text-amber-600" />
+                                  Return In Verification
+                                </span>
+                              ) : isApproved ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 bg-indigo-500/10 text-indigo-700 border border-indigo-500/20">
+                                  Approved (Awaiting Collection)
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
+                                  {issue.status || 'Pending'}
+                                </span>
+                              )}
                             </td>
 
                             <td>
@@ -1137,23 +1287,9 @@ const HodLibrary = () => {
                                 </span>
                               ) : (
                                 <span className="text-xs font-semibold text-emerald-600">
-                                  ₹0
+                                  ₹0 (No Dues)
                                 </span>
                               )}
-                            </td>
-
-                            <td>
-                              <span
-                                className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                                  isOverdue
-                                    ? 'bg-red-500/10 text-red-600'
-                                    : issue.status === 'Returned'
-                                      ? 'bg-emerald-500/10 text-emerald-600'
-                                      : 'bg-indigo-500/10 text-indigo-600'
-                                }`}
-                              >
-                                {issue.status}
-                              </span>
                             </td>
                           </tr>
                         );
@@ -1166,7 +1302,199 @@ const HodLibrary = () => {
           </div>
         )}
 
-        {/* TAB 3: ISSUE REQUESTS (RESERVATIONS) */}
+        {/* TAB 3: FACULTY / STAFF CIRCULATION (SEPARATE STAFF SECTION) */}
+        {activeTab === 'Faculty Circulation' && (
+          <div className="animate-fade-in flex flex-col gap-4">
+            <div className="hod-table-toolbar">
+              <div className="hod-search-box">
+                <Search size={18} className="text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search by faculty name, staff ID, book title, barcode..."
+                  value={staffCirculationSearch}
+                  onChange={(e) => setStaffCirculationSearch(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Staff Circulation Scope Switcher */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setStaffCirculationScope('department')}
+                    className={`px-3 py-1.5 rounded-md transition-all ${staffCirculationScope === 'department' ? 'bg-indigo-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-indigo-600'}`}
+                  >
+                    Department Faculty
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStaffCirculationScope('all')}
+                    className={`px-3 py-1.5 rounded-md transition-all ${staffCirculationScope === 'all' ? 'bg-indigo-600 text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-indigo-600'}`}
+                  >
+                    All College Faculty ({transactions.filter(t => t.userType === 'Staff' || Boolean(getStaffObj(t.userId))).length})
+                  </button>
+                </div>
+
+                <select
+                  className="hod-select-filter"
+                  value={staffCirculationStatus}
+                  onChange={(e) => setStaffCirculationStatus(e.target.value)}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Active">Not Returned (Active Loans)</option>
+                  <option value="Returned">Returned Books</option>
+                  <option value="Overdue">Overdue</option>
+                  <option value="Return Requested">Return Requested</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="hod-table-card">
+              <div className="overflow-x-auto">
+                <table className="hod-erp-table">
+                  <thead>
+                    <tr>
+                      <th>Borrower Faculty / Staff</th>
+                      <th>Book Title & Details</th>
+                      <th>Physical Copy</th>
+                      <th>Issue Date</th>
+                      <th>Due Date</th>
+                      <th>Return Status & Date</th>
+                      <th>Fine Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStaffCirculation.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="p-8 text-center text-muted">
+                          <Briefcase size={28} className="mx-auto text-slate-400 mb-2" />
+                          <p className="font-semibold text-slate-700">No faculty borrowing records found.</p>
+                          <p className="text-xs text-muted mt-1">Books issued to or reserved by department teachers/staff will be tracked here.</p>
+                          {staffCirculationScope === 'department' && (
+                            <button
+                              type="button"
+                              onClick={() => setStaffCirculationScope('all')}
+                              className="mt-2 text-xs font-bold text-indigo-600 underline"
+                            >
+                              Switch to All College Faculty
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredStaffCirculation.map((issue) => {
+                        const borrower = getStaffDisplay(issue.userId);
+                        const isReturned = issue.status === 'Returned' || Boolean(issue.returnDate);
+                        const isOverdue = issue.status === 'Overdue';
+                        const isIssued = issue.status === 'Issued';
+                        const isReturnRequested = issue.status === 'Return Requested' || issue.status === 'Return Pending';
+                        const isApproved = issue.status === 'Approved';
+                        const fine = Number(issue.fineAmount || 0);
+
+                        const returnDateFormatted = issue.returnDate ? new Date(issue.returnDate).toLocaleDateString('en-GB') : null;
+                        const issueDateFormatted = issue.issueDate ? new Date(issue.issueDate).toLocaleDateString('en-GB') : (issue.requestDate ? new Date(issue.requestDate).toLocaleDateString('en-GB') : '-');
+                        const dueDateFormatted = issue.dueDate ? new Date(issue.dueDate).toLocaleDateString('en-GB') : '-';
+
+                        return (
+                          <tr key={issue._id}>
+                            <td>
+                              <div className="flex flex-col">
+                                <span className="font-bold text-[var(--text-main)]">
+                                  {borrower.name}
+                                </span>
+                                <span className="text-xs text-muted">
+                                  {borrower.details}
+                                </span>
+                              </div>
+                            </td>
+
+                            <td style={{ minWidth: '200px' }}>
+                              <span className="font-semibold text-[var(--text-main)] block">
+                                {issue.bookId?.title || 'Catalog Book'}
+                              </span>
+                              <span className="text-xs text-muted">
+                                {issue.bookId?.author ? `By ${issue.bookId.author}` : ''}
+                              </span>
+                            </td>
+
+                            <td>
+                              <span className="text-xs font-mono text-muted">
+                                {issue.bookCopyId?.accessionNumber || issue.bookCopyId?.barcode || '-'}
+                              </span>
+                            </td>
+
+                            <td className="text-sm text-muted">
+                              {issueDateFormatted}
+                            </td>
+
+                            <td className="text-sm">
+                              <span
+                                className={
+                                  isOverdue
+                                    ? 'text-red-600 font-bold'
+                                    : 'text-muted'
+                                }
+                              >
+                                {dueDateFormatted}
+                              </span>
+                            </td>
+
+                            {/* RETURN STATUS & EXACT RETURN DATE */}
+                            <td>
+                              {isReturned ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+                                  <CheckCircle2 size={12} className="text-emerald-600" />
+                                  Returned on {returnDateFormatted || issueDateFormatted}
+                                </span>
+                              ) : isOverdue ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 bg-red-500/10 text-red-600 border border-red-500/20">
+                                  <AlertTriangle size={12} />
+                                  Not Returned (Overdue)
+                                </span>
+                              ) : isIssued ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 bg-blue-500/10 text-blue-700 border border-blue-500/20">
+                                  <Clock size={12} className="text-blue-600" />
+                                  Not Returned (Active Loan)
+                                </span>
+                              ) : isReturnRequested ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 bg-amber-500/10 text-amber-700 border border-amber-500/20">
+                                  <RotateCcw size={12} className="text-amber-600" />
+                                  Return In Verification
+                                </span>
+                              ) : isApproved ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1 bg-indigo-500/10 text-indigo-700 border border-indigo-500/20">
+                                  Approved (Awaiting Collection)
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
+                                  {issue.status || 'Pending'}
+                                </span>
+                              )}
+                            </td>
+
+                            <td>
+                              {fine > 0 ? (
+                                <span className="text-xs font-bold text-red-600">
+                                  ₹{fine}
+                                </span>
+                              ) : (
+                                <span className="text-xs font-semibold text-emerald-600">
+                                  ₹0 (No Dues)
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: ISSUE REQUESTS (RESERVATIONS) */}
         {activeTab === 'Reservations' && (
           <div className="animate-fade-in">
             <div className="hod-table-card">
@@ -1175,6 +1503,7 @@ const HodLibrary = () => {
                   <thead>
                     <tr>
                       <th>Borrower Info</th>
+                      <th>Borrower Role</th>
                       <th>Book Requested</th>
                       <th>Department</th>
                       <th>Request Date</th>
@@ -1184,15 +1513,16 @@ const HodLibrary = () => {
                   <tbody>
                     {pendingIssueRequests.length === 0 ? (
                       <tr>
-                        <td colSpan="5" className="p-10 text-center text-muted">
+                        <td colSpan="6" className="p-10 text-center text-muted">
                           <CheckCircle2 size={32} className="mx-auto text-emerald-500 mb-2" />
                           <p className="font-bold text-[var(--text-main)]">No Pending Issue Requests</p>
-                          <p className="text-xs text-muted mt-1">All student book requests have been processed.</p>
+                          <p className="text-xs text-muted mt-1">All student and faculty book requests have been processed.</p>
                         </td>
                       </tr>
                     ) : (
                       pendingIssueRequests.map((req) => {
-                        const borrower = getStudentDisplay(req.userId);
+                        const isStaff = req.userType === 'Staff' || Boolean(getStaffObj(req.userId));
+                        const borrower = isStaff ? getStaffDisplay(req.userId) : getStudentDisplay(req.userId);
                         const isApproved = req.status === 'Approved';
 
                         return (
@@ -1206,6 +1536,12 @@ const HodLibrary = () => {
                                   {borrower.details}
                                 </span>
                               </div>
+                            </td>
+
+                            <td>
+                              <span className={`px-2 py-0.5 rounded text-xs font-bold ${isStaff ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}>
+                                {isStaff ? 'Faculty' : 'Student'}
+                              </span>
                             </td>
 
                             <td style={{ minWidth: '220px' }}>
@@ -1251,7 +1587,7 @@ const HodLibrary = () => {
           </div>
         )}
 
-        {/* TAB 4: RETURN REQUESTS */}
+        {/* TAB 5: RETURN REQUESTS */}
         {activeTab === 'Return Requests' && (
           <div className="animate-fade-in">
             <div className="hod-table-card">
@@ -1259,7 +1595,8 @@ const HodLibrary = () => {
                 <table className="hod-erp-table">
                   <thead>
                     <tr>
-                      <th>Student</th>
+                      <th>Borrower</th>
+                      <th>Role</th>
                       <th>Book & Allocated Copy</th>
                       <th>Issue / Due Date</th>
                       <th>Fine Amount</th>
@@ -1270,7 +1607,7 @@ const HodLibrary = () => {
                   <tbody>
                     {pendingReturnRequests.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="p-10 text-center text-muted">
+                        <td colSpan="7" className="p-10 text-center text-muted">
                           <CheckCircle2 size={32} className="mx-auto text-emerald-500 mb-2" />
                           <p className="font-bold text-[var(--text-main)]">No Pending Return Requests</p>
                           <p className="text-xs text-muted mt-1">All physical return requests have been acknowledged.</p>
@@ -1278,7 +1615,8 @@ const HodLibrary = () => {
                       </tr>
                     ) : (
                       pendingReturnRequests.map((request) => {
-                        const borrower = getStudentDisplay(request.userId);
+                        const isStaff = request.userType === 'Staff' || Boolean(getStaffObj(request.userId));
+                        const borrower = isStaff ? getStaffDisplay(request.userId) : getStudentDisplay(request.userId);
                         const transaction = request.transactionId || {};
                         const fine = Number(transaction.fineAmount || 0);
 
@@ -1293,6 +1631,12 @@ const HodLibrary = () => {
                                   {borrower.details}
                                 </span>
                               </div>
+                            </td>
+
+                            <td>
+                              <span className={`px-2 py-0.5 rounded text-xs font-bold ${isStaff ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}>
+                                {isStaff ? 'Faculty' : 'Student'}
+                              </span>
                             </td>
 
                             <td style={{ minWidth: '220px' }}>
@@ -1346,7 +1690,7 @@ const HodLibrary = () => {
           </div>
         )}
 
-        {/* TAB 5: DEPARTMENT STUDENTS LIBRARY ROSTER */}
+        {/* TAB 6: DEPARTMENT STUDENTS LIBRARY ROSTER */}
         {activeTab === 'Department Students' && (
           <div className="animate-fade-in flex flex-col gap-4">
             <div className="hod-table-toolbar">

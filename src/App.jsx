@@ -66,6 +66,7 @@ import HostelManagement from './pages/hostel/HostelManagement';
 import HostelDashboard from './pages/hostel/HostelDashboard';
 import HostelLayout from './hostel/components/HostelLayout';
 import PlacementManagement from './pages/placement/PlacementManagement';
+import PlacementOfficerManagement from './pages/placement/PlacementOfficerManagement';
 import AdminAssignments from './pages/assignments/AdminAssignments';
 import AccountsOfficerManagement from './pages/accounts-officer/AccountsOfficerManagement';
 import AIAssistant from './pages/ai/AIAssistant';
@@ -181,6 +182,7 @@ import ParentFees from './parent/pages/ParentFees';
 import ParentNotifications from './parent/pages/ParentNotifications';
 import ParentLeaves from './parent/pages/ParentLeaves';
 import ParentTimetable from './parent/pages/ParentTimetable';
+import ParentTransport from './parent/pages/ParentTransport';
 
 import UpgradePlan from './pages/UpgradePlan';
 import AdminSubscription from './pages/AdminSubscription';
@@ -218,6 +220,8 @@ import DriverAttendance from './driver/pages/DriverAttendance';
 // Librarian Layout & Pages
 import LibrarianLayout from './librarian/components/LibrarianLayout';
 import LibrarianDashboard from './librarian/pages/LibrarianDashboard';
+import PlacementLayout, { PlacementGuard } from './placement/components/PlacementLayout';
+import PlacementDashboard from './placement/pages/PlacementDashboard';
 
 import Unauthorized from './pages/Unauthorized';
 
@@ -227,7 +231,7 @@ export const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {
 export const SettingsContext = createContext({ collegeSettings: null, setCollegeSettings: () => {} });
 
 const hasAnyOtherSession = (excludeKey) => {
-  const keys = ['superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session', 'hostel_session', 'watchman_session', 'librarian_session'];
+  const keys = ['superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session', 'hostel_session', 'watchman_session', 'librarian_session', 'placement_session'];
   return keys.some(key => key !== excludeKey && sessionStorage.getItem(key));
 };
 
@@ -320,7 +324,7 @@ function App() {
 
   // Derive the active token to re-trigger settings fetch on login / logout
   const getActiveToken = () => {
-    const keys = ['superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token', 'hostel_token', 'watchman_token', 'librarian_token'];
+    const keys = ['superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token', 'hostel_token', 'watchman_token', 'librarian_token', 'placement_token'];
     for (const key of keys) {
       const val = sessionStorage.getItem(key);
       if (val) return val;
@@ -470,6 +474,7 @@ function App() {
               <Route path="hostel"        element={<HostelDashboard />} />
               <Route path="hostel-dashboard" element={<HostelDashboard />} />
               <Route path="placement"     element={<PlacementManagement />} />
+              <Route path="placement-management" element={<PlacementOfficerManagement />} />
               <Route path="assignments"   element={<AdminAssignments />} />
               <Route path="accounts-management" element={<AccountsOfficerManagement />} />
               <Route path="ai"            element={<AIAssistant />} />
@@ -578,6 +583,8 @@ function App() {
               <Route path="notifications" element={<ParentNotifications />} />
               <Route path="leaves" element={<ParentLeaves />} />
               <Route path="timetable" element={<ParentTimetable />} />
+              <Route path="exams" element={<ParentTimetable />} />
+              <Route path="transport" element={<ParentTransport />} />
             </Route>
 
             {/* ── ACCOUNTS ROUTES ── */}
@@ -645,6 +652,20 @@ function App() {
               <Route path="digital" element={<LibrarianDashboard defaultTab="Digital Library" />} />
               <Route path="members" element={<LibrarianDashboard defaultTab="Student Members" />} />
               <Route path="reports" element={<LibrarianDashboard defaultTab="Fines & Analytics" />} />
+            </Route>
+
+            {/* ── PLACEMENT OFFICER ROUTES ── */}
+            <Route path="/placement" element={<PlacementGuard><GlobalLockdown><PlacementLayout /></GlobalLockdown></PlacementGuard>}>
+              <Route index element={<Navigate to="/placement/dashboard" replace />} />
+              <Route path="dashboard" element={<PlacementDashboard defaultTab="Dashboard" />} />
+              <Route path="companies" element={<PlacementDashboard defaultTab="Companies" />} />
+              <Route path="jobs" element={<PlacementDashboard defaultTab="Job Openings" />} />
+              <Route path="applications" element={<PlacementDashboard defaultTab="Applications" />} />
+              <Route path="eligibility" element={<PlacementDashboard defaultTab="Eligibility Tracker" />} />
+              <Route path="training" element={<PlacementDashboard defaultTab="Training Programs" />} />
+              <Route path="interviews" element={<PlacementDashboard defaultTab="Interviews" />} />
+              <Route path="selections" element={<PlacementDashboard defaultTab="Selected Students" />} />
+              <Route path="reports" element={<PlacementDashboard defaultTab="Reports" />} />
             </Route>
           </Routes>
         </BrowserRouter>

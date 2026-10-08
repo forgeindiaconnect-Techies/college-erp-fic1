@@ -81,12 +81,28 @@ router.all('/purge-all', protect, authorize('Admin', 'Sub Admin', 'Principal', '
 // Get student by ID
 router.get('/:id', protect, collegeScope, async (req, res) => {
   try {
+    const targetCollegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
     // If Student or Parent, they can only view their own record
     if ((req.user.role === 'Student' || req.user.role === 'Parent') && req.user.referenceId !== req.params.id) {
       return res.status(403).json({ message: 'Unauthorized to view this record' });
     }
     
-    const student = await Student.findOne({ id: req.params.id });
+    let query = {
+      $or: [
+        { id: req.params.id },
+        ...(mongoose.Types.ObjectId.isValid(req.params.id) ? [{ _id: req.params.id }] : [])
+      ]
+    };
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      query = {
+        $and: [
+          query,
+          { $or: [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }] }
+        ]
+      };
+    }
+
+    const student = await Student.findOne(query);
     if (!student) return res.status(404).json({ message: 'Student not found' });
     
     // If HOD/Staff, ensure they can only view students in their dept
@@ -689,14 +705,25 @@ router.put('/:id/payment/:paymentId', protect, authorize('Admin', 'Sub Admin', '
 router.delete('/:id/payment/:paymentId', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, deleteAdmissionPayment);
 
 // Update student
-
 router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts', 'Hostel'), requirePermission('manage_students'), collegeScope, checkSubscription, async (req, res) => {
   try {
     const studentId = req.params.id;
-    let query = { id: studentId };
-    if (mongoose.Types.ObjectId.isValid(studentId)) {
-      query = { $or: [{ id: studentId }, { _id: studentId }] };
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    let query = {
+      $or: [
+        { id: studentId },
+        ...(mongoose.Types.ObjectId.isValid(studentId) ? [{ _id: studentId }] : [])
+      ]
+    };
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      query = {
+        $and: [
+          query,
+          { $or: [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }] }
+        ]
+      };
     }
+
     const updatedStudent = await Student.findOneAndUpdate(
       query,
       req.body,
@@ -724,7 +751,7 @@ router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 
         }
       }
 
-      const collegeId = req.collegeId || req.user.collegeId || 'unassigned_college';
+      const collegeId = targetCollegeId || 'unassigned_college';
       const studentUser = await User.findOne({ referenceId: updatedStudent.id });
       if (studentUser) {
         await sendNotification(req, {
@@ -750,12 +777,24 @@ router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 
 router.delete('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, async (req, res) => {
   try {
     const studentId = req.params.id;
-    let query = { id: studentId };
-    if (mongoose.Types.ObjectId.isValid(studentId)) {
-      query = { $or: [{ id: studentId }, { _id: studentId }] };
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    let query = {
+      $or: [
+        { id: studentId },
+        ...(mongoose.Types.ObjectId.isValid(studentId) ? [{ _id: studentId }] : [])
+      ]
+    };
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      query = {
+        $and: [
+          query,
+          { $or: [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }] }
+        ]
+      };
     }
+
     const deletedStudent = await Student.findOneAndDelete(query);
-    const collegeId = req.collegeId || req.user.collegeId || 'unassigned_college';
+    const collegeId = targetCollegeId || 'unassigned_college';
 
     if (deletedStudent && deletedStudent.email) {
       await User.findOneAndDelete({ email: deletedStudent.email });
@@ -784,12 +823,15 @@ router.delete('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD
 // Purge all student records
 router.post('/purge-all', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, async (req, res) => {
   try {
-    const collegeId = req.collegeId || req.user.collegeId || 'unassigned_college';
-    const students = await Student.find({});
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId || 'unassigned_college';
+    const filter = (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system')
+      ? { $or: [{ collegeId }, { tenantId: collegeId }] }
+      : {};
+    const students = await Student.find(filter);
     const emails = students.map(s => s.email).filter(Boolean);
     const ids = students.map(s => s.id).filter(Boolean);
 
-    await Student.deleteMany({});
+    await Student.deleteMany(filter);
     if (emails.length > 0) {
       await User.deleteMany({ email: { $in: emails }, role: 'Student' });
     }
@@ -808,6 +850,8 @@ router.post('/purge-all', protect, authorize('Admin', 'Sub Admin', 'Principal', 
     res.status(500).json({ message: err.message });
   }
 });
+
+
 
 // Bulk Promote / Graduate Students
 router.post('/promote', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), collegeScope, checkSubscription, async (req, res) => {

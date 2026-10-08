@@ -17,8 +17,7 @@ const libraryReservationSchema = new mongoose.Schema(
     },
     userType: {
       type: String,
-      enum: ['Student', 'Staff'],
-      required: true
+      default: 'Student'
     },
     requestDate: {
       type: Date,
@@ -29,16 +28,19 @@ const libraryReservationSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed'],
+      enum: ['Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed', 'Issued', 'Reserved'],
       default: 'Pending'
     },
     collegeId: {
       type: String,
-      required: true,
+      index: true
+    },
+    tenantId: {
+      type: String,
       index: true
     }
   },
-  { timestamps: true }
+  { timestamps: true, strict: false }
 );
 
 libraryReservationSchema.index({

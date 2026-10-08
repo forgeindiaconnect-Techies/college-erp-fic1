@@ -5,9 +5,39 @@ import {
   LayoutDashboard, BookOpen, ArrowRightLeft, Clock, 
   FileText, Users, BarChart3, LogOut, ChevronRight, 
   ChevronDown, Library, PlusCircle, BookmarkCheck,
-  BookDown, CheckCircle2, ShieldCheck
+  BookDown, CheckCircle2, ShieldCheck, X
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
+
+const menuGroups = [
+  {
+    name: 'Catalog & Books',
+    icon: <BookOpen size={20} />,
+    items: [
+      { name: 'Book Inventory', path: '/librarian/books', icon: <BookOpen size={18} /> },
+      { name: 'Digital Library', path: '/librarian/digital', icon: <FileText size={18} /> },
+    ]
+  },
+  {
+    name: 'Circulation Ops',
+    icon: <ArrowRightLeft size={20} />,
+    items: [
+      { name: 'Issued Books', path: '/librarian/issued', icon: <BookDown size={18} /> },
+      { name: 'Returned Books', path: '/librarian/returned-books', icon: <CheckCircle2 size={18} /> },
+      { name: 'Return Requests', path: '/librarian/returns', icon: <Clock size={18} /> },
+      { name: 'Clearance Requests', path: '/librarian/clearance', icon: <ShieldCheck size={18} /> },
+      { name: 'Reservations', path: '/librarian/reservations', icon: <BookmarkCheck size={18} /> },
+    ]
+  },
+  {
+    name: 'Members & Records',
+    icon: <Users size={20} />,
+    items: [
+      { name: 'Library Members', path: '/librarian/members', icon: <Users size={18} /> },
+      { name: 'Reports & Analytics', path: '/librarian/reports', icon: <BarChart3 size={18} /> },
+    ]
+  }
+];
 
 const LibrarianSidebar = ({ isOpen, onClose }) => {
   const { collegeSettings } = React.useContext(SettingsContext) || {};
@@ -31,36 +61,6 @@ const LibrarianSidebar = ({ isOpen, onClose }) => {
     });
   }, [location.pathname]);
 
-  const menuGroups = [
-    {
-      name: 'Catalog & Books',
-      icon: <BookOpen size={20} />,
-      items: [
-        { name: 'Book Inventory', path: '/librarian/books', icon: <BookOpen size={18} /> },
-        { name: 'Digital Library', path: '/librarian/digital', icon: <FileText size={18} /> },
-      ]
-    },
-    {
-      name: 'Circulation Ops',
-      icon: <ArrowRightLeft size={20} />,
-      items: [
-        { name: 'Issued Books', path: '/librarian/issued', icon: <BookDown size={18} /> },
-        { name: 'Returned Books', path: '/librarian/returned-books', icon: <CheckCircle2 size={18} /> },
-        { name: 'Return Requests', path: '/librarian/returns', icon: <Clock size={18} /> },
-        { name: 'Clearance Requests', path: '/librarian/clearance', icon: <ShieldCheck size={18} /> },
-        { name: 'Reservations', path: '/librarian/reservations', icon: <BookmarkCheck size={18} /> },
-      ]
-    },
-    {
-      name: 'Members & Records',
-      icon: <Users size={20} />,
-      items: [
-        { name: 'Student Members', path: '/librarian/members', icon: <Users size={18} /> },
-        { name: 'Reports & Analytics', path: '/librarian/reports', icon: <BarChart3 size={18} /> },
-      ]
-    }
-  ];
-
   const handleLogout = () => {
     sessionStorage.clear();
     navigate('/login');
@@ -79,18 +79,21 @@ const LibrarianSidebar = ({ isOpen, onClose }) => {
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
       {/* Brand Header */}
-      <div className="sidebar-header">
-        {collegeSettings?.collegeLogo ? (
-          <img 
-            src={collegeSettings.collegeLogo} 
-            alt={displayCollegeName} 
-            style={{ height: '32px', objectFit: 'contain' }} 
-          />
-        ) : (
-          <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+      <div className="sidebar-header" style={{ padding: '1rem 1.25rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+          <div 
+            style={{ fontWeight: '700', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }} 
+            title={displayCollegeName}
+          >
             {displayCollegeName}
           </div>
-        )}
+          <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 500, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+            Librarian Portal
+          </span>
+        </div>
+        <button className="sidebar-close-btn" onClick={onClose}>
+          <X size={20} />
+        </button>
       </div>
 
       {/* Nav Links */}

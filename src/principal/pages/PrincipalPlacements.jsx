@@ -17,6 +17,14 @@ export default function PrincipalPlacements() {
 
   useEffect(() => {
     fetchData();
+
+    const handlePlacementUpdate = () => {
+      console.log('⚡ Principal Placement data updated - refreshing');
+      fetchData();
+    };
+
+    window.addEventListener('erp_placement_updated', handlePlacementUpdate);
+    return () => window.removeEventListener('erp_placement_updated', handlePlacementUpdate);
   }, []);
 
   const fetchData = async () => {
@@ -389,3 +397,4 @@ export default function PrincipalPlacements() {
     </div>
   );
 }
+

@@ -17,7 +17,11 @@ const libraryFinePaymentSchema = new mongoose.Schema(
 
     collegeId: {
       type: String,
-      required: true,
+      index: true
+    },
+
+    tenantId: {
+      type: String,
       index: true
     },
 
@@ -65,7 +69,7 @@ const libraryFinePaymentSchema = new mongoose.Schema(
       trim: true
     }
   },
-  { timestamps: true }
+  { timestamps: true, strict: false }
 );
 
 libraryFinePaymentSchema.index(

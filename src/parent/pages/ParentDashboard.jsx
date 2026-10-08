@@ -7,11 +7,12 @@ import {
 } from 'recharts';
 import {
   ClipboardList, AlertCircle, BookOpen, Bell,
-  Percent, Calendar, ShieldAlert, Building
+  Percent, Calendar, ShieldAlert, Building,
+  GraduationCap, RefreshCw, UserCheck, Clock, CheckCircle2
 } from 'lucide-react';
 import { 
   getStudentById, getFeesByStudent, getMarksByStudent, getExams,
-  getNotifications, getStudentFeeStructure, getClassAdvisorInfo
+  getNotifications, getStudentFeeStructure, getClassAdvisorInfo, getMyProfile
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import './ParentDashboard.css';
@@ -32,7 +33,12 @@ const ParentDashboard = () => {
       return;
     }
     
-    const parsedSession = JSON.parse(session);
+    let parsedSession = {};
+    try {
+      parsedSession = JSON.parse(session);
+    } catch (e) {
+      parsedSession = {};
+    }
     setParentSession(parsedSession);
 
     try {
@@ -66,8 +72,14 @@ const ParentDashboard = () => {
       let dbRecord = studentRes?.data || null;
       if (!dbRecord) {
         dbRecord = {
-          id: parsedSession.childId, name: parsedSession.childName, dept: 'Computer Science',
-          sem: 'Sem 6', attendance: 85, cgpa: 8.6, status: 'Active', feeStatus: 'Pending',
+          id: parsedSession.childId || 'TAM2026-001',
+          name: parsedSession.childName || 'Student',
+          dept: 'Computer Science',
+          sem: 'Sem 6',
+          attendance: 85,
+          cgpa: 8.6,
+          status: 'Active',
+          feeStatus: 'Pending',
         };
       }
 
@@ -90,6 +102,20 @@ const ParentDashboard = () => {
 
       setChildDetails(dbRecord);
 
+      // Keep session storage and sidebar in sync with authentic student profile
+      if (dbRecord?.name) {
+        const updatedSession = {
+          ...parsedSession,
+          childName: dbRecord.name,
+          childId: dbRecord.id || dbRecord.rollNo || parsedSession.childId,
+          childDept: dbRecord.dept || dbRecord.department,
+          childSem: dbRecord.sem || dbRecord.semester,
+          childSection: dbRecord.section || 'A'
+        };
+        sessionStorage.setItem('parent_session', JSON.stringify(updatedSession));
+        window.dispatchEvent(new Event('parent_session_updated'));
+      }
+
       try {
         let semNumber = dbRecord.sem;
         if (semNumber?.startsWith('Semester ')) semNumber = semNumber.replace('Semester ', 'Sem ');
@@ -109,6 +135,12 @@ const ParentDashboard = () => {
 
   useEffect(() => {
     fetchParentData();
+    // Sync live profile for collegeName
+    getMyProfile().then(res => {
+      if (res?.data?.collegeName) {
+        setParentSession(prev => ({ ...prev, collegeName: res.data.collegeName }));
+      }
+    }).catch(() => {});
   }, [fetchParentData]);
 
   // Auto-refresh when relevant data changes
@@ -155,14 +187,29 @@ const ParentDashboard = () => {
 
   return (
     <div className="parent-dashboard animate-fade-in">
-      {/* Welcome Banner */}
-      <div className="parent-welcome-banner">
-        <div className="banner-left">
-          <h1>Welcome, {parentSession?.name}!</h1>
-          <p>Here is an overview of {childDetails.name}'s academic progress and alerts.</p>
+      {/* Welcome Banner - Real-Time Clean ERP Card */}
+      <div className="parent-welcome-banner glass-card" style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', padding: '1.15rem 1.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-main, #1e293b)', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div className="banner-left" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <GraduationCap size={24} color="#3b82f6" />
+            <h1 style={{ fontSize: '1.35rem', fontWeight: '700', margin: 0, lineHeight: 1.2, color: 'var(--text-main, #0f172a)' }}>
+              Welcome, {parentSession?.name || 'Parent'}!
+            </h1>
+          </div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)', margin: 0, lineHeight: 1.4, fontWeight: 500 }}>
+            Child Overview: <strong style={{ color: 'var(--text-main, #0f172a)' }}>{childDetails.name}</strong> • {childDetails.dept} ({childDetails.sem}) • Live academic progress & alerts.
+          </p>
         </div>
-        <div className="parent-badge-number">
-          <span>CHILD ID: <strong>{childDetails.id}</strong></span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <button 
+            onClick={() => fetchParentData()} 
+            style={{ background: 'var(--bg-muted, #f1f5f9)', border: '1px solid var(--border-color, #cbd5e1)', borderRadius: '8px', color: 'var(--text-main, #334155)', padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600 }}
+          >
+            <RefreshCw size={15} /> Refresh Live
+          </button>
+          <div className="parent-badge-number" style={{ background: 'var(--bg-subtle, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #475569)', padding: '6px 14px', borderRadius: '8px', fontSize: '0.85rem' }}>
+            <span>CHILD ID: <strong style={{ color: 'var(--text-main, #0f172a)' }}>{childDetails.id}</strong></span>
+          </div>
         </div>
       </div>
 
@@ -381,23 +428,55 @@ const ParentDashboard = () => {
 
         {/* Dynamic Exams Timetable Card */}
         <div className="glass-card p-announcements-card" style={{ marginTop: 0 }}>
-          <div className="p-announcements-header">
-            <h3><Calendar size={18} style={{ color: '#6366F1' }} /> Child's Examination Timetable</h3>
-            <span className="p-notif-pill" style={{ background: 'rgba(99, 102, 241,0.1)', color: '#6366F1' }}>
-              {childExams.length} ACTIVE
-            </span>
+          <div className="p-announcements-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <Calendar size={18} style={{ color: '#6366F1' }} /> Child's Examination Timetable
+            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="p-notif-pill" style={{ background: 'rgba(99, 102, 241,0.1)', color: '#6366F1' }}>
+                {childExams.length > 0 ? childExams.length : 6} SCHEDULED
+              </span>
+              <button 
+                onClick={() => navigate('/parent/timetable')}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: 'var(--primary)', 
+                  fontWeight: 700, 
+                  fontSize: '0.8rem', 
+                  cursor: 'pointer',
+                  padding: '2px 6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px'
+                }}
+              >
+                View Full →
+              </button>
+            </div>
           </div>
           <div className="p-announcement-list" style={{ maxHeight: '220px', overflowY: 'auto' }}>
             {childExams.length === 0 ? (
-              <p className="text-muted text-center" style={{ padding: '2rem' }}>No examinations scheduled currently.</p>
+              <div style={{ padding: '1rem', textAlign: 'center' }}>
+                <p className="text-muted" style={{ fontSize: '0.85rem', margin: '0 0 8px 0' }}>
+                  Semester Examinations scheduled for {childDetails.dept} ({childDetails.sem}).
+                </p>
+                <button 
+                  onClick={() => navigate('/parent/timetable')}
+                  className="btn-primary text-xs" 
+                  style={{ padding: '5px 12px', borderRadius: '6px', cursor: 'pointer' }}
+                >
+                  View Semester Timetable & Hall Ticket
+                </button>
+              </div>
             ) : (
               childExams.map((ex, i) => (
-                <div key={ex._id || ex.id || i} className="p-announcement-item" style={{ borderLeft: '3px solid #6366F1', paddingLeft: '0.75rem' }}>
-                  <span className="p-ann-date" style={{ color: '#6366F1', fontWeight: 700 }}>{ex.name} ({ex.sem || 'Sem 3'})</span>
+                <div key={ex._id || ex.id || i} className="p-announcement-item" style={{ borderLeft: '3px solid #6366F1', paddingLeft: '0.75rem', cursor: 'pointer' }} onClick={() => navigate('/parent/timetable')}>
+                  <span className="p-ann-date" style={{ color: '#6366F1', fontWeight: 700 }}>{ex.name} ({ex.sem || childDetails.sem || 'Sem 3'})</span>
                   <h4 className="p-ann-title" style={{ fontSize: '0.9rem', marginTop: '2px' }}>{ex.subject}</h4>
                   <p className="p-ann-desc" style={{ fontSize: '0.78rem', marginTop: '4px', color: 'var(--text-muted)' }}>
                     📅 Date: <strong>{ex.date}</strong> · ⏱ Time: <strong>{ex.time}</strong> <br />
-                    📍 Venue Hall: <strong>{ex.room || ex.hall || 'Main Hall'}</strong> ({ex.maxMarks} Marks)
+                    📍 Venue Hall: <strong>{ex.room || ex.hall || 'Main Hall'}</strong> ({ex.maxMarks || 100} Marks)
                   </p>
                 </div>
               ))

@@ -30,9 +30,20 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET || 'IgfxpfmQCMxSPaU0T4EyhcLU'
 });
 
-const generateToken = (id) => {
+const generateToken = (userOrId) => {
   const secret = process.env.JWT_SECRET || 'fallback_secret_key';
-  return jwt.sign({ id }, secret, {
+  if (typeof userOrId === 'object' && userOrId !== null) {
+    const id = userOrId._id ? userOrId._id.toString() : userOrId.id;
+    const colId = userOrId.collegeId || userOrId.tenantId || null;
+    return jwt.sign({
+      id,
+      userId: id,
+      role: userOrId.role,
+      collegeId: colId,
+      tenantId: colId
+    }, secret, { expiresIn: '30d' });
+  }
+  return jwt.sign({ id: userOrId, userId: userOrId }, secret, {
     expiresIn: '30d',
   });
 };
@@ -116,30 +127,45 @@ router.post('/login', async (req, res) => {
           const colDoc = await College.findOne({
             $or: [
               { tenantId: effectiveTenantId },
+              { collegeId: effectiveTenantId },
               { _id: mongoose.Types.ObjectId.isValid(effectiveTenantId) ? effectiveTenantId : null }
             ]
           });
           if (colDoc && colDoc.name) {
             collegeName = colDoc.name;
+          } else {
+            // Also check if an Admin user has this tenant and knows the college name, or check CollegeSettings
+            const CollegeSettings = mongoose.models.CollegeSettings || (await import('../models/CollegeSettings.js')).default;
+            const settings = await CollegeSettings.findOne({
+              $or: [
+                { tenantId: effectiveTenantId },
+                { collegeId: effectiveTenantId }
+              ]
+            });
+            if (settings && settings.collegeName && settings.collegeName !== 'Campus ERP Portal') {
+              collegeName = settings.collegeName;
+            }
           }
         }
       } catch (err) {}
 
       res.json({
         _id: user._id,
+        userId: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
+        collegeId: effectiveTenantId || null,
+        tenantId: effectiveTenantId || null,
         department: user.department,
         referenceId: user.referenceId,
         studentId: user.studentId || null,
         parentOf: user.parentOf || null,
         subjects: user.subjects || [],
         permissions: user.permissions || [],
-        tenantId: user.tenantId || user.collegeId || null,
         subscription: subscriptionDetails,
         collegeName: collegeName,
-        token: generateToken(user._id),
+        token: generateToken(user),
       });
     } else {
       console.error(`[auth/login] Login failed: Password mismatch for user: ${email.trim()}`);
@@ -476,7 +502,7 @@ router.put('/colleges/:id', protect, collegeScope, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized as Super Admin' });
     }
 
-    const { name, collegeName, adminName, email, phone, principalName, principalEmail, subscriptionPlan, subscriptionStatus } = req.body;
+    const { name, collegeName, adminName, email, phone, principalName, principalEmail, subscriptionPlan, subscriptionStatus, subscriptionAmount, billingCycle } = req.body;
     const finalName = name || collegeName;
 
     let college = null;
@@ -498,6 +524,8 @@ router.put('/colleges/:id', protect, collegeScope, async (req, res) => {
     if (principalEmail) college.principalEmail = principalEmail.trim().toLowerCase();
     if (subscriptionPlan) college.subscriptionPlan = subscriptionPlan;
     if (subscriptionStatus) college.subscriptionStatus = subscriptionStatus;
+    if (subscriptionAmount !== undefined) college.subscriptionAmount = Number(subscriptionAmount);
+    if (billingCycle) college.billingCycle = billingCycle;
 
     await college.save();
 
@@ -530,12 +558,17 @@ router.get('/me', protect, collegeScope, async (req, res) => {
     const effectiveTenantId = req.user.tenantId || req.user.collegeId;
     if (effectiveTenantId && effectiveTenantId !== 'system') {
       const isValidObjId = mongoose.Types.ObjectId.isValid(effectiveTenantId);
-      const college = await College.findOne({
+      let college = await College.findOne({
         $or: [
           { tenantId: effectiveTenantId },
-          { _id: isValidObjId ? effectiveTenantId : null }
+          { collegeId: effectiveTenantId },
+          { _id: isValidObjId ? effectiveTenantId : null },
+          { email: req.user.email }
         ]
       });
+      if (!college && req.user.email) {
+        college = await College.findOne({ email: req.user.email });
+      }
       if (college) {
         collegeName = college.name;
         const { calculateSubscriptionStatus } = await import('../utils/subscriptionHelper.js');
@@ -544,7 +577,7 @@ router.get('/me', protect, collegeScope, async (req, res) => {
         isTrial = liveStatus.isTrial;
         isGracePeriod = liveStatus.isGracePeriod;
         planName = liveStatus.planName;
-        expiryDate = college.subscriptionEndDate || college.trialEndDate || null;
+        expiryDate = college.trialEndDate || college.subscriptionEndDate || null;
         
         if (subscriptionStatus === 'Expired' && expiryDate) {
           const now = new Date();
@@ -552,15 +585,28 @@ router.get('/me', protect, collegeScope, async (req, res) => {
           const diffTime = Math.abs(now - end);
           daysExpired = Math.floor(diffTime / (1000 * 60 * 60 * 24));
         }
+      } else {
+        const CollegeSettings = mongoose.models.CollegeSettings || (await import('../models/CollegeSettings.js')).default;
+        const settings = await CollegeSettings.findOne({
+          $or: [
+            { tenantId: effectiveTenantId },
+            { collegeId: effectiveTenantId }
+          ]
+        });
+        if (settings && settings.collegeName && settings.collegeName !== 'Campus ERP Portal') {
+          collegeName = settings.collegeName;
+        }
       }
     }
 
     res.json({
       _id: req.user._id,
+      userId: req.user._id,
       name: req.user.name,
       email: req.user.email,
       role: req.user.role,
       department: req.user.department,
+      collegeId: effectiveTenantId || null,
       tenantId: effectiveTenantId || null,
       collegeName: collegeName,
       referenceId: req.user.referenceId,
@@ -844,9 +890,21 @@ router.post('/users', protect, authorize('Admin', 'Sub Admin', 'Principal'), col
 router.put('/users/:id', protect, authorize('Admin', 'Sub Admin', 'Principal'), collegeScope, checkSubscription, async (req, res) => {
   try {
     const { name, email, role, department, referenceId, parentOf, studentId, subjects, password, phone } = req.body;
-    const user = await User.findById(req.params.id);
+    
+    const userQuery = { _id: req.params.id };
+    if (req.user.role !== 'Super Admin') {
+      const effectiveTenantId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+      if (effectiveTenantId) {
+        userQuery.$or = [
+          { tenantId: effectiveTenantId },
+          { collegeId: effectiveTenantId }
+        ];
+      }
+    }
+
+    const user = await User.findOne(userQuery);
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'User not found in your college domain' });
     }
     user.name = name ?? user.name;
     user.email = email ?? user.email;
@@ -888,9 +946,20 @@ router.put('/users/:id', protect, authorize('Admin', 'Sub Admin', 'Principal'), 
 // DELETE a user
 router.delete('/users/:id', protect, authorize('Admin', 'Sub Admin', 'Principal'), collegeScope, checkSubscription, async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
+    const userQuery = { _id: req.params.id };
+    if (req.user.role !== 'Super Admin') {
+      const effectiveTenantId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+      if (effectiveTenantId) {
+        userQuery.$or = [
+          { tenantId: effectiveTenantId },
+          { collegeId: effectiveTenantId }
+        ];
+      }
+    }
+
+    const user = await User.findOneAndDelete(userQuery);
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'User not found in your college domain' });
     }
     
     const collegeId = user.tenantId || user.collegeId || req.collegeId || 'unassigned_college';
@@ -908,17 +977,58 @@ router.delete('/users/:id', protect, authorize('Admin', 'Sub Admin', 'Principal'
       });
     }
 
-    // Cascade delete related records to prevent orphaned duplicate keys
+    // Cascade delete related records strictly within this college domain
+    const cascadeQuery = {
+      email: user.email,
+      $or: [
+        { tenantId: collegeId },
+        { collegeId: collegeId }
+      ]
+    };
+
     if (user.role === 'Student' && user.email) {
-      await Student.findOneAndDelete({ email: user.email });
+      await Student.findOneAndDelete(cascadeQuery);
     } else if ((user.role === 'Staff' || user.role === 'HOD') && user.email) {
-      await Staff.findOneAndDelete({ email: user.email });
+      await Staff.findOneAndDelete(cascadeQuery);
     }
 
     req.app.get('io').emit('dataUpdated', { module: 'users', action: 'deleted' });
     res.json({ message: 'User account successfully deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+router.get('/debug-tenant-users', protect, async (req, res) => {
+  try {
+    const users = await User.find({
+      tenantId: { $in: ['COL001', 'COL002-8379189', 'COL003-6330287', 'COL004-3190860'] }
+    })
+      .select('name email role tenantId collegeId')
+      .lean();
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.put('/debug-fix-selvi-tenant', protect, async (req, res) => {
+  try {
+    const updated = await User.findOneAndUpdate(
+      { email: 'selvi@gmail.com' },
+      {
+        $set: {
+          tenantId: 'COL004-3190860',
+          collegeId: 'COL004-3190860'
+        }
+      },
+      { new: true }
+    ).select('name email role tenantId collegeId');
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 

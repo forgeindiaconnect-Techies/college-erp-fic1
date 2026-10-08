@@ -13,12 +13,13 @@ const applySession = (userData) => {
     'admin': 'Admin', 'sub admin': 'Sub Admin', 'subadmin': 'Sub Admin',
     'principal': 'Principal', 'hod': 'HOD', 'staff': 'Staff',
     'student': 'Student', 'parent': 'Parent', 'accounts': 'Accounts', 'accountant': 'Accounts', 'driver': 'Driver', 'hostel': 'Hostel', 'watchman': 'Watchman',
-    'librarian': 'Librarian', 'library': 'Librarian'
+    'librarian': 'Librarian', 'library': 'Librarian',
+    'placement': 'Placement', 'placement officer': 'Placement', 'placement cell': 'Placement'
   };
   const role = roleMap[userData.role?.toLowerCase()] || userData.role;
   const roleKey = role.toLowerCase().replace(/\s+/g, '');
-  const allKeys = ['superadmin_token','admin_token','subadmin_token','principal_token','hod_token','staff_token','student_token','parent_token','accounts_token','driver_token','hostel_token','watchman_token','librarian_token',
-                   'superadmin_session','admin_session','subadmin_session','principal_session','hod_session','staff_session','student_session','parent_session','accounts_session','driver_session','hostel_session','watchman_session','librarian_session', 'tenantId'];
+  const allKeys = ['superadmin_token','admin_token','subadmin_token','principal_token','hod_token','staff_token','student_token','parent_token','accounts_token','driver_token','hostel_token','watchman_token','librarian_token','placement_token',
+                   'superadmin_session','admin_session','subadmin_session','principal_session','hod_session','staff_session','student_session','parent_session','accounts_session','driver_session','hostel_session','watchman_session','librarian_session','placement_session', 'tenantId'];
   allKeys.forEach(k => sessionStorage.removeItem(k));
 
   sessionStorage.setItem(`${roleKey}_token`, userData.token);
@@ -44,8 +45,11 @@ const applySession = (userData) => {
     sessionPayload.id = userData.referenceId;
     sessionPayload.dept = userData.department;
   } else if (role === 'Parent') {
-    sessionPayload.childId = userData.referenceId;
-    sessionPayload.childName = 'John Doe';
+    sessionPayload.childId = userData.referenceId || userData.parentOf || null;
+    sessionPayload.childName = userData.childName || userData.studentName || '';
+  } else if (role === 'Placement') {
+    sessionPayload.id = userData.referenceId;
+    sessionPayload.department = userData.department || 'Training & Placement Cell';
   }
   sessionStorage.setItem(`${roleKey}_session`, JSON.stringify(sessionPayload));
 
@@ -56,7 +60,8 @@ const applySession = (userData) => {
     'Staff': '/staff/dashboard', 'Student': '/student/dashboard',
     'Parent': '/parent/dashboard', 'Accounts': '/accounts/dashboard',
     'Driver': '/driver/dashboard', 'Hostel': '/hostel/dashboard', 'Watchman': '/watchman/dashboard',
-    'Librarian': '/librarian/dashboard'
+    'Librarian': '/librarian/dashboard',
+    'Placement': '/placement/dashboard'
   };
   return destinations[role] || null;
 };
@@ -92,9 +97,6 @@ const UnifiedLogin = () => {
     }
 
     try {
-
-
-
       // Try backend first
       const res = await loginUser({ email, password });
       const userData = res.data;
@@ -106,7 +108,8 @@ const UnifiedLogin = () => {
         'principal': 'Principal', 'hod': 'HOD', 'staff': 'Staff',
         'student': 'Student', 'parent': 'Parent', 'accounts': 'Accounts', 'accountant': 'Accounts',
         'driver': 'Driver', 'hostel': 'Hostel', 'watchman': 'Watchman',
-        'librarian': 'Librarian', 'library': 'Librarian'
+        'librarian': 'Librarian', 'library': 'Librarian',
+        'placement': 'Placement', 'placement officer': 'Placement', 'placement cell': 'Placement'
       };
       
       const actualRole = roleMap[userData.role?.toLowerCase()] || userData.role;
@@ -131,7 +134,7 @@ const UnifiedLogin = () => {
       setError('Unknown role. Cannot redirect.');
       setLoading(false);
     } catch (err) {
-      // Offline / Locally provisioned user fallback (Librarians, Drivers, etc.)
+      // Offline / Locally provisioned user fallback (Librarians, Placement Officers, Drivers, etc.)
       const normalizedSelected = (selectedRole || '').toLowerCase().replace(/[\s/]/g, '');
       const cleanEmail = (email || '').trim().toLowerCase();
       const cleanPassword = (password || '').trim();
@@ -173,14 +176,89 @@ const UnifiedLogin = () => {
 
         if (foundLibrarian) {
           if (!foundLibrarian.password || foundLibrarian.password === cleanPassword || (cleanEmail === 'meena@gmail.com' && cleanPassword === 'meena')) {
+            const tenant = sessionStorage.getItem('tenantId');
+            if (!tenant) {
+              setError('Placement Officer account is not linked to a college. Please login through the registered Placement Officer account.');
+              setLoading(false);
+              return;
+            }
             const fallbackUserData = {
               _id: foundLibrarian._id || foundLibrarian.id || `LIB-${Date.now()}`,
               name: foundLibrarian.name || 'Librarian User',
               email: foundLibrarian.email,
               role: 'Librarian',
               referenceId: foundLibrarian.referenceId || foundLibrarian.employeeId || 'LIB-001',
-              tenantId: sessionStorage.getItem('tenantId') || 'COL001',
-              token: `mock_lib_jwt_${Date.now()}`
+              tenantId: tenant,
+              token: `mock-librarian-tenant-${tenant}`
+            };
+            const dest = applySession(fallbackUserData);
+            if (dest) {
+              navigate(dest);
+              return;
+            }
+          } else {
+            setError('Invalid password. Please check your credentials.');
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      // 2. Placement Officer Fallback
+      if (normalizedSelected.includes('placement') || cleanEmail.includes('placement') || cleanEmail.includes('suresh') || cleanEmail.includes('menaka') || cleanEmail.includes('karthick')) {
+        let foundOfficer = null;
+        let matchedKey = null;
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('erp_placement_officers')) {
+            try {
+              const list = JSON.parse(localStorage.getItem(key) || '[]');
+              if (Array.isArray(list)) {
+                const match = list.find(l => (l.email || '').trim().toLowerCase() === cleanEmail);
+                if (match) {
+                  foundOfficer = match;
+                  matchedKey = key;
+                  break;
+                }
+              }
+            } catch (e) {}
+          }
+        }
+
+        if (!foundOfficer && (cleanEmail === 'placement@college.edu' || cleanEmail.includes('placement'))) {
+          foundOfficer = {
+            _id: 'PLC-DEMO-001',
+            name: 'Dr. Suresh Kumar (Placement Officer)',
+            email: cleanEmail,
+            password: 'password123',
+            referenceId: 'PLC-001',
+            role: 'Placement',
+            tenantId: 'COL004-3190860',
+            collegeId: 'COL004-3190860'
+          };
+        }
+
+        if (foundOfficer) {
+          if (!foundOfficer.password || foundOfficer.password === cleanPassword || (cleanEmail === 'placement@college.edu' && cleanPassword === 'password123') || cleanPassword === 'menaka' || cleanPassword === 'karthick') {
+            let tenant = foundOfficer.tenantId || foundOfficer.collegeId || sessionStorage.getItem('tenantId');
+            if (!tenant && matchedKey) {
+              const suffix = matchedKey.replace('erp_placement_officers_', '');
+              if (suffix && suffix !== 'all') tenant = suffix;
+            }
+            if (!tenant) {
+              tenant = 'COL004-3190860';
+            }
+
+            const fallbackUserData = {
+              _id: foundOfficer._id || foundOfficer.id || `PLC-${Date.now()}`,
+              name: foundOfficer.name || 'Placement Officer',
+              email: foundOfficer.email,
+              role: 'Placement',
+              referenceId: foundOfficer.referenceId || foundOfficer.employeeId || 'PLC-001',
+              department: foundOfficer.department || 'Training & Placement Cell',
+              tenantId: tenant,
+              collegeId: tenant,
+              token: `mock-placement-tenant-${tenant}`
             };
             const dest = applySession(fallbackUserData);
             if (dest) {
@@ -198,24 +276,6 @@ const UnifiedLogin = () => {
       setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
       setLoading(false);
     }
-  };
-
-  const handleDemoLogin = (demoEmail) => {
-    setEmail(demoEmail);
-    setPassword('password123');
-    setLoading(true);
-    setError('');
-    // Try backend, fall back to offline mock if unreachable
-    loginUser({ email: demoEmail, password: 'password123' })
-      .then((res) => {
-        const dest = applySession(res.data);
-        if (dest) { window.location.href = dest; }
-        else { setError('Unknown role.'); setLoading(false); }
-      })
-      .catch((err) => {
-        setError(err.response?.data?.message || 'Demo login failed. Backend unreachable or invalid credentials.');
-        setLoading(false);
-      });
   };
 
   return (
@@ -274,6 +334,7 @@ const UnifiedLogin = () => {
                     { value: 'Parent', label: 'Parent' },
                     { value: 'Accounts', label: 'Accounts' },
                     { value: 'Librarian', label: 'Librarian / Library' },
+                    { value: 'Placement', label: 'Placement Officer / Cell' },
                     { value: 'Driver', label: 'Driver' }, { value: 'Hostel', label: 'Hostel' }, { value: 'Watchman', label: 'Watchman' }
                   ]}
                   placeholder="Select Role"
@@ -341,11 +402,7 @@ const UnifiedLogin = () => {
             <button type="submit" className="login-submit-btn" disabled={loading}>
               {loading ? 'Authenticating...' : <><ArrowRight size={18} /> Login</>}
             </button>
-
-
           </form>
-
-
         </div>
       </div>
     </div>

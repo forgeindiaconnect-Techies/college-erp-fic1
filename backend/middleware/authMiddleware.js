@@ -23,6 +23,8 @@ export const protect = async (req, res, next) => {
         else if (token.includes('-accounts')) role = 'Accounts';
         else if (token.includes('-hostel')) role = 'Hostel';
         else if (token.includes('-driver')) role = 'Driver';
+        else if (token.includes('-placement')) role = 'Placement';
+        else if (token.includes('-librarian')) role = 'Librarian';
         
         let referenceId = null;
         if (token.includes('-dynamic-')) {
@@ -102,9 +104,9 @@ export const authorize = (...roles) => {
 };
 
 export const departmentScope = (req, res, next) => {
-  // Admin, Principal, and Accounts have unrestricted global access, never filter query
+  // Admin, Principal, Accounts, Librarian, and Placement have unrestricted global access, never filter query
   const role = req.user?.role?.toLowerCase() || '';
-  if (req.user && role !== 'admin' && role !== 'principal' && role !== 'sub admin' && role !== 'accounts') {
+  if (req.user && role !== 'admin' && role !== 'principal' && role !== 'sub admin' && role !== 'accounts' && role !== 'librarian' && role !== 'library' && role !== 'placement' && role !== 'placement officer') {
     // If it's a mock token, bypass strict backend department scoping 
     // since the frontend handles scoping and the mock department is hardcoded
     if (req.user._id !== 'mock-id' && req.user.department) {

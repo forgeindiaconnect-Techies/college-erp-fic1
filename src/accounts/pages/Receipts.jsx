@@ -5,7 +5,7 @@ import FeeReceipt from '../../components/FeeReceipt';
 
 const getLoggedInCollegeName = () => {
   try {
-    const s = sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || sessionStorage.getItem('user_session');
+    const s = sessionStorage.getItem('accounts_session') || sessionStorage.getItem('user_session');
     if (s) {
       const p = JSON.parse(s);
       if (p?.collegeName && p.collegeName !== 'Institution Portal' && p.collegeName !== 'Royal College') {

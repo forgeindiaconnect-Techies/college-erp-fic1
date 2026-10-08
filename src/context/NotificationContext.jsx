@@ -145,6 +145,16 @@ export const NotificationProvider = ({ children }) => {
       }
     });
 
+socket.on('dataUpdated', (payload) => {
+      console.log('⚡ Live ERP Data Update:', payload);
+
+      if (payload?.module === 'placement') {
+        window.dispatchEvent(
+          new CustomEvent('erp_placement_updated', { detail: payload })
+        );
+      }
+    });
+
     socket.on('newNotification', (notif) => {
       console.log('🔔 Live Notification Received via Socket:', notif);
       
@@ -290,3 +300,6 @@ export const NotificationProvider = ({ children }) => {
     </NotificationContext.Provider>
   );
 };
+
+
+

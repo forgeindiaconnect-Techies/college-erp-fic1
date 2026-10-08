@@ -667,7 +667,7 @@ const Scholarships = () => {
               <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', letterSpacing: '0.5px' }}>
                 {(() => {
                   try {
-                    const s = JSON.parse(sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || '{}');
+                    const s = JSON.parse(sessionStorage.getItem('accounts_session') || '{}');
                     return (s.collegeName || 'Institution').toUpperCase();
                   } catch(e) { return 'INSTITUTION'; }
                 })()}

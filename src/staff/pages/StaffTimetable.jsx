@@ -365,9 +365,19 @@ const StaffTimetable = () => {
                                   <h4 style={{ color: theme.text }} className="font-bold text-xs leading-snug">
                                     {subjectName}
                                   </h4>
-                                  <span className="text-[10px] font-bold text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50 px-1 rounded border border-blue-200">
-                                    Start ▶
-                                  </span>
+                                  {slot.status === 'Completed' || slot.session?.status === 'Completed' ? (
+                                    <span style={{ fontSize: '9px', fontWeight: 800, background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', padding: '1px 5px', borderRadius: '4px' }}>
+                                      ✅ Completed
+                                    </span>
+                                  ) : slot.status === 'Live' || slot.session?.status === 'Live' ? (
+                                    <span style={{ fontSize: '9px', fontWeight: 800, background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', padding: '1px 5px', borderRadius: '4px' }}>
+                                      🟢 Live
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1 rounded border border-blue-200">
+                                      Start ▶
+                                    </span>
+                                  )}
                                 </div>
 
                                 <div className="text-[10px] text-gray-600 font-medium mt-0.5">

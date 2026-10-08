@@ -74,7 +74,7 @@ const NoDueCertificate = ({ clearance, studentSession }) => {
         </div>
         
         <h2 style={{ margin: '6px 0 4px', fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          MARUDHAR KESARI JAIN COLLEGE FOR WOMEN
+          {item.collegeName || studentSession?.collegeName || sessionStorage.getItem('collegeName') || localStorage.getItem('collegeName') || 'Arignar Anna College (Autonomous)'}
         </h2>
         
         <div style={{ fontSize: '0.76rem', color: '#64748b', marginBottom: '18px' }}>
@@ -150,7 +150,13 @@ const StudentLibrary = () => {
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const studentSession = useMemo(() => {
     try {
-      return JSON.parse(sessionStorage.getItem('student_session') || '{}');
+      return JSON.parse(
+        sessionStorage.getItem('student_session') ||
+        localStorage.getItem('student_session') ||
+        sessionStorage.getItem('user') ||
+        localStorage.getItem('user') ||
+        '{}'
+      );
     } catch {
       return {};
     }
@@ -196,6 +202,10 @@ const StudentLibrary = () => {
     clearancePendingRequests === 0 &&
     clearancePendingReturns === 0 &&
     clearanceOutstandingFine === 0;
+
+  const isClearanceApproved = Boolean(
+    clearance?.status === 'Approved' && clearanceEligible
+  );
 
   const categories = useMemo(() => {
     const list = new Set(['All Categories']);
@@ -856,9 +866,9 @@ const StudentLibrary = () => {
             <span
               className="tab-clearance-pill"
             >
-              {clearance?.status === 'Approved'
+              {isClearanceApproved
                 ? '✓ Cleared'
-                : clearance?.status === 'Pending'
+                : (clearance?.status === 'Pending' && clearanceEligible)
                 ? '⏳ Pending'
                 : clearanceEligible
                 ? 'Eligible'
@@ -955,9 +965,9 @@ const StudentLibrary = () => {
             <div className="clearance-header-actions">
               <div
                 className={`clearance-master-status-badge ${
-                  clearance?.status === 'Approved'
+                  isClearanceApproved
                     ? 'approved'
-                    : clearance?.status === 'Pending'
+                    : (clearance?.status === 'Pending' && clearanceEligible)
                     ? 'pending'
                     : clearance?.status === 'Rejected'
                     ? 'rejected'
@@ -967,16 +977,16 @@ const StudentLibrary = () => {
                 }`}
               >
                 <span className={`pulse-dot ${
-                  clearance?.status === 'Approved' || clearanceEligible
+                  isClearanceApproved || clearanceEligible
                     ? 'emerald'
-                    : clearance?.status === 'Pending'
+                    : (clearance?.status === 'Pending' && clearanceEligible)
                     ? 'amber'
                     : 'red'
                 }`}></span>
                 <span>
-                  {clearance?.status === 'Approved'
+                  {isClearanceApproved
                     ? '✓ Institutional Clearance Certified'
-                    : clearance?.status === 'Pending'
+                    : (clearance?.status === 'Pending' && clearanceEligible)
                     ? '⏳ Under Librarian Desk Review'
                     : clearance?.status === 'Rejected'
                     ? '❌ Request Rejected'
@@ -986,7 +996,7 @@ const StudentLibrary = () => {
                 </span>
               </div>
 
-              {clearance?.status === 'Approved' && (
+              {isClearanceApproved && (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -1192,7 +1202,7 @@ const StudentLibrary = () => {
           </div>
 
           {/* 4. INSTITUTIONAL CERTIFICATE & ENDORSEMENT SHOWCASE */}
-          {clearance?.status === 'Approved' ? (
+          {isClearanceApproved ? (
             <div className="clearance-cert-showcase">
               <div className="cert-showcase-header">
                 <div className="flex items-center gap-2.5">
@@ -1237,7 +1247,7 @@ const StudentLibrary = () => {
                 <NoDueCertificate clearance={clearance} studentSession={studentSession} />
               </div>
             </div>
-          ) : clearance?.status === 'Pending' ? (
+          ) : (clearance?.status === 'Pending' && clearanceEligible) ? (
             <div className="clearance-pending-box">
               <div className="flex items-center gap-3">
                 <div className="pending-icon-circle">
@@ -1330,7 +1340,30 @@ const StudentLibrary = () => {
                 )}
               </div>
             </div>
-          ) : null}
+          ) : (
+            <div className="clearance-action-required-box" style={{ borderColor: '#10b981', background: '#ecfdf5' }}>
+              <div className="flex items-start gap-3">
+                <div className="alert-icon-circle" style={{ background: '#d1fae5', color: '#059669' }}>
+                  <ShieldCheck size={20} className="text-emerald-600" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-900 text-sm">All Library Holdings Cleared</h4>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    You have returned all library books and settled all outstanding dues. Submit a formal clearance request to receive your official No-Due Certificate.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleLibraryClearanceRequest}
+                disabled={clearanceRequesting}
+                className="btn-clearance-primary"
+              >
+                <ShieldCheck size={16} />
+                <span>{clearanceRequesting ? 'Submitting...' : 'Submit Clearance Request'}</span>
+              </button>
+            </div>
+          )}
 
         </div>
       )}
@@ -2129,10 +2162,10 @@ const StudentLibrary = () => {
                         </td>
 
                         <td className="whitespace-nowrap text-sm text-muted">
-                          {res.approvedDate ? (
+                          {(res.approvedDate || ((res.status === 'Approved' || res.status === 'Completed' || res.status === 'Issued') ? (res.updatedAt || res.createdAt) : null)) ? (
                             <div className="flex items-center gap-1.5 text-emerald-600 font-medium">
                               <CheckCircle2 size={14} />
-                              <span>{getDate(res.approvedDate)}</span>
+                              <span>{getDate(res.approvedDate || res.updatedAt || res.createdAt)}</span>
                             </div>
                           ) : (
                             <span>-</span>

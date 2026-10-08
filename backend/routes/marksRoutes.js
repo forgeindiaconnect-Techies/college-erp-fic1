@@ -30,7 +30,7 @@ const updateStudentCGPA = async (studentId, collegeId) => {
   try {
     const markQuery = {
       studentId,
-      resultStatus: 'Published'
+      resultStatus: { $in: ['Approved', 'Published'] }
     };
 
     if (collegeId) {
@@ -443,6 +443,8 @@ router.patch(
         });
       }
 
+      await updateStudentCGPA(mark.studentId, req.collegeId);
+
       req.app.get('io').emit('dataUpdated', {
         module: 'marks',
         action: 'approved',
@@ -462,15 +464,22 @@ router.patch(
 // Update mark
 router.put('/:id', protect, authorize('Admin', 'Principal', 'HOD', 'Staff'), collegeScope, async (req, res) => {
   try {
-    const updatedRecord = await Mark.findByIdAndUpdate(
-      req.params.id, 
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = { _id: req.params.id };
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      filter.$or = [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }];
+    }
+
+    const updatedRecord = await Mark.findOneAndUpdate(
+      filter, 
       processMarkPayload(req.body), 
       { new: true }
     );
-    if (updatedRecord) {
-      await updateStudentCGPA(updatedRecord.studentId, req.collegeId);
+    if (!updatedRecord) {
+      return res.status(404).json({ message: 'Mark record not found' });
     }
-    req.app.get('io').emit('dataUpdated', { module: 'marks', action: 'updated' });
+    await updateStudentCGPA(updatedRecord.studentId, targetCollegeId);
+    req.app.get('io')?.emit('dataUpdated', { module: 'marks', action: 'updated' });
     res.json(updatedRecord);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -480,12 +489,18 @@ router.put('/:id', protect, authorize('Admin', 'Principal', 'HOD', 'Staff'), col
 // Delete mark
 router.delete('/:id', protect, authorize('Admin', 'Principal', 'HOD', 'Staff'), collegeScope, async (req, res) => {
   try {
-    const record = await Mark.findById(req.params.id);
-    if (record) {
-      await Mark.findByIdAndDelete(req.params.id);
-      await updateStudentCGPA(record.studentId, req.collegeId);
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = { _id: req.params.id };
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      filter.$or = [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }];
     }
-    req.app.get('io').emit('dataUpdated', { module: 'marks', action: 'deleted' });
+
+    const record = await Mark.findOneAndDelete(filter);
+    if (!record) {
+      return res.status(404).json({ message: 'Mark record not found' });
+    }
+    await updateStudentCGPA(record.studentId, targetCollegeId);
+    req.app.get('io')?.emit('dataUpdated', { module: 'marks', action: 'deleted' });
     res.json({ message: 'Mark deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });

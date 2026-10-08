@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import College from '../models/College.js';
 import Subscription from '../models/Subscription.js';
 import { calculateSubscriptionStatus } from '../utils/subscriptionHelper.js';
@@ -13,19 +14,44 @@ router.get('/my-subscription', protect, authorize('Admin'), collegeScope, async 
   try {
     // Support tenantId stored in either field
     const tenantId = req.user.tenantId || req.user.collegeId || req.collegeId;
-    if (!tenantId || tenantId === 'unassigned_college') {
-      return res.status(400).json({ message: 'Tenant ID not found for this admin.' });
+    let college = null;
+    if (tenantId && tenantId !== 'unassigned_college' && tenantId !== 'system') {
+      const isValidObjId = mongoose.Types.ObjectId.isValid(tenantId);
+      college = await College.findOne({
+        $or: [
+          { tenantId },
+          { collegeId: tenantId },
+          { _id: isValidObjId ? tenantId : null },
+          { email: req.user.email }
+        ]
+      });
     }
-
-    const college = await College.findOne({ tenantId });
+    if (!college && req.user.email) {
+      college = await College.findOne({ email: req.user.email });
+    }
     if (!college) {
       return res.status(404).json({ message: `College not found for tenant: ${tenantId}` });
     }
 
-    const payments = await Subscription.find({ tenantId }).sort({ createdAt: -1 });
+    const payments = await Subscription.find({
+      $or: [
+        { tenantId: college.tenantId },
+        { collegeId: college._id }
+      ]
+    }).sort({ createdAt: -1 });
+
     const subscription = calculateSubscriptionStatus(college);
 
-    res.json({ subscription: { ...subscription, collegeName: college.name }, payments });
+    res.json({
+      subscription: {
+        ...subscription,
+        collegeName: college.name,
+        amount: college.subscriptionAmount !== undefined ? college.subscriptionAmount : (subscription.planName === 'Elite' ? 35000 : (subscription.planName === 'Premium' ? 20000 : (subscription.planName === 'Basic' ? 10000 : 0))),
+        billingCycle: college.billingCycle || 'Monthly',
+        convertedToPaid: college.convertedToPaid
+      },
+      payments
+    });
   } catch (error) {
     console.error('[admin/my-subscription] Error:', error.message, error.stack);
     res.status(500).json({ message: 'Server Error fetching subscription.', detail: error.message });

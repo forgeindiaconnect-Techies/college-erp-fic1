@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import TransportRoute from '../models/TransportRoute.js';
 import TransportDriver from '../models/TransportDriver.js';
@@ -254,6 +255,33 @@ router.get('/students', protect, collegeScope, async (req, res) => {
   }
 });
 
+// @desc    Get a transport student allocation by ID or studentId
+// @route   GET /api/transport/students/:id
+// @access  Private
+router.get('/students/:id', protect, collegeScope, async (req, res) => {
+  try {
+    let student = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      student = await TransportStudent.findById(req.params.id).populate({
+        path: 'studentProfile',
+        populate: { path: 'user', select: 'name email phone' }
+      });
+    }
+    if (!student) {
+      student = await TransportStudent.findOne({ studentId: req.params.id }).populate({
+        path: 'studentProfile',
+        populate: { path: 'user', select: 'name email phone' }
+      });
+    }
+    if (!student) {
+      return res.status(404).json({ message: 'Transport student record not found' });
+    }
+    res.json(student);
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Server Error fetching student' });
+  }
+});
+
 // @desc    Create or allocate a transport student
 // @route   POST /api/transport/students
 // @access  Private
@@ -482,9 +510,24 @@ router.put('/maintenance/:id', protect, collegeScope, async (req, res) => {
       req.body,
       { new: true }
     );
+    if (!updated) {
+      return res.status(404).json({ message: 'Maintenance record not found' });
+    }
     res.json(updated);
   } catch (error) {
-    res.status(500).json({ message: 'Server Error updating maintenance task' });
+    res.status(500).json({ message: error.message || 'Server Error updating maintenance record' });
+  }
+});
+
+// @desc    Delete a maintenance task
+// @route   DELETE /api/transport/maintenance/:id
+// @access  Private
+router.delete('/maintenance/:id', protect, collegeScope, async (req, res) => {
+  try {
+    await TransportVehicleMaintenance.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Maintenance record deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Server Error deleting maintenance record' });
   }
 });
 
@@ -497,10 +540,35 @@ router.put('/maintenance/:id', protect, collegeScope, async (req, res) => {
 // @access  Private
 router.get('/complaints', protect, collegeScope, async (req, res) => {
   try {
-    const complaints = await TransportComplaint.find({});
+    const filter = {};
+    if (req.query.studentId) filter.studentId = req.query.studentId;
+    if (req.query.reporterType) filter.reporterType = req.query.reporterType;
+    if (req.query.status) filter.status = req.query.status;
+    const complaints = await TransportComplaint.find(filter).sort({ createdAt: -1 });
     res.json(complaints);
   } catch (error) {
     res.status(500).json({ message: 'Server Error fetching complaints' });
+  }
+});
+
+// @desc    Get complaint by ID
+// @route   GET /api/transport/complaints/:id
+// @access  Private
+router.get('/complaints/:id', protect, collegeScope, async (req, res) => {
+  try {
+    let complaint = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      complaint = await TransportComplaint.findById(req.params.id);
+    }
+    if (!complaint) {
+      complaint = await TransportComplaint.findOne({ complaintId: req.params.id });
+    }
+    if (!complaint) {
+      return res.status(404).json({ message: 'Complaint not found' });
+    }
+    res.json(complaint);
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Server Error fetching complaint' });
   }
 });
 
@@ -515,7 +583,36 @@ router.post('/complaints', protect, collegeScope, async (req, res) => {
     });
     res.status(201).json(newComplaint);
   } catch (error) {
-    res.status(500).json({ message: 'Server Error creating complaint' });
+    res.status(500).json({ message: error.message || 'Server Error creating complaint' });
+  }
+});
+
+// @desc    Add reply to a complaint
+// @route   POST /api/transport/complaints/:id/reply
+// @access  Private
+router.post('/complaints/:id/reply', protect, collegeScope, async (req, res) => {
+  try {
+    let complaint = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      complaint = await TransportComplaint.findById(req.params.id);
+    }
+    if (!complaint) {
+      complaint = await TransportComplaint.findOne({ complaintId: req.params.id });
+    }
+    if (!complaint) {
+      return res.status(404).json({ message: 'Complaint not found' });
+    }
+    const { message, sender, role } = req.body;
+    complaint.replies.push({
+      sender: sender || req.user.name || 'User',
+      role: role || req.user.role || 'Staff',
+      message,
+      timestamp: new Date()
+    });
+    await complaint.save();
+    res.json(complaint);
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Server Error adding reply' });
   }
 });
 
@@ -531,7 +628,19 @@ router.put('/complaints/:id', protect, collegeScope, async (req, res) => {
     );
     res.json(updated);
   } catch (error) {
-    res.status(500).json({ message: 'Server Error updating complaint' });
+    res.status(500).json({ message: error.message || 'Server Error updating complaint' });
+  }
+});
+
+// @desc    Delete a complaint
+// @route   DELETE /api/transport/complaints/:id
+// @access  Private
+router.delete('/complaints/:id', protect, collegeScope, async (req, res) => {
+  try {
+    await TransportComplaint.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Complaint deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Server Error deleting complaint' });
   }
 });
 
@@ -559,7 +668,7 @@ router.post('/trips', protect, collegeScope, async (req, res) => {
     const newTrip = await TransportTrip.create(req.body);
     res.status(201).json(newTrip);
   } catch (error) {
-    res.status(500).json({ message: 'Server Error creating trip' });
+    res.status(500).json({ message: error.message || 'Server Error creating trip' });
   }
 });
 
@@ -575,7 +684,7 @@ router.put('/trips/:id', protect, collegeScope, async (req, res) => {
     );
     res.json(updated);
   } catch (error) {
-    res.status(500).json({ message: 'Server Error updating trip' });
+    res.status(500).json({ message: error.message || 'Server Error updating trip' });
   }
 });
 
@@ -592,6 +701,21 @@ router.get('/notifications', protect, collegeScope, async (req, res) => {
     res.json(notifs);
   } catch (error) {
     res.status(500).json({ message: 'Server Error fetching notifications' });
+  }
+});
+
+// @desc    Create a transport notification
+// @route   POST /api/transport/notifications
+// @access  Private
+router.post('/notifications', protect, collegeScope, async (req, res) => {
+  try {
+    const notif = await TransportNotification.create({
+      ...req.body,
+      collegeId: req.user.tenantId || req.user.collegeId
+    });
+    res.status(201).json(notif);
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Server Error creating notification' });
   }
 });
 

@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Plus, Trash2, Clock, Users, MapPin, X, BookOpen, Layers, CheckCircle2 } from 'lucide-react';
-import { getTimetable, createTimetable, deleteTimetable, getPeriodMasters, getFacultyAllocations } from '../../api/index';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Calendar, Plus, Trash2, Clock, Users, MapPin, X, BookOpen, Layers, CheckCircle2, Filter, UserCheck, Play } from 'lucide-react';
+import { getTimetable, createTimetable, deleteTimetable, getPeriodMasters, getFacultyAllocations, getStaff, getMyTimetable } from '../../api/index';
+import useRealtimeSync from '../../hooks/useRealtimeSync';
+import LiveClassModal from '../../staff/components/LiveClassModal';
 import './HodTimetable.css';
 
 const getHodSession = () => {
   try {
     return JSON.parse(sessionStorage.getItem('hod_session')) || {
-      name: 'Prof. Rajan Iyer', dept: 'Computer Science Engineering', deptCode: 'CS', role: 'HOD'
+      name: 'Prof. Rajan Iyer', dept: 'Computer Science', deptCode: 'CS', role: 'HOD'
     };
   } catch (e) {
-    return { name: 'Prof. Rajan Iyer', dept: 'Computer Science Engineering', deptCode: 'CS', role: 'HOD' };
+    return { name: 'Prof. Rajan Iyer', dept: 'Computer Science', deptCode: 'CS', role: 'HOD' };
   }
 };
 
@@ -61,7 +63,7 @@ const formatRoomNo = (room) => {
 
 const getDayDateInfo = (dayName) => {
   const now = new Date();
-  const currentDayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat
+  const currentDayOfWeek = now.getDay();
   const daysMap = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
   const targetDayOfWeek = daysMap[dayName] || 1;
 
@@ -83,33 +85,46 @@ const getDayDateInfo = (dayName) => {
 
 const HodTimetable = () => {
   const hodSession = getHodSession();
-  const HOD_DEPT = hodSession.dept;
+  const HOD_DEPT = hodSession.dept || hodSession.department || 'Computer Science';
+
+  // Navigation Tabs: 'department' | 'faculty' | 'my'
+  const [activeTab, setActiveTab] = useState('department');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [allTimetables, setAllTimetables] = useState([]);
   const [periods, setPeriods] = useState([]);
-  const [allocations, setAllocations] = useState([]);
+  const [departmentStaffList, setDepartmentStaffList] = useState([]);
   
-  const [selectedSem, setSelectedSem] = useState('Semester 1');
-  const [selectedSection, setSelectedSection] = useState('A');
+  // Department View Filters
+  const [selectedSem, setSelectedSem] = useState('All');
+  const [selectedSection, setSelectedSection] = useState('All');
+  const [selectedFacultyFilter, setSelectedFacultyFilter] = useState('All');
+
+  // Faculty-wise Tab Filter
+  const [selectedFacultyId, setSelectedFacultyId] = useState('');
+
+  // Live Class Modal (for HOD's own classes)
+  const [activeClassSlot, setActiveClassSlot] = useState(null);
 
   // Slot Modal State
   const [modalOpen, setModalOpen] = useState(false);
+  const [formSem, setFormSem] = useState('Semester 1');
+  const [formSection, setFormSection] = useState('A');
   const [formDay, setFormDay] = useState('Monday');
   const [formPeriod, setFormPeriod] = useState('');
-  const [formSubject, setFormSubject] = useState(''); // facultyAllocationId
+  const [formSubject, setFormSubject] = useState('');
   const [formRoom, setFormRoom] = useState('C101');
   const [autoFaculty, setAutoFaculty] = useState('');
+  const [modalAllocations, setModalAllocations] = useState([]);
   const [error, setError] = useState('');
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  // Initial Master Data Loading
+  const loadInitialData = useCallback(async () => {
     try {
-      const [ttRes, periodRes, allocRes] = await Promise.all([
-        getTimetable(HOD_DEPT, selectedSem, selectedSection),
+      const [periodRes, staffRes] = await Promise.all([
         getPeriodMasters().catch(() => ({ data: [] })),
-        getFacultyAllocations({ department: HOD_DEPT, semester: selectedSem, section: selectedSection }).catch(() => ({ data: [] }))
+        getStaff().catch(() => ({ data: [] }))
       ]);
 
       if (periodRes.data) {
@@ -123,33 +138,96 @@ const HodTimetable = () => {
         }
       }
 
-      setAllTimetables(ttRes.data || []);
-      setAllocations(allocRes.data || []);
+      if (staffRes.data) {
+        const rawStaff = Array.isArray(staffRes.data) ? staffRes.data : staffRes.data.staff || [];
+        const deptStaff = rawStaff.filter(s => {
+          const d = (s.dept || s.department || '').toLowerCase();
+          const target = HOD_DEPT.toLowerCase();
+          return d.includes(target) || target.includes(d);
+        });
+        setDepartmentStaffList(deptStaff);
+        if (deptStaff.length > 0 && !selectedFacultyId) {
+          setSelectedFacultyId(deptStaff[0]._id || deptStaff[0].id || deptStaff[0].staffId);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load initial timetable data', err);
+    }
+  }, [HOD_DEPT, formPeriod, selectedFacultyId]);
+
+  // Load Main Timetable Data based on Active Tab and Filters
+  const loadTimetableData = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (activeTab === 'my') {
+        const res = await getMyTimetable().catch(() => ({ data: [] }));
+        setAllTimetables(res.data || []);
+      } else {
+        const semParam = selectedSem === 'All' ? undefined : selectedSem;
+        const secParam = selectedSection === 'All' ? undefined : selectedSection;
+        
+        const ttRes = await getTimetable(HOD_DEPT, semParam, secParam);
+        setAllTimetables(ttRes.data || []);
+      }
     } catch (err) {
       console.error('Failed to load timetable from backend', err);
       setAllTimetables([]);
     } finally {
       setLoading(false);
     }
-  }, [HOD_DEPT, selectedSem, selectedSection, formPeriod]);
+  }, [HOD_DEPT, activeTab, selectedSem, selectedSection]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadInitialData();
+  }, [loadInitialData]);
+
+  useEffect(() => {
+    loadTimetableData();
+  }, [loadTimetableData]);
+
+  useRealtimeSync(loadTimetableData, ['timetable', 'substitutions', 'faculty_allocations', 'class_started']);
+
+  // Fetch Allocations dynamically for the Schedule Slot Modal
+  useEffect(() => {
+    if (!modalOpen) return;
+    const fetchModalAllocations = async () => {
+      try {
+        const res = await getFacultyAllocations({
+          department: HOD_DEPT,
+          semester: formSem,
+          section: formSection
+        }).catch(() => ({ data: [] }));
+        const list = res.data || [];
+        setModalAllocations(list);
+        if (list.length > 0) {
+          setFormSubject(list[0]._id);
+          setAutoFaculty(list[0].staffId?.name || list[0].staffName || '');
+        } else {
+          setFormSubject('');
+          setAutoFaculty('');
+        }
+      } catch (e) {
+        setModalAllocations([]);
+      }
+    };
+    fetchModalAllocations();
+  }, [modalOpen, HOD_DEPT, formSem, formSection]);
 
   const handleSubjectChange = (allocId) => {
     setFormSubject(allocId);
-    const alloc = allocations.find(a => a._id === allocId);
-    if (alloc && alloc.staffId) {
-      setAutoFaculty(alloc.staffId.name);
+    const alloc = modalAllocations.find(a => a._id === allocId);
+    if (alloc && (alloc.staffId || alloc.staffName)) {
+      setAutoFaculty(alloc.staffId?.name || alloc.staffName || '');
     } else {
       setAutoFaculty('');
     }
   };
 
-  const openAddSlotModal = (targetDay = 'Monday', targetPeriodId = null) => {
+  const openAddSlotModal = (targetDay = 'Monday', targetPeriodId = null, targetSem = null, targetSec = null) => {
     setFormDay(targetDay);
     if (targetPeriodId) setFormPeriod(targetPeriodId);
+    setFormSem(targetSem || (selectedSem !== 'All' ? selectedSem : 'Semester 1'));
+    setFormSection(targetSec || (selectedSection !== 'All' ? selectedSection : 'A'));
     setError('');
     setModalOpen(true);
   };
@@ -163,9 +241,9 @@ const HodTimetable = () => {
     setError('');
     setSaving(true);
     
-    const alloc = allocations.find(a => a._id === formSubject);
+    const alloc = modalAllocations.find(a => a._id === formSubject);
     if (!alloc || !alloc.subjectId) {
-      setError('Invalid faculty allocation selected.');
+      setError('Invalid faculty allocation selected. Please ensure subject has an allocated faculty.');
       setSaving(false);
       return;
     }
@@ -173,8 +251,8 @@ const HodTimetable = () => {
     try {
       await createTimetable({
         department: HOD_DEPT,
-        semester: selectedSem,
-        section: selectedSection,
+        semester: formSem,
+        section: formSection,
         day: formDay,
         periodId: formPeriod,
         subjectId: alloc.subjectId._id || alloc.subjectId,
@@ -182,7 +260,7 @@ const HodTimetable = () => {
         roomNo: formRoom
       });
       setModalOpen(false);
-      loadData();
+      loadTimetableData();
     } catch (err) {
       setError(err.response?.data?.message || 'Conflict detected: Faculty or Room already occupied.');
     } finally {
@@ -194,106 +272,211 @@ const HodTimetable = () => {
     if (!window.confirm('Are you sure you want to remove this timetable slot?')) return;
     try {
       await deleteTimetable(id);
-      loadData();
+      loadTimetableData();
     } catch (err) {
       alert(err.response?.data?.message || 'Error deleting slot');
     }
   };
 
+  // Filtered displayed timetable slots based on activeTab and sub-filters
+  const displayedTimetable = useMemo(() => {
+    if (activeTab === 'my') {
+      const myName = (hodSession.name || '').trim().toLowerCase();
+      return allTimetables.filter(slot => {
+        const staffName = (slot.facultyAllocationId?.staffId?.name || slot.staffName || '').trim().toLowerCase();
+        if (myName && staffName) {
+          return staffName === myName || staffName.includes(myName) || myName.includes(staffName);
+        }
+        return false;
+      });
+    }
+
+    if (activeTab === 'faculty') {
+      if (!selectedFacultyId) return allTimetables;
+      return allTimetables.filter(slot => {
+        const staffIdObj = slot.facultyAllocationId?.staffId;
+        const staffId = typeof staffIdObj === 'object' ? (staffIdObj?._id || staffIdObj?.id) : staffIdObj;
+        const staffName = slot.facultyAllocationId?.staffId?.name || slot.staffName || '';
+        
+        const targetStaff = departmentStaffList.find(s => (s._id || s.id || s.staffId) === selectedFacultyId);
+        const targetName = targetStaff ? targetStaff.name : '';
+
+        return staffId === selectedFacultyId || 
+               (targetName && staffName.toLowerCase() === targetName.toLowerCase());
+      });
+    }
+
+    // Tab: 'department'
+    return allTimetables.filter(slot => {
+      if (selectedSem !== 'All' && slot.semester !== selectedSem) return false;
+      if (selectedSection !== 'All' && slot.section !== selectedSection) return false;
+      if (selectedFacultyFilter !== 'All') {
+        const staffName = slot.facultyAllocationId?.staffId?.name || slot.staffName || '';
+        if (staffName.toLowerCase() !== selectedFacultyFilter.toLowerCase()) return false;
+      }
+      return true;
+    });
+  }, [allTimetables, activeTab, selectedSem, selectedSection, selectedFacultyFilter, selectedFacultyId, departmentStaffList, hodSession.name]);
+
+  // Unique faculty names for filter dropdown
+  const uniqueFacultyNames = useMemo(() => {
+    const names = new Set();
+    allTimetables.forEach(t => {
+      const fName = t.facultyAllocationId?.staffId?.name || t.staffName;
+      if (fName) names.add(fName);
+    });
+    departmentStaffList.forEach(s => {
+      if (s.name) names.add(s.name);
+    });
+    return Array.from(names).sort();
+  }, [allTimetables, departmentStaffList]);
+
   return (
-    <div className="animate-fade-in p-6 pb-24 max-w-7xl mx-auto">
+    <div className="hod-timetable-container">
       
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-800">
-            <Calendar className="text-blue-600" size={28} /> Department Class Timetable
+      {/* Page Header Row */}
+      <div className="tt-header-row">
+        <div className="tt-title-wrap">
+          <h1 className="tt-title-h1">
+            <div className="tt-title-icon-badge">
+              <Calendar size={22} />
+            </div>
+            Department Class Timetable
           </h1>
-          <p className="text-gray-500 mt-1">Weekly Monday–Saturday class schedule for {HOD_DEPT}.</p>
+          <p className="tt-subtitle">
+            Weekly class schedule, teacher assignments, and period slots for <strong>{HOD_DEPT}</strong>.
+          </p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3">
-          <button 
-            onClick={() => openAddSlotModal('Monday')}
-            style={{
-              padding: '0.65rem 1.25rem',
-              borderRadius: '10px',
-              background: '#2563eb',
-              color: '#ffffff',
-              fontWeight: 700,
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              boxShadow: '0 4px 12px rgba(37,99,235,0.25)'
-            }}
-          >
-            <Plus size={18} /> Schedule Class Slot
-          </button>
-
-          <div className="flex items-center gap-3 bg-white p-2 px-3 rounded-xl border border-gray-200 shadow-sm">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Semester:</label>
-            <select 
-              className="border border-gray-200 bg-gray-50 py-1.5 px-3 rounded-lg text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500"
-              value={selectedSem}
-              onChange={(e) => setSelectedSem(e.target.value)}
-            >
-              {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Section:</label>
-            <select 
-              className="border border-gray-200 bg-gray-50 py-1.5 px-3 rounded-lg text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500"
-              value={selectedSection}
-              onChange={(e) => setSelectedSection(e.target.value)}
-            >
-              {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-        </div>
+        <button 
+          onClick={() => openAddSlotModal('Monday')}
+          className="tt-primary-btn"
+        >
+          <Plus size={18} /> Schedule Class Slot
+        </button>
       </div>
 
-      {/* LIVE DAY TRACKER BANNER */}
+      {/* Control Toolbar Card */}
+      <div className="tt-toolbar-card">
+        
+        {/* Segmented View Mode Tabs */}
+        <div className="tt-tabs-group">
+          <button
+            onClick={() => setActiveTab('department')}
+            className={`tt-tab-btn ${activeTab === 'department' ? 'active' : ''}`}
+          >
+            <BookOpen size={14} /> Department Timetable
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('faculty')}
+            className={`tt-tab-btn ${activeTab === 'faculty' ? 'active' : ''}`}
+          >
+            <Users size={14} /> Faculty Schedule
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('my')}
+            className={`tt-tab-btn ${activeTab === 'my' ? 'active' : ''}`}
+          >
+            <UserCheck size={14} /> My Assigned Classes
+          </button>
+        </div>
+
+        {/* Dynamic Context Filters aligned right */}
+        {activeTab === 'department' && (
+          <div className="tt-filters-group">
+            <div className="tt-filter-pill">
+              <span>Sem:</span>
+              <select 
+                value={selectedSem}
+                onChange={(e) => setSelectedSem(e.target.value)}
+              >
+                <option value="All">All Semesters</option>
+                {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div className="tt-filter-pill">
+              <span>Sec:</span>
+              <select 
+                value={selectedSection}
+                onChange={(e) => setSelectedSection(e.target.value)}
+              >
+                <option value="All">All Sections</option>
+                {SECTIONS.map(s => <option key={s} value={s}>Sec {s}</option>)}
+              </select>
+            </div>
+
+            <div className="tt-filter-pill">
+              <span>Faculty:</span>
+              <select 
+                value={selectedFacultyFilter}
+                onChange={(e) => setSelectedFacultyFilter(e.target.value)}
+              >
+                <option value="All">All Faculty</option>
+                {uniqueFacultyNames.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'faculty' && (
+          <div className="tt-filter-badge faculty">
+            <span>Select Teacher:</span>
+            <select 
+              style={{ border: 'none', background: 'transparent', fontWeight: 700, color: '#6b21a8', outline: 'none', cursor: 'pointer', fontSize: '0.78rem' }}
+              value={selectedFacultyId}
+              onChange={(e) => setSelectedFacultyId(e.target.value)}
+            >
+              {departmentStaffList.map(st => (
+                <option key={st._id || st.id || st.staffId} value={st._id || st.id || st.staffId}>
+                  {st.name} ({st.designation || 'Faculty'})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {activeTab === 'my' && (
+          <div className="tt-filter-badge hod">
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }}></span>
+            <span>HOD: {hodSession.name || 'Ananya'}</span>
+          </div>
+        )}
+
+      </div>
+
+      {/* Compact Live Day Tracker Strip */}
       {(() => {
         const todayInfo = getDayDateInfo(new Date().toLocaleDateString('en-US', { weekday: 'long' }));
         const tomorrowName = new Date(Date.now() + 86400000).toLocaleDateString('en-US', { weekday: 'long' });
         const tomorrowInfo = getDayDateInfo(tomorrowName);
         return (
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(37,99,235,0.06), rgba(147,51,234,0.06))',
-            border: '1px solid rgba(37,99,235,0.2)',
-            borderRadius: '12px',
-            padding: '0.75rem 1.25rem',
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            color: '#1e293b'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2563eb', boxShadow: '0 0 0 3px rgba(37,99,235,0.2)' }} />
-              <span>Live Day Tracker: <strong style={{ color: '#2563eb' }}>Today is {todayInfo.fullDateStr} (TODAY)</strong> • <strong style={{ color: '#9333ea' }}>Tomorrow is {tomorrowInfo.fullDateStr} (TOMORROW)</strong></span>
+          <div className="tt-tracker-strip">
+            <div className="tt-tracker-indicator">
+              <span className="tt-dot-live"></span>
+              <span>
+                Today is <strong style={{ color: '#2563eb' }}>{todayInfo.fullDateStr} (TODAY)</strong> • Tomorrow is <strong style={{ color: '#9333ea' }}>{tomorrowInfo.fullDateStr} (TOMORROW)</strong>
+              </span>
             </div>
-            <span style={{ fontSize: '0.75rem', background: '#ffffff', border: '1px solid #cbd5e1', padding: '0.2rem 0.6rem', borderRadius: '6px', color: '#475569' }}>
-              Weekly Matrix
-            </span>
+            
+            <div>
+              <span className="tt-count-pill">
+                {displayedTimetable.length} Slot{displayedTimetable.length !== 1 ? 's' : ''} Displayed
+              </span>
+            </div>
           </div>
         );
       })()}
 
-      {/* WEEKLY TIMETABLE MATRIX CONTAINER */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto" style={{ maxHeight: '72vh' }}>
-          <table className="w-full border-collapse text-left" style={{ minWidth: '980px' }}>
+      {/* TIMETABLE MATRIX CARD */}
+      <div className="tt-matrix-card">
+        <div className="tt-table-scroll">
+          <table className="tt-table">
             <thead>
-              <tr style={{ background: '#f8fafc', color: '#1e293b', position: 'sticky', top: 0, zIndex: 20, borderBottom: '2px solid #e2e8f0' }} className="text-xs uppercase tracking-wider">
-                <th 
-                  className="p-3.5 border-r border-gray-200 text-center font-bold" 
-                  style={{ width: '170px', minWidth: '170px', position: 'sticky', left: 0, zIndex: 30, background: '#f1f5f9', color: '#0f172a' }}
-                >
+              <tr>
+                <th className="tt-th-period">
                   TIMING / PERIOD
                 </th>
                 {DAYS_ORDER.map(dayName => {
@@ -301,30 +484,20 @@ const HodTimetable = () => {
                   return (
                     <th 
                       key={dayName} 
-                      className="p-3 border-r border-gray-200 text-center font-bold" 
+                      className="tt-th-day"
                       style={{ 
                         background: info.isToday ? '#eff6ff' : info.isTomorrow ? '#faf5ff' : '#f8fafc', 
                         color: info.isToday ? '#1d4ed8' : info.isTomorrow ? '#6b21a8' : '#1e293b',
-                        borderBottom: info.isToday ? '3px solid #2563eb' : info.isTomorrow ? '3px solid #9333ea' : undefined
+                        borderBottom: info.isToday ? '3px solid #2563eb' : info.isTomorrow ? '3px solid #9333ea' : '1px solid #e2e8f0'
                       }}
                     >
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div className="tt-th-day-content">
+                        <div className="tt-th-day-label">
                           <span>{dayName}</span>
-                          {info.isToday && (
-                            <span style={{ background: '#2563eb', color: '#ffffff', fontSize: '9px', padding: '1px 5px', borderRadius: '8px', fontWeight: 800 }}>
-                              TODAY
-                            </span>
-                          )}
-                          {info.isTomorrow && (
-                            <span style={{ background: '#9333ea', color: '#ffffff', fontSize: '9px', padding: '1px 5px', borderRadius: '8px', fontWeight: 800 }}>
-                              TOMORROW
-                            </span>
-                          )}
+                          {info.isToday && <span className="tt-badge-today">TODAY</span>}
+                          {info.isTomorrow && <span className="tt-badge-tomorrow">TOMORROW</span>}
                         </div>
-                        <span style={{ fontSize: '10px', fontWeight: 500, opacity: 0.75, textTransform: 'none' }}>
-                          {info.dateFormatted}
-                        </span>
+                        <span className="tt-th-date-sub">{info.dateFormatted}</span>
                       </div>
                     </th>
                   );
@@ -335,13 +508,13 @@ const HodTimetable = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center text-gray-400 font-medium">
+                  <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>
                     Loading department schedule...
                   </td>
                 </tr>
               ) : periods.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center text-gray-400 font-medium">
+                  <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>
                     No period structures configured.
                   </td>
                 </tr>
@@ -351,15 +524,12 @@ const HodTimetable = () => {
 
                   if (period.isBreak) {
                     return (
-                      <tr key={period._id || pIdx} className="bg-amber-50/70 border-b border-amber-200">
-                        <td 
-                          className="p-3 border-r border-amber-200 text-center bg-amber-100/80" 
-                          style={{ width: '170px', minWidth: '170px', position: 'sticky', left: 0, zIndex: 10 }}
-                        >
-                          <span className="font-bold text-amber-900 text-xs block">{cleanPeriodName}</span>
-                          <span className="text-[11px] text-amber-700 font-medium">{period.startTime} – {period.endTime}</span>
+                      <tr key={period._id || pIdx} style={{ background: '#fffbeb', borderBottom: '1px solid #fef3c7' }}>
+                        <td className="tt-td-period-sticky" style={{ background: '#fef3c7', color: '#92400e' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.78rem' }}>{cleanPeriodName}</span>
+                          <span style={{ fontSize: '0.7rem', display: 'block', color: '#b45309' }}>{period.startTime} – {period.endTime}</span>
                         </td>
-                        <td colSpan={6} className="p-3 text-center font-bold text-amber-800 text-xs tracking-wide uppercase">
+                        <td colSpan={6} style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, color: '#92400e', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           ☕ {cleanPeriodName} ({period.startTime} – {period.endTime})
                         </td>
                       </tr>
@@ -367,98 +537,126 @@ const HodTimetable = () => {
                   }
 
                   return (
-                    <tr key={period._id || pIdx} className="border-b border-gray-200 hover:bg-gray-50/50 transition-colors">
+                    <tr key={period._id || pIdx} style={{ borderBottom: '1px solid #e2e8f0' }}>
                       {/* Sticky Period Header Column */}
-                      <td 
-                        className="p-3 border-r border-gray-200 bg-gray-50 text-center" 
-                        style={{ width: '170px', minWidth: '170px', position: 'sticky', left: 0, zIndex: 10 }}
-                      >
-                        <span className="font-bold text-gray-800 text-xs block">{cleanPeriodName}</span>
-                        <span className="text-[11px] text-gray-500 font-medium block mt-0.5">{period.startTime}</span>
-                        <span className="text-[11px] text-gray-400 block">{period.endTime}</span>
+                      <td className="tt-td-period-sticky">
+                        <span className="tt-period-name">{cleanPeriodName}</span>
+                        <span className="tt-period-time">{period.startTime} – {period.endTime}</span>
                       </td>
 
                       {/* Day Columns */}
                       {DAYS_ORDER.map(dayName => {
-                        const slot = allTimetables.find(t => 
+                        const matchingSlots = displayedTimetable.filter(t => 
                           t.day?.toLowerCase() === dayName.toLowerCase() && 
                           (t.periodId?._id === period._id || t.periodId === period._id)
                         );
 
-                        if (slot) {
-                          const subjectName =
-                            slot.subjectId?.subjectName ||
-                            slot.facultyAllocationId?.subjectId?.subjectName ||
-                            slot.subject ||
-                            'Subject';
-                          const facultyName = slot.facultyAllocationId?.staffId?.name || slot.staffName || 'Allocated Faculty';
-                          const room = formatRoomNo(slot.roomNo);
-                          
-                          const colorIdx = Math.abs(subjectName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % SUBJECT_COLORS.length;
-                          const theme = SUBJECT_COLORS[colorIdx];
-
+                        if (matchingSlots.length > 0) {
                           return (
-                            <td key={dayName} className="p-2 border-r border-gray-200 align-top">
-                              <div 
-                                style={{
-                                  background: theme.bg,
-                                  border: `1px solid ${theme.border}`,
-                                  borderRadius: '8px',
-                                  padding: '0.6rem',
-                                  position: 'relative'
-                                }}
-                                className="group shadow-sm transition-all hover:shadow-md"
-                              >
-                                <div className="flex justify-between items-start">
-                                  <h4 style={{ color: theme.text }} className="font-bold text-xs leading-snug">
-                                    {subjectName}
-                                  </h4>
-                                  <button 
-                                    onClick={() => handleDeleteSlot(slot._id)}
-                                    className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity p-0.5"
-                                    title="Delete slot"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </div>
+                            <td key={dayName} className="tt-td-slot-cell">
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {matchingSlots.map(slot => {
+                                  const subjectName =
+                                    slot.subjectId?.subjectName ||
+                                    slot.facultyAllocationId?.subjectId?.subjectName ||
+                                    slot.subject ||
+                                    'Subject';
+                                  const facultyName = slot.facultyAllocationId?.staffId?.name || slot.staffName || 'Allocated Faculty';
+                                  const room = formatRoomNo(slot.roomNo);
+                                  const classLabel = `${slot.semester || ''} • Sec ${slot.section || 'A'}`;
+                                  
+                                  const colorIdx = Math.abs(subjectName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % SUBJECT_COLORS.length;
+                                  const theme = SUBJECT_COLORS[colorIdx];
 
-                                <div className="flex items-center gap-1 text-[10px] text-gray-500 font-medium mt-1">
-                                  <Users size={10} className="text-gray-400 flex-shrink-0" />
-                                  <span className="truncate">{facultyName}</span>
-                                </div>
+                                  return (
+                                    <div 
+                                      key={slot._id}
+                                      onClick={() => {
+                                        if (activeTab === 'my') {
+                                          setActiveClassSlot({ ...slot, periodId: period });
+                                        }
+                                      }}
+                                      style={{
+                                        background: theme.bg,
+                                        border: `1px solid ${theme.border}`,
+                                        cursor: activeTab === 'my' ? 'pointer' : 'default'
+                                      }}
+                                      className="tt-slot-card"
+                                    >
+                                      <div className="tt-slot-header">
+                                        <h4 style={{ color: theme.text }} className="tt-slot-subject">
+                                          {subjectName}
+                                        </h4>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          {slot.status === 'Completed' || slot.session?.status === 'Completed' ? (
+                                            <span style={{ fontSize: '9px', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '1px 4px', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
+                                              ✅ Completed
+                                            </span>
+                                          ) : slot.status === 'Live' || slot.session?.status === 'Live' ? (
+                                            <span style={{ fontSize: '9px', fontWeight: 800, color: '#1d4ed8', background: '#dbeafe', padding: '1px 4px', borderRadius: '4px', border: '1px solid #93c5fd' }}>
+                                              🟢 Live
+                                            </span>
+                                          ) : activeTab === 'my' ? (
+                                            <span style={{ fontSize: '9px', fontWeight: 800, color: '#2563eb', background: '#ffffff', padding: '1px 4px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
+                                              Start ▶
+                                            </span>
+                                          ) : null}
+                                          <button 
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteSlot(slot._id);
+                                            }}
+                                            className="tt-slot-delete-btn"
+                                            title="Delete slot"
+                                          >
+                                            <Trash2 size={13} />
+                                          </button>
+                                        </div>
+                                      </div>
 
-                                <div className="mt-2 flex items-center justify-between">
-                                  <span 
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '3px',
-                                      fontSize: '10px',
-                                      fontWeight: 600,
-                                      color: '#334155',
-                                      background: '#ffffff',
-                                      border: '1px solid #cbd5e1',
-                                      padding: '1px 6px',
-                                      borderRadius: '4px',
-                                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                                    }}
-                                  >
-                                    <MapPin size={10} style={{ color: '#ef4444' }} /> {room}
-                                  </span>
-                                </div>
+                                      {/* Semester & Section Badge */}
+                                      <div className="tt-slot-sem-tag">
+                                        {classLabel}
+                                      </div>
+
+                                      <div className="tt-slot-faculty">
+                                        <Users size={11} color="#64748b" />
+                                        <span>{facultyName}</span>
+                                      </div>
+
+                                      <div className="tt-slot-footer">
+                                        <span className="tt-slot-room">
+                                          <MapPin size={10} color="#ef4444" /> {room}
+                                        </span>
+
+                                        {slot.isSubstitution && (
+                                          <span style={{ fontSize: '9px', fontWeight: 800, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', padding: '1px 4px', borderRadius: '4px' }}>
+                                            Sub
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </td>
                           );
                         }
 
                         return (
-                          <td key={dayName} className="p-2 border-r border-gray-200 align-middle text-center">
+                          <td key={dayName} className="tt-td-slot-cell" style={{ verticalAlign: 'middle', textAlign: 'center' }}>
                             <button
-                              onClick={() => openAddSlotModal(dayName, period._id)}
-                              className="w-full h-14 border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center text-xs text-gray-400 font-medium hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/30 transition-all group"
+                              type="button"
+                              onClick={() => openAddSlotModal(dayName, period._id, selectedSem !== 'All' ? selectedSem : 'Semester 1', selectedSection !== 'All' ? selectedSection : 'A')}
+                              className="tt-free-btn"
+                              onMouseEnter={e => {
+                                e.currentTarget.innerText = '+ Add Slot';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.innerText = 'Free';
+                              }}
                             >
-                              <span className="group-hover:inline hidden font-semibold">+ Add</span>
-                              <span className="group-hover:hidden opacity-60">Free</span>
+                              Free
                             </button>
                           </td>
                         );
@@ -479,13 +677,12 @@ const HodTimetable = () => {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(15, 23, 42, 0.75)',
-            backdropFilter: 'blur(6px)',
-            WebkitBackdropFilter: 'blur(6px)',
+            background: 'rgba(15, 23, 42, 0.7)',
+            backdropFilter: 'blur(5px)',
             zIndex: 9999,
             display: 'flex',
             alignItems: 'center',
-            justify: 'center',
+            justifyContent: 'center',
             padding: '1rem'
           }}
         >
@@ -495,20 +692,19 @@ const HodTimetable = () => {
               background: '#ffffff',
               color: '#0f172a',
               width: '100%',
-              maxWidth: '480px',
+              maxWidth: '520px',
               borderRadius: '16px',
               padding: '1.75rem',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
               border: '1px solid #e2e8f0',
-              position: 'relative',
-              zIndex: 10000
+              position: 'relative'
             }}
           >
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0', marginBottom: '1rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>Schedule Class Slot</h3>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>{HOD_DEPT} • {selectedSem} • Sec {selectedSection}</p>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Schedule Class Slot</h3>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>{HOD_DEPT} Department Schedule</p>
               </div>
               <button onClick={() => setModalOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: '0.25rem' }}>
                 <X size={20} />
@@ -522,6 +718,37 @@ const HodTimetable = () => {
             )}
 
             <form onSubmit={handleCreateSlot} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              
+              {/* Target Class: Semester & Section */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem' }}>Semester</label>
+                  <select 
+                    value={formSem} 
+                    onChange={e => setFormSem(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#f8fafc', fontWeight: 600, outline: 'none' }}
+                  >
+                    {SEMESTERS.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem' }}>Section</label>
+                  <select 
+                    value={formSection} 
+                    onChange={e => setFormSection(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#f8fafc', fontWeight: 600, outline: 'none' }}
+                  >
+                    {SECTIONS.map(s => (
+                      <option key={s} value={s}>Section {s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Day & Period */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem' }}>Weekday</label>
@@ -552,6 +779,7 @@ const HodTimetable = () => {
                 </div>
               </div>
 
+              {/* Subject (Filtered by selected Semester & Section) */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem' }}>Subject & Allocated Faculty</label>
                 <select 
@@ -560,15 +788,17 @@ const HodTimetable = () => {
                   onChange={e => handleSubjectChange(e.target.value)}
                   style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', fontWeight: 600, outline: 'none' }}
                 >
-                  <option value="">Select Subject (from Allocations)</option>
-                  {allocations.map(a => (
+                  <option value="">Select Subject (for {formSem} Sec {formSection})</option>
+                  {modalAllocations.map(a => (
                     <option key={a._id} value={a._id}>
-                      {a.subjectId?.subjectName || 'Subject'} ({a.staffId?.name || 'Faculty'})
+                      {a.subjectId?.subjectName || 'Subject'} ({a.staffId?.name || a.staffName || 'Faculty'})
                     </option>
                   ))}
                 </select>
-                {allocations.length === 0 && (
-                  <p style={{ fontSize: '0.75rem', color: '#d97706', marginTop: '0.25rem', fontWeight: 600 }}>⚠️ No faculty allocations found for this class.</p>
+                {modalAllocations.length === 0 && (
+                  <p style={{ fontSize: '0.75rem', color: '#d97706', marginTop: '0.25rem', fontWeight: 600 }}>
+                    ⚠️ No faculty allocations found for {formSem} Sec {formSection}. Allocate faculty under Academic Operations → Faculty Allocation.
+                  </p>
                 )}
               </div>
 
@@ -613,6 +843,15 @@ const HodTimetable = () => {
 
           </div>
         </div>
+      )}
+
+      {/* LIVE CLASS MODAL (When HOD clicks their own assigned class slot) */}
+      {activeClassSlot && (
+        <LiveClassModal 
+          slot={activeClassSlot} 
+          onClose={() => setActiveClassSlot(null)}
+          onSessionUpdated={loadTimetableData}
+        />
       )}
 
     </div>

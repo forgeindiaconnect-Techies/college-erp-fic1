@@ -160,7 +160,8 @@ const studentSchema = new mongoose.Schema({
     promotedTo: String,
     status: { type: String, default: 'Passed' }
   }],
-  collegeId: { type: String }
+  collegeId: { type: String },
+  tenantId: { type: String }
 }, { timestamps: true, strict: false });
 
 export default mongoose.model('Student', studentSchema);

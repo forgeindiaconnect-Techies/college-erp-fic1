@@ -11,7 +11,9 @@ const placementJobSchema = new mongoose.Schema({
   eligibleDepartments: { type: [String], default: [] },
   driveDate: { type: Date }, // Drive Date
   deadline: { type: Date, required: true }, // Last Date to Apply
-  applicants: { type: Number, required: true, default: 0 }
+  applicants: { type: Number, required: true, default: 0 },
+  totalRounds: { type: Number, default: 3 },
+  rounds: { type: [mongoose.Schema.Types.Mixed], default: [] }
 , collegeId: { type: String } }, { timestamps: true });
 
 export default mongoose.model('PlacementJob', placementJobSchema);

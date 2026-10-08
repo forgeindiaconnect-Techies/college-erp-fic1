@@ -7,11 +7,11 @@ import { getTimetable, getSubstitutions, createSubstitution, deleteSubstitution,
 
 const getHodSession = () => {
   try {
-    return JSON.parse(sessionStorage.getItem('hod_session')) || {
-      name: 'Prof. Rajan Iyer', dept: 'Computer Science', deptCode: 'CSE', role: 'HOD'
-    };
+    const raw = sessionStorage.getItem('hod_session') || localStorage.getItem('erp_user');
+    if (raw) return JSON.parse(raw);
+    return { name: 'HOD', dept: 'TAMIL', role: 'HOD' };
   } catch (e) {
-    return { name: 'Prof. Rajan Iyer', dept: 'Computer Science', deptCode: 'CSE', role: 'HOD' };
+    return { name: 'HOD', dept: 'TAMIL', role: 'HOD' };
   }
 };
 
@@ -147,20 +147,8 @@ const HodSubstitution = () => {
 
   // Merge timetable slots with live substitution entries
   const slotsWithSubstitutions = useMemo(() => {
-    if (timetables.length === 0) {
-      // Default fallback periodic structure so HOD can test easily
-      return [
-        { id: '1', periodName: 'Period 1 (09:00 - 10:00)', subjectName: 'Data Structures & Algorithms', facultyName: 'Dr. Ramesh Kumar', roomNo: 'Room 204' },
-        { id: '2', periodName: 'Period 2 (10:00 - 11:00)', subjectName: 'Database Management Systems', facultyName: 'Prof. Anitha S', roomNo: 'Lab 2' },
-        { id: '3', periodName: 'Period 3 (11:15 - 12:15)', subjectName: 'Operating Systems', facultyName: 'Dr. Suresh V', roomNo: 'Room 204' },
-        { id: '4', periodName: 'Period 4 (01:15 - 02:15)', subjectName: 'Computer Networks', facultyName: 'Prof. Divya M', roomNo: 'Room 205' },
-      ].map(slot => {
-        const sub = substitutions.find(s => s.periodName === slot.periodName || s.subjectName === slot.subjectName);
-        return {
-          ...slot,
-          substitution: sub || null
-        };
-      });
+    if (!Array.isArray(timetables) || timetables.length === 0) {
+      return [];
     }
 
     return timetables.map(slot => {
@@ -368,58 +356,80 @@ const HodSubstitution = () => {
               </tr>
             </thead>
             <tbody>
-              {slotsWithSubstitutions.map((slot, idx) => {
-                const isSubstituted = Boolean(slot.substitution);
-                return (
-                  <tr key={slot.id || idx} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)', background: isSubstituted ? 'rgba(245, 158, 11, 0.03)' : 'transparent' }}>
-                    <td style={{ padding: '14px 16px', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>
-                      {slot.periodName}
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>{slot.subjectName}</div>
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <div style={{ fontWeight: 600, color: 'var(--text-muted, #475569)' }}>{slot.facultyName}</div>
-                    </td>
-                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                      <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'var(--bg-secondary, #f1f5f9)', fontSize: '0.76rem', fontWeight: 600 }}>
-                        {slot.roomNo}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                      {isSubstituted ? (
-                        <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                          <span style={{ padding: '3px 10px', borderRadius: '20px', background: '#fef3c7', color: '#b45309', fontWeight: 700, fontSize: '0.74rem' }}>
-                            Proxy: {slot.substitution.substituteStaffId?.name || slot.substitution.substituteFacultyName || 'Substitute'}
-                          </span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>({slot.substitution.reason || 'Leave'})</span>
-                        </div>
-                      ) : (
-                        <span style={{ padding: '3px 10px', borderRadius: '20px', background: '#dcfce7', color: '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
-                          ✓ Regular Faculty
+              {loading ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted, #64748b)' }}>
+                    Loading timetable slots...
+                  </td>
+                </tr>
+              ) : slotsWithSubstitutions.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '48px 20px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <Calendar size={36} color="#94a3b8" />
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main, #0f172a)' }}>
+                        No Timetable Classes Scheduled
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-muted, #64748b)', maxWidth: '460px' }}>
+                        There are no scheduled lecture periods for <strong>{HOD_DEPT}</strong> ({selectedSem}, Section {selectedSection}) on <strong>{dayName}</strong> ({selectedDate}).
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                slotsWithSubstitutions.map((slot, idx) => {
+                  const isSubstituted = Boolean(slot.substitution);
+                  return (
+                    <tr key={slot._id || slot.id || idx} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)', background: isSubstituted ? 'rgba(245, 158, 11, 0.03)' : 'transparent' }}>
+                      <td style={{ padding: '14px 16px', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>
+                        {slot.periodName}
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>{slot.subjectName}</div>
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-muted, #475569)' }}>{slot.facultyName}</div>
+                      </td>
+                      <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                        <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'var(--bg-secondary, #f1f5f9)', fontSize: '0.76rem', fontWeight: 600 }}>
+                          {slot.roomNo}
                         </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                      {isSubstituted ? (
-                        <button 
-                          onClick={() => handleDeleteSub(slot.substitution._id || slot.substitution.id)}
-                          style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #fecdd3', background: '#fff1f2', color: '#e11d48', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
-                        >
-                          Revoke Proxy
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => handleOpenModal(slot)}
-                          style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #bfdbfe', background: '#eff6ff', color: '#2563eb', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
-                        >
-                          + Assign Proxy
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                        {isSubstituted ? (
+                          <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                            <span style={{ padding: '3px 10px', borderRadius: '20px', background: '#fef3c7', color: '#b45309', fontWeight: 700, fontSize: '0.74rem' }}>
+                              Proxy: {slot.substitution.substituteStaffId?.name || slot.substitution.substituteFacultyName || 'Substitute'}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>({slot.substitution.reason || 'Leave'})</span>
+                          </div>
+                        ) : (
+                          <span style={{ padding: '3px 10px', borderRadius: '20px', background: '#dcfce7', color: '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                            ✓ Regular Faculty
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                        {isSubstituted ? (
+                          <button 
+                            onClick={() => handleDeleteSub(slot.substitution._id || slot.substitution.id)}
+                            style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #fecdd3', background: '#fff1f2', color: '#e11d48', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Revoke Proxy
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => handleOpenModal(slot)}
+                            style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #bfdbfe', background: '#eff6ff', color: '#2563eb', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            + Assign Proxy
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

@@ -53,6 +53,8 @@ api.interceptors.request.use(
         token = sessionStorage.getItem('hostel_token');
       } else if (path.startsWith('/librarian')) {
         token = sessionStorage.getItem('librarian_token');
+      } else if (path.startsWith('/placement')) {
+        token = sessionStorage.getItem('placement_token');
       } else {
         // Fallback: Check all in priority
         token = sessionStorage.getItem('superadmin_token')
@@ -67,6 +69,7 @@ api.interceptors.request.use(
           || sessionStorage.getItem('driver_token')
           || sessionStorage.getItem('hostel_token')
           || sessionStorage.getItem('librarian_token')
+          || sessionStorage.getItem('placement_token')
           || sessionStorage.getItem('token');
       }
     } catch (e) {
@@ -99,7 +102,7 @@ api.interceptors.response.use(
       }
 
       // Do not redirect if on a public route (not under protected route prefixes)
-      const protectedPrefixes = ['/admin', '/superadmin', '/subadmin', '/principal', '/hod', '/staff', '/student', '/parent', '/accounts', '/driver', '/hostel'];
+      const protectedPrefixes = ['/admin', '/superadmin', '/subadmin', '/principal', '/hod', '/staff', '/student', '/parent', '/accounts', '/driver', '/hostel', '/librarian', '/placement'];
       const isProtectedRoute = protectedPrefixes.some(prefix => window.location.pathname.startsWith(prefix));
       if (!isProtectedRoute) {
         return Promise.reject(error);
@@ -126,8 +129,8 @@ api.interceptors.response.use(
 
       console.warn('Session expired or unauthorized! Clearing session storage and redirecting to login...');
       const keys = [
-        'superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token', 'hostel_token', 'watchman_token',
-        'superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session', 'hostel_session', 'watchman_session'
+        'superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token', 'hostel_token', 'watchman_token', 'librarian_token', 'placement_token',
+        'superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session', 'hostel_session', 'watchman_session', 'librarian_session', 'placement_session'
       ];
       keys.forEach(k => {
         sessionStorage.removeItem(k);
@@ -145,8 +148,8 @@ api.interceptors.response.use(
       if (msg.toLowerCase().includes('deactivated')) {
         console.warn('College is deactivated! Clearing session storage and redirecting to login...');
         const keys = [
-          'superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token', 'hostel_token', 'watchman_token',
-          'superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session', 'hostel_session', 'watchman_session'
+          'superadmin_token', 'admin_token', 'subadmin_token', 'principal_token', 'hod_token', 'staff_token', 'student_token', 'parent_token', 'accounts_token', 'driver_token', 'hostel_token', 'watchman_token', 'librarian_token', 'placement_token',
+          'superadmin_session', 'admin_session', 'subadmin_session', 'principal_session', 'hod_session', 'staff_session', 'student_session', 'parent_session', 'accounts_session', 'driver_session', 'hostel_session', 'watchman_session', 'librarian_session', 'placement_session'
         ];
         keys.forEach(k => {
           sessionStorage.removeItem(k);
@@ -193,7 +196,8 @@ export const getAdmissions = () => api.get('/admissions');
 export const getAdmissionById = (id) => api.get(`/admissions/${id}`);
 
 // Staff Endpoints
-export const getStaff = () => api.get('/staff');
+export const getStaff = (params) => api.get('/staff', { params });
+export const getAllStaff = (params) => api.get('/staff', { params });
 export const getStaffForPayroll = () => api.get('/staff/payroll-list');
 export const createStaff = (staffData) => api.post('/staff', staffData);
 export const updateStaff = (id, staffData) => api.put(`/staff/${id}`, staffData);
@@ -372,10 +376,12 @@ export const getTransportRoutes = () => api.get('/transport/routes').catch(() =>
 export const createTransportRoute = (data) => api.post('/transport/routes', data);
 export const updateTransportRoute = (id, data) => api.put(`/transport/routes/${id}`, data);
 export const deleteTransportRoute = (id) => api.delete(`/transport/routes/${id}`);
-export const getTransportDrivers = () => api.get('/transport/drivers').catch(() => ({ data: [] }));
+export const getTransportDrivers = (params) => api.get('/transport/drivers', { params });
+export const createTransportDriver = (data) => api.post('/transport/drivers', data);
 export const updateTransportDriver = (id, data) => api.put(`/transport/drivers/${id}`, data);
 export const deleteTransportDriver = (id) => api.delete(`/transport/drivers/${id}`);
-export const getTransportStudents = () => api.get('/transport/students').catch(() => ({ data: [] }));
+export const getTransportStudents = (params) => api.get('/transport/students', { params });
+export const getTransportStudentById = (id) => api.get(`/transport/students/${id}`);
 export const createTransportStudent = (data) => api.post('/transport/students', data);
 export const updateTransportStudent = (id, data) => api.put(`/transport/students/${id}`, data);
 export const deleteTransportStudent = (id) => api.delete(`/transport/students/${id}`);
@@ -383,16 +389,22 @@ export const deleteTransportStudent = (id) => api.delete(`/transport/students/${
 // Driver Operations
 export const getDriverAttendance = (params) => api.get('/transport/attendance', { params });
 export const markDriverAttendance = (data) => api.post('/transport/attendance', data);
-export const getTransportComplaints = () => api.get('/transport/complaints');
+export const getTransportComplaints = (params) => api.get('/transport/complaints', { params });
+export const getTransportComplaintById = (id) => api.get(`/transport/complaints/${id}`);
+export const getStudentTransportComplaints = (studentId) => api.get('/transport/complaints', { params: { studentId } });
 export const createTransportComplaint = (data) => api.post('/transport/complaints', data);
 export const updateTransportComplaint = (id, data) => api.put(`/transport/complaints/${id}`, data);
+export const addTransportComplaintReply = (id, data) => api.post(`/transport/complaints/${id}/reply`, data);
+export const deleteTransportComplaint = (id) => api.delete(`/transport/complaints/${id}`);
 export const getTransportTrips = () => api.get('/transport/trips');
 export const createTransportTrip = (data) => api.post('/transport/trips', data);
 export const updateTransportTrip = (id, data) => api.put(`/transport/trips/${id}`, data);
 export const getTransportMaintenance = () => api.get('/transport/maintenance');
 export const createTransportMaintenance = (data) => api.post('/transport/maintenance', data);
 export const updateTransportMaintenance = (id, data) => api.put(`/transport/maintenance/${id}`, data);
-export const getTransportNotifications = () => api.get('/transport/notifications');
+export const deleteTransportMaintenance = (id) => api.delete(`/transport/maintenance/${id}`);
+export const getTransportNotifications = (params) => api.get('/transport/notifications', { params });
+export const createTransportNotification = (data) => api.post('/transport/notifications', data);
 
 // Hostel Management
 export const getHostelBlocks = () => api.get('/hostel/blocks');
@@ -435,7 +447,11 @@ export const getEligibleStudentsForJob = (id) => api.get(`/placement/jobs/${id}/
 }));
 
 export const getPlacementApplications = () => api.get('/placement/applications');
-export const updatePlacementApplicationStatus = (id, status) => api.put(`/placement/applications/${id}/status`, { status });
+export const updatePlacementApplicationStatus = (id, data) => {
+  const payload = typeof data === 'string' ? { status: data } : data;
+  return api.put(`/placement/applications/${id}/status`, payload);
+};
+export const bulkApplyPlacementApplications = (data) => api.post('/placement/applications/bulk-apply', data);
 export const getPlacementInterviews = () => api.get('/placement/interviews');
 export const createPlacementInterview = (data) => api.post('/placement/interviews', data);
 export const getPlacementSelections = () => api.get('/placement/selections');
@@ -599,17 +615,22 @@ export const deleteBookCopy = (id) => api.delete(`/library/copies/${id}`);
 // Super Admin Subscriptions
 export const getSuperAdminSubscriptions = () => api.get('/superadmin/subscriptions');
 export const getSuperAdminSubscriptionById = (id) => api.get(`/superadmin/subscriptions/${id}`);
-export const upgradeSubscription = (id, planName) => api.put(`/superadmin/subscriptions/${id}/upgrade`, { planName });
+export const getSuperAdminSubscription = (id) => api.get(`/superadmin/subscriptions/${id}`);
+export const upgradeSubscription = (id, data) => api.put(`/superadmin/subscriptions/${id}/upgrade`, typeof data === 'string' ? { planName: data } : (data || {}));
 export const renewSubscription = (id) => api.put(`/superadmin/subscriptions/${id}/renew`);
 export const cancelSubscription = (id) => api.put(`/superadmin/subscriptions/${id}/cancel`);
 
 // Super Admin Trials
 export const getSuperAdminTrials = () => api.get('/superadmin/trials');
 export const getSuperAdminTrialById = (id) => api.get(`/superadmin/trials/${id}`);
+export const getSuperAdminTrial = (id) => api.get(`/superadmin/trials/${id}`);
 export const extendTrial = (id) => api.put(`/superadmin/trials/${id}/extend`);
 export const expireTrial = (id) => api.put(`/superadmin/trials/${id}/expire`);
-export const convertTrialToPaid = (id) => api.put(`/superadmin/trials/${id}/convert-to-paid`);
+export const convertTrialToPaid = (id, data = {}) => api.put(`/superadmin/trials/${id}/convert-to-paid`, typeof data === 'string' ? { planName: data } : (data || {}));
 export const sendTrialReminder = (id) => api.post(`/superadmin/trials/${id}/remind`);
+export const activateCollege = (id) => api.put(`/superadmin/college/${id}/activate`);
+export const deactivateCollege = (id) => api.put(`/superadmin/college/${id}/deactivate`);
+export const updateSuperAdminCollege = (id, data) => api.put(`/superadmin/college/${id}`, data);
 
 // Super Admin Payments
 export const getSuperAdminPayments = () => api.get('/superadmin/payments');
@@ -717,19 +738,12 @@ export const getScholarshipApplications = () =>
 export const createScholarshipApplication = (data) =>
   api.post("/scholarships/applications", data);
 
-// Transport APIs
-export const createTransportDriver = (data) => api.post('/transport/drivers', data);
-
 // Librarian Management APIs
 export const getLibrarians = () => api.get('/librarian');
 export const createLibrarian = (data) => api.post('/librarian', data);
 export const updateLibrarian = (id, data) => api.put(`/librarian/${id}`, data);
 export const deleteLibrarian = (id) => api.delete(`/librarian/${id}`);
 export const getLibraryBorrowers = () => api.get('/library/borrowers');
-
-
-
-
 
 export const attachLibraryTransactionCopy = (transactionId, bookCopyId) => api.put(`/library/transactions/${transactionId}/attach-copy`, { bookCopyId });
 export const issueLibraryReservation = (id, bookCopyId, dueDate) =>
@@ -745,6 +759,7 @@ export const getLibraryReturnRequests = () => api.get('/library/return-requests'
 export const approveLibraryReturnRequest = (id) => api.put('/library/return-requests/' + id + '/approve');
 export const rejectLibraryReturnRequest = (id, remarks = '') => api.put('/library/return-requests/' + id + '/reject', { remarks });
 
-
-
-
+export const getPlacementOfficers = () => api.get('/placement-officers');
+export const createPlacementOfficer = (data) => api.post('/placement-officers', data);
+export const updatePlacementOfficer = (id, data) => api.put(`/placement-officers/${id}`, data);
+export const deletePlacementOfficer = (id) => api.delete(`/placement-officers/${id}`);

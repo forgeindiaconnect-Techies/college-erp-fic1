@@ -83,11 +83,18 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'S
     if (Array.isArray(req.body)) {
       if (req.body.length === 0) return res.status(400).json({ message: 'Empty payload' });
 
+      const facultyName = req.user?.name || 'Faculty Member';
       const bulkOps = req.body.map(record => {
         const exactDate = new Date(record.attendanceDate || record.date);
         exactDate.setUTCHours(0, 0, 0, 0);
         record.attendanceDate = exactDate;
         record.tenantId = req.collegeId || 'unassigned_college';
+        if (!record.markedBy || record.markedBy === 'System') {
+          record.markedBy = record.facultyName || record.staffName || facultyName;
+        }
+        if (!record.facultyName) {
+          record.facultyName = record.markedBy || facultyName;
+        }
         
         return {
           updateOne: {
@@ -185,11 +192,18 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'S
 // Update attendance record
 router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff'), requirePermission('view_attendance'), collegeScope, async (req, res) => {
   try {
-    const updatedRecord = await Attendance.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (updatedRecord) {
-      await updateStudentAttendancePercentage(updatedRecord.studentId, req);
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = { _id: req.params.id };
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      filter.$or = [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }];
     }
-    req.app.get('io').emit('dataUpdated', { module: 'attendance', action: 'updated' });
+
+    const updatedRecord = await Attendance.findOneAndUpdate(filter, req.body, { new: true });
+    if (!updatedRecord) {
+      return res.status(404).json({ message: 'Attendance record not found' });
+    }
+    await updateStudentAttendancePercentage(updatedRecord.studentId, req);
+    req.app.get('io')?.emit('dataUpdated', { module: 'attendance', action: 'updated' });
     res.json(updatedRecord);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -199,12 +213,18 @@ router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 
 // Delete attendance record
 router.delete('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff'), requirePermission('view_attendance'), collegeScope, async (req, res) => {
   try {
-    const record = await Attendance.findById(req.params.id);
-    if (record) {
-      await Attendance.findByIdAndDelete(req.params.id);
-      await updateStudentAttendancePercentage(record.studentId, req);
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = { _id: req.params.id };
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      filter.$or = [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }];
     }
-    req.app.get('io').emit('dataUpdated', { module: 'attendance', action: 'deleted' });
+
+    const record = await Attendance.findOneAndDelete(filter);
+    if (!record) {
+      return res.status(404).json({ message: 'Attendance record not found' });
+    }
+    await updateStudentAttendancePercentage(record.studentId, req);
+    req.app.get('io')?.emit('dataUpdated', { module: 'attendance', action: 'deleted' });
     res.json({ message: 'Attendance record deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });

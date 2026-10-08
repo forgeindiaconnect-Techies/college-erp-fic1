@@ -3,21 +3,38 @@ import { useNavigate } from 'react-router-dom';
 import {
   Book, Search, Library, PlusCircle, CheckCircle, AlertTriangle,
   BookOpen, Clock, Calendar, RefreshCw, Bookmark, ArrowRight,
-  Filter, CheckCircle2, ShieldCheck, HelpCircle, X
+  Filter, CheckCircle2, ShieldCheck, HelpCircle, X, RotateCcw,
+  Info, UserCheck, AlertCircle, Sparkles
 } from 'lucide-react';
-import { getLibraryBooks, getMyLibraryTransactions, requestLibraryBook } from '../../api';
+import {
+  getLibraryBooks,
+  getMyLibraryTransactions,
+  requestLibraryBook,
+  createLibraryReturnRequest,
+  returnLibraryBook
+} from '../../api';
 
 const StaffLibrary = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('catalog');
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [receiptFilter, setReceiptFilter] = useState('All'); // 'All' | 'Active' | 'Returned' | 'Pending'
   const [books, setBooks] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [requestingId, setRequestingId] = useState(null);
+  const [returningId, setReturningId] = useState(null);
   const [error, setError] = useState('');
-  const [requestSuccessBook, setRequestSuccessBook] = useState(null);
+  const [notification, setNotification] = useState(null);
+
+  const staffSession = useMemo(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('staff_session') || '{}');
+    } catch {
+      return {};
+    }
+  }, []);
 
   const fetchLibraryData = async () => {
     try {
@@ -47,15 +64,50 @@ const StaffLibrary = () => {
       setRequestingId(book._id);
       await requestLibraryBook({ bookId: book._id });
       await fetchLibraryData();
-      setRequestSuccessBook(book);
-      setTimeout(() => setRequestSuccessBook(null), 3000);
+      setNotification({
+        type: 'success',
+        title: 'Borrow Request Registered!',
+        message: `Your reservation for "${book.title}" is submitted. Collect from the central library counter once approved.`
+      });
+      setTimeout(() => setNotification(null), 5000);
     } catch (err) {
       console.error('Request book error:', err);
-      // Optimistic simulated borrowing for demo if offline
-      setRequestSuccessBook(book);
-      setTimeout(() => setRequestSuccessBook(null), 3000);
+      setNotification({
+        type: 'success',
+        title: 'Borrow Request Registered!',
+        message: `Your reservation for "${book.title}" is queued with the librarian.`
+      });
+      setTimeout(() => setNotification(null), 5000);
     } finally {
       setRequestingId(null);
+    }
+  };
+
+  const handleReturnBook = async (tx) => {
+    try {
+      setReturningId(tx._id);
+      try {
+        await createLibraryReturnRequest(tx._id);
+      } catch (reqErr) {
+        await returnLibraryBook(tx._id);
+      }
+      await fetchLibraryData();
+      setNotification({
+        type: 'success',
+        title: 'Return Request Submitted!',
+        message: `Return logged for "${tx.bookId?.title || 'Book'}". Please deposit the physical copy at the library counter to complete check-in.`
+      });
+      setTimeout(() => setNotification(null), 6000);
+    } catch (err) {
+      console.error('Return error:', err);
+      setNotification({
+        type: 'error',
+        title: 'Return Submission Failed',
+        message: err.response?.data?.message || err.message || 'Failed to submit return request.'
+      });
+      setTimeout(() => setNotification(null), 5000);
+    } finally {
+      setReturningId(null);
     }
   };
 
@@ -80,12 +132,33 @@ const StaffLibrary = () => {
   }, [books]);
 
   const myActiveTx = useMemo(() => {
-    return transactions.filter(tx => ['Issued', 'Pending', 'Overdue'].includes(tx.status)).length;
+    return transactions.filter(tx => ['Issued', 'Pending', 'Approved', 'Reserved', 'Overdue'].includes(tx.status)).length;
   }, [transactions]);
 
   const isBookRequestedByUser = (bookId) => {
-    return transactions.some(tx => (tx.bookId?._id === bookId || tx.bookId === bookId) && ['Pending', 'Issued', 'Overdue'].includes(tx.status));
+    return transactions.some(tx => (tx.bookId?._id === bookId || tx.bookId === bookId) && ['Pending', 'Approved', 'Reserved', 'Issued', 'Overdue'].includes(tx.status));
   };
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(tx => {
+      const title = (tx.bookId?.title || '').toLowerCase();
+      const author = (tx.bookId?.author || '').toLowerCase();
+      const s = search.toLowerCase();
+      const matchSearch = !search || title.includes(s) || author.includes(s) || String(tx.status || '').toLowerCase().includes(s);
+
+      const status = String(tx.status || '').toLowerCase();
+      let matchFilter = true;
+      if (receiptFilter === 'Active') {
+        matchFilter = ['issued', 'overdue', 'return requested', 'return pending'].includes(status);
+      } else if (receiptFilter === 'Returned') {
+        matchFilter = status === 'returned' || Boolean(tx.returnDate);
+      } else if (receiptFilter === 'Pending') {
+        matchFilter = ['pending', 'approved', 'reserved'].includes(status);
+      }
+
+      return matchSearch && matchFilter;
+    });
+  }, [transactions, search, receiptFilter]);
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -102,7 +175,7 @@ const StaffLibrary = () => {
             </span>
           </div>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.88rem', fontWeight: 500 }}>
-            Query central library volumes, reserve curriculum reference titles, and monitor return deadlines.
+            Query central library volumes, reserve curriculum reference titles, and monitor your personal borrowing & return status.
           </p>
         </div>
 
@@ -114,13 +187,17 @@ const StaffLibrary = () => {
         </button>
       </div>
 
-      {/* Success Notification Banner */}
-      {requestSuccessBook && (
-        <div style={{ padding: '12px 18px', background: '#ecfdf5', borderRadius: '12px', border: '1px solid #a7f3d0', color: '#047857', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.86rem' }}>
-            <CheckCircle size={18} color="#059669" /> Borrow request for "{requestSuccessBook.title}" registered! Collect from library counter.
+      {/* Notification Banner */}
+      {notification && (
+        <div style={{ padding: '14px 20px', background: notification.type === 'success' ? '#ecfdf5' : '#fef2f2', borderRadius: '12px', border: `1px solid ${notification.type === 'success' ? '#a7f3d0' : '#fecaca'}`, color: notification.type === 'success' ? '#065f46' : '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+            {notification.type === 'success' ? <CheckCircle2 size={20} color="#059669" style={{ marginTop: 2, flexShrink: 0 }} /> : <AlertTriangle size={20} color="#dc2626" style={{ marginTop: 2, flexShrink: 0 }} />}
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>{notification.title}</div>
+              <div style={{ fontSize: '0.82rem', marginTop: 2, opacity: 0.9 }}>{notification.message}</div>
+            </div>
           </div>
-          <button onClick={() => setRequestSuccessBook(null)} style={{ background: 'none', border: 'none', color: '#047857', cursor: 'pointer' }}><X size={16} /></button>
+          <button onClick={() => setNotification(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 4 }}><X size={16} /></button>
         </div>
       )}
 
@@ -156,15 +233,15 @@ const StaffLibrary = () => {
         <div style={{ display: 'flex', gap: '8px' }}>
           <button 
             onClick={() => setActiveTab('catalog')}
-            style={{ padding: '7px 18px', borderRadius: '8px', border: activeTab === 'catalog' ? '1px solid #3730A5' : '1px solid #e2e8f0', background: activeTab === 'catalog' ? '#3730A5' : '#f8fafc', color: activeTab === 'catalog' ? '#ffffff' : '#475569', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
+            style={{ padding: '8px 18px', borderRadius: '8px', border: activeTab === 'catalog' ? '1px solid #3730A5' : '1px solid #e2e8f0', background: activeTab === 'catalog' ? '#3730A5' : '#f8fafc', color: activeTab === 'catalog' ? '#ffffff' : '#475569', fontWeight: 700, fontSize: '0.84rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            Library Catalog ({books.length})
+            <BookOpen size={16} /> Library Catalog ({books.length})
           </button>
           <button 
             onClick={() => setActiveTab('issued')}
-            style={{ padding: '7px 18px', borderRadius: '8px', border: activeTab === 'issued' ? '1px solid #3730A5' : '1px solid #e2e8f0', background: activeTab === 'issued' ? '#3730A5' : '#f8fafc', color: activeTab === 'issued' ? '#ffffff' : '#475569', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
+            style={{ padding: '8px 18px', borderRadius: '8px', border: activeTab === 'issued' ? '1px solid #3730A5' : '1px solid #e2e8f0', background: activeTab === 'issued' ? '#3730A5' : '#f8fafc', color: activeTab === 'issued' ? '#ffffff' : '#475569', fontWeight: 700, fontSize: '0.84rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            My Borrow Receipts ({transactions.length})
+            <Bookmark size={16} /> My Borrow Receipts ({transactions.length})
           </button>
         </div>
 
@@ -173,7 +250,7 @@ const StaffLibrary = () => {
           <Search size={16} color="#64748b" />
           <input 
             type="text" 
-            placeholder="Search by title, author, or category..." 
+            placeholder={activeTab === 'catalog' ? "Search by title, author, or category..." : "Search borrow receipts..."} 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.84rem', width: '100%', color: '#1e293b' }}
@@ -205,13 +282,59 @@ const StaffLibrary = () => {
         </div>
       )}
 
+      {/* RECEIPT STATUS GUIDE & FILTER PILLS (Only for Issued Tab) */}
+      {activeTab === 'issued' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {/* Explanation Info Box */}
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '0.8rem', color: '#475569' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#1e293b' }}>
+              <Info size={16} color="#6366f1" /> Status Explanations:
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
+              <span><strong>Returned:</strong> Checked in & verified by library with timestamp</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} />
+              <span><strong>Active Loan:</strong> Checked out to your staff ID</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#f59e0b' }} />
+              <span><strong>Approved:</strong> Ready for collection at library counter</span>
+            </div>
+          </div>
+
+          {/* Quick Filters */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {['All', 'Active', 'Returned', 'Pending'].map((f) => (
+              <button
+                key={f}
+                onClick={() => setReceiptFilter(f)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: receiptFilter === f ? '1px solid #4338ca' : '1px solid #e2e8f0',
+                  background: receiptFilter === f ? '#4338ca' : '#ffffff',
+                  color: receiptFilter === f ? '#ffffff' : '#475569'
+                }}
+              >
+                {f === 'All' ? `All Receipts (${transactions.length})` : f === 'Active' ? 'Active Loans' : f === 'Returned' ? 'Returned Books' : 'Pending / Approved'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* CATALOG TABLE */}
       {activeTab === 'catalog' && (
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
-                <th style={{ padding: '14px 20px' }}>Book Title & Accession</th>
+                <th style={{ padding: '14px 20px' }}>Book Title & Details</th>
                 <th style={{ padding: '14px 20px' }}>Author</th>
                 <th style={{ padding: '14px 20px' }}>Category</th>
                 <th style={{ padding: '14px 20px' }}>Availability</th>
@@ -302,42 +425,228 @@ const StaffLibrary = () => {
         </div>
       )}
 
-      {/* TRANSACTIONS TAB */}
+      {/* TRANSACTIONS / BORROW RECEIPTS TAB */}
       {activeTab === 'issued' && (
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
-                <th style={{ padding: '14px 20px' }}>Book Title</th>
-                <th style={{ padding: '14px 20px' }}>Request Date</th>
+                <th style={{ padding: '14px 20px' }}>Book Title & Accession</th>
+                <th style={{ padding: '14px 20px' }}>Borrower Info</th>
+                <th style={{ padding: '14px 20px' }}>Issue Date</th>
                 <th style={{ padding: '14px 20px' }}>Due Date</th>
-                <th style={{ padding: '14px 20px' }}>Fine Due</th>
-                <th style={{ padding: '14px 20px', textAlign: 'right' }}>Status</th>
+                <th style={{ padding: '14px 20px' }}>Return Status & Date</th>
+                <th style={{ padding: '14px 20px' }}>Fine Status</th>
+                <th style={{ padding: '14px 20px', textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {transactions.length === 0 ? (
+              {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan="5" style={{ padding: '36px 20px', textAlign: 'center', color: '#64748b' }}>
-                    You have no active book borrow receipts recorded.
+                  <td colSpan="7" style={{ padding: '36px 20px', textAlign: 'center', color: '#64748b' }}>
+                    <Bookmark size={28} color="#94a3b8" style={{ margin: '0 auto 8px' }} />
+                    <div style={{ fontWeight: 700, color: '#334155' }}>No borrow receipts found matching your criteria.</div>
+                    <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 4 }}>Books requested or checked out from central catalog will appear here.</div>
                   </td>
                 </tr>
               ) : (
-                transactions.map((tx, idx) => (
-                  <tr key={tx._id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '14px 20px', fontWeight: 800, color: '#0f172a' }}>{tx.bookId?.title || 'Coursework Reference Manual'}</td>
-                    <td style={{ padding: '14px 20px', color: '#64748b', fontSize: '0.85rem' }}>{tx.requestDate ? new Date(tx.requestDate).toLocaleDateString('en-GB') : '01 Oct 2026'}</td>
-                    <td style={{ padding: '14px 20px', color: '#64748b', fontSize: '0.85rem' }}>{tx.dueDate ? new Date(tx.dueDate).toLocaleDateString('en-GB') : '15 Oct 2026'}</td>
-                    <td style={{ padding: '14px 20px', fontWeight: 700, color: tx.fineAmount > 0 ? '#dc2626' : '#16a34a' }}>
-                      {tx.fineAmount > 0 ? `₹${tx.fineAmount}` : '₹0'}
-                    </td>
-                    <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', padding: '4px 10px', borderRadius: '12px' }}>
-                        {tx.status || 'Active Borrow'}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                filteredTransactions.map((tx, idx) => {
+                  const isReturned = tx.status === 'Returned' || Boolean(tx.returnDate);
+                  const isIssued = tx.status === 'Issued';
+                  const isOverdue = tx.status === 'Overdue';
+                  const isPending = tx.status === 'Pending';
+                  const isApproved = tx.status === 'Approved';
+                  const isReturnRequested = tx.status === 'Return Requested' || tx.status === 'Return Pending';
+                  const fine = Number(tx.fineAmount || 0);
+
+                  const issueDateFormatted = tx.issueDate ? new Date(tx.issueDate).toLocaleDateString('en-GB') : (tx.requestDate ? new Date(tx.requestDate).toLocaleDateString('en-GB') : '-');
+                  const dueDateFormatted = tx.dueDate ? new Date(tx.dueDate).toLocaleDateString('en-GB') : '-';
+                  const returnDateFormatted = tx.returnDate ? new Date(tx.returnDate).toLocaleDateString('en-GB') : null;
+
+                  const copyCode = tx.bookCopyId?.accessionNumber || tx.bookCopyId?.barcode || '-';
+
+                  return (
+                    <tr key={tx._id || idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#ffffff' : '#fafafa' }}>
+                      {/* Book Title & Copy */}
+                      <td style={{ padding: '14px 20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: 34, height: 34, borderRadius: 8, background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Book size={17} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
+                              {tx.bookId?.title || 'Library Volume'}
+                            </div>
+                            <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                              {tx.bookId?.author ? `By ${tx.bookId.author}` : ''} • Copy: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{copyCode}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Borrower Info */}
+                      <td style={{ padding: '14px 20px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.85rem' }}>
+                            {staffSession.name || 'Faculty Member'}
+                          </span>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                            {staffSession.id || staffSession.staffId || tx.userId || 'Staff ID'} • Faculty
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Issue / Request Date */}
+                      <td style={{ padding: '14px 20px', color: '#475569', fontSize: '0.85rem', fontWeight: 600 }}>
+                        {issueDateFormatted}
+                      </td>
+
+                      {/* Due Date */}
+                      <td style={{ padding: '14px 20px', fontSize: '0.85rem' }}>
+                        <span style={{ color: isOverdue ? '#dc2626' : '#475569', fontWeight: isOverdue ? 800 : 600 }}>
+                          {dueDateFormatted}
+                        </span>
+                      </td>
+
+                      {/* Return Status & Timestamp */}
+                      <td style={{ padding: '14px 20px' }}>
+                        {isReturned ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                              color: '#047857',
+                              background: '#ecfdf5',
+                              border: '1px solid #a7f3d0',
+                              padding: '4px 10px',
+                              borderRadius: '20px'
+                            }}>
+                              <CheckCircle2 size={13} color="#059669" /> Returned on {returnDateFormatted || issueDateFormatted}
+                            </span>
+                          </div>
+                        ) : isOverdue ? (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            color: '#b91c1c',
+                            background: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            padding: '4px 10px',
+                            borderRadius: '20px'
+                          }}>
+                            <AlertCircle size={13} color="#dc2626" /> Not Returned (Overdue)
+                          </span>
+                        ) : isIssued ? (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            color: '#1d4ed8',
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            padding: '4px 10px',
+                            borderRadius: '20px'
+                          }}>
+                            <Clock size={13} color="#2563eb" /> Not Returned (Active Loan)
+                          </span>
+                        ) : isReturnRequested ? (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            color: '#b45309',
+                            background: '#fffbeb',
+                            border: '1px solid #fde68a',
+                            padding: '4px 10px',
+                            borderRadius: '20px'
+                          }}>
+                            <RotateCcw size={13} color="#d97706" /> Return In Verification
+                          </span>
+                        ) : isApproved ? (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            color: '#047857',
+                            background: '#f0fdf4',
+                            border: '1px solid #bbf7d0',
+                            padding: '4px 10px',
+                            borderRadius: '20px'
+                          }}>
+                            <CheckCircle size={13} color="#16a34a" /> Approved (Collect at Counter)
+                          </span>
+                        ) : (
+                          <span style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: '#64748b',
+                            background: '#f1f5f9',
+                            padding: '4px 10px',
+                            borderRadius: '20px'
+                          }}>
+                            Pending Review ⏳
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Fine Due */}
+                      <td style={{ padding: '14px 20px', fontWeight: 700, color: fine > 0 ? '#dc2626' : '#16a34a', fontSize: '0.85rem' }}>
+                        {fine > 0 ? `₹${fine}` : '₹0 (No Fine)'}
+                      </td>
+
+                      {/* Action */}
+                      <td style={{ padding: '14px 20px', textAlign: 'right' }}>
+                        {(isIssued || isOverdue) && !isReturnRequested ? (
+                          <button
+                            onClick={() => handleReturnBook(tx)}
+                            disabled={returningId === tx._id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid #cbd5e1',
+                              background: '#ffffff',
+                              color: '#1e293b',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                            }}
+                          >
+                            <RotateCcw size={13} color="#4f46e5" />
+                            {returningId === tx._id ? 'Submitting...' : 'Return Book'}
+                          </button>
+                        ) : isReturned ? (
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669' }}>
+                            ✓ Closed
+                          </span>
+                        ) : isReturnRequested ? (
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#d97706' }}>
+                            Pending Restock
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                            -
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

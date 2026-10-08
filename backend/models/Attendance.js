@@ -18,9 +18,15 @@ const attendanceSchema = new mongoose.Schema({
   timetableId: { type: String, default: null },
   attendanceDate: { type: Date, required: true },
   periodId: { type: String },
+  periodName: { type: String, default: null },
+  timeRange: { type: String, default: null },
+  roomNo: { type: String, default: null },
+  facultyName: { type: String, default: null },
+  staffName: { type: String, default: null },
   status: { type: String, enum: ['Present', 'Absent', 'On Leave', 'Medical Leave', 'Leave'], required: true },
   subjectId: { type: String },
   subjectName: { type: String },
+  subjectCode: { type: String },
   subject: { type: String },
   markedBy: { type: String }
 }, { timestamps: true });

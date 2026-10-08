@@ -36,6 +36,21 @@ const SuperAdminTrials = () => {
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [targetTrial, setTargetTrial] = useState(null);
   const [convertPlan, setConvertPlan] = useState('Premium');
+  const [convertAmount, setConvertAmount] = useState(20000);
+  const [convertBillingCycle, setConvertBillingCycle] = useState('Monthly');
+  const [convertDurationMonths, setConvertDurationMonths] = useState(1);
+
+  const PLAN_DEFAULT_RATES = {
+    Elite: 35000,
+    Premium: 20000,
+    Basic: 10000,
+    Custom: 15000
+  };
+
+  const handleSelectPlanTier = (tier) => {
+    setConvertPlan(tier);
+    setConvertAmount(PLAN_DEFAULT_RATES[tier] || 20000);
+  };
 
   useEffect(() => {
     fetchTrials();
@@ -69,6 +84,10 @@ const SuperAdminTrials = () => {
     if (action === 'Convert to Paid') {
       const trial = trials.find(t => t._id === collegeId || t.id === collegeId);
       setTargetTrial(trial || { _id: collegeId, name: collegeName });
+      setConvertPlan('Premium');
+      setConvertAmount(20000);
+      setConvertBillingCycle('Monthly');
+      setConvertDurationMonths(1);
       setShowConvertModal(true);
       return;
     }
@@ -117,17 +136,23 @@ const SuperAdminTrials = () => {
   const handleConfirmConversion = async () => {
     if (!targetTrial) return;
     try {
-      await convertTrialToPaid(targetTrial._id || targetTrial.id);
+      const collegeId = targetTrial._id || targetTrial.id || targetTrial.collegeId;
+      await convertTrialToPaid(collegeId, {
+        planName: convertPlan,
+        amount: Number(convertAmount) || 0,
+        billingCycle: convertBillingCycle,
+        durationMonths: Number(convertDurationMonths) || 1
+      });
       setShowConvertModal(false);
       setSuccessModal({ 
         isOpen: true, 
         title: 'Converted to Paid Plan!', 
-        message: `${targetTrial.name || 'Institution'} is now activated on ${convertPlan} plan.` 
+        message: `${targetTrial.name || 'Institution'} is now activated on ${convertPlan} plan at ₹${Number(convertAmount).toLocaleString('en-IN')}/${convertBillingCycle.toLowerCase()}.` 
       });
       fetchTrials();
     } catch (error) {
       console.error('Conversion failed:', error);
-      alert('Failed to convert trial.');
+      alert(error.response?.data?.message || 'Failed to convert trial.');
     }
   };
 
@@ -498,16 +523,16 @@ const SuperAdminTrials = () => {
       {/* Convert to Paid Modal */}
       {showConvertModal && targetTrial && (
         <div className="sa-modal-overlay" onClick={() => setShowConvertModal(false)}>
-          <div className="sa-modal-card" onClick={(e) => e.stopPropagation()}>
+          <div className="sa-modal-card" style={{ maxWidth: '580px', width: '90%' }} onClick={(e) => e.stopPropagation()}>
             <div className="sa-modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <CreditCard size={22} color="#10b981" />
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                    Convert Trial to Paid Tier
+                    Convert Trial & Set Plan Pricing
                   </h3>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {targetTrial.name || 'Institution'}
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {targetTrial.name || targetTrial.collegeName || 'Institution'}
                   </span>
                 </div>
               </div>
@@ -519,44 +544,188 @@ const SuperAdminTrials = () => {
               </button>
             </div>
 
-            <div className="sa-modal-body">
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                Select Paid Subscription Tier
-              </label>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div 
-                  onClick={() => setConvertPlan('Elite')}
-                  style={{
-                    border: convertPlan === 'Elite' ? '2px solid #6366f1' : '1px solid var(--border-color)',
-                    background: convertPlan === 'Elite' ? 'rgba(99,102,241,0.06)' : 'var(--bg-primary)',
-                    borderRadius: '10px',
-                    padding: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                    <span>Enterprise Elite</span>
-                    <span style={{ color: '#6366f1' }}>₹35,000 / mo</span>
+            <div className="sa-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
+              <div>
+                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px', display: 'block' }}>
+                  1. Select Subscription Tier
+                </label>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                  {/* Elite */}
+                  <div 
+                    onClick={() => handleSelectPlanTier('Elite')}
+                    style={{
+                      border: convertPlan === 'Elite' ? '2px solid #6366f1' : '1px solid var(--border-color)',
+                      background: convertPlan === 'Elite' ? 'rgba(99,102,241,0.08)' : 'var(--bg-primary)',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>Enterprise Elite</strong>
+                      <span style={{ color: '#6366f1', fontSize: '0.78rem', fontWeight: 800 }}>₹35,000/mo</span>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Unlimited students & AI features</span>
                   </div>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Unlimited students, AI marks analytics, custom domain</span>
+
+                  {/* Premium */}
+                  <div 
+                    onClick={() => handleSelectPlanTier('Premium')}
+                    style={{
+                      border: convertPlan === 'Premium' ? '2px solid #3b82f6' : '1px solid var(--border-color)',
+                      background: convertPlan === 'Premium' ? 'rgba(59,130,246,0.08)' : 'var(--bg-primary)',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>Premium Standard</strong>
+                      <span style={{ color: '#3b82f6', fontSize: '0.78rem', fontWeight: 800 }}>₹20,000/mo</span>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Up to 5,000 students, full ERP</span>
+                  </div>
+
+                  {/* Basic */}
+                  <div 
+                    onClick={() => handleSelectPlanTier('Basic')}
+                    style={{
+                      border: convertPlan === 'Basic' ? '2px solid #10b981' : '1px solid var(--border-color)',
+                      background: convertPlan === 'Basic' ? 'rgba(16,185,129,0.08)' : 'var(--bg-primary)',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>Starter Basic</strong>
+                      <span style={{ color: '#10b981', fontSize: '0.78rem', fontWeight: 800 }}>₹10,000/mo</span>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Up to 1,500 students, core modules</span>
+                  </div>
+
+                  {/* Custom */}
+                  <div 
+                    onClick={() => handleSelectPlanTier('Custom')}
+                    style={{
+                      border: convertPlan === 'Custom' ? '2px solid #f59e0b' : '1px solid var(--border-color)',
+                      background: convertPlan === 'Custom' ? 'rgba(245,158,11,0.08)' : 'var(--bg-primary)',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>Custom Plan</strong>
+                      <span style={{ color: '#f59e0b', fontSize: '0.78rem', fontWeight: 800 }}>Custom Price</span>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Tailored terms and negotiated rate</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Amount & Pricing Adjustment */}
+              <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '14px' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>2. Plan Pricing / Amount</span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 500 }}>Editable by Super Admin</span>
+                </label>
+
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--text-muted)', fontSize: '1rem' }}>₹</span>
+                    <input 
+                      type="number"
+                      value={convertAmount}
+                      onChange={(e) => setConvertAmount(Number(e.target.value))}
+                      placeholder="Enter plan amount"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px 10px 30px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-secondary)',
+                        color: 'var(--text-main)',
+                        fontWeight: 700,
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+
+                  {/* Preset quick buttons */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {[10000, 20000, 35000, 50000].map(amt => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setConvertAmount(amt)}
+                        style={{
+                          background: convertAmount === amt ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                          color: convertAmount === amt ? '#fff' : 'var(--text-muted)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '6px',
+                          padding: '6px 8px',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ₹{(amt/1000)}k
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div 
-                  onClick={() => setConvertPlan('Premium')}
-                  style={{
-                    border: convertPlan === 'Premium' ? '2px solid #3b82f6' : '1px solid var(--border-color)',
-                    background: convertPlan === 'Premium' ? 'rgba(59,130,246,0.06)' : 'var(--bg-primary)',
-                    borderRadius: '10px',
-                    padding: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                    <span>Premium Standard</span>
-                    <span style={{ color: '#3b82f6' }}>₹20,000 / mo</span>
-                  </div>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Up to 5,000 students, full multi-department attendance, fees ledger</span>
+                {/* Billing Cycle */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '12px' }}>
+                  {[
+                    { id: 'Monthly', label: 'Monthly', months: 1 },
+                    { id: 'Quarterly', label: 'Quarterly (3 Mo)', months: 3 },
+                    { id: 'Annually', label: 'Annual (12 Mo)', months: 12 }
+                  ].map(cycle => (
+                    <button
+                      key={cycle.id}
+                      type="button"
+                      onClick={() => {
+                        setConvertBillingCycle(cycle.id);
+                        setConvertDurationMonths(cycle.months);
+                      }}
+                      style={{
+                        background: convertBillingCycle === cycle.id ? 'rgba(16,185,129,0.15)' : 'transparent',
+                        color: convertBillingCycle === cycle.id ? '#10b981' : 'var(--text-muted)',
+                        border: convertBillingCycle === cycle.id ? '1px solid #10b981' : '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        textAlign: 'center'
+                      }}
+                    >
+                      {cycle.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Summary Card */}
+              <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '10px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600, display: 'block' }}>Summary Activation</span>
+                  <strong style={{ color: 'var(--text-main)', fontSize: '0.92rem' }}>
+                    {convertPlan} Plan • {convertBillingCycle}
+                  </strong>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Total Billing Value</span>
+                  <strong style={{ color: '#10b981', fontSize: '1.15rem' }}>
+                    ₹{(Number(convertAmount) * Number(convertDurationMonths)).toLocaleString('en-IN')}
+                  </strong>
                 </div>
               </div>
             </div>
@@ -573,7 +742,7 @@ const SuperAdminTrials = () => {
                 onClick={handleConfirmConversion}
                 style={{ background: '#10b981' }}
               >
-                Activate Paid Plan &rarr;
+                Activate {convertPlan} Plan (₹{Number(convertAmount).toLocaleString('en-IN')}) &rarr;
               </button>
             </div>
           </div>

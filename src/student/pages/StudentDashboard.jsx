@@ -46,10 +46,28 @@ const StudentDashboard = () => {
   const loadLiveSession = useCallback(async () => {
     try {
       const res = await getStudentLiveClass().catch(() => ({ data: { activeLive: null, materials: [] } }));
+      const apiMaterials = (res.data && Array.isArray(res.data.materials)) ? res.data.materials : [];
+
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const localNotes1 = JSON.parse(localStorage.getItem(`erp_notes_${tenantId}`) || '[]');
+      const localNotes2 = tenantId !== 'mock_college_id' ? JSON.parse(localStorage.getItem('erp_notes_mock_college_id') || '[]') : [];
+      const localMaterials = [...localNotes1, ...localNotes2];
+
+      const combined = [...apiMaterials, ...localMaterials];
+      const seen = new Set();
+      const uniqueMaterials = [];
+      combined.forEach(m => {
+        const key = `${m.title}_${m.fileUrl}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueMaterials.push(m);
+        }
+      });
+
       if (res.data) {
         setLiveClassSession(res.data.activeLive || null);
-        setTodayMaterials(res.data.materials || []);
       }
+      setTodayMaterials(uniqueMaterials);
     } catch (err) {
       console.error('Error fetching live class session:', err);
     }
@@ -317,6 +335,9 @@ const StudentDashboard = () => {
       }));
 
       setTodaySchedule(mappedSchedule);
+
+      // Fetch live session and uploaded class notes
+      await loadLiveSession();
 
     } catch (err) {
       console.error('Failed to load original student data:', err);
@@ -695,6 +716,94 @@ const StudentDashboard = () => {
                     {slot.status}
                   </span>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Class Notes & Study Materials ── */}
+      <div className="glass-card" style={{ padding: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <h2 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main, #0f172a)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <BookOpen size={18} className="text-indigo-600" /> Class Notes & Study Materials
+            </h2>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', margin: '2px 0 0 0' }}>
+              Lecture notes, unit materials, and reference documents uploaded by your professors.
+            </p>
+          </div>
+          <span style={{ fontSize: '0.76rem', fontWeight: 700, padding: '4px 12px', borderRadius: '8px', background: '#e0e7ff', color: '#4338ca', border: '1px solid #c7d2fe' }}>
+            {todayMaterials.length} File{todayMaterials.length !== 1 ? 's' : ''} Available
+          </span>
+        </div>
+
+        {todayMaterials.length === 0 ? (
+          <div style={{ padding: '32px 20px', textAlign: 'center', background: 'var(--bg-secondary, #f8fafc)', borderRadius: '12px', border: '1px dashed var(--border-color, #e2e8f0)' }}>
+            <FileText size={32} className="text-gray-400 mx-auto mb-2" />
+            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>
+              No Class Notes Uploaded Yet
+            </h4>
+            <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Materials and reference notes shared by your faculty during lectures will appear here in real time.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '14px' }}>
+            {todayMaterials.map((mat, idx) => (
+              <div 
+                key={mat.id || idx}
+                style={{
+                  padding: '16px',
+                  background: 'var(--bg-secondary, #f8fafc)',
+                  border: '1px solid var(--border-color, #e2e8f0)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '4px' }}>
+                      {mat.subjectName}
+                    </span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                      {mat.uploadedAt ? new Date(mat.uploadedAt).toLocaleDateString('en-GB') : 'Recent'}
+                    </span>
+                  </div>
+                  <h4 style={{ margin: '10px 0 3px', fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                    📄 {mat.title}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Uploaded by: <strong>{mat.facultyName}</strong>
+                  </p>
+                </div>
+
+                <a 
+                  href={mat.fileUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="btn-primary"
+                  style={{
+                    textDecoration: 'none',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    textAlign: 'center',
+                    background: '#4f46e5',
+                    color: '#ffffff'
+                  }}
+                >
+                  <Download size={14} /> View / Download Material
+                </a>
               </div>
             ))}
           </div>

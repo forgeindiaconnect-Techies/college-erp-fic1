@@ -36,7 +36,23 @@ const SuperAdminSubscriptions = () => {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [targetCollegeForUpgrade, setTargetCollegeForUpgrade] = useState(null);
   const [selectedUpgradePlan, setSelectedUpgradePlan] = useState('Elite');
+  const [customUpgradeAmount, setCustomUpgradeAmount] = useState(35000);
+  const [upgradeBillingCycle, setUpgradeBillingCycle] = useState('Monthly');
+  const [upgradeDurationMonths, setUpgradeDurationMonths] = useState(1);
   const [selectedBillingDetails, setSelectedBillingDetails] = useState(null);
+
+  const PLAN_DEFAULT_RATES = {
+    Elite: 35000,
+    Premium: 20000,
+    Basic: 10000,
+    Starter: 10000,
+    Custom: 25000
+  };
+
+  const handleSelectUpgradeTier = (tier) => {
+    setSelectedUpgradePlan(tier);
+    setCustomUpgradeAmount(PLAN_DEFAULT_RATES[tier] || 20000);
+  };
 
   useEffect(() => {
     fetchSubscriptions();
@@ -62,12 +78,17 @@ const SuperAdminSubscriptions = () => {
     const active = colleges.filter(c => (c.status || 'Active') === 'Active').length;
     const elite = colleges.filter(c => (c.planName || '').toLowerCase().includes('elite')).length;
     const premium = colleges.filter(c => (c.planName || '').toLowerCase().includes('premium')).length;
-    const basic = colleges.filter(c => (c.planName || '').toLowerCase().includes('basic') || (c.planName || '').toLowerCase().includes('standard')).length;
+    const basic = colleges.filter(c => (c.planName || '').toLowerCase().includes('basic') || (c.planName || '').toLowerCase().includes('standard') || (c.planName || '').toLowerCase().includes('starter')).length;
     const trials = colleges.filter(c => (c.planName || '').toLowerCase().includes('trial')).length;
     const expiringSoon = colleges.filter(c => c.daysRemaining && c.daysRemaining <= 15 && c.daysRemaining > 0).length;
 
-    // Estimate MRR
-    const mrr = (elite * 35000) + (premium * 20000) + (basic * 10000);
+    // Calculate actual configured MRR across institutions
+    const mrr = colleges.reduce((acc, c) => {
+      const plan = (c.planName || '').toLowerCase();
+      if (plan.includes('trial')) return acc;
+      const amt = c.amount || (plan.includes('elite') ? 35000 : plan.includes('premium') ? 20000 : 10000);
+      return acc + (c.billingCycle === 'Annually' ? Math.round(amt / 12) : amt);
+    }, 0);
 
     return { total, active, elite, premium, basic, trials, expiringSoon, mrr };
   }, [colleges]);
@@ -75,8 +96,12 @@ const SuperAdminSubscriptions = () => {
   const handleActionClick = (action, collegeId, collegeName, currentPlan) => {
     if (action === 'Upgrade Plan') {
       const college = colleges.find(c => c._id === collegeId);
+      const currentTier = currentPlan || college?.planName || 'Premium';
       setTargetCollegeForUpgrade(college || { _id: collegeId, collegeName, planName: currentPlan });
-      setSelectedUpgradePlan(currentPlan === 'Basic' ? 'Premium' : 'Elite');
+      setSelectedUpgradePlan(currentTier === 'Trial' ? 'Premium' : currentTier);
+      setCustomUpgradeAmount(college?.amount || PLAN_DEFAULT_RATES[currentTier] || 20000);
+      setUpgradeBillingCycle(college?.billingCycle || 'Monthly');
+      setUpgradeDurationMonths(college?.billingCycle === 'Annually' ? 12 : 1);
       setShowUpgradeModal(true);
       return;
     }
@@ -124,17 +149,23 @@ const SuperAdminSubscriptions = () => {
   const handleConfirmUpgrade = async () => {
     if (!targetCollegeForUpgrade) return;
     try {
-      await upgradeSubscription(targetCollegeForUpgrade._id, selectedUpgradePlan);
+      const collegeId = targetCollegeForUpgrade._id || targetCollegeForUpgrade.collegeId || targetCollegeForUpgrade.id;
+      await upgradeSubscription(collegeId, {
+        planName: selectedUpgradePlan,
+        amount: Number(customUpgradeAmount) || 0,
+        billingCycle: upgradeBillingCycle,
+        durationMonths: Number(upgradeDurationMonths) || 1
+      });
       setShowUpgradeModal(false);
       setSuccessModal({ 
         isOpen: true, 
-        title: 'Plan Upgraded Successfully!', 
-        message: `${targetCollegeForUpgrade.collegeName || 'College'} upgraded to ${selectedUpgradePlan} plan.` 
+        title: 'Plan & Pricing Updated Successfully!', 
+        message: `${targetCollegeForUpgrade.collegeName || 'College'} has been updated to ${selectedUpgradePlan} plan at ₹${Number(customUpgradeAmount).toLocaleString('en-IN')}/${upgradeBillingCycle.toLowerCase()}.` 
       });
       fetchSubscriptions();
     } catch (error) {
       console.error('Upgrade failed:', error);
-      alert('Failed to upgrade subscription plan.');
+      alert(error.response?.data?.message || 'Failed to update subscription plan.');
     }
   };
 
@@ -402,13 +433,14 @@ const SuperAdminSubscriptions = () => {
                             plan === 'Elite' || plan === 'Enterprise' ? 'sa-plan-elite' :
                             plan === 'Premium' ? 'sa-plan-premium' :
                             plan === 'Basic' || plan === 'Standard' ? 'sa-plan-basic' :
+                            plan === 'Custom' ? 'sa-plan-custom' :
                             'sa-plan-trial'
                           }`}>
                             <Crown size={13} />
                             {plan}
                           </span>
-                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                            {plan === 'Elite' ? '₹35,000/m' : plan === 'Premium' ? '₹20,000/m' : plan === 'Basic' ? '₹10,000/m' : 'Free Trial'}
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                            {plan === 'Trial' ? 'Free Trial' : `₹${(college.amount || (plan === 'Elite' ? 35000 : plan === 'Premium' ? 20000 : 10000)).toLocaleString('en-IN')}/${(college.billingCycle || 'Monthly').slice(0,2).toLowerCase()}`}
                           </span>
                         </div>
                       </td>
@@ -449,7 +481,7 @@ const SuperAdminSubscriptions = () => {
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           <button 
                             onClick={() => handleActionClick('Upgrade Plan', college._id, collegeName, plan)}
-                            title="Upgrade Subscription Plan" 
+                            title="Change Subscription Plan & Amount" 
                             style={{ 
                               background: 'rgba(99,102,241,0.1)', 
                               color: '#6366f1', 
@@ -464,7 +496,7 @@ const SuperAdminSubscriptions = () => {
                               fontWeight: 700
                             }}
                           >
-                            <ArrowUpRight size={14} /> Upgrade
+                            <ArrowUpRight size={14} /> Change Plan & Amount
                           </button>
 
                           <button 
@@ -525,16 +557,16 @@ const SuperAdminSubscriptions = () => {
       {/* Upgrade Plan Modal */}
       {showUpgradeModal && targetCollegeForUpgrade && (
         <div className="sa-modal-overlay" onClick={() => setShowUpgradeModal(false)}>
-          <div className="sa-modal-card" onClick={(e) => e.stopPropagation()}>
+          <div className="sa-modal-card" style={{ maxWidth: '600px', width: '92%' }} onClick={(e) => e.stopPropagation()}>
             <div className="sa-modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Crown size={22} color="#f59e0b" />
+                <Crown size={22} color="#6366f1" />
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                    Upgrade Plan for {targetCollegeForUpgrade.collegeName || 'Institution'}
+                    Change Plan & Pricing for {targetCollegeForUpgrade.collegeName || 'Institution'}
                   </h3>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    Select new institutional licensing tier
+                    Select institutional tier and customize the exact subscription fee
                   </span>
                 </div>
               </div>
@@ -546,78 +578,197 @@ const SuperAdminSubscriptions = () => {
               </button>
             </div>
 
-            <div className="sa-modal-body">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Elite Card */}
-                <div 
-                  onClick={() => setSelectedUpgradePlan('Elite')}
-                  style={{
-                    border: selectedUpgradePlan === 'Elite' ? '2px solid #6366f1' : '1px solid var(--border-color)',
-                    background: selectedUpgradePlan === 'Elite' ? 'rgba(99,102,241,0.06)' : 'var(--bg-primary)',
-                    borderRadius: '12px',
-                    padding: '14px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Crown size={18} color="#6366f1" />
-                      <strong style={{ color: 'var(--text-main)', fontSize: '1rem' }}>Enterprise Elite Plan</strong>
+            <div className="sa-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '72vh', overflowY: 'auto' }}>
+              {/* Step 1: Select Tier */}
+              <div>
+                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px', display: 'block' }}>
+                  1. Select Subscription Tier
+                </label>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                  {/* Elite */}
+                  <div 
+                    onClick={() => handleSelectUpgradeTier('Elite')}
+                    style={{
+                      border: selectedUpgradePlan === 'Elite' ? '2px solid #6366f1' : '1px solid var(--border-color)',
+                      background: selectedUpgradePlan === 'Elite' ? 'rgba(99,102,241,0.08)' : 'var(--bg-primary)',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>Enterprise Elite</strong>
+                      <span style={{ color: '#6366f1', fontSize: '0.78rem', fontWeight: 800 }}>₹35,000/mo</span>
                     </div>
-                    <strong style={{ color: '#6366f1', fontSize: '1rem' }}>₹35,000 / mo</strong>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Unlimited students & AI features</span>
                   </div>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Unlimited Students, Staff, Full Transport GPS, Automated Marks Grading, Custom Domain, 24/7 Dedicated Support.
-                  </p>
+
+                  {/* Premium */}
+                  <div 
+                    onClick={() => handleSelectUpgradeTier('Premium')}
+                    style={{
+                      border: selectedUpgradePlan === 'Premium' ? '2px solid #3b82f6' : '1px solid var(--border-color)',
+                      background: selectedUpgradePlan === 'Premium' ? 'rgba(59,130,246,0.08)' : 'var(--bg-primary)',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>Premium Standard</strong>
+                      <span style={{ color: '#3b82f6', fontSize: '0.78rem', fontWeight: 800 }}>₹20,000/mo</span>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Up to 5,000 students, full ERP</span>
+                  </div>
+
+                  {/* Basic */}
+                  <div 
+                    onClick={() => handleSelectUpgradeTier('Basic')}
+                    style={{
+                      border: selectedUpgradePlan === 'Basic' ? '2px solid #10b981' : '1px solid var(--border-color)',
+                      background: selectedUpgradePlan === 'Basic' ? 'rgba(16,185,129,0.08)' : 'var(--bg-primary)',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>Starter Basic</strong>
+                      <span style={{ color: '#10b981', fontSize: '0.78rem', fontWeight: 800 }}>₹10,000/mo</span>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Up to 1,500 students, core modules</span>
+                  </div>
+
+                  {/* Custom */}
+                  <div 
+                    onClick={() => handleSelectUpgradeTier('Custom')}
+                    style={{
+                      border: selectedUpgradePlan === 'Custom' ? '2px solid #f59e0b' : '1px solid var(--border-color)',
+                      background: selectedUpgradePlan === 'Custom' ? 'rgba(245,158,11,0.08)' : 'var(--bg-primary)',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>Custom Plan</strong>
+                      <span style={{ color: '#f59e0b', fontSize: '0.78rem', fontWeight: 800 }}>Custom Price</span>
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Tailored terms and negotiated rate</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 2: Custom Amount & Pricing */}
+              <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '14px' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>2. Plan Pricing / Amount</span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 500 }}>Editable by Super Admin</span>
+                </label>
+
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--text-muted)', fontSize: '1rem' }}>₹</span>
+                    <input 
+                      type="number"
+                      value={customUpgradeAmount}
+                      onChange={(e) => setCustomUpgradeAmount(Number(e.target.value))}
+                      placeholder="Enter plan amount"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px 10px 30px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-secondary)',
+                        color: 'var(--text-main)',
+                        fontWeight: 700,
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+
+                  {/* Preset quick buttons */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {[10000, 20000, 35000, 50000].map(amt => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setCustomUpgradeAmount(amt)}
+                        style={{
+                          background: customUpgradeAmount === amt ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                          color: customUpgradeAmount === amt ? '#fff' : 'var(--text-muted)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '6px',
+                          padding: '6px 8px',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ₹{(amt/1000)}k
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Premium Card */}
-                <div 
-                  onClick={() => setSelectedUpgradePlan('Premium')}
-                  style={{
-                    border: selectedUpgradePlan === 'Premium' ? '2px solid #3b82f6' : '1px solid var(--border-color)',
-                    background: selectedUpgradePlan === 'Premium' ? 'rgba(59,130,246,0.06)' : 'var(--bg-primary)',
-                    borderRadius: '12px',
-                    padding: '14px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Zap size={18} color="#3b82f6" />
-                      <strong style={{ color: 'var(--text-main)', fontSize: '1rem' }}>Premium Standard</strong>
-                    </div>
-                    <strong style={{ color: '#3b82f6', fontSize: '1rem' }}>₹20,000 / mo</strong>
-                  </div>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Up to 5,000 Students, Multi-Department Attendance, Fees Gateway, Library & Hostel, Standard Support.
-                  </p>
+                {/* Billing Cycle */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '12px' }}>
+                  {[
+                    { id: 'Monthly', label: 'Monthly', months: 1 },
+                    { id: 'Quarterly', label: 'Quarterly (3 Mo)', months: 3 },
+                    { id: 'Annually', label: 'Annual (12 Mo)', months: 12 }
+                  ].map(cycle => (
+                    <button
+                      key={cycle.id}
+                      type="button"
+                      onClick={() => {
+                        setUpgradeBillingCycle(cycle.id);
+                        setUpgradeDurationMonths(cycle.months);
+                      }}
+                      style={{
+                        background: upgradeBillingCycle === cycle.id ? 'rgba(99,102,241,0.15)' : 'transparent',
+                        color: upgradeBillingCycle === cycle.id ? '#6366f1' : 'var(--text-muted)',
+                        border: upgradeBillingCycle === cycle.id ? '1px solid #6366f1' : '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        textAlign: 'center'
+                      }}
+                    >
+                      {cycle.label}
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                {/* Basic Card */}
-                <div 
-                  onClick={() => setSelectedUpgradePlan('Basic')}
-                  style={{
-                    border: selectedUpgradePlan === 'Basic' ? '2px solid #10b981' : '1px solid var(--border-color)',
-                    background: selectedUpgradePlan === 'Basic' ? 'rgba(16,185,129,0.06)' : 'var(--bg-primary)',
-                    borderRadius: '12px',
-                    padding: '14px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <CheckCircle2 size={18} color="#10b981" />
-                      <strong style={{ color: 'var(--text-main)', fontSize: '1rem' }}>Starter Basic</strong>
-                    </div>
-                    <strong style={{ color: '#10b981', fontSize: '1rem' }}>₹10,000 / mo</strong>
-                  </div>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Up to 1,500 Students, Core Admissions, Timetable, Daily Attendance, Standard Billing.
-                  </p>
+              {/* Calculated Invoice Summary */}
+              <div style={{ 
+                background: 'rgba(99,102,241,0.05)', 
+                border: '1px dashed rgba(99,102,241,0.3)', 
+                borderRadius: '10px', 
+                padding: '12px 16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Updated Billing Summary</div>
+                  <strong style={{ fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                    {selectedUpgradePlan} Plan ({upgradeBillingCycle})
+                  </strong>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate per cycle</div>
+                  <strong style={{ fontSize: '1.2rem', color: '#6366f1' }}>
+                    ₹{Number(customUpgradeAmount || 0).toLocaleString('en-IN')}
+                  </strong>
                 </div>
               </div>
             </div>
@@ -633,7 +784,7 @@ const SuperAdminSubscriptions = () => {
                 className="sa-btn sa-btn-primary" 
                 onClick={handleConfirmUpgrade}
               >
-                Confirm Upgrade to {selectedUpgradePlan}
+                Save Plan & Amount
               </button>
             </div>
           </div>

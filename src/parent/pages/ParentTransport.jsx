@@ -5,9 +5,9 @@ import { getStudentById, getTransportStudentById, getStudentTransportComplaints,
 import './ParentDashboard.css';
 
 const DEFAULT_PARENT = {
-  name: 'Parent Name',
-  childName: 'John Doe',
-  childId: 'CS2022001'
+  name: 'Parent',
+  childName: 'Student',
+  childId: 'TAM2026-001'
 };
 
 const ParentTransport = () => {
@@ -142,18 +142,20 @@ const ParentTransport = () => {
 
   return (
     <>
-      <div className="parent-dashboard animate-fade-in" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Premium Header Banner */}
-        <div style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)', borderRadius: '24px', padding: '3rem', color: 'white', marginBottom: '2.5rem', boxShadow: '0 20px 40px -15px rgba(79, 70, 229, 0.5)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', right: '-10%', top: '-50%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 70%)', borderRadius: '50%' }}></div>
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-              <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '10px', borderRadius: '14px', backdropFilter: 'blur(10px)' }}>
-                <Bus size={24} />
-              </div>
-              <h1 style={{ fontSize: '1.8rem', fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>Child Transport Tracking</h1>
+      <div className="parent-dashboard animate-fade-in" style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
+        {/* Header Banner */}
+        <div className="glass-card" style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '12px', padding: '1.25rem 1.5rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '10px', borderRadius: '10px' }}>
+              <Bus size={24} />
             </div>
-            <p style={{ fontSize: '0.95rem', opacity: 0.9, margin: '0 0 0 3.5rem', maxWidth: '600px' }}>Monitor {childDetails.name}'s daily bus route, fee status, and receive real-time notifications about their journey.</p>
+            <div>
+              <h1 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0, color: 'var(--text-main, #0f172a)' }}>Child Transport Tracking</h1>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)', margin: '4px 0 0' }}>Monitor {childDetails?.name || 'Child'}'s daily bus route, fee status, and trip updates.</p>
+            </div>
+          </div>
+          <div style={{ background: 'var(--bg-subtle, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', padding: '6px 14px', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-muted, #475569)' }}>
+            <span>STUDENT ID: <strong style={{ color: 'var(--text-main, #0f172a)' }}>{childDetails?.id || 'TAM2026-001'}</strong></span>
           </div>
         </div>
 

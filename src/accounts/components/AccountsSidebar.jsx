@@ -97,9 +97,10 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
     }
   ];
 
-  const displayCollegeName = (account?.collegeName && account.collegeName !== 'Institution Portal') 
-    ? account.collegeName 
-    : (collegeSettings?.collegeName && collegeSettings.collegeName !== 'Campus ERP Portal' ? collegeSettings.collegeName : 'Accounts Department');
+  const sessionCollege = account?.collegeName && account.collegeName !== 'Institution Portal' ? account.collegeName : null;
+
+  const displayCollegeName = sessionCollege 
+    || (collegeSettings?.collegeName && collegeSettings.collegeName !== 'Campus ERP Portal' ? collegeSettings.collegeName : 'Accounts Department');
 
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>

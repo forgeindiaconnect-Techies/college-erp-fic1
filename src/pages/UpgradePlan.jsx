@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Zap, Crown, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Shield, Zap, Crown, CheckCircle2, ArrowRight, ArrowLeft, Check, Sparkles } from 'lucide-react';
 import api from '../api';
 import './UpgradePlan.css';
 
@@ -8,6 +8,35 @@ const UpgradePlan = () => {
   const navigate = useNavigate();
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [successModal, setSuccessModal] = useState({ show: false, message: '' });
+  const [currentSub, setCurrentSub] = useState(null);
+
+  useEffect(() => {
+    fetchCurrentSubscription();
+  }, []);
+
+  const fetchCurrentSubscription = async () => {
+    try {
+      const res = await api.get('/admin/my-subscription');
+      if (res.data && res.data.subscription) {
+        setCurrentSub(res.data.subscription);
+      }
+    } catch (err) {
+      try {
+        const meRes = await api.get('/auth/me');
+        if (meRes.data) {
+          setCurrentSub({
+            planName: meRes.data.planName,
+            status: meRes.data.subscriptionStatus,
+            isTrial: meRes.data.isTrial,
+            expiryDate: meRes.data.expiryDate,
+            daysRemaining: meRes.data.daysExpired ? 0 : 30
+          });
+        }
+      } catch (e) {
+        console.error('Failed to fetch subscription status:', e);
+      }
+    }
+  };
 
   const handleBack = () => {
     navigate('/admin/dashboard');
@@ -32,7 +61,6 @@ const UpgradePlan = () => {
     setLoadingPlan(planName);
     
     try {
-      // 1. Load Razorpay script
       const isLoaded = await loadRazorpayScript();
       if (!isLoaded) {
         setSuccessModal({ show: true, message: 'Failed to load Razorpay SDK. Please check your internet connection.', isError: true });
@@ -40,21 +68,18 @@ const UpgradePlan = () => {
         return;
       }
 
-      // 2. Create order on backend
       const orderRes = await api.post('/auth/create-order', { planName, amount: price });
       const { orderId, keyId, amount, currency } = orderRes.data;
 
-      // 3. Configure Razorpay options
       const options = {
         key: keyId,
         amount: amount,
         currency: currency,
-        name: 'Marudhar Kesari Jain College',
+        name: currentSub?.collegeName || 'Institution Portal',
         description: `${planName} Plan Subscription`,
         order_id: orderId,
         handler: async function (response) {
           try {
-            // 4. Verify payment signature on backend
             const verifyRes = await api.post('/auth/verify-payment', {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
@@ -64,11 +89,11 @@ const UpgradePlan = () => {
             });
             
             setSuccessModal({ show: true, message: verifyRes.data.message });
+            fetchCurrentSubscription();
 
-            // Delay redirect so user can read the success message
             setTimeout(() => {
               navigate('/admin/subscription');
-            }, 3500);
+            }, 2500);
           } catch (err) {
             console.error('Payment verification failed:', err);
             setSuccessModal({ 
@@ -106,20 +131,23 @@ const UpgradePlan = () => {
     }
   };
 
+  const activePlanNormalized = (currentSub?.planName || currentSub?.plan || '').toLowerCase();
+  const isPaidActive = currentSub?.status === 'Active' && !currentSub?.isTrial && activePlanNormalized !== 'trial';
+
   return (
-    <div className="upgrade-container animate-fade-in">
+    <div className="upgrade-container animate-fade-in" style={{ position: 'relative' }}>
       <button 
         onClick={handleBack}
         style={{
           position: 'absolute',
-          top: '30px',
-          left: '30px',
+          top: '24px',
+          left: '24px',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          background: '#FFFFFF',
-          border: '1px solid #E2E8F0',
-          color: '#475569',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border-color)',
+          color: 'var(--text-main)',
           padding: '8px 16px',
           borderRadius: '20px',
           cursor: 'pointer',
@@ -127,14 +155,6 @@ const UpgradePlan = () => {
           transition: 'all 0.2s',
           boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
           zIndex: 100
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.background = '#F8FAFC';
-          e.currentTarget.style.color = '#0F172A';
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.background = '#FFFFFF';
-          e.currentTarget.style.color = '#475569';
         }}
       >
         <ArrowLeft size={16} /> Back to Dashboard
@@ -183,91 +203,167 @@ const UpgradePlan = () => {
         </div>
       )}
 
+      {/* Header & Active Plan Banner */}
       <div className="upgrade-header">
-        <h1>Upgrade Your Plan</h1>
-        <p>Your free trial limits your capabilities. Choose a plan to unlock the full potential of your campus.</p>
+        {isPaidActive ? (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(99,102,241,0.12))',
+            border: '1px solid rgba(16,185,129,0.3)',
+            borderRadius: '16px',
+            padding: '16px 24px',
+            maxWidth: '650px',
+            margin: '0 auto 24px auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            textAlign: 'left'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Crown size={22} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <strong style={{ fontSize: '1.05rem', color: 'var(--text-main)' }}>
+                    Current Plan: {currentSub.planName} Tier
+                  </strong>
+                  <span style={{ background: '#10b981', color: '#fff', fontSize: '0.72rem', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
+                    ACTIVE
+                  </span>
+                </div>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  {currentSub.amount !== undefined ? `₹${Number(currentSub.amount).toLocaleString('en-IN')}/${(currentSub.billingCycle || 'Monthly').slice(0,2).toLowerCase()}` : 'Configured by Super Admin'} &bull; {currentSub.daysRemaining ? `${currentSub.daysRemaining} days remaining` : 'Active status'}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/admin/subscription')}
+              style={{
+                background: 'transparent',
+                border: '1px solid #10b981',
+                color: '#10b981',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '0.8rem',
+                cursor: 'pointer'
+              }}
+            >
+              View Ledger
+            </button>
+          </div>
+        ) : null}
+
+        <h1>{isPaidActive ? 'Manage Or Switch Subscription' : 'Upgrade Your Plan'}</h1>
+        <p>
+          {isPaidActive
+            ? `Your institution is currently active on the ${currentSub.planName} Plan. You can change your tier or renew your plan below.`
+            : 'Your free trial limits your capabilities. Choose a plan to unlock the full potential of your campus.'}
+        </p>
       </div>
 
       <div className="pricing-cards">
-        {/* Starter Plan */}
+        {/* Starter / Basic Plan */}
         <div 
-          className="pricing-card" 
-          onClick={() => handleSubscribe('Starter', 15000)}
+          className={`pricing-card ${activePlanNormalized.includes('basic') || activePlanNormalized.includes('starter') ? 'popular' : ''}`}
+          onClick={() => handleSubscribe('Starter', 10000)}
           style={{ cursor: 'pointer' }}
         >
-          <div className="plan-icon" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
+          {(activePlanNormalized.includes('basic') || activePlanNormalized.includes('starter')) && (
+            <div className="popular-badge" style={{ background: '#10b981' }}>Current Active Plan</div>
+          )}
+          <div className="plan-icon" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>
             <Shield size={28} />
           </div>
-          <h2>Starter</h2>
-          <div className="price">₹15,000<span>/month</span></div>
-          <p className="plan-desc">Perfect for small institutions getting started with digital management.</p>
+          <h2>Starter Basic</h2>
+          <div className="price">₹10,000<span>/month</span></div>
+          <p className="plan-desc">Perfect for small to mid-size institutions getting started with digital ERP.</p>
           <ul className="plan-features">
-            <li><CheckCircle2 size={16} /> Up to 500 Students</li>
-            <li><CheckCircle2 size={16} /> Basic Attendance Tracking</li>
-            <li><CheckCircle2 size={16} /> Max 5 HODs</li>
-            <li><CheckCircle2 size={16} /> Email Support</li>
+            <li><CheckCircle2 size={16} /> Up to 1,500 Students</li>
+            <li><CheckCircle2 size={16} /> Core Attendance & Admissions</li>
+            <li><CheckCircle2 size={16} /> Timetable & Staff Management</li>
+            <li><CheckCircle2 size={16} /> Standard Email Support</li>
           </ul>
           <button 
             className="btn-subscribe btn-starter" 
-            onClick={(e) => { e.stopPropagation(); handleSubscribe('Starter', 15000); }}
+            onClick={(e) => { e.stopPropagation(); handleSubscribe('Starter', 10000); }}
             disabled={loadingPlan !== null}
+            style={activePlanNormalized.includes('basic') || activePlanNormalized.includes('starter') ? { background: '#10b981', color: '#fff' } : {}}
           >
-            {loadingPlan === 'Starter' ? 'Processing...' : 'Subscribe Now'} <ArrowRight size={16} />
+            {(activePlanNormalized.includes('basic') || activePlanNormalized.includes('starter')) 
+              ? <><Check size={16} /> Current Plan</> 
+              : (loadingPlan === 'Starter' ? 'Processing...' : 'Subscribe / Switch')
+            } <ArrowRight size={16} />
           </button>
         </div>
 
         {/* Premium Plan */}
         <div 
-          className="pricing-card popular"
-          onClick={() => handleSubscribe('Premium', 25000)}
+          className={`pricing-card ${activePlanNormalized.includes('premium') ? 'popular' : ''}`}
+          onClick={() => handleSubscribe('Premium', 20000)}
           style={{ cursor: 'pointer' }}
         >
-          <div className="popular-badge">Most Popular</div>
-          <div className="plan-icon" style={{ background: 'rgba(139,92,246,0.1)', color: '#8b5cf6' }}>
+          {activePlanNormalized.includes('premium') ? (
+            <div className="popular-badge" style={{ background: '#3b82f6' }}>Current Active Plan</div>
+          ) : (
+            <div className="popular-badge">Most Popular</div>
+          )}
+          <div className="plan-icon" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
             <Zap size={28} />
           </div>
-          <h2>Premium</h2>
-          <div className="price">₹25,000<span>/month</span></div>
-          <p className="plan-desc">Complete ERP suite for growing colleges and universities.</p>
+          <h2>Premium Standard</h2>
+          <div className="price">₹20,000<span>/month</span></div>
+          <p className="plan-desc">Complete ERP suite for growing colleges and multi-department universities.</p>
           <ul className="plan-features">
-            <li><CheckCircle2 size={16} /> Unlimited Students</li>
-            <li><CheckCircle2 size={16} /> Transport & Hostel Modules</li>
-            <li><CheckCircle2 size={16} /> Advanced Analytics</li>
+            <li><CheckCircle2 size={16} /> Up to 5,000 Students</li>
+            <li><CheckCircle2 size={16} /> Transport GPS & Hostel Modules</li>
+            <li><CheckCircle2 size={16} /> Advanced Analytics & Mark Grading</li>
             <li><CheckCircle2 size={16} /> 24/7 Priority Support</li>
           </ul>
           <button 
             className="btn-subscribe popular-btn"
-            onClick={(e) => { e.stopPropagation(); handleSubscribe('Premium', 25000); }}
+            onClick={(e) => { e.stopPropagation(); handleSubscribe('Premium', 20000); }}
             disabled={loadingPlan !== null}
           >
-            {loadingPlan === 'Premium' ? 'Processing...' : 'Subscribe Now'} <ArrowRight size={16} />
+            {activePlanNormalized.includes('premium')
+              ? <><Check size={16} /> Current Plan</>
+              : (loadingPlan === 'Premium' ? 'Processing...' : 'Subscribe / Switch')
+            } <ArrowRight size={16} />
           </button>
         </div>
 
         {/* Elite Plan */}
         <div 
-          className="pricing-card"
-          onClick={() => handleSubscribe('Elite', 50000)}
+          className={`pricing-card ${activePlanNormalized.includes('elite') || activePlanNormalized.includes('enterprise') ? 'popular' : ''}`}
+          onClick={() => handleSubscribe('Elite', 35000)}
           style={{ cursor: 'pointer' }}
         >
-          <div className="plan-icon" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>
+          {(activePlanNormalized.includes('elite') || activePlanNormalized.includes('enterprise')) && (
+            <div className="popular-badge" style={{ background: '#6366f1' }}>Current Active Plan</div>
+          )}
+          <div className="plan-icon" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1' }}>
             <Crown size={28} />
           </div>
-          <h2>Elite</h2>
-          <div className="price">₹50,000<span>/month</span></div>
-          <p className="plan-desc">Enterprise-grade AI and custom integrations for massive scale.</p>
+          <h2>Enterprise Elite</h2>
+          <div className="price">₹35,000<span>/month</span></div>
+          <p className="plan-desc">Enterprise-grade AI, automated workflows, and custom scale.</p>
           <ul className="plan-features">
-            <li><CheckCircle2 size={16} /> Everything in Premium</li>
-            <li><CheckCircle2 size={16} /> Custom White-labeling</li>
-            <li><CheckCircle2 size={16} /> AI Predictive Analytics</li>
-            <li><CheckCircle2 size={16} /> Dedicated Account Manager</li>
+            <li><CheckCircle2 size={16} /> Unlimited Students & Staff</li>
+            <li><CheckCircle2 size={16} /> Custom Institutional Domain</li>
+            <li><CheckCircle2 size={16} /> AI Predictive Insights & Automation</li>
+            <li><CheckCircle2 size={16} /> Dedicated 24/7 Account Manager</li>
           </ul>
           <button 
             className="btn-subscribe btn-elite"
-            onClick={(e) => { e.stopPropagation(); handleSubscribe('Elite', 50000); }}
+            onClick={(e) => { e.stopPropagation(); handleSubscribe('Elite', 35000); }}
             disabled={loadingPlan !== null}
+            style={activePlanNormalized.includes('elite') || activePlanNormalized.includes('enterprise') ? { background: '#6366f1', color: '#fff' } : {}}
           >
-            {loadingPlan === 'Elite' ? 'Processing...' : 'Subscribe Now'} <ArrowRight size={16} />
+            {(activePlanNormalized.includes('elite') || activePlanNormalized.includes('enterprise'))
+              ? <><Check size={16} /> Current Plan</>
+              : (loadingPlan === 'Elite' ? 'Processing...' : 'Subscribe / Switch')
+            } <ArrowRight size={16} />
           </button>
         </div>
       </div>
@@ -276,3 +372,4 @@ const UpgradePlan = () => {
 };
 
 export default UpgradePlan;
+

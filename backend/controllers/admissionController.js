@@ -14,10 +14,21 @@ export const recordAdmissionPayment = async (req, res) => {
       paymentDate,
     } = req.body;
 
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
     // Support lookup by MongoDB _id, id string, or admissionNumber
-    let query = { id };
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      query = { $or: [{ _id: id }, { id }] };
+    let query = {
+      $or: [
+        { id },
+        ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: id }] : [])
+      ]
+    };
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      query = {
+        $and: [
+          { $or: query.$or },
+          { $or: [{ collegeId }, { tenantId: collegeId }] }
+        ]
+      };
     }
 
     const admission = await Student.findOne(query);
@@ -285,9 +296,20 @@ export const updateAdmissionPayment = async (req, res) => {
       return res.status(400).json({ message: "Enter a valid payment amount" });
     }
 
-    let query = { id };
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      query = { $or: [{ _id: id }, { id }] };
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    let query = {
+      $or: [
+        { id },
+        ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: id }] : [])
+      ]
+    };
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      query = {
+        $and: [
+          { $or: query.$or },
+          { $or: [{ collegeId }, { tenantId: collegeId }] }
+        ]
+      };
     }
 
     const admission = await Student.findOne(query);
@@ -369,10 +391,21 @@ export const updateAdmissionPayment = async (req, res) => {
 export const deleteAdmissionPayment = async (req, res) => {
   try {
     const { id, paymentId } = req.params;
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
 
-    let query = { id };
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      query = { $or: [{ _id: id }, { id }] };
+    let query = {
+      $or: [
+        { id },
+        ...(mongoose.Types.ObjectId.isValid(id) ? [{ _id: id }] : [])
+      ]
+    };
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      query = {
+        $and: [
+          { $or: query.$or },
+          { $or: [{ collegeId }, { tenantId: collegeId }] }
+        ]
+      };
     }
 
     const admission = await Student.findOne(query);
@@ -413,7 +446,13 @@ export const deleteAdmissionPayment = async (req, res) => {
 
     // Also delete matching Fee document if present
     if (mongoose.Types.ObjectId.isValid(paymentId)) {
-      await Fee.findByIdAndDelete(paymentId).catch(() => {});
+      const feeDeleteFilter = {
+        _id: paymentId,
+        ...(req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system'
+          ? { $or: [{ collegeId }, { tenantId: collegeId }] }
+          : {})
+      };
+      await Fee.findOneAndDelete(feeDeleteFilter).catch(() => {});
     }
 
     req.app.get('io')?.emit('dataUpdated', { module: 'admissions', action: 'payment_deleted', admissionId: admission._id });
@@ -488,8 +527,17 @@ export const getFeeCollectionRecords = async (req, res) => {
       }
     }
 
-    if (req.collegeId && req.collegeId !== 'all') {
-      query.collegeId = req.collegeId;
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system' && targetCollegeId !== 'all') {
+      const colCond = { $or: [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }] };
+      if (query.$and) {
+        query.$and.push(colCond);
+      } else if (query.$or) {
+        query.$and = [{ $or: query.$or }, colCond];
+        delete query.$or;
+      } else {
+        query.$or = colCond.$or;
+      }
     }
 
     const totalRecords = await Student.countDocuments(query);

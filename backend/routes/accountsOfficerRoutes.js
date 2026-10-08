@@ -1,17 +1,21 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
-import { protect, authorize, checkSubscription } from '../middleware/authMiddleware.js';
+import { protect, authorize, collegeScope, checkSubscription } from '../middleware/authMiddleware.js';
 import { sendNotification } from '../utils/notificationHelper.js';
 
 const router = express.Router();
 
 // Get all Accounts Officers
-router.get('/', protect, authorize('Admin', 'Super Admin'), async (req, res) => {
+router.get('/', protect, authorize('Admin', 'Super Admin'), collegeScope, async (req, res) => {
   try {
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
     const filter = { role: { $regex: new RegExp('^accounts$', 'i') } };
-    if (req.user.role !== 'Super Admin') {
-      filter.collegeId = req.user.collegeId || req.user.tenantId;
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      filter.$or = [
+        { collegeId: targetCollegeId },
+        { tenantId: targetCollegeId }
+      ];
     }
     const officers = await User.find(filter).select('-password').sort({ createdAt: -1 });
     res.json(officers);
@@ -21,7 +25,7 @@ router.get('/', protect, authorize('Admin', 'Super Admin'), async (req, res) => 
 });
 
 // Create an Accounts Officer
-router.post('/', protect, authorize('Admin', 'Super Admin'), checkSubscription, async (req, res) => {
+router.post('/', protect, authorize('Admin', 'Super Admin'), collegeScope, checkSubscription, async (req, res) => {
   try {
     const { name, email, phone, password } = req.body;
     
@@ -30,7 +34,7 @@ router.post('/', protect, authorize('Admin', 'Super Admin'), checkSubscription, 
       return res.status(400).json({ message: 'User with this email already exists' });
     }
 
-    const collegeId = req.user.collegeId || req.user.tenantId || 'unassigned_college';
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId || 'unassigned_college';
 
     const newUser = new User({
       name,
@@ -38,7 +42,8 @@ router.post('/', protect, authorize('Admin', 'Super Admin'), checkSubscription, 
       phone,
       password, // Pass plain password, Mongoose schema will hash it
       role: 'Accounts',
-      collegeId
+      collegeId: collegeId,
+      tenantId: collegeId
     });
 
     await newUser.save();
@@ -70,6 +75,7 @@ router.post('/', protect, authorize('Admin', 'Super Admin'), checkSubscription, 
     // Emit real-time event if socket.io is configured
     if (req.app.get('io')) {
       req.app.get('io').emit('dataUpdated', { module: 'accounts-officer', action: 'created' });
+      req.app.get('io').emit('dataUpdated', { module: 'users', action: 'created' });
     }
 
     res.status(201).json({ message: 'Accounts Officer created successfully', user: { id: newUser._id, name: newUser.name, email: newUser.email } });
@@ -79,17 +85,18 @@ router.post('/', protect, authorize('Admin', 'Super Admin'), checkSubscription, 
 });
 
 // Delete an Accounts Officer
-router.delete('/:id', protect, authorize('Admin', 'Super Admin'), checkSubscription, async (req, res) => {
+router.delete('/:id', protect, authorize('Admin', 'Super Admin'), collegeScope, checkSubscription, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'Accounts Officer not found' });
     }
     
-    const collegeId = user.collegeId || user.tenantId || req.user.collegeId || 'unassigned_college';
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const userColId = user.collegeId || user.tenantId;
 
     // Ensure the Admin can only delete officers from their own college
-    if (req.user.role !== 'Super Admin' && user.collegeId !== (req.user.collegeId || req.user.tenantId)) {
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && userColId && userColId !== targetCollegeId) {
       return res.status(403).json({ message: 'Unauthorized to delete this user' });
     }
 
@@ -98,8 +105,8 @@ router.delete('/:id', protect, authorize('Admin', 'Super Admin'), checkSubscript
     // Notify Admin of deletion
     await sendNotification(req, {
       receiverId: req.user._id,
-      collegeId,
-      tenantId: collegeId,
+      collegeId: targetCollegeId,
+      tenantId: targetCollegeId,
       title: 'Accounts User Removed',
       message: `Accounts user ${user.name} (${user.email}) was deleted.`,
       category: 'system',
@@ -108,6 +115,7 @@ router.delete('/:id', protect, authorize('Admin', 'Super Admin'), checkSubscript
     
     if (req.app.get('io')) {
       req.app.get('io').emit('dataUpdated', { module: 'accounts-officer', action: 'deleted' });
+      req.app.get('io').emit('dataUpdated', { module: 'users', action: 'deleted' });
     }
 
     res.json({ message: 'Accounts Officer deleted successfully' });

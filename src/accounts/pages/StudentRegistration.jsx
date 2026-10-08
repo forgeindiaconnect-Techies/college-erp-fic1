@@ -825,7 +825,7 @@ const StudentRegistration = () => {
       <body>
         <div class="receipt">
           <div class="header">
-            <h2>${(typeof window !== 'undefined' && (JSON.parse(sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || '{}')?.collegeName)) || 'INSTITUTION PORTAL'}</h2>
+            <h2>${(typeof window !== 'undefined' && (JSON.parse(sessionStorage.getItem('accounts_session') || '{}')?.collegeName)) || 'INSTITUTION PORTAL'}</h2>
             <p style="margin: 4px 0 0; font-size: 13px; color: #475569; font-weight: 600;">OFFICIAL ADMISSION & FEE RECEIPT</p>
             <p style="margin: 4px 0 0; font-size: 12px; color: #64748b;">Academic Year: ${data.academicYear || '2026-2027'} | Reg No: <strong>${data.id || data.admissionNo || 'N/A'}</strong></p>
           </div>

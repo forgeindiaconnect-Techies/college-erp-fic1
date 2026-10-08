@@ -54,11 +54,118 @@ tbody tr:hover { background: rgba(0,0,0,0.01); }
 .text-muted { color: var(--text-muted); }
 
 /* Progress Bar */
-.progress-bar-bg { width: 100%; height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden; margin-top: 0.5rem; }
-.progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
-.progress-bar-fill.safe { background: #10b981; }
-.progress-bar-fill.warning { background: #f59e0b; }
-.progress-bar-fill.danger { background: #ef4444; }
+.progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 0.4rem;
+}
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.progress-bar-fill.safe, .progress-bar-fill.high { background: linear-gradient(90deg, #10b981, #059669); }
+.progress-bar-fill.warning, .progress-bar-fill.medium { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.progress-bar-fill.danger, .progress-bar-fill.low { background: linear-gradient(90deg, #ef4444, #dc2626); }
+
+/* Eligibility badges & tags */
+.eligibility-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.eligibility-pill.safe {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+.eligibility-pill.warning {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+.eligibility-pill.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.advice-subtext {
+  font-size: 0.72rem;
+  margin-top: 0.25rem;
+  font-weight: 600;
+}
+.advice-subtext.safe { color: #15803d; }
+.advice-subtext.warning { color: #b45309; }
+.advice-subtext.danger { color: #b91c1c; }
+
+/* Subject Code pill */
+.subj-code-tag {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  margin-left: 0.4rem;
+}
+
+/* Explanation / Guide Card */
+.attendance-guide-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-top: 0.5rem;
+}
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+.guide-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: #ffffff;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid #f1f5f9;
+}
+.guide-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.guide-dot.safe { background: #10b981; box-shadow: 0 0 6px rgba(16, 185, 129, 0.4); }
+.guide-dot.warning { background: #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.4); }
+.guide-dot.danger { background: #ef4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.4); }
+
+.guide-item h5 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+.guide-item p {
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.3;
+}
 
 .subject-cell-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.2rem; }
 .subject-cell-subtitle { font-size: 0.75rem; color: var(--text-muted); }
@@ -66,7 +173,90 @@ tbody tr:hover { background: rgba(0,0,0,0.01); }
 /* Layout Grid for Sub-tables */
 .attendance-tables-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
 @media (min-width: 1024px) {
-  .attendance-tables-grid { grid-template-columns: 3fr 2fr; }
+  .attendance-tables-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* Monthly Card Item Styling */
+.monthly-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+.monthly-item-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.monthly-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.monthly-item-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+.monthly-item-subtitle {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+}
+.monthly-metrics-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+.monthly-metric-box {
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  text-align: center;
+}
+.monthly-metric-box .label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #64748b;
+  display: block;
+}
+.monthly-metric-box .val {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-top: 2px;
+  display: block;
+}
+
+.monthly-progress-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.monthly-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.monthly-explainer-note {
+  font-size: 0.72rem;
+  color: #64748b;
+  background: #f8fafc;
+  border-left: 3px solid #6366f1;
+  padding: 0.4rem 0.65rem;
+  border-radius: 4px;
+  line-height: 1.35;
 }
 
 /* Parent Attendance specific styling */

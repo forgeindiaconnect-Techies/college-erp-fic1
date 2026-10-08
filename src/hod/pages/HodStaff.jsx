@@ -5,7 +5,8 @@ import {
   updateStaff,
   createStaff,
   getEmployeeAttendanceStats,
-  getFacultyAllocations
+  getFacultyAllocations,
+  getSubjects
 } from '../../api/index';
 import { io } from 'socket.io-client';
 import { getBackendURL } from '../../utils/backendUrl';
@@ -14,27 +15,13 @@ import './HodStaff.css';
 // Try to grab logged in HOD session
 const getHodSession = () => {
   try {
-    return JSON.parse(sessionStorage.getItem('hod_session')) || {
-      name: 'Prof. Rajan Iyer', dept: 'Electrical Engg.', deptCode: 'EE', role: 'HOD'
-    };
+    const raw = sessionStorage.getItem('hod_session') || localStorage.getItem('erp_user');
+    if (raw) return JSON.parse(raw);
+    return { name: 'HOD', dept: 'TAMIL', role: 'HOD' };
   } catch (e) {
-    return { name: 'Prof. Rajan Iyer', dept: 'Electrical Engg.', deptCode: 'EE', role: 'HOD' };
+    return { name: 'HOD', dept: 'TAMIL', role: 'HOD' };
   }
 };
-
-const MOCK_STAFF_FALLBACK = [
-  { id: 'STF001', name: 'Dr. Ananya Rao', email: 'ananya@college.edu', phone: '9876543210', dept: 'Computer Science', designation: 'Professor', subjects: ['Data Structures', 'DBMS'], workload: 18, attendance: 0 },
-  { id: 'STF002', name: 'Prof. Rajan Iyer', email: 'rajan@college.edu', phone: '9845123456', dept: 'Electrical Engg.', designation: 'HOD', subjects: ['Circuits', 'Networks'], workload: 14, attendance: 0 },
-  { id: 'STF003', name: 'Dr. Meena Pillai', email: 'meena@college.edu', phone: '9812987654', dept: 'Mechanical Engg.', designation: 'Associate Prof.', subjects: ['Thermodynamics', 'Fluid Mechanics'], workload: 16, attendance: 0 },
-  { id: 'STF004', name: 'Prof. Karthik S.', email: 'karthik@college.edu', phone: '9823456789', dept: 'Computer Science', designation: 'Assistant Prof.', subjects: ['OS', 'Machine Learning'], workload: 20, attendance: 0 },
-  { id: 'STF005', name: 'Dr. Shalini Nair', email: 'shalini@college.edu', phone: '9867123456', dept: 'Civil Engg.', designation: 'Professor', subjects: ['Structural Analysis'], workload: 12, attendance: 0 },
-];
-
-const SUBJECTS = [
-  'Data Structures', 'DBMS', 'Networks', 'OS', 'Machine Learning', 
-  'Circuits', 'Power Systems', 'Electronics', 'Thermodynamics', 
-  'Fluid Mechanics', 'Structural Analysis', 'Engineering Math'
-];
 
 const EMPTY_FORM = { id: '', name: '', email: '', phone: '', designation: 'Assistant Prof.', workload: '16', subjects: [], attendance: 0 };
 
@@ -47,6 +34,7 @@ const HodStaff = () => {
 
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState([]);
+  const [availableSubjects, setAvailableSubjects] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7)
@@ -71,14 +59,18 @@ const HodStaff = () => {
 
   const fetchStaff = async () => {
     try {
-      const [resStaff, resAttStats] = await Promise.all([
+      const [resStaff, resAttStats, resSubs] = await Promise.all([
         getStaff().catch(() => ({ data: [] })),
         getEmployeeAttendanceStats({ month: selectedMonth })
-          .catch(() => ({ data: {} }))
+          .catch(() => ({ data: {} })),
+        getSubjects({ dept: HOD_DEPT }).catch(() => ({ data: [] }))
       ]);
 
       const backendData = resStaff.data || [];
       const attStats = resAttStats.data || {};
+      const subsData = resSubs.data || [];
+      const loadedSubNames = subsData.map(s => s.subjectName || s.name || s.subjectCode).filter(Boolean);
+      setAvailableSubjects(loadedSubNames);
 
       const processed = backendData
         .filter(s => s.dept === HOD_DEPT || s.department === HOD_DEPT)
@@ -109,10 +101,8 @@ const HodStaff = () => {
       setStaff(processed);
       setLoading(false);
     } catch (err) {
-      console.warn('Backend unavailable, using fallback data:', err.message);
-      const savedData = localStorage.getItem('erp_staff');
-      const initialData = savedData ? JSON.parse(savedData) : MOCK_STAFF_FALLBACK;
-      setStaff(initialData.filter(s => s.dept === HOD_DEPT));
+      console.warn('Backend staff load failed:', err.message);
+      setStaff([]);
       setLoading(false);
     }
   };
@@ -394,20 +384,26 @@ const HodStaff = () => {
               <div className="form-group" style={{ marginTop: '1.25rem' }}>
                 <label><BookOpen size={13} /> Subjects Assignment</label>
                 <div className="subjects-picker" style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem', maxHeight: '180px', overflowY: 'auto', padding: '0.2rem'}}>
-                  {SUBJECTS.map(sub => (
-                    <button type="button" key={sub}
-                      className={`subject-pick-btn ${form.subjects.includes(sub) ? 'selected' : ''}`}
-                      onClick={() => toggleSubject(sub)}
-                      style={{
-                        padding: '0.4rem 0.8rem', borderRadius: '20px', border: '1px solid var(--border-color)',
-                        background: form.subjects.includes(sub) ? 'rgba(79,70,229,0.1)' : 'var(--bg-primary)',
-                        borderColor: form.subjects.includes(sub) ? 'var(--primary)' : 'var(--border-color)',
-                        color: form.subjects.includes(sub) ? 'var(--primary)' : 'var(--text-muted)',
-                        fontSize: '0.82rem', fontWeight: form.subjects.includes(sub) ? '600' : '400',
-                        cursor: 'pointer', transition: 'all 0.15s ease'
-                      }}
-                    >{sub}</button>
-                  ))}
+                  {availableSubjects.length > 0 ? (
+                    availableSubjects.map(sub => (
+                      <button type="button" key={sub}
+                        className={`subject-pick-btn ${form.subjects.includes(sub) ? 'selected' : ''}`}
+                        onClick={() => toggleSubject(sub)}
+                        style={{
+                          padding: '0.4rem 0.8rem', borderRadius: '20px', border: '1px solid var(--border-color)',
+                          background: form.subjects.includes(sub) ? 'rgba(79,70,229,0.1)' : 'var(--bg-primary)',
+                          borderColor: form.subjects.includes(sub) ? 'var(--primary)' : 'var(--border-color)',
+                          color: form.subjects.includes(sub) ? 'var(--primary)' : 'var(--text-muted)',
+                          fontSize: '0.82rem', fontWeight: form.subjects.includes(sub) ? '600' : '400',
+                          cursor: 'pointer', transition: 'all 0.15s ease'
+                        }}
+                      >{sub}</button>
+                    ))
+                  ) : (
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted, #64748b)', fontStyle: 'italic', padding: '6px' }}>
+                      No subjects configured for {HOD_DEPT}. Please add department subjects first.
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -77,7 +77,11 @@ const SuperAdminColleges = () => {
       email: college.email || '',
       phone: college.phone || '',
       principalName: college.principalName || '',
-      principalEmail: college.principalEmail || ''
+      principalEmail: college.principalEmail || '',
+      subscriptionPlan: college.subscriptionPlan || 'Premium',
+      subscriptionAmount: college.subscriptionAmount !== undefined ? college.subscriptionAmount : (college.subscriptionPlan === 'Elite' ? 35000 : college.subscriptionPlan === 'Basic' ? 10000 : 20000),
+      billingCycle: college.billingCycle || 'Monthly',
+      subscriptionStatus: college.subscriptionStatus || 'Active'
     });
     setIsEditing(false);
     setShowInspectModal(true);
@@ -719,6 +723,64 @@ const SuperAdminColleges = () => {
                       />
                     </div>
                   </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', background: 'rgba(99,102,241,0.04)', padding: '10px', borderRadius: '8px', border: '1px dashed rgba(99,102,241,0.2)' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
+                        Subscription Plan
+                      </label>
+                      <select
+                        className="sa-input"
+                        value={editFormData.subscriptionPlan || 'Premium'}
+                        onChange={(e) => {
+                          const plan = e.target.value;
+                          const defaultAmt = plan === 'Elite' ? 35000 : plan === 'Premium' ? 20000 : plan === 'Basic' ? 10000 : 25000;
+                          setEditFormData({ 
+                            ...editFormData, 
+                            subscriptionPlan: plan,
+                            subscriptionAmount: defaultAmt 
+                          });
+                        }}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-main)', fontWeight: 600 }}
+                      >
+                        <option value="Trial">Free Trial</option>
+                        <option value="Basic">Starter Basic</option>
+                        <option value="Premium">Premium Standard</option>
+                        <option value="Elite">Enterprise Elite</option>
+                        <option value="Custom">Custom Plan</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
+                        Plan Amount (₹)
+                      </label>
+                      <input
+                        type="number"
+                        className="sa-input"
+                        value={editFormData.subscriptionAmount || 0}
+                        onChange={(e) => setEditFormData({ ...editFormData, subscriptionAmount: Number(e.target.value) })}
+                        placeholder="₹ Amount"
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-main)', fontWeight: 700 }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
+                        Billing Cycle
+                      </label>
+                      <select
+                        className="sa-input"
+                        value={editFormData.billingCycle || 'Monthly'}
+                        onChange={(e) => setEditFormData({ ...editFormData, billingCycle: e.target.value })}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-main)', fontWeight: 600 }}
+                      >
+                        <option value="Monthly">Monthly</option>
+                        <option value="Quarterly">Quarterly</option>
+                        <option value="Annually">Annually</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
                     <button
                       type="button"
@@ -741,18 +803,25 @@ const SuperAdminColleges = () => {
                 </div>
               ) : null}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
                 <div style={{ background: 'var(--bg-primary)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Subscription Plan</div>
-                  <div style={{ fontWeight: 700, color: '#6366f1', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Crown size={16} />
+                  <div style={{ fontWeight: 700, color: '#6366f1', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Crown size={15} />
                     {selectedCollege.subscriptionPlan || 'Trial'}
                   </div>
                 </div>
 
                 <div style={{ background: 'var(--bg-primary)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Fee & Billing</div>
+                  <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem' }}>
+                    {selectedCollege.subscriptionPlan === 'Trial' ? '₹0 (Free)' : `₹${(selectedCollege.subscriptionAmount || 20000).toLocaleString('en-IN')}/${(selectedCollege.billingCycle || 'Monthly').slice(0,2).toLowerCase()}`}
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--bg-primary)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Account Status</div>
-                  <div style={{ fontWeight: 700, color: selectedCollege.subscriptionStatus === 'Active' ? '#10b981' : '#ef4444', fontSize: '1rem' }}>
+                  <div style={{ fontWeight: 700, color: selectedCollege.subscriptionStatus === 'Active' ? '#10b981' : '#ef4444', fontSize: '0.95rem' }}>
                     {selectedCollege.subscriptionStatus || 'Active'}
                   </div>
                 </div>

@@ -16,6 +16,7 @@ const feeSchema = new mongoose.Schema({
   receiptNo: { type: String },
   payments: { type: Array, default: [] },
   collegeId: { type: String },
+  tenantId: { type: String },
   quota: { type: mongoose.Schema.Types.Mixed, default: null },
   quotaName: { type: String, default: 'General Quota' },
   normalFee: { type: Number, default: 0 },

@@ -1,915 +1,3655 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building, Target, FileText, Calendar, 
   Users, Award, Search, Plus, MapPin, DollarSign,
-  CheckCircle, XCircle, Clock, Download
+  CheckCircle, XCircle, X, Clock, Download, TrendingUp,
+  Filter, Eye, CheckCircle2, AlertCircle, Sparkles,
+  RefreshCw, ExternalLink, Mail, Phone, UserCheck, ShieldCheck, Trash2, BookOpen,
+  Layers, ArrowRight, CheckCheck, ListOrdered, Zap, CheckSquare
 } from 'lucide-react';
 import { 
   getPlacementCompanies, getPlacementJobs, getPlacementApplications, 
-  getPlacementInterviews, getPlacementSelections,
-  createPlacementCompany, createPlacementJob, getEligibleStudentsForJob,
-  updatePlacementApplicationStatus, createPlacementInterview, createPlacementSelection
+  getPlacementInterviews, getPlacementSelections, getStudents,
+  getAllMarks, getAllAttendance,
+  createPlacementCompany, createPlacementJob, deletePlacementJob, deletePlacementCompany,
+  updatePlacementApplicationStatus, bulkApplyPlacementApplications,
+  createPlacementInterview, createPlacementSelection
 } from '../../api/index';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, LineChart, Line, AreaChart, Area
+  ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 import './PlacementManagement.css';
 
-const CHART_DATA = [
-  { month: 'Jul', placed: 20 }, { month: 'Aug', placed: 50 },
-  { month: 'Sep', placed: 120 }, { month: 'Oct', placed: 250 },
-  { month: 'Nov', placed: 310 }, { month: 'Dec', placed: 450 },
+const CHART_DATA_FALLBACK = [
+  { month: 'Jul', placed: 15 }, { month: 'Aug', placed: 35 },
+  { month: 'Sep', placed: 68 }, { month: 'Oct', placed: 120 },
+  { month: 'Nov', placed: 180 }, { month: 'Dec', placed: 240 },
 ];
 
-const PlacementManagement = () => {
-  const [activeTab, setActiveTab] = useState('Dashboard');
+export const generateDefaultRounds = (count) => {
+  const roundPresets = [
+    { name: 'Round 1: Online Aptitude & Assessment', type: 'Aptitude' },
+    { name: 'Round 2: Technical Coding & Problem Solving', type: 'Technical' },
+    { name: 'Round 3: Advanced Domain & System Design', type: 'Technical' },
+    { name: 'Round 4: Group Discussion / Case Study', type: 'GD' },
+    { name: 'Round 5: HR & Leadership Fitment', type: 'HR' }
+  ];
+  const rounds = [];
+  const numRounds = Math.max(1, Math.min(Number(count) || 3, 6));
+  for (let i = 1; i <= numRounds; i++) {
+    const preset = roundPresets[i - 1] || { name: `Round ${i}: Evaluation Round`, type: 'Technical' };
+    rounds.push({
+      roundNumber: i,
+      name: preset.name,
+      type: preset.type
+    });
+  }
+  return rounds;
+};
+
+const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const getTabFromLocation = () => {
+    const path = (location.pathname || '').toLowerCase();
+    if (path.includes('/companies')) return 'Companies';
+    if (path.includes('/jobs')) return 'Job Openings';
+    if (path.includes('/eligibility')) return 'Eligibility Tracker';
+    if (path.includes('/applications')) return 'Applications';
+    if (path.includes('/training')) return 'Training Programs';
+    if (path.includes('/interviews')) return 'Interviews';
+    if (path.includes('/selections') || path.includes('/offers')) return 'Selected Students';
+    if (path.includes('/reports') || path.includes('/analytics')) return 'Reports';
+    return defaultTab || 'Dashboard';
+  };
+
+  const [activeTab, setActiveTab] = useState(getTabFromLocation);
+
+  useEffect(() => {
+    setActiveTab(getTabFromLocation());
+  }, [location.pathname, defaultTab]);
+
+  const handleTabClick = (tabName) => {
+    setActiveTab(tabName);
+    const pathToTab = {
+      'Dashboard': '/placement/dashboard',
+      'Companies': '/placement/companies',
+      'Job Openings': '/placement/jobs',
+      'Eligibility Tracker': '/placement/eligibility',
+      'Applications': '/placement/applications',
+      'Training Programs': '/placement/training',
+      'Interviews': '/placement/interviews',
+      'Selected Students': '/placement/selections',
+      'Reports': '/placement/reports'
+    };
+    if (location.pathname.startsWith('/placement') && pathToTab[tabName]) {
+      navigate(pathToTab[tabName]);
+    }
+  };
+
   const [search, setSearch] = useState('');
   const [companies, setCompanies] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
   const [interviews, setInterviews] = useState([]);
   const [selections, setSelections] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [toastMsg, setToastMsg] = useState('');
+
+  const showToast = (msg) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(''), 3500);
+  };
+
+  // Active Job and Round state for Interviews / Evaluation workflow
+  const [selectedInterviewJob, setSelectedInterviewJob] = useState('');
+  const [selectedRoundIndex, setSelectedRoundIndex] = useState(0);
+  const [trainingRoundFilter, setTrainingRoundFilter] = useState('ALL');
 
   // Modals state
   const [showCompanyModal, setShowCompanyModal] = useState(false);
-  const [companyForm, setCompanyForm] = useState({ name: '', sector: '', location: '', website: '', hrName: '', hrEmail: '', hrContact: '' });
+  const [companyForm, setCompanyForm] = useState({ name: '', sector: 'IT & Software', location: 'Pan India', website: '', hrName: '', hrEmail: '', hrContact: '' });
 
   const [showJobModal, setShowJobModal] = useState(false);
-  const [jobForm, setJobForm] = useState({ company: '', role: '', ctc: '', eligibility: '', minCgpa: 0, maxArrears: 0, eligibleDepartments: [], driveDate: '', deadline: '' });
+  const [jobForm, setJobForm] = useState({ 
+    company: '', 
+    role: '', 
+    ctc: '4.5 LPA', 
+    eligibility: 'CGPA >= 6.0 & Zero Arrears', 
+    minCgpa: 6.0, 
+    maxArrears: 0, 
+    eligibleDepartments: ['ALL'], 
+    driveDate: '', 
+    deadline: '',
+    totalRounds: 3,
+    rounds: generateDefaultRounds(3)
+  });
 
   const [showInterviewModal, setShowInterviewModal] = useState(false);
-  const [interviewForm, setInterviewForm] = useState({ company: '', role: '', round: '', date: '', time: '', mode: 'Online', venue: '', panel: '', candidates: 0 });
+  const [interviewForm, setInterviewForm] = useState({ company: '', role: '', round: 'Technical Round 1', date: '', time: '10:00 AM', mode: 'Online', venue: 'Campus Auditorium / Zoom', panel: 'Recruitment Panel', candidates: 10 });
 
   const [showSelectionModal, setShowSelectionModal] = useState(false);
-  const [selectionForm, setSelectionForm] = useState({ student: '', regNo: '', company: '', role: '', ctc: '', date: '' });
+  const [selectionForm, setSelectionForm] = useState({ student: '', regNo: '', company: '', role: '', ctc: '4.5 LPA', date: new Date().toISOString().split('T')[0] });
   
-  const [reportPreview, setReportPreview] = useState(null); // { title: string, headers: string[], rows: any[][] }
+  const [reportPreview, setReportPreview] = useState(null);
+
+  // Training Programs State
+  const [trainingPrograms, setTrainingPrograms] = useState(() => {
+    try {
+      const saved = localStorage.getItem('erp_placement_training_programs');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return [
+      {
+        id: 'TP-101',
+        title: 'Aptitude & Quantitative Problem Solving Bootcamp',
+        trainer: 'Placement Training Cell / Dr. Ramanathan',
+        targetDepartment: 'ALL',
+        date: '2026-10-15',
+        time: '09:30 AM - 12:30 PM',
+        venue: 'Main Auditorium & Online Portal',
+        mode: 'Hybrid',
+        status: 'Scheduled',
+        description: 'Comprehensive shortcuts, numerical reasoning, and data interpretation for tier-1 IT drives.'
+      },
+      {
+        id: 'TP-102',
+        title: 'Full Stack Java & Spring Cloud Microservices',
+        trainer: 'Corporate Tech Lead (Ex-Amazon)',
+        targetDepartment: 'Computer Science and Engineering',
+        date: '2026-10-22',
+        time: '10:00 AM - 01:00 PM',
+        venue: 'Advanced Computing Lab 4',
+        mode: 'Offline',
+        status: 'Scheduled',
+        description: 'System design, REST APIs, JPA Hibernate, and deployment architecture.'
+      },
+      {
+        id: 'TP-103',
+        title: 'Corporate Soft Skills, GD & Resume Mastery',
+        trainer: 'TalentSprint Senior HR Consultant',
+        targetDepartment: 'ALL',
+        date: '2026-10-28',
+        time: '02:00 PM - 05:00 PM',
+        venue: 'Seminar Hall B',
+        mode: 'Offline',
+        status: 'Scheduled',
+        description: 'HR interview simulations, communication etiquettes, and ATS resume verification.'
+      },
+      {
+        id: 'TP-104',
+        title: 'Mock Technical Coding & Live Debugging Workshop',
+        trainer: 'Alumni Industry Network',
+        targetDepartment: 'Computer Science and Engineering',
+        date: '2026-11-04',
+        time: '09:00 AM - 01:00 PM',
+        venue: 'Virtual Lab (HackerRank Platform)',
+        mode: 'Online',
+        status: 'Scheduled',
+        description: 'Live LeetCode / HackerRank timed coding assessments with one-on-one feedback.'
+      }
+    ];
+  });
+
+  const [studentTrainingStatus, setStudentTrainingStatus] = useState(() => {
+    try {
+      const saved = localStorage.getItem('erp_placement_training_attendance');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [showTrainingModal, setShowTrainingModal] = useState(false);
+  const [trainingForm, setTrainingForm] = useState({
+    title: '',
+    trainer: '',
+    targetDepartment: 'ALL',
+    targetRound: 'ALL',
+    date: new Date().toISOString().split('T')[0],
+    time: '09:30 AM - 12:30 PM',
+    venue: 'Main Auditorium',
+    mode: 'Offline',
+    status: 'Scheduled',
+    description: ''
+  });
+
+  const [selectedTrainingForAttendance, setSelectedTrainingForAttendance] = useState(null);
 
   // Eligibility tracker state
   const [selectedEligibleJob, setSelectedEligibleJob] = useState('');
-  const [eligibleStudents, setEligibleStudents] = useState([]);
-  const [notEligibleStudents, setNotEligibleStudents] = useState([]);
-  const [eligibilityLoading, setEligibilityLoading] = useState(false);
 
-  React.useEffect(() => {
-    fetchPlacementData();
-  }, []);
-
-  React.useEffect(() => {
-    if (selectedEligibleJob) {
-      const fetchEligible = async () => {
-        setEligibilityLoading(true);
-        try {
-          const res = await getEligibleStudentsForJob(selectedEligibleJob);
-          setEligibleStudents(res.data.eligible || []);
-          setNotEligibleStudents(res.data.notEligible || []);
-        } catch (error) {
-          console.error('Failed to load eligible students', error);
-          setEligibleStudents([]);
-          setNotEligibleStudents([]);
-        } finally {
-          setEligibilityLoading(false);
-        }
-      };
-      fetchEligible();
-    } else {
-      setEligibleStudents([]);
-      setNotEligibleStudents([]);
-    }
-  }, [selectedEligibleJob]);
-
-  const fetchPlacementData = async () => {
+  const fetchPlacementData = useCallback(async () => {
+    setLoading(true);
+    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
     try {
-      setLoading(true);
-      const [compRes, jobsRes, appsRes, intRes, selRes] = await Promise.all([
-        getPlacementCompanies(),
-        getPlacementJobs(),
-        getPlacementApplications(),
-        getPlacementInterviews(),
-        getPlacementSelections()
+      const [compRes, jobsRes, appsRes, intRes, selRes, studentsRes, marksRes, attRes] = await Promise.all([
+        getPlacementCompanies().catch(() => ({ data: [] })),
+        getPlacementJobs().catch(() => ({ data: [] })),
+        getPlacementApplications().catch(() => ({ data: [] })),
+        getPlacementInterviews().catch(() => ({ data: [] })),
+        getPlacementSelections().catch(() => ({ data: [] })),
+        getStudents().catch(() => ({ data: [] })),
+        getAllMarks().catch(() => ({ data: [] })),
+        getAllAttendance().catch(() => ({ data: [] }))
       ]);
-      setCompanies(compRes.data);
-      setJobs(jobsRes.data);
-      setApplications(appsRes.data);
-      setInterviews(intRes.data);
-      setSelections(selRes.data);
+
+      const readArray = (res, key) => {
+        if (Array.isArray(res?.data)) return res.data;
+        if (Array.isArray(res?.data?.[key])) return res.data[key];
+        return [];
+      };
+
+      setCompanies(readArray(compRes, 'companies'));
+      
+      const rawJobs = readArray(jobsRes, 'jobs');
+      setJobs(rawJobs);
+
+      setApplications(readArray(appsRes, 'applications'));
+      setInterviews(readArray(intRes, 'interviews'));
+      setSelections(readArray(selRes, 'selections'));
+
+      // Raw students
+      let rawStudents = readArray(studentsRes, 'students');
+      if (rawStudents.length === 0) {
+        try {
+          const local = localStorage.getItem(`erp_students_${tenantId}`);
+          if (local) rawStudents = JSON.parse(local);
+        } catch {}
+      }
+
+      // Merge Marks & Attendance for Live Student Calculations
+      const rawMarks = readArray(marksRes, 'marks');
+      let localMarks = [];
+      try {
+        const rawM = localStorage.getItem(`erp_marks_${tenantId}`) || localStorage.getItem('erp_marks');
+        if (rawM) localMarks = JSON.parse(rawM);
+      } catch {}
+      try {
+        const rawSubs = localStorage.getItem(`erp_marks_submissions_${tenantId}`) || localStorage.getItem('erp_marks_submissions');
+        if (rawSubs) {
+          const subs = JSON.parse(rawSubs);
+          subs.forEach(b => {
+            if (b.records && Array.isArray(b.records)) {
+              b.records.forEach(r => localMarks.push({ ...r, resultStatus: b.status || r.resultStatus }));
+            }
+          });
+        }
+      } catch {}
+      const combinedMarks = [...rawMarks, ...localMarks];
+
+      const rawAtt = readArray(attRes, 'attendance');
+      let localAtt = [];
+      try {
+        const rawA = localStorage.getItem(`erp_attendance_${tenantId}`) || localStorage.getItem('erp_attendance');
+        if (rawA) localAtt = JSON.parse(rawA);
+      } catch {}
+      const combinedAtt = [...rawAtt, ...localAtt];
+
+      const enrichedStudents = rawStudents.map(st => {
+        const sRoll = String(st.id || st.rollNo || st.regNo || '').toLowerCase();
+        const sName = String(st.name || '').toLowerCase();
+
+        // Marks & CGPA & Arrears
+        const stMarks = combinedMarks.filter(m => {
+          const mId = String(m.studentId || m._id || m.id || '').toLowerCase();
+          const mRoll = String(m.registerNo || m.rollNo || '').toLowerCase();
+          const mName = String(m.studentName || m.name || '').toLowerCase();
+          return (mId && sRoll && mId === sRoll) || (mRoll && sRoll && mRoll === sRoll) || (mName && sName && (mName === sName || mName.includes(sName)));
+        });
+
+        let computedCgpa = Number(st.cgpa ?? 0);
+        let computedArrears = Number(st.arrears ?? 0);
+
+        if (stMarks.length > 0) {
+          const validGpas = stMarks.map(m => {
+            const tot = Number(m.totalMarks ?? (Number(m.internalMarks || 0) + Number(m.semesterMarks || 0)) ?? m.marksObtained ?? 0);
+            return Number(m.cgpa || m.gpa || (tot > 0 ? (tot / 10).toFixed(2) : 0));
+          }).filter(g => g > 0);
+
+          if (validGpas.length > 0 && computedCgpa === 0) {
+            computedCgpa = Number((validGpas.reduce((a, b) => a + b, 0) / validGpas.length).toFixed(2));
+          }
+
+          computedArrears = stMarks.filter(m => {
+            const tot = Number(m.totalMarks ?? (Number(m.internalMarks || 0) + Number(m.semesterMarks || 0)) ?? m.marksObtained ?? 0);
+            return m.arrearStatus === 'Arrear' || (m.totalMarks !== undefined && tot < 40);
+          }).length;
+        }
+
+        // Attendance
+        const stAtt = combinedAtt.filter(r => 
+          String(r.studentId || '').toLowerCase() === sRoll || 
+          String(r.studentName || '').toLowerCase() === sName
+        );
+
+        let computedAttendance = st.attendance !== undefined && st.attendance !== null ? st.attendance : '100%';
+        if (stAtt.length > 0) {
+          const presents = stAtt.filter(r => ['Present', 'Late'].includes(r.status)).length;
+          computedAttendance = `${Math.round((presents / stAtt.length) * 100)}%`;
+        }
+
+        return {
+          ...st,
+          cgpa: computedCgpa,
+          arrears: computedArrears,
+          attendance: computedAttendance
+        };
+      });
+
+      setAllStudents(enrichedStudents);
+
     } catch (error) {
       console.error('Failed to load placement data', error);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchPlacementData();
+
+    const handlePlacementUpdate = () => {
+      console.log('⚡ Placement data updated across ERP - refreshing live state');
+      fetchPlacementData();
+    };
+
+    window.addEventListener('erp_placement_updated', handlePlacementUpdate);
+    window.addEventListener('erp_marks_updated', handlePlacementUpdate);
+    window.addEventListener('storage', handlePlacementUpdate);
+
+    return () => {
+      window.removeEventListener('erp_placement_updated', handlePlacementUpdate);
+      window.removeEventListener('erp_marks_updated', handlePlacementUpdate);
+      window.removeEventListener('storage', handlePlacementUpdate);
+    };
+  }, [fetchPlacementData]);
+
+  // Auto-select first job for Eligibility Tracker & Interview Evaluation
+  useEffect(() => {
+    if (jobs.length > 0) {
+      if (!selectedEligibleJob) {
+        setSelectedEligibleJob(jobs[0]._id || jobs[0].jobId || jobs[0].id);
+      }
+      if (!selectedInterviewJob) {
+        setSelectedInterviewJob(jobs[0]._id || jobs[0].jobId || jobs[0].id);
+      }
+    }
+  }, [jobs, selectedEligibleJob, selectedInterviewJob]);
+
+  // Current Active Job for Interview Round Evaluations
+  const currentInterviewJob = useMemo(() => {
+    if (!selectedInterviewJob && jobs.length > 0) return jobs[0];
+    return jobs.find(j => (j._id || j.jobId || j.id) === selectedInterviewJob) || jobs[0] || null;
+  }, [jobs, selectedInterviewJob]);
+
+  // Current Job's configured rounds
+  const currentJobRounds = useMemo(() => {
+    if (!currentInterviewJob) return generateDefaultRounds(3);
+    if (Array.isArray(currentInterviewJob.rounds) && currentInterviewJob.rounds.length > 0) {
+      return currentInterviewJob.rounds;
+    }
+    return generateDefaultRounds(currentInterviewJob.totalRounds || 3);
+  }, [currentInterviewJob]);
+
+  // Applications for the current interview job
+  const currentJobApplications = useMemo(() => {
+    if (!currentInterviewJob) return [];
+    const jId = currentInterviewJob._id || currentInterviewJob.jobId || currentInterviewJob.id;
+    const jCompany = String(currentInterviewJob.company || '').trim().toLowerCase();
+    const jRole = String(currentInterviewJob.role || '').trim().toLowerCase();
+
+    return applications.filter(app => {
+      const aJobId = app.jobId || app.job?._id;
+      const aCompany = String(app.company || '').trim().toLowerCase();
+      const aRole = String(app.role || '').trim().toLowerCase();
+
+      return (aJobId && (aJobId === jId || aJobId === currentInterviewJob._id)) || 
+             (aCompany === jCompany && aRole === jRole);
+    });
+  }, [applications, currentInterviewJob]);
+
+  // Dynamic Calculation of Eligible & Not Eligible Students for the selected job
+  const { liveEligible, liveIneligible } = useMemo(() => {
+    if (!selectedEligibleJob) return { liveEligible: [], liveIneligible: [] };
+    const currentJob = jobs.find(j => (j._id || j.jobId || j.id) === selectedEligibleJob);
+    if (!currentJob) return { liveEligible: [], liveIneligible: [] };
+
+    const minCgpa = Number(currentJob.minCgpa ?? 0);
+    const maxArrears = Number(currentJob.maxArrears ?? 0);
+    const allowedDepts = Array.isArray(currentJob.eligibleDepartments) && currentJob.eligibleDepartments.length > 0
+      ? currentJob.eligibleDepartments.map(d => String(d).trim().toLowerCase())
+      : ['all'];
+
+    const eligible = [];
+    const ineligible = [];
+
+    allStudents.forEach(st => {
+      const sCgpa = Number(st.cgpa ?? 0);
+      const sArrears = Number(st.arrears ?? 0);
+      const sDept = String(st.dept || st.department || 'General').trim().toLowerCase();
+
+      const deptMatch = allowedDepts.includes('all') || allowedDepts.some(d => sDept.includes(d) || d.includes(sDept));
+      const cgpaMatch = minCgpa === 0 || sCgpa >= minCgpa;
+      const arrearsMatch = sArrears <= maxArrears;
+
+      if (deptMatch && cgpaMatch && arrearsMatch) {
+        eligible.push(st);
+      } else {
+        let reasons = [];
+        if (!deptMatch) reasons.push(`Department ${st.dept || 'General'} not shortlisted`);
+        if (!cgpaMatch) reasons.push(`CGPA ${sCgpa} < ${minCgpa}`);
+        if (!arrearsMatch) reasons.push(`Arrears ${sArrears} > max ${maxArrears}`);
+        ineligible.push({ ...st, reason: reasons.join(' • ') });
+      }
+    });
+
+    return { liveEligible: eligible, liveIneligible: ineligible };
+  }, [selectedEligibleJob, jobs, allStudents]);
+
+  // Handle Round Count Change in Job Form
+  const handleRoundCountChange = (count) => {
+    const num = Math.max(1, Math.min(Number(count) || 1, 6));
+    const newRounds = generateDefaultRounds(num);
+    const merged = newRounds.map((r, i) => {
+      if (jobForm.rounds && jobForm.rounds[i]) {
+        return { ...r, name: jobForm.rounds[i].name || r.name, type: jobForm.rounds[i].type || r.type };
+      }
+      return r;
+    });
+    setJobForm(prev => ({
+      ...prev,
+      totalRounds: num,
+      rounds: merged
+    }));
   };
 
-  // Auto-select first job for Eligibility Tracker
-  React.useEffect(() => {
-    if (jobs.length > 0 && !selectedEligibleJob) {
-      setSelectedEligibleJob(jobs[0]._id || jobs[0].jobId);
-    }
-  }, [jobs, selectedEligibleJob]);
+  // Handle Custom Round Detail Change in Job Form
+  const handleRoundDetailChange = (index, field, value) => {
+    setJobForm(prev => {
+      const updated = [...prev.rounds];
+      if (updated[index]) {
+        updated[index] = { ...updated[index], [field]: value };
+      }
+      return { ...prev, rounds: updated };
+    });
+  };
 
+  // Handle Update Student Round Status (Qualified, Selected, Rejected, Pending, Absent)
+  const handleUpdateStudentRoundStatus = async (app, roundName, roundIndex, newStatus, notes = '') => {
+    const appId = app._id || app.applicationId;
+    try {
+      await updatePlacementApplicationStatus(appId, {
+        status: newStatus,
+        roundName,
+        roundIndex,
+        notes
+      });
+
+      setApplications(prev => prev.map(a => {
+        if (a._id === appId || a.applicationId === appId) {
+          const roundEvaluations = { ...(a.roundEvaluations || {}) };
+          roundEvaluations[roundName] = {
+            status: newStatus,
+            notes,
+            updatedAt: new Date().toISOString()
+          };
+          return {
+            ...a,
+            status: newStatus === 'Selected' ? 'Selected' : newStatus === 'Rejected' ? 'Rejected' : newStatus === 'Qualified' ? 'Qualified' : a.status,
+            currentRound: newStatus === 'Qualified' ? Math.max(roundIndex + 2, a.currentRound || 1) : a.currentRound,
+            roundEvaluations
+          };
+        }
+        return a;
+      }));
+
+      if (newStatus === 'Selected') {
+        const studentName = app.student || app.name;
+        const regNo = app.regNo || app.id || app.rollNo;
+        const company = app.company || currentInterviewJob?.company;
+        const role = app.role || currentInterviewJob?.role;
+        const ctc = currentInterviewJob?.ctc || '4.5 LPA';
+
+        const exists = selections.some(s => s.regNo === regNo && s.company === company);
+        if (!exists) {
+          try {
+            await createPlacementSelection({
+              student: studentName,
+              regNo,
+              company,
+              role,
+              ctc,
+              date: new Date().toISOString().split('T')[0]
+            });
+            fetchPlacementData();
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        showToast(`🏆 ${studentName} Selected for ${company} (${ctc})! Placement Offer Issued.`);
+      } else if (newStatus === 'Qualified') {
+        showToast(`✓ ${app.student || app.name} Qualified ${roundName}! Promoted to next round.`);
+      } else if (newStatus === 'Rejected') {
+        showToast(`Marked ${app.student || app.name} as Rejected for ${roundName}.`);
+      } else {
+        showToast(`Updated status for ${app.student || app.name} to ${newStatus}`);
+      }
+
+      window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: { appId, status: newStatus, roundName } }));
+    } catch (error) {
+      console.error('Failed to update round status', error);
+      showToast('Failed to update round status', 'error');
+    }
+  };
+
+  // One-click Auto-enroll eligible students into drive
+  const handleBulkEnrollEligibleStudents = async (jobToEnroll) => {
+    const targetJob = jobToEnroll || currentInterviewJob;
+    if (!targetJob) return showToast('Please select a job drive first', 'warning');
+
+    const minCgpa = Number(targetJob.minCgpa ?? 0);
+    const maxArrears = Number(targetJob.maxArrears ?? 0);
+    const allowedDepts = Array.isArray(targetJob.eligibleDepartments) && targetJob.eligibleDepartments.length > 0
+      ? targetJob.eligibleDepartments.map(d => String(d).trim().toLowerCase())
+      : ['all'];
+
+    const eligibleCandidates = allStudents.filter(st => {
+      const sCgpa = Number(st.cgpa ?? 0);
+      const sArrears = Number(st.arrears ?? 0);
+      const sDept = String(st.dept || st.department || 'General').trim().toLowerCase();
+      const deptMatch = allowedDepts.includes('all') || allowedDepts.some(d => sDept.includes(d) || d.includes(sDept));
+      const cgpaMatch = minCgpa === 0 || sCgpa >= minCgpa;
+      const arrearsMatch = sArrears <= maxArrears;
+      return deptMatch && cgpaMatch && arrearsMatch;
+    });
+
+    if (eligibleCandidates.length === 0) {
+      return showToast('No students currently match the cutoff criteria for this drive', 'warning');
+    }
+
+    try {
+      showToast(`Enrolling ${eligibleCandidates.length} eligible candidates into ${targetJob.company}...`);
+      await bulkApplyPlacementApplications({
+        company: targetJob.company,
+        role: targetJob.role,
+        candidates: eligibleCandidates.map(st => ({
+          studentId: st._id || st.id,
+          name: st.name,
+          regNo: st.id || st.rollNo || st.regNo,
+          dept: st.dept || st.department || 'General',
+          cgpa: st.cgpa || 0
+        }))
+      });
+      showToast(`✓ Successfully enrolled ${eligibleCandidates.length} scholars into ${targetJob.company} Drive!`);
+      await fetchPlacementData();
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to bulk enroll students', 'error');
+    }
+  };
+
+  // Handle Add Company
   const handleAddCompany = async (e) => {
     e.preventDefault();
     try {
-      await createPlacementCompany(companyForm);
+      const res = await createPlacementCompany(companyForm);
       setShowCompanyModal(false);
-      setCompanyForm({ name: '', sector: '', location: '', website: '', hrName: '', hrEmail: '', hrContact: '' });
+      setCompanyForm({ name: '', sector: 'IT & Software', location: 'Pan India', website: '', hrName: '', hrEmail: '', hrContact: '' });
+      
+      window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: res.data }));
+      showToast(`✓ Added ${companyForm.name} to Partner Recruiters!`);
       fetchPlacementData();
     } catch (error) {
       console.error('Failed to add company', error);
+      showToast(error.response?.data?.message || 'Failed to add company.', 'error');
     }
   };
 
+  // Handle Delete Company
+  const handleDeleteCompany = async (companyId, companyName) => {
+    if (!window.confirm(`Are you sure you want to delete ${companyName}?`)) return;
+    try {
+      await deletePlacementCompany(companyId);
+      window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: { companyId } }));
+      showToast(`Removed ${companyName}`);
+      fetchPlacementData();
+    } catch (error) {
+      console.error('Failed to delete company', error);
+      showToast('Failed to delete company.', 'error');
+    }
+  };
+
+  // Handle Add Job / Drive
   const handleAddJob = async (e) => {
     e.preventDefault();
     try {
-      await createPlacementJob(jobForm);
+      const res = await createPlacementJob(jobForm);
       setShowJobModal(false);
-      setJobForm({ company: '', role: '', ctc: '', eligibility: '', minCgpa: 0, maxArrears: 0, eligibleDepartments: [], driveDate: '', deadline: '' });
+      const companyName = jobForm.company;
+      setJobForm({ 
+        company: '', 
+        role: '', 
+        ctc: '4.5 LPA', 
+        eligibility: 'CGPA >= 6.0 & Zero Arrears', 
+        minCgpa: 6.0, 
+        maxArrears: 0, 
+        eligibleDepartments: ['ALL'], 
+        driveDate: '', 
+        deadline: '',
+        totalRounds: 3,
+        rounds: generateDefaultRounds(3)
+      });
+      
+      window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: res.data }));
+      showToast(`✓ Successfully scheduled recruitment drive for ${companyName}!`);
       fetchPlacementData();
+      
+      // Automatically switch to Job Openings tab so the user sees the posted drive card immediately
+      handleTabClick('Job Openings');
     } catch (error) {
       console.error('Failed to add job', error);
+      showToast(error.response?.data?.message || 'Failed to create job drive.', 'error');
     }
   };
 
+  // Handle Delete Job / Drive
+  const handleDeleteJob = async (jobId, companyName, roleName) => {
+    if (!window.confirm(`Are you sure you want to delete the drive for ${companyName} (${roleName})?`)) return;
+    try {
+      await deletePlacementJob(jobId);
+      window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: { jobId } }));
+      showToast(`Deleted drive for ${companyName}`);
+      fetchPlacementData();
+    } catch (error) {
+      console.error('Failed to delete drive', error);
+      showToast('Failed to delete drive.', 'error');
+    }
+  };
+
+  // Handle Application Status Update
   const handleUpdateAppStatus = async (id, nextStatus) => {
     try {
       await updatePlacementApplicationStatus(id, nextStatus);
-      fetchPlacementData();
+      setApplications(prev => prev.map(a => (a._id === id || a.applicationId === id) ? { ...a, status: nextStatus } : a));
+      
+      window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: { id, status: nextStatus } }));
+      showToast(`✓ Updated application status to ${nextStatus}`);
     } catch (error) {
       console.error('Failed to update status', error);
-      alert('Failed to update status');
+      showToast('Failed to update status', 'error');
     }
   };
 
+  // Handle Add Interview
   const handleAddInterview = async (e) => {
     e.preventDefault();
     try {
-      await createPlacementInterview(interviewForm);
+      const res = await createPlacementInterview(interviewForm);
       setShowInterviewModal(false);
-      setInterviewForm({ company: '', role: '', round: '', date: '', time: '', mode: 'Online', venue: '', panel: '', candidates: 0 });
+      setInterviewForm({ company: '', role: '', round: 'Technical Round 1', date: '', time: '10:00 AM', mode: 'Online', venue: 'Campus Auditorium / Zoom', panel: 'Recruitment Panel', candidates: 10 });
+      
+      window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: res.data }));
+      showToast(`✓ Scheduled ${interviewForm.round} for ${interviewForm.company}!`);
       fetchPlacementData();
     } catch (error) {
       console.error('Failed to schedule interview', error);
+      showToast('Failed to schedule interview.', 'error');
     }
   };
 
+  // Handle Add Selection / Offer
   const handleAddSelection = async (e) => {
     e.preventDefault();
     try {
-      await createPlacementSelection(selectionForm);
+      const res = await createPlacementSelection(selectionForm);
       setShowSelectionModal(false);
-      setSelectionForm({ student: '', regNo: '', company: '', role: '', ctc: '', date: '' });
+      setSelectionForm({ student: '', regNo: '', company: '', role: '', ctc: '4.5 LPA', date: new Date().toISOString().split('T')[0] });
+      
+      window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: res.data }));
+      showToast(`🏆 Added verified placement offer for ${selectionForm.student}!`);
       fetchPlacementData();
     } catch (error) {
       console.error('Failed to add selected student', error);
+      showToast('Failed to add selection.', 'error');
     }
   };
 
-  const packageStats = React.useMemo(() => {
+  // KPI Calculations
+  const packageStats = useMemo(() => {
     let max = 0;
     let sum = 0;
     let count = 0;
     selections.forEach(sel => {
-      const match = sel.ctc.match(/(\d+(\.\d+)?)/);
-      if (match) {
-        const val = parseFloat(match[1]);
+      const val = parseFloat(String(sel.ctc).replace(/[^0-9.]/g, ''));
+      if (!isNaN(val) && val > 0) {
         if (val > max) max = val;
         sum += val;
         count++;
       }
     });
     return {
-      highest: max > 0 ? `${max} LPA` : 'N/A',
-      average: count > 0 ? `${(sum/count).toFixed(2)} LPA` : 'N/A'
+      highest: max > 0 ? `${max} LPA` : '0 LPA',
+      average: count > 0 ? `${(sum/count).toFixed(2)} LPA` : '0 LPA'
     };
   }, [selections]);
 
-  const viewNIRFReport = () => {
-    const headers = ["Registration Number", "Student Name", "Placed Company", "Role", "Package (CTC)"];
-    const rows = selections.map(sel => [sel.regNo, sel.student, sel.company, sel.role, sel.ctc]);
-    setReportPreview({ title: "NIRF Placement Report", headers, rows });
+  // Department-wise placement rate
+  const deptStats = useMemo(() => {
+    const depts = {};
+    allStudents.forEach(st => {
+      const d = st.dept || st.department || 'General';
+      if (!depts[d]) depts[d] = { total: 0, placed: 0 };
+      depts[d].total += 1;
+    });
+
+    selections.forEach(sel => {
+      const st = allStudents.find(s => 
+        String(s.id || s.rollNo || s.regNo || '').toLowerCase() === String(sel.regNo || '').toLowerCase() ||
+        String(s.name || '').toLowerCase() === String(sel.student || sel.studentName || '').toLowerCase()
+      );
+      const d = st ? (st.dept || st.department || 'General') : (sel.dept || 'General');
+      if (!depts[d]) depts[d] = { total: 1, placed: 0 };
+      depts[d].placed += 1;
+    });
+
+    return Object.entries(depts).map(([dept, data]) => ({
+      dept,
+      percentage: data.total > 0 ? Math.round((data.placed / data.total) * 100) : 0,
+      placed: data.placed,
+      total: data.total
+    }));
+  }, [allStudents, selections]);
+
+  // Header Titles
+  const getHeaderInfo = () => {
+    switch (activeTab) {
+      case 'Companies':
+        return {
+          title: 'Partner Companies & Corporate Recruiters',
+          subtitle: 'Manage registered recruiters, corporate profiles, and HR points of contact.'
+        };
+      case 'Job Openings':
+        return {
+          title: 'Campus Recruitment Drives & Job Openings',
+          subtitle: 'Create, schedule, and track placement drives, packages, eligibility cutoffs, and deadlines.'
+        };
+      case 'Eligibility Tracker':
+        return {
+          title: 'Student Eligibility Matrix',
+          subtitle: 'Verify eligible candidates for active campus drives based on live CGPA, active arrears, and departments.'
+        };
+      case 'Applications':
+        return {
+          title: 'Student Applications Tracking',
+          subtitle: 'Review candidate applications, shortlist profiles, and update recruitment status.'
+        };
+      case 'Training Programs':
+        return {
+          title: 'Placement Training & Skill Development Programs',
+          subtitle: 'Organize, schedule, and track aptitude bootcamps, technical certifications, and mock interview workshops.'
+        };
+      case 'Interviews':
+        return {
+          title: 'Interview Schedules & Rounds',
+          subtitle: 'Manage recruitment rounds, technical/HR interview venues, meeting links, and candidate rosters.'
+        };
+      case 'Selected Students':
+        return {
+          title: 'Selections & Corporate Offer Letters',
+          subtitle: 'Track students selected across corporate recruitment drives, compensation packages, and offer dates.'
+        };
+      case 'Reports':
+        return {
+          title: 'Placement Reports & NIRF Analytics',
+          subtitle: 'Generate and export department summaries, NIRF audit reports, and institution hiring statistics.'
+        };
+      default:
+        return {
+          title: 'Placement Overview & Executive Analytics',
+          subtitle: 'Key recruitment indicators, active drives status, and placement distribution trends.'
+        };
+    }
   };
 
-  const viewDepartmentSummary = () => {
-    const headers = ["Company Name", "Sector", "Location", "Active Drives"];
-    const rows = companies.map(comp => [comp.name, comp.sector, comp.location, comp.drives || 1]);
-    setReportPreview({ title: "Department Placement Summary", headers, rows });
+  const headerInfo = getHeaderInfo();
+
+  // Training Program Handlers
+  const handleCreateTrainingProgram = (e) => {
+    e.preventDefault();
+    if (!trainingForm.title.trim()) return showToast('Please enter a training title', 'warning');
+    const newProg = {
+      ...trainingForm,
+      id: `TP-${Date.now().toString().slice(-4)}`
+    };
+    const updated = [newProg, ...trainingPrograms];
+    setTrainingPrograms(updated);
+    try {
+      localStorage.setItem('erp_placement_training_programs', JSON.stringify(updated));
+    } catch(err) {
+      console.error(err);
+    }
+    setShowTrainingModal(false);
+    setTrainingForm({
+      title: '',
+      trainer: '',
+      targetDepartment: 'ALL',
+      targetRound: 'ALL',
+      date: new Date().toISOString().split('T')[0],
+      time: '09:30 AM - 12:30 PM',
+      venue: 'Main Auditorium',
+      mode: 'Offline',
+      status: 'Scheduled',
+      description: ''
+    });
+    showToast('✓ Training program scheduled successfully');
   };
 
-  const TABS = [
-    { name: 'Dashboard', icon: <Target size={16} /> },
-    { name: 'Companies', icon: <Building size={16} /> },
-    { name: 'Job Openings', icon: <Briefcase size={16} /> },
-    { name: 'Eligibility Tracker', icon: <CheckCircle size={16} /> },
-    { name: 'Applications', icon: <FileText size={16} /> },
-    { name: 'Interviews', icon: <Calendar size={16} /> },
-    { name: 'Selected Students', icon: <Award size={16} /> },
-    { name: 'Reports', icon: <Download size={16} /> }
-  ];
+  const handleDeleteTrainingProgram = (id) => {
+    const updated = trainingPrograms.filter(p => p.id !== id);
+    setTrainingPrograms(updated);
+    try {
+      localStorage.setItem('erp_placement_training_programs', JSON.stringify(updated));
+    } catch(err) {
+      console.error(err);
+    }
+    showToast('Removed training program');
+  };
+
+  const handleUpdateTrainingAttendance = (studentKey, status) => {
+    setStudentTrainingStatus(prev => {
+      const next = { ...prev, [studentKey]: status };
+      try {
+        localStorage.setItem('erp_placement_training_attendance', JSON.stringify(next));
+      } catch(err) {
+        console.error(err);
+      }
+      return next;
+    });
+    showToast('Updated attendance status');
+  };
+
+  // Export CSV Helper
+  const exportCSV = (filename, headers, rows) => {
+    let csv = `data:text/csv;charset=utf-8,${headers.join(',')}\n`;
+    rows.forEach(r => {
+      csv += r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',') + '\n';
+    });
+    const encoded = encodeURI(csv);
+    const link = document.createElement('a');
+    link.setAttribute('href', encoded);
+    link.setAttribute('download', `${filename}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
-    <div className="placement-page animate-fade-in">
-      <div className="placement-header">
-        <h1><Briefcase size={32} className="text-blue-500" /> Advanced Placement Management</h1>
-        <p className="text-muted mt-2">Manage campus recruitment drives, company profiles, student applications, and interview schedules.</p>
-      </div>
+    <div className="placement-page animate-fade-in" style={{ padding: '24px', maxWidth: '1440px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      
+      {/* ── Top Header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', borderBottom: '1px solid var(--border-color, #e2e8f0)', paddingBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(37,99,235,0.1)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Briefcase size={24} />
+          </div>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+              {headerInfo.title}
+            </h1>
+            <p style={{ margin: '3px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>
+              {headerInfo.subtitle}
+            </p>
+          </div>
+        </div>
 
-      <div className="placement-tabs">
-        {TABS.map(tab => (
-          <button
-            key={tab.name}
-            className={`placement-tab ${activeTab === tab.name ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.name)}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button 
+            type="button" 
+            onClick={() => fetchPlacementData()} 
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
           >
-            {tab.icon} {tab.name}
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Sync Live Data
           </button>
-        ))}
+        </div>
       </div>
 
+      {/* ── ONLY SHOW THE 6-KPI EXECUTIVE STRIP ON DASHBOARD / OVERVIEW TAB ── */}
       {activeTab === 'Dashboard' && (
-        <div className="animate-fade-in">
-          <div className="placement-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="glass-card p-3 relative overflow-hidden">
-              <Building size={18} className="text-blue-500 mb-1"/>
-              <h3 className="text-xs text-muted uppercase font-bold">Total Companies</h3>
-              <p className="text-lg font-bold mt-1">{companies.length}</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '14px' }}>
+          
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>Total Companies</span>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(37,99,235,0.1)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Building size={16} />
+              </div>
             </div>
-            <div className="glass-card p-3 relative overflow-hidden">
-              <Briefcase size={18} className="text-purple-500 mb-1"/>
-              <h3 className="text-xs text-muted uppercase font-bold">Active Drives</h3>
-              <p className="text-lg font-bold mt-1">{jobs.length}</p>
-            </div>
-            <div className="glass-card p-3 relative overflow-hidden">
-              <Users size={18} className="text-yellow-500 mb-1"/>
-              <h3 className="text-xs text-muted uppercase font-bold">Applications</h3>
-              <p className="text-lg font-bold mt-1">{applications.length}</p>
-            </div>
-            <div className="glass-card p-3 relative overflow-hidden">
-              <Award size={18} className="text-success mb-1"/>
-              <h3 className="text-xs text-muted uppercase font-bold">Students Placed</h3>
-              <p className="text-lg font-bold text-success mt-1">{selections.length}</p>
-            </div>
-            <div className="glass-card p-3 relative overflow-hidden">
-              <DollarSign size={18} className="text-blue-400 mb-1"/>
-              <h3 className="text-xs text-muted uppercase font-bold">Highest Package</h3>
-              <p className="text-lg font-bold mt-1">{packageStats.highest}</p>
-            </div>
-            <div className="glass-card p-3 relative overflow-hidden">
-              <DollarSign size={18} className="text-green-400 mb-1"/>
-              <h3 className="text-xs text-muted uppercase font-bold">Avg Package</h3>
-              <p className="text-lg font-bold mt-1">{packageStats.average}</p>
-            </div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', marginTop: '4px' }}>{companies.length}</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: '2px' }}>Corporate Partners</div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            <div className="glass-card p-6">
-              <h3 className="font-bold mb-4">Placement Trends (YTD)</h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={CHART_DATA}>
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>Active Drives</span>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(22,163,74,0.1)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Briefcase size={16} />
+              </div>
+            </div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#15803d', marginTop: '4px' }}>{jobs.length}</div>
+            <div style={{ fontSize: '0.72rem', color: '#16a34a', marginTop: '2px', fontWeight: 600 }}>Recruitment Drives Open</div>
+          </div>
+
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' }}>Applications</span>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(124,58,237,0.1)', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={16} />
+              </div>
+            </div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#6d28d9', marginTop: '4px' }}>{applications.length}</div>
+            <div style={{ fontSize: '0.72rem', color: '#7c3aed', marginTop: '2px', fontWeight: 600 }}>Candidate Submissions</div>
+          </div>
+
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase' }}>Students Placed</span>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(5,150,105,0.1)', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Award size={16} />
+              </div>
+            </div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#047857', marginTop: '4px' }}>{selections.length}</div>
+            <div style={{ fontSize: '0.72rem', color: '#047857', marginTop: '2px', fontWeight: 600 }}>Offers Issued</div>
+          </div>
+
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#d97706', textTransform: 'uppercase' }}>Highest Package</span>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(217,119,6,0.1)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <TrendingUp size={16} />
+              </div>
+            </div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#b45309', marginTop: '4px' }}>{packageStats.highest}</div>
+            <div style={{ fontSize: '0.72rem', color: '#d97706', marginTop: '2px', fontWeight: 600 }}>Top Offer</div>
+          </div>
+
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0284c7', textTransform: 'uppercase' }}>Average CTC</span>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(2,132,199,0.1)', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <DollarSign size={16} />
+              </div>
+            </div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0369a1', marginTop: '4px' }}>{packageStats.average}</div>
+            <div style={{ fontSize: '0.72rem', color: '#0369a1', marginTop: '2px', fontWeight: 600 }}>Overall Mean</div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ── Tabbed View Router Content ── */}
+
+      {/* 1. DASHBOARD / OVERVIEW */}
+      {activeTab === 'Dashboard' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* Charts Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+            
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '20px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                  Cumulative Hiring Trends (YTD)
+                </h3>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', background: '#eff6ff', padding: '2px 8px', borderRadius: '6px' }}>
+                  {selections.length} Total Offers
+                </span>
+              </div>
+              <div style={{ height: '240px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={CHART_DATA_FALLBACK}>
                     <defs>
                       <linearGradient id="colorPlaced" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--success-color)" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="var(--success-color)" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} />
-                    <YAxis axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', borderRadius: '8px' }} />
-                    <Area type="monotone" dataKey="placed" stroke="var(--success-color)" fillOpacity={1} fill="url(#colorPlaced)" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color, #f1f5f9)" />
+                    <XAxis dataKey="month" stroke="var(--text-muted, #64748b)" fontSize={12} tickLine={false} />
+                    <YAxis stroke="var(--text-muted, #64748b)" fontSize={12} tickLine={false} />
+                    <Tooltip contentStyle={{ background: 'var(--bg-card, #fff)', border: '1px solid var(--border-color, #cbd5e1)', borderRadius: 8, fontSize: '0.8rem' }} />
+                    <Area type="monotone" dataKey="placed" stroke="#2563eb" strokeWidth={2} fillOpacity={1} fill="url(#colorPlaced)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
-            
-            <div className="glass-card p-6">
-              <h3 className="font-bold mb-4">Department-wise Placement %</h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={[
-                    { dept: 'CSE', percentage: 88 },
-                    { dept: 'IT', percentage: 82 },
-                    { dept: 'ECE', percentage: 75 },
-                    { dept: 'EEE', percentage: 65 },
-                    { dept: 'MECH', percentage: 55 }
-                  ]}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
-                    <XAxis dataKey="dept" axisLine={false} tickLine={false} />
-                    <YAxis axisLine={false} tickLine={false} domain={[0, 100]} />
-                    <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', borderRadius: '8px' }} />
-                    <Bar dataKey="percentage" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '20px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                  Department-Wise Placement Ratio (%)
+                </h3>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: '6px' }}>
+                  Live Data
+                </span>
+              </div>
+              <div style={{ height: '240px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={deptStats.length > 0 ? deptStats : [{ dept: 'TAMIL', percentage: 0 }]}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color, #f1f5f9)" />
+                    <XAxis dataKey="dept" stroke="var(--text-muted, #64748b)" fontSize={12} tickLine={false} />
+                    <YAxis stroke="var(--text-muted, #64748b)" fontSize={12} tickLine={false} domain={[0, 100]} />
+                    <Tooltip contentStyle={{ background: 'var(--bg-card, #fff)', border: '1px solid var(--border-color, #cbd5e1)', borderRadius: 8, fontSize: '0.8rem' }} />
+                    <Bar dataKey="percentage" fill="#10b981" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
+
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            <div className="glass-card p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-bold">Upcoming Interviews</h2>
-                <button className="text-xs text-primary font-bold">View Calendar</button>
+          {/* Quick Operations & Upcoming Interviews */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+            
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '20px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                  Placement Cell Quick Actions
+                </h3>
               </div>
-              <div className="space-y-4">
-                {interviews.map(interview => (
-                  <div key={interview.interviewId} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg flex justify-between items-center border-l-4 border-blue-500">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+                <button 
+                  type="button"
+                  onClick={() => setShowCompanyModal(true)}
+                  style={{ padding: '12px', background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.2)', borderRadius: '10px', color: '#2563eb', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}
+                >
+                  <Plus size={18} /> Add Recruiter
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setShowJobModal(true)}
+                  style={{ padding: '12px', background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '10px', color: '#16a34a', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}
+                >
+                  <Briefcase size={18} /> Post Drive
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setShowInterviewModal(true)}
+                  style={{ padding: '12px', background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: '10px', color: '#7c3aed', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}
+                >
+                  <Calendar size={18} /> Schedule Interview
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setShowSelectionModal(true)}
+                  style={{ padding: '12px', background: 'rgba(217,119,6,0.06)', border: '1px solid rgba(217,119,6,0.2)', borderRadius: '10px', color: '#d97706', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}
+                >
+                  <Award size={18} /> Record Offer
+                </button>
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '20px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                  Upcoming Interview Sessions ({interviews.length})
+                </h3>
+                <button 
+                  type="button" 
+                  onClick={() => handleTabClick('Interviews')}
+                  style={{ background: 'none', border: 'none', color: '#2563eb', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}
+                >
+                  View All →
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {interviews.slice(0, 3).map((int, i) => (
+                  <div key={int._id || int.interviewId || i} style={{ padding: '10px 12px', background: 'var(--bg-secondary, #f8fafc)', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <p className="font-bold">{interview.company} - {interview.role}</p>
-                      <p className="text-xs text-muted mt-1 flex items-center gap-2">
-                        <Calendar size={12}/> {new Date(interview.date).toLocaleDateString()} &nbsp; <Clock size={12}/> {interview.time}
-                      </p>
+                      <div style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' }}>{int.company} • {int.role}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{int.round} • {int.date ? new Date(int.date).toLocaleDateString() : 'TBA'} ({int.time || '10:00 AM'})</div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-xs font-bold px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{interview.round}</span>
-                      <p className="text-xs text-muted mt-1">{interview.candidates} Candidates</p>
-                    </div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 8px', borderRadius: '4px', background: '#eff6ff', color: '#2563eb' }}>
+                      {int.mode || 'Online'}
+                    </span>
                   </div>
                 ))}
+                {interviews.length === 0 && (
+                  <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                    No interview sessions currently scheduled.
+                  </div>
+                )}
               </div>
             </div>
+
           </div>
+
         </div>
       )}
 
+      {/* 2. PARTNER COMPANIES */}
       {activeTab === 'Companies' && (
-        <div className="animate-fade-in">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Partner Companies</h2>
-            <button className="btn-primary flex items-center gap-2" onClick={() => setShowCompanyModal(true)}><Plus size={16}/> Add Company</button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {companies.map(company => (
-              <div key={company.companyId} className="glass-card company-card">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-3">
-                    {company.logo ? (
-                      <img src={company.logo} alt={company.name} className="w-8 h-8 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">{company.name.charAt(0)}</div>
-                    )}
-                    <h3 className="font-bold text-lg">{company.name}</h3>
-                  </div>
-                  <span className="text-xs font-bold px-2 py-1 bg-green-100 text-green-700 rounded-full">{company.status}</span>
-                </div>
-                <p className="text-sm text-muted mb-4">{company.sector}</p>
-                <div className="flex flex-col gap-2 text-sm">
-                  <div className="flex items-center gap-2 text-muted"><MapPin size={14}/> {company.location}</div>
-                  {company.website && (
-                    <div className="flex items-center gap-2 text-muted"><Search size={14}/> <a href={company.website} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">Website</a></div>
-                  )}
-                  {company.hrName && (
-                    <div className="flex items-center gap-2 text-muted"><Users size={14}/> HR: {company.hrName} {company.hrContact ? `(${company.hrContact})` : ''}</div>
-                  )}
-                  <div className="flex items-center gap-2 text-muted"><Briefcase size={14}/> {company.drives} Active Drives</div>
-                </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', width: '280px', background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #cbd5e1)', borderRadius: '8px', padding: '0 10px' }}>
+                <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                <input 
+                  value={search} 
+                  onChange={e => setSearch(e.target.value)} 
+                  placeholder="Search company or HR..." 
+                  style={{ border: 'none', background: 'transparent', outline: 'none', padding: '8px 8px', fontSize: '0.82rem', width: '100%', color: 'var(--text-main, #0f172a)' }} 
+                />
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'Job Openings' && (
-        <div className="animate-fade-in">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Active Campus Drives</h2>
-            <button className="btn-primary flex items-center gap-2" onClick={() => setShowJobModal(true)}><Plus size={16}/> Post Job</button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {jobs.map(job => (
-              <div key={job.jobId} className="glass-card job-card relative" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700 }}>
-                  {job.applicants || 0} Applied
-                </div>
-                <h3 className="font-bold text-xl mb-1" style={{ maxWidth: '70%' }}>{job.role}</h3>
-                <p className="font-bold mb-4" style={{ color: '#3b82f6' }}>{job.company}</p>
-                
-                <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                  <div>
-                    <span className="text-muted block text-xs">CTC Offered</span>
-                    <span className="font-bold flex items-center gap-1"><DollarSign size={14}/> {job.ctc}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted block text-xs">Eligibility</span>
-                    <span className="font-bold flex items-center gap-1"><CheckCircle size={14}/> {job.eligibility}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted block text-xs">Drive Date</span>
-                    <span className="font-bold flex items-center gap-1"><Calendar size={14}/> {job.driveDate ? new Date(job.driveDate).toLocaleDateString() : 'TBA'}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted block text-xs">Max Arrears</span>
-                    <span className="font-bold flex items-center gap-1"><XCircle size={14}/> {job.maxArrears} allowed</span>
-                  </div>
-                </div>
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center">
-                  <span className="text-xs text-danger font-bold flex items-center gap-1"><Clock size={14}/> Deadline: {new Date(job.deadline).toLocaleDateString()}</span>
-                  <button className="btn-secondary text-xs py-1">View Applicants</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'Applications' && (
-        <div className="animate-fade-in glass-card">
-          <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
-            <h2 className="font-bold">Student Applications</h2>
-            <div className="search-box">
-              <Search size={16} className="text-muted"/>
-              <input type="text" placeholder="Search student or company..." value={search} onChange={e=>setSearch(e.target.value)}/>
             </div>
+
+            <button 
+              type="button" 
+              onClick={() => setShowCompanyModal(true)} 
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              <Plus size={16} /> Add Partner Recruiter
+            </button>
           </div>
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Reg No</th>
-                  <th>Student Name</th>
-                  <th>Department</th>
-                  <th>CGPA</th>
-                  <th>Company</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {applications.map(app => (
-                  <tr key={app._id}>
-                    <td className="font-mono text-sm">{app.regNo}</td>
-                    <td className="font-medium">{app.studentId?.name || app.student}</td>
-                    <td>{app.studentId?.dept || app.dept || '-'}</td>
-                    <td className="font-bold">{app.studentId?.cgpa || app.cgpa || '-'}</td>
-                    <td className="font-bold text-primary">{app.company}</td>
-                    <td>{app.role}</td>
-                    <td>
-                      <span className={`text-xs font-bold px-2 py-1 rounded ${
-                        app.status === 'Shortlisted' ? 'bg-green-100 text-green-700' : 
-                        app.status === 'Rejected' ? 'bg-red-100 text-red-700' : 
-                        app.status === 'Selected' ? 'bg-indigo-100 text-indigo-700' : 
-                        app.status === 'Waitlisted' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-blue-100 text-blue-700'
-                      }`}>
-                        {app.status}
-                      </span>
-                    </td>
-                    <td>
-                      <select 
-                        value={app.status} 
-                        onChange={(e) => handleUpdateAppStatus(app._id, e.target.value)}
-                        className="text-xs font-bold px-2 py-1 rounded cursor-pointer outline-none border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
+            {companies
+              .filter(c => (c.name || '').toLowerCase().includes(search.toLowerCase()) || (c.sector || '').toLowerCase().includes(search.toLowerCase()))
+              .map((comp, idx) => {
+                const compJobs = jobs.filter(j => (j.company || '').trim().toLowerCase() === (comp.name || '').trim().toLowerCase());
+                return (
+                  <div key={comp._id || comp.companyId || idx} style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', padding: '20px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>{comp.name}</h3>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2563eb' }}>{comp.sector || 'Technology & Services'}</span>
+                        </div>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: '#dcfce7', color: '#15803d' }}>
+                          Partnered
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem', color: 'var(--text-muted, #64748b)', marginTop: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <MapPin size={14} /> <span>{comp.location || 'Pan India'}</span>
+                        </div>
+                        {comp.hrName && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Users size={14} /> <span>HR: <strong>{comp.hrName}</strong> {comp.hrContact ? `(${comp.hrContact})` : ''}</span>
+                          </div>
+                        )}
+                        {comp.hrEmail && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Mail size={14} /> <span>{comp.hrEmail}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Active Drives for this company */}
+                      <div style={{ marginTop: '14px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '10px', padding: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Campus Recruitment Drives ({compJobs.length})
+                          </span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: compJobs.length > 0 ? '#dbeafe' : '#f1f5f9', color: compJobs.length > 0 ? '#1d4ed8' : '#64748b' }}>
+                            {compJobs.length > 0 ? `${compJobs.length} Active` : 'None Open'}
+                          </span>
+                        </div>
+
+                        {compJobs.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {compJobs.map((j, jIdx) => (
+                              <div key={j._id || j.jobId || jIdx} style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ overflow: 'hidden' }}>
+                                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Briefcase size={13} color="#2563eb" /> {j.role}
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '1px 6px', borderRadius: '4px' }}>
+                                      {j.ctc}
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                                    Min CGPA: {j.minCgpa ?? 'N/A'} • Max Arrears: {j.maxArrears ?? 0} • Deadline: {j.deadline ? new Date(j.deadline).toLocaleDateString() : 'Open'}
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedEligibleJob(j._id || j.jobId || j.id);
+                                      handleTabClick('Eligibility Tracker');
+                                    }}
+                                    style={{ padding: '4px 8px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', color: '#2563eb', fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer' }}
+                                    title="Check Eligible Students"
+                                  >
+                                    Eligible →
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteJob(j._id || j.jobId || j.id, comp.name, j.role)}
+                                    style={{ padding: '4px 6px', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '6px', color: '#dc2626', cursor: 'pointer' }}
+                                    title="Delete this drive"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: '6px 0' }}>
+                            No active drives scheduled yet. Click "+ Schedule Drive" below.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid var(--border-color, #f1f5f9)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => handleDeleteCompany(comp._id || comp.companyId, comp.name)}
+                        style={{ padding: '6px 12px', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '6px', color: '#dc2626', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                       >
-                        <option value="Applied">Applied</option>
-                        <option value="Shortlisted">Shortlisted</option>
-                        <option value="Selected">Selected</option>
-                        <option value="Waitlisted">Waitlisted</option>
-                        <option value="Rejected">Rejected</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        <Trash2 size={13} /> Delete Company
+                      </button>
+
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setJobForm(prev => ({ ...prev, company: comp.name }));
+                          setShowJobModal(true);
+                        }}
+                        style={{ padding: '6px 14px', background: '#2563eb', border: 'none', borderRadius: '6px', color: '#ffffff', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Plus size={14} /> + Schedule Drive
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            {companies.length === 0 && (
+              <div style={{ gridColumn: '1 / -1', padding: '3.5rem', textAlign: 'center', background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted)' }}>
+                No corporate partner recruiters registered yet. Click "Add Partner Recruiter" to add companies.
+              </div>
+            )}
           </div>
+
         </div>
       )}
 
-      {activeTab === 'Selected Students' && (
-        <div className="animate-fade-in glass-card">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-green-50 dark:bg-green-900/10">
-            <h2 className="font-bold text-success flex items-center gap-2"><Award size={20}/> Hall of Fame</h2>
-            <button className="btn-primary flex items-center gap-2" onClick={() => setShowSelectionModal(true)}><Plus size={16}/> Add Placement</button>
+      {/* 3. JOB OPENINGS & DRIVES */}
+      {activeTab === 'Job Openings' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', width: '280px', background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #cbd5e1)', borderRadius: '8px', padding: '0 10px' }}>
+              <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              <input 
+                value={search} 
+                onChange={e => setSearch(e.target.value)} 
+                placeholder="Search job drives..." 
+                style={{ border: 'none', background: 'transparent', outline: 'none', padding: '8px 8px', fontSize: '0.82rem', width: '100%', color: 'var(--text-main, #0f172a)' }} 
+              />
+            </div>
+
+            <button 
+              type="button" 
+              onClick={() => setShowJobModal(true)} 
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              <Plus size={16} /> Post New Campus Drive
+            </button>
           </div>
-          <div className="table-container">
-            <table>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px' }}>
+            {jobs
+              .filter(j => (j.company || '').toLowerCase().includes(search.toLowerCase()) || (j.role || '').toLowerCase().includes(search.toLowerCase()))
+              .map((job, idx) => {
+                const jobApps = applications.filter(a => 
+                  (a.jobId && (a.jobId === job._id || a.jobId === job.jobId || a.jobId === job.id)) ||
+                  (String(a.company || '').toLowerCase() === String(job.company || '').toLowerCase() && String(a.role || '').toLowerCase() === String(job.role || '').toLowerCase())
+                );
+
+                return (
+                  <div key={job._id || job.jobId || idx} style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', padding: '20px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, padding: '3px 10px', borderRadius: '6px', background: '#dcfce7', color: '#15803d' }}>
+                          💰 {job.ctc || 'Not Disclosed'}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb' }}>
+                          {job.status || 'Active Drive'}
+                        </span>
+                      </div>
+
+                      <h3 style={{ margin: '0 0 2px 0', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                        {job.role}
+                      </h3>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', fontWeight: 700, color: '#2563eb', marginBottom: '10px' }}>
+                        <Building size={15} />
+                        <span>{job.company}</span>
+                      </div>
+
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', background: 'var(--bg-secondary, #f8fafc)', padding: '10px 12px', borderRadius: '8px', margin: '8px 0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Min CGPA Cutoff:</span>
+                          <strong style={{ color: '#0f172a' }}>{job.minCgpa ?? 'None'}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Max Arrears Allowed:</span>
+                          <strong style={{ color: '#0f172a' }}>{job.maxArrears ?? 0} Arrears</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Eligible Departments:</span>
+                          <strong style={{ color: '#0f172a' }}>{Array.isArray(job.eligibleDepartments) ? job.eligibleDepartments.join(', ') : 'All Departments'}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '4px', marginTop: '2px' }}>
+                          <span>Application Deadline:</span>
+                          <strong style={{ color: '#dc2626' }}>{job.deadline ? new Date(job.deadline).toLocaleDateString() : 'Open'}</strong>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#6d28d9', background: '#f5f3ff', padding: '5px 10px', borderRadius: '6px' }}>
+                          <Users size={14} />
+                          <span><strong>{jobApps.length}</strong> Applied</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#0369a1', background: '#e0f2fe', padding: '5px 10px', borderRadius: '6px', fontWeight: 700 }}>
+                          <Layers size={14} />
+                          <span>{job.totalRounds || (job.rounds ? job.rounds.length : 3)} Interview Rounds</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid var(--border-color, #f1f5f9)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', flexWrap: 'wrap', gap: '8px' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => handleDeleteJob(job._id || job.jobId || job.id, job.company, job.role)}
+                        style={{ padding: '6px 12px', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '6px', color: '#dc2626', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Trash2 size={13} /> Delete
+                      </button>
+
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedInterviewJob(job._id || job.jobId || job.id);
+                            setSelectedRoundIndex(0);
+                            handleTabClick('Interviews');
+                          }}
+                          style={{ padding: '6px 12px', background: '#f0fdf4', border: '1px solid #86efac', color: '#15803d', borderRadius: '6px', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Target size={13} /> Round Evaluations →
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setSelectedEligibleJob(job._id || job.jobId || job.id);
+                            handleTabClick('Eligibility Tracker');
+                          }}
+                          style={{ padding: '6px 12px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                        >
+                          Eligibility →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            {jobs.length === 0 && (
+              <div style={{ gridColumn: '1 / -1', padding: '3.5rem', textAlign: 'center', background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted)' }}>
+                No active recruitment drives posted yet. Click "+ Post New Campus Drive" to publish jobs.
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
+
+      {/* 4. STUDENT APPLICATIONS */}
+      {activeTab === 'Applications' && (
+        <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                Submitted Student Applications ({applications.length})
+              </h3>
+              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Filter, review candidate profiles, and manage shortlisting workflow.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <div style={{ position: 'relative', width: '240px' }}>
+                <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input 
+                  value={search} 
+                  onChange={e => setSearch(e.target.value)} 
+                  placeholder="Filter applicant..." 
+                  style={{ padding: '6px 10px 6px 30px', borderRadius: 8, border: '1px solid var(--border-color, #cbd5e1)', background: 'var(--bg-card, #ffffff)', color: 'var(--text-main, #0f172a)', fontSize: '0.8rem', width: '100%', outline: 'none' }} 
+                />
+              </div>
+
+              <button 
+                type="button" 
+                onClick={() => {
+                  const headers = ['Register No', 'Student Name', 'Department', 'CGPA', 'Company', 'Role', 'Status'];
+                  const rows = applications.map(a => [a.regNo, a.student, a.dept, a.cgpa, a.company, a.role, a.status]);
+                  exportCSV('Placement_Applications_Roster', headers, rows);
+                }}
+                style={{ padding: '6px 12px', background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <Download size={13} /> Export (.CSV)
+              </button>
+            </div>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
-                <tr>
-                  <th>Reg No</th>
-                  <th>Student Name</th>
-                  <th>Company</th>
-                  <th>Role</th>
-                  <th>Package (CTC)</th>
-                  <th>Offer Date</th>
+                <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
+                  <th style={{ padding: '12px 18px', textAlign: 'left' }}>Register No</th>
+                  <th style={{ padding: '12px 18px', textAlign: 'left' }}>Student Name</th>
+                  <th style={{ padding: '12px 18px', textAlign: 'center' }}>Department</th>
+                  <th style={{ padding: '12px 18px', textAlign: 'center' }}>CGPA</th>
+                  <th style={{ padding: '12px 18px', textAlign: 'left' }}>Company</th>
+                  <th style={{ padding: '12px 18px', textAlign: 'left' }}>Job Role</th>
+                  <th style={{ padding: '12px 18px', textAlign: 'right' }}>Application Stage</th>
                 </tr>
               </thead>
               <tbody>
-                {selections.map(sel => (
-                  <tr key={sel.selectionId}>
-                    <td className="font-mono text-sm">{sel.regNo}</td>
-                    <td className="font-medium">{sel.student}</td>
-                    <td className="font-bold text-primary">{sel.company}</td>
-                    <td>{sel.role}</td>
-                    <td className="font-bold text-success">{sel.ctc}</td>
-                    <td>{new Date(sel.date).toLocaleDateString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'Eligibility Tracker' && (
-        <div className="animate-fade-in glass-card">
-          <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
-            <h2 className="font-bold">Student Eligibility</h2>
-            <div className="flex gap-4">
-              <select 
-                value={selectedEligibleJob} 
-                onChange={(e) => setSelectedEligibleJob(e.target.value)}
-                className="bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-main)] rounded px-3 py-1 outline-none text-sm"
-              >
-                <option value="">Select a Campus Drive...</option>
-                {jobs.map(job => (
-                  <option key={job._id || job.jobId} value={job._id || job.jobId}>{job.company} - {job.role}</option>
-                ))}
-              </select>
-              <div className="search-box">
-                <Search size={16} className="text-muted"/>
-                <input type="text" placeholder="Search by Reg No..." />
-              </div>
-            </div>
-          </div>
-          <div className="table-container">
-            {eligibilityLoading ? (
-              <div className="p-8 text-center text-muted">Checking eligibility matrix...</div>
-            ) : !selectedEligibleJob ? (
-              <div className="p-8 text-center text-muted">Please select a campus drive to view eligible students.</div>
-            ) : (eligibleStudents.length === 0 && notEligibleStudents.length === 0) ? (
-              <div className="p-8 text-center text-muted">No students found.</div>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Reg No</th>
-                    <th>Student Name</th>
-                    <th>Department</th>
-                    <th>CGPA</th>
-                    <th>Arrears</th>
-                    <th>Status</th>
-                    <th>Action/Reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {eligibleStudents.map((student, idx) => (
-                    <tr key={`el-${idx}`}>
-                      <td className="font-mono text-sm">{student.id}</td>
-                      <td className="font-medium">{student.name}</td>
-                      <td>{student.dept}</td>
-                      <td className="font-bold">{student.cgpa}</td>
-                      <td>{student.arrears}</td>
-                      <td><span style={{ backgroundColor: '#d1fae5', color: '#047857', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>✓ Eligible</span></td>
-                      <td>
-                        <button className="btn-secondary text-xs py-1 px-3" onClick={() => alert(`Eligibility notification sent to ${student.name}.`)}>Notify Student</button>
+                {applications
+                  .filter(a => (a.student || '').toLowerCase().includes(search.toLowerCase()) || (a.company || '').toLowerCase().includes(search.toLowerCase()) || (a.regNo || '').toLowerCase().includes(search.toLowerCase()))
+                  .map((app, idx) => (
+                    <tr key={app._id || app.applicationId || idx} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
+                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-muted)' }}>{app.regNo}</td>
+                      <td style={{ padding: '12px 18px', fontWeight: 800, color: 'var(--text-main)' }}>{app.student}</td>
+                      <td style={{ padding: '12px 18px', textAlign: 'center', color: 'var(--text-muted)' }}>{app.dept || 'TAMIL'}</td>
+                      <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 700, color: '#2563eb' }}>{app.cgpa ?? '0.0'}</td>
+                      <td style={{ padding: '12px 18px', fontWeight: 800, color: '#2563eb' }}>{app.company}</td>
+                      <td style={{ padding: '12px 18px', fontWeight: 600 }}>{app.role}</td>
+                      <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                        <select 
+                          value={app.status} 
+                          onChange={(e) => handleUpdateAppStatus(app._id || app.applicationId, e.target.value)}
+                          style={{ 
+                            background: app.status === 'Shortlisted' ? '#fef3c7' : 
+                                        app.status === 'Selected' ? '#dcfce7' : 
+                                        app.status === 'Rejected' ? '#fee2e2' : '#eff6ff', 
+                            color: app.status === 'Shortlisted' ? '#b45309' : 
+                                   app.status === 'Selected' ? '#15803d' : 
+                                   app.status === 'Rejected' ? '#dc2626' : '#2563eb', 
+                            padding: '5px 10px', borderRadius: 6, fontSize: '0.78rem', fontWeight: 700, border: '1px solid var(--border-color, #e2e8f0)', outline: 'none', cursor: 'pointer'
+                          }}
+                        >
+                          <option value="Applied">Applied</option>
+                          <option value="Shortlisted">Shortlisted</option>
+                          <option value="Selected">Selected</option>
+                          <option value="Waitlisted">Waitlisted</option>
+                          <option value="Rejected">Rejected</option>
+                        </select>
                       </td>
                     </tr>
                   ))}
-                  {notEligibleStudents.map((student, idx) => (
-                    <tr key={`nel-${idx}`} className="opacity-75 bg-gray-50 dark:bg-gray-800/50">
-                      <td className="font-mono text-sm">{student.id}</td>
-                      <td className="font-medium">{student.name}</td>
-                      <td>{student.dept}</td>
-                      <td className="font-bold">{student.cgpa}</td>
-                      <td>{student.arrears}</td>
-                      <td><span style={{ backgroundColor: '#fee2e2', color: '#b91c1c', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>✗ Not Eligible</span></td>
-                      <td className="text-xs text-danger font-medium">{student.reason}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'Interviews' && (
-        <div className="animate-fade-in glass-card">
-          <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
-            <h2 className="font-bold">Interview Schedules</h2>
-            <button className="btn-primary flex items-center gap-2" onClick={() => setShowInterviewModal(true)}><Plus size={16}/> Schedule Interview</button>
-          </div>
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Company</th>
-                  <th>Role</th>
-                  <th>Round</th>
-                  <th>Date & Time</th>
-                  <th>Mode & Venue</th>
-                  <th>Panel Details</th>
-                  <th>Candidates</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {interviews.map(interview => (
-                  <tr key={interview._id || interview.interviewId}>
-                    <td className="font-bold text-primary">{interview.company}</td>
-                    <td>{interview.role}</td>
-                    <td><span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">{interview.round}</span></td>
-                    <td>
-                      <div className="flex flex-col text-sm">
-                        <span className="font-bold flex items-center gap-1"><Calendar size={14}/> {new Date(interview.date).toLocaleDateString()}</span>
-                        <span className="text-muted flex items-center gap-1"><Clock size={14}/> {interview.time}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="flex flex-col text-sm">
-                        <span className={`font-bold ${interview.mode === 'Online' ? 'text-blue-500' : 'text-orange-500'}`}>{interview.mode}</span>
-                        <span className="text-muted">{interview.venue || '-'}</span>
-                      </div>
-                    </td>
-                    <td className="text-sm text-muted">{interview.panel || '-'}</td>
-                    <td>{interview.candidates}</td>
-                    <td>
-                      <button className="btn-secondary text-xs py-1 px-3" onClick={() => alert('Interview list has been generated and sent to department coordinators.')}>View List</button>
+                {applications.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                      No student applications recorded in this cycle yet.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {activeTab === 'Reports' && (
-        <div className="animate-fade-in glass-card p-12 flex flex-col items-center text-center">
-          <Download size={48} className="text-muted opacity-50 mb-4"/>
-          <h2 className="text-xl font-bold mb-2">Placement Data Export</h2>
-          <p className="text-muted max-w-md mb-6">Export NIRF placement data, company-wise selections, and department-wise statistics.</p>
-          <div className="flex gap-4">
-            <button className="btn-primary flex items-center gap-2" onClick={viewNIRFReport}><FileText size={16}/> NIRF Report</button>
-            <button className="btn-secondary flex items-center gap-2" onClick={viewDepartmentSummary}><FileText size={16}/> Department Summary</button>
-          </div>
-        </div>
-      )}
-
-      {/* Add Company Modal */}
-      {showCompanyModal && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-card">
-            <div className="modal-header">
-              <h2>Add Partner Company</h2>
-              <button className="close-btn" onClick={() => setShowCompanyModal(false)}><XCircle size={20}/></button>
+      {/* 5. ELIGIBILITY MATRIX */}
+      {activeTab === 'Eligibility Tracker' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '18px 20px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' }}>Select Active Recruitment Drive:</label>
+              <select 
+                value={selectedEligibleJob} 
+                onChange={e => setSelectedEligibleJob(e.target.value)}
+                style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'var(--bg-primary, #ffffff)', color: 'var(--text-main, #0f172a)', fontWeight: 700, fontSize: '0.85rem', outline: 'none' }}
+              >
+                {jobs.map(j => (
+                  <option key={j._id || j.jobId || j.id} value={j._id || j.jobId || j.id}>
+                    {j.company} — {j.role} ({j.ctc || 'N/A'})
+                  </option>
+                ))}
+                {jobs.length === 0 && <option value="">No active drives available</option>}
+              </select>
             </div>
-            <form onSubmit={handleAddCompany} className="modal-form">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="form-group col-span-2">
-                  <label>Company Name</label>
-                  <input type="text" value={companyForm.name} onChange={e => setCompanyForm({...companyForm, name: e.target.value})} required />
-                </div>
-                <div className="form-group">
-                  <label>Industry Type</label>
-                  <input type="text" value={companyForm.sector} onChange={e => setCompanyForm({...companyForm, sector: e.target.value})} required />
-                </div>
-                <div className="form-group">
-                  <label>Location (HQ)</label>
-                  <input type="text" value={companyForm.location} onChange={e => setCompanyForm({...companyForm, location: e.target.value})} required />
-                </div>
-                <div className="form-group col-span-2">
-                  <label>Website</label>
-                  <input type="url" value={companyForm.website} onChange={e => setCompanyForm({...companyForm, website: e.target.value})} />
-                </div>
-                <div className="form-group">
-                  <label>HR Name</label>
-                  <input type="text" value={companyForm.hrName} onChange={e => setCompanyForm({...companyForm, hrName: e.target.value})} />
-                </div>
-                <div className="form-group">
-                  <label>HR Email</label>
-                  <input type="email" value={companyForm.hrEmail} onChange={e => setCompanyForm({...companyForm, hrEmail: e.target.value})} />
-                </div>
-                <div className="form-group col-span-2">
-                  <label>HR Contact (Phone)</label>
-                  <input type="text" value={companyForm.hrContact} onChange={e => setCompanyForm({...companyForm, hrContact: e.target.value})} />
-                </div>
-              </div>
-              <div className="modal-actions mt-4">
-                <button type="button" className="btn-secondary" onClick={() => setShowCompanyModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary">Save Company</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Post Job Modal */}
-      {showJobModal && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-card max-h-[90vh] overflow-y-auto">
-            <div className="modal-header">
-              <h2>Post Campus Drive</h2>
-              <button className="close-btn" onClick={() => setShowJobModal(false)}><XCircle size={20}/></button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, padding: '6px 12px', borderRadius: '8px', background: '#dcfce7', color: '#15803d' }}>
+                {liveEligible.length} Scholars Eligible
+              </span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, padding: '6px 12px', borderRadius: '8px', background: '#fee2e2', color: '#991b1b' }}>
+                {liveIneligible.length} Ineligible
+              </span>
             </div>
-            <form onSubmit={handleAddJob} className="modal-form">
-              <div className="form-group">
-                <label>Company Name</label>
-                <select value={jobForm.company} onChange={e => setJobForm({...jobForm, company: e.target.value})} required>
-                  <option value="">Select Company</option>
-                  {companies.map(c => <option key={c.companyId} value={c.name}>{c.name}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="form-group">
-                  <label>Job Role</label>
-                  <input type="text" value={jobForm.role} onChange={e => setJobForm({...jobForm, role: e.target.value})} required />
-                </div>
-                <div className="form-group">
-                  <label>Package (CTC in LPA)</label>
-                  <input type="text" value={jobForm.ctc} onChange={e => setJobForm({...jobForm, ctc: e.target.value})} required placeholder="e.g. 4.5 LPA" />
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Eligibility Criteria Description (Visible to Students)</label>
-                <input type="text" value={jobForm.eligibility} onChange={e => setJobForm({...jobForm, eligibility: e.target.value})} required placeholder="e.g. CGPA: 7.0+, Dept: CSE, IT" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="form-group">
-                  <label>Minimum CGPA Required</label>
-                  <input type="number" step="0.1" value={jobForm.minCgpa} onChange={e => setJobForm({...jobForm, minCgpa: Number(e.target.value)})} required />
-                </div>
-                <div className="form-group">
-                  <label>Maximum Arrears Allowed</label>
-                  <input type="number" value={jobForm.maxArrears} onChange={e => setJobForm({...jobForm, maxArrears: Number(e.target.value)})} required />
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Eligible Departments (Comma separated codes like CSE, IT, ECE)</label>
-                <input type="text" value={jobForm.eligibleDepartments.join(', ')} onChange={e => setJobForm({...jobForm, eligibleDepartments: e.target.value.split(',').map(d=>d.trim())})} required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="form-group">
-                  <label>Drive Date</label>
-                  <input type="date" value={jobForm.driveDate} onChange={e => setJobForm({...jobForm, driveDate: e.target.value})} required />
-                </div>
-                <div className="form-group">
-                  <label>Last Date to Apply</label>
-                  <input type="date" value={jobForm.deadline} onChange={e => setJobForm({...jobForm, deadline: e.target.value})} required />
-                </div>
-              </div>
-              <div className="modal-actions mt-4">
-                <button type="button" className="btn-secondary" onClick={() => setShowJobModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary">Create Drive</button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
 
-      {/* Schedule Interview Modal */}
-      {showInterviewModal && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-card">
-            <div className="modal-header">
-              <h2>Schedule Interview</h2>
-              <button className="close-btn" onClick={() => setShowInterviewModal(false)}><XCircle size={20}/></button>
+          {/* Eligible Table */}
+          <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', background: 'rgba(22, 163, 74, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#15803d' }}>
+                ✓ Eligible Candidates ({liveEligible.length})
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => showToast(`Notified ${liveEligible.length} eligible students via email & portal!`)}
+                style={{ padding: '5px 12px', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+              >
+                Notify Eligible Scholars
+              </button>
             </div>
-            <form onSubmit={handleAddInterview} className="modal-form">
-              <div className="form-group">
-                <label>Company</label>
-                <select value={interviewForm.company} onChange={e => setInterviewForm({...interviewForm, company: e.target.value})} required>
-                  <option value="">Select Company</option>
-                  {companies.map(c => <option key={c.companyId} value={c.name}>{c.name}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Role</label>
-                <input type="text" value={interviewForm.role} onChange={e => setInterviewForm({...interviewForm, role: e.target.value})} required />
-              </div>
-              <div className="form-group">
-                <label>Interview Round (e.g. Technical Round 1)</label>
-                <input type="text" value={interviewForm.round} onChange={e => setInterviewForm({...interviewForm, round: e.target.value})} required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="form-group">
-                  <label>Date</label>
-                  <input type="date" value={interviewForm.date} onChange={e => setInterviewForm({...interviewForm, date: e.target.value})} required />
-                </div>
-                <div className="form-group">
-                  <label>Time</label>
-                  <input type="time" value={interviewForm.time} onChange={e => setInterviewForm({...interviewForm, time: e.target.value})} required />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="form-group">
-                  <label>Mode</label>
-                  <select value={interviewForm.mode} onChange={e => setInterviewForm({...interviewForm, mode: e.target.value})}>
-                    <option value="Online">Online</option>
-                    <option value="Offline">Offline</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Venue / Link</label>
-                  <input type="text" value={interviewForm.venue} onChange={e => setInterviewForm({...interviewForm, venue: e.target.value})} required placeholder="e.g. Main Auditorium / Zoom Link" />
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Panel Details (Names / Roles)</label>
-                <input type="text" value={interviewForm.panel} onChange={e => setInterviewForm({...interviewForm, panel: e.target.value})} placeholder="e.g. John Doe (Senior SDE)" />
-              </div>
-              <div className="form-group">
-                <label>Number of Candidates Expected</label>
-                <input type="number" value={interviewForm.candidates} onChange={e => setInterviewForm({...interviewForm, candidates: Number(e.target.value)})} required />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn-secondary" onClick={() => setShowInterviewModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary">Schedule</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Add Selection Modal */}
-      {showSelectionModal && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-card">
-            <div className="modal-header">
-              <h2>Add Selected Student</h2>
-              <button className="close-btn" onClick={() => setShowSelectionModal(false)}><XCircle size={20}/></button>
-            </div>
-            <form onSubmit={handleAddSelection} className="modal-form">
-              <div className="form-group">
-                <label>Student Name</label>
-                <input type="text" value={selectionForm.student} onChange={e => setSelectionForm({...selectionForm, student: e.target.value})} required />
-              </div>
-              <div className="form-group">
-                <label>Registration Number</label>
-                <input type="text" value={selectionForm.regNo} onChange={e => setSelectionForm({...selectionForm, regNo: e.target.value})} required />
-              </div>
-              <div className="form-group">
-                <label>Company</label>
-                <select value={selectionForm.company} onChange={e => setSelectionForm({...selectionForm, company: e.target.value})} required>
-                  <option value="">Select Company</option>
-                  {companies.map(c => <option key={c.companyId} value={c.name}>{c.name}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Role</label>
-                <input type="text" value={selectionForm.role} onChange={e => setSelectionForm({...selectionForm, role: e.target.value})} required />
-              </div>
-              <div className="form-group">
-                <label>Package (CTC in LPA)</label>
-                <input type="text" value={selectionForm.ctc} onChange={e => setSelectionForm({...selectionForm, ctc: e.target.value})} required />
-              </div>
-              <div className="form-group">
-                <label>Offer Date</label>
-                <input type="date" value={selectionForm.date} onChange={e => setSelectionForm({...selectionForm, date: e.target.value})} required />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn-secondary" onClick={() => setShowSelectionModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary">Add Selection</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Report Preview Modal */}
-      {reportPreview && (
-        <div className="modal-overlay" style={{ zIndex: 1000, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-content glass-card" style={{ maxWidth: '800px', width: '90%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>
-              <h2>{reportPreview.title}</h2>
-              <button className="close-btn" onClick={() => setReportPreview(null)}><XCircle size={20}/></button>
-            </div>
-            <div className="p-4 overflow-auto flex-1">
-              <table className="w-full text-left border-collapse">
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
-                  <tr className="bg-gray-100 dark:bg-gray-800">
-                    {reportPreview.headers.map((h, i) => <th key={i} className="p-2 border-b dark:border-gray-700 font-bold">{h}</th>)}
+                  <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Register No</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Student Name</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Department</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Live CGPA</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Arrears</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Attendance</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'right' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {reportPreview.rows.map((row, i) => (
-                    <tr key={i} className="border-b dark:border-gray-800">
-                      {row.map((cell, j) => <td key={j} className="p-2 text-sm">{cell}</td>)}
+                  {liveEligible.map(st => (
+                    <tr key={st.id || st.rollNo} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
+                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-muted)' }}>{st.id || st.rollNo}</td>
+                      <td style={{ padding: '12px 18px', fontWeight: 800, color: 'var(--text-main)' }}>{st.name}</td>
+                      <td style={{ padding: '12px 18px', textAlign: 'center', color: 'var(--text-muted)' }}>{st.dept || 'TAMIL'}</td>
+                      <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 800, color: '#2563eb' }}>{st.cgpa ?? 'N/A'}</td>
+                      <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 700, color: '#15803d' }}>{st.arrears ?? '0'}</td>
+                      <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 600, color: '#15803d' }}>{st.attendance || '100%'}</td>
+                      <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                        <span style={{ padding: '4px 10px', borderRadius: '6px', background: '#dcfce7', color: '#15803d', fontWeight: 800, fontSize: '0.75rem' }}>
+                          ✓ Qualified
+                        </span>
+                      </td>
                     </tr>
                   ))}
-                  {reportPreview.rows.length === 0 && (
-                    <tr><td colSpan={reportPreview.headers.length} className="p-4 text-center text-muted">No data available for this report.</td></tr>
+                  {liveEligible.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                        No candidates currently meet all cutoff criteria for this drive.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div className="p-4 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800">
-              <button className="btn-secondary flex items-center gap-2" onClick={() => {
-                const csvContent = "data:text/csv;charset=utf-8," + [reportPreview.headers, ...reportPreview.rows].map(e => e.join(",")).join("\n");
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", `${reportPreview.title.replace(/\s+/g, '_')}.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-              }}><Download size={16}/> Download CSV</button>
-              <button className="btn-primary flex items-center gap-2" onClick={() => window.print()}><FileText size={16}/> Print</button>
+          </div>
+
+          {/* Ineligible Table */}
+          {liveIneligible.length > 0 && (
+            <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', background: 'rgba(239, 68, 68, 0.05)' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#dc2626' }}>
+                  ❌ Criteria Pending / Ineligible Candidates ({liveIneligible.length})
+                </h3>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
+                      <th style={{ padding: '12px 18px', textAlign: 'left' }}>Register No</th>
+                      <th style={{ padding: '12px 18px', textAlign: 'left' }}>Student Name</th>
+                      <th style={{ padding: '12px 18px', textAlign: 'center' }}>Department</th>
+                      <th style={{ padding: '12px 18px', textAlign: 'center' }}>CGPA</th>
+                      <th style={{ padding: '12px 18px', textAlign: 'left' }}>Ineligibility Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {liveIneligible.map(st => (
+                      <tr key={st.id || st.rollNo} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
+                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-muted)' }}>{st.id || st.rollNo}</td>
+                        <td style={{ padding: '12px 18px', fontWeight: 700, color: 'var(--text-main)' }}>{st.name}</td>
+                        <td style={{ padding: '12px 18px', textAlign: 'center', color: 'var(--text-muted)' }}>{st.dept || 'TAMIL'}</td>
+                        <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 700, color: '#dc2626' }}>{st.cgpa ?? '0.0'}</td>
+                        <td style={{ padding: '12px 18px', color: '#dc2626', fontWeight: 600 }}>{st.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 6. INTERVIEWS & ROUND-BY-ROUND EVALUATIONS */}
+      {activeTab === 'Interviews' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          
+          {/* Top Bar with Drive Selector and Quick Actions */}
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 20px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(37,99,235,0.1)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Layers size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Active Recruitment Drive</div>
+                  <select 
+                    value={selectedInterviewJob} 
+                    onChange={e => {
+                      setSelectedInterviewJob(e.target.value);
+                      setSelectedRoundIndex(0);
+                    }}
+                    style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'var(--bg-primary, #ffffff)', color: 'var(--text-main, #0f172a)', fontWeight: 800, fontSize: '0.9rem', outline: 'none', cursor: 'pointer', minWidth: '280px' }}
+                  >
+                    {jobs.map(j => (
+                      <option key={j._id || j.jobId || j.id} value={j._id || j.jobId || j.id}>
+                        {j.company} — {j.role} ({j.ctc || 'N/A'}) • {j.totalRounds || (j.rounds ? j.rounds.length : 3)} Rounds
+                      </option>
+                    ))}
+                    {jobs.length === 0 && <option value="">No recruitment drives posted</option>}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {currentInterviewJob && currentJobApplications.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleBulkEnrollEligibleStudents(currentInterviewJob)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#f59e0b', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  <Zap size={15} /> Auto-Enroll Eligible Scholars ({liveEligible.length})
+                </button>
+              )}
+              <button 
+                type="button" 
+                onClick={() => {
+                  if (currentInterviewJob) {
+                    setInterviewForm(prev => ({
+                      ...prev,
+                      company: currentInterviewJob.company,
+                      role: currentInterviewJob.role,
+                      round: currentJobRounds[selectedRoundIndex]?.name || `Round ${selectedRoundIndex + 1}`
+                    }));
+                  }
+                  setShowInterviewModal(true);
+                }} 
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                <Plus size={15} /> Schedule Interview Session
+              </button>
             </div>
           </div>
+
+          {/* Drive Snapshot Card if job exists */}
+          {currentInterviewJob && (
+            <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: '#ffffff', borderRadius: '14px', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(59,130,246,0.25)', color: '#60a5fa', fontSize: '0.72rem', fontWeight: 800 }}>
+                    {currentInterviewJob.company}
+                  </span>
+                  <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(34,197,94,0.25)', color: '#4ade80', fontSize: '0.72rem', fontWeight: 800 }}>
+                    💰 {currentInterviewJob.ctc}
+                  </span>
+                  <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(245,158,11,0.25)', color: '#fcd34d', fontSize: '0.72rem', fontWeight: 800 }}>
+                    🎯 {currentJobRounds.length} Interview Rounds Specified
+                  </span>
+                </div>
+                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>{currentInterviewJob.role}</h2>
+                <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '4px' }}>
+                  Min CGPA: <strong>{currentInterviewJob.minCgpa ?? 'None'}</strong> • Max Backlogs: <strong>{currentInterviewJob.maxArrears ?? 0}</strong> • Departments: <strong>{Array.isArray(currentInterviewJob.eligibleDepartments) ? currentInterviewJob.eligibleDepartments.join(', ') : 'ALL'}</strong>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.06)', padding: '8px 16px', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#38bdf8' }}>{currentJobApplications.length}</div>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Total Applied</div>
+                </div>
+                <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.06)', padding: '8px 16px', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#4ade80' }}>
+                    {currentJobApplications.filter(a => a.status === 'Selected').length}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Offers Issued</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DYNAMIC ROUND-BY-ROUND TABS BAR */}
+          {currentInterviewJob && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              
+              <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
+                {currentJobRounds.map((rnd, idx) => {
+                  const isSelected = selectedRoundIndex === idx;
+                  const roundName = rnd.name || `Round ${idx + 1}`;
+                  
+                  // Compute candidates currently at or qualified in this round
+                  let candidateCount = 0;
+                  if (idx === 0) {
+                    candidateCount = currentJobApplications.length;
+                  } else {
+                    const prevRoundName = currentJobRounds[idx - 1]?.name || `Round ${idx}`;
+                    candidateCount = currentJobApplications.filter(a => {
+                      const prevEval = a.roundEvaluations?.[prevRoundName];
+                      return prevEval?.status === 'Qualified' || prevEval?.status === 'Selected' || (a.currentRound || 1) > idx;
+                    }).length;
+                  }
+
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedRoundIndex(idx)}
+                      style={{
+                        padding: '12px 18px',
+                        borderRadius: '12px',
+                        border: isSelected ? '2px solid #2563eb' : '1px solid var(--border-color, #e2e8f0)',
+                        background: isSelected ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' : 'var(--bg-card, #ffffff)',
+                        color: isSelected ? '#ffffff' : 'var(--text-main, #0f172a)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        minWidth: '220px',
+                        boxShadow: isSelected ? '0 4px 14px rgba(37,99,235,0.25)' : '0 1px 3px rgba(0,0,0,0.02)',
+                        transition: 'all 0.2s ease',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div style={{
+                        width: '28px', height: '28px', borderRadius: '8px',
+                        background: isSelected ? 'rgba(255,255,255,0.2)' : '#eff6ff',
+                        color: isSelected ? '#ffffff' : '#2563eb',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 800, fontSize: '0.85rem'
+                      }}>
+                        {idx + 1}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '0.84rem', fontWeight: 800 }}>{rnd.name || `Round ${idx + 1}`}</div>
+                        <div style={{ fontSize: '0.72rem', color: isSelected ? 'rgba(255,255,255,0.8)' : 'var(--text-muted, #64748b)', marginTop: '2px' }}>
+                          Type: {rnd.type || 'Assessment'} • <strong>{candidateCount} Candidates</strong>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* ACTIVE ROUND CANDIDATE EVALUATION ROSTER & FORM */}
+              {(() => {
+                const activeRound = currentJobRounds[selectedRoundIndex] || { name: `Round ${selectedRoundIndex + 1}`, type: 'Technical' };
+                const prevRound = selectedRoundIndex > 0 ? currentJobRounds[selectedRoundIndex - 1]?.name : null;
+
+                // Candidates for this round
+                const roundCandidates = selectedRoundIndex === 0
+                  ? currentJobApplications
+                  : currentJobApplications.filter(a => {
+                      const prevEval = a.roundEvaluations?.[prevRound];
+                      return prevEval?.status === 'Qualified' || prevEval?.status === 'Selected' || (a.currentRound || 1) > selectedRoundIndex;
+                    });
+
+                const qualifiedCount = roundCandidates.filter(a => a.roundEvaluations?.[activeRound.name]?.status === 'Qualified').length;
+                const selectedCount = roundCandidates.filter(a => a.roundEvaluations?.[activeRound.name]?.status === 'Selected').length;
+                const rejectedCount = roundCandidates.filter(a => a.roundEvaluations?.[activeRound.name]?.status === 'Rejected').length;
+                const pendingCount = roundCandidates.filter(a => !a.roundEvaluations?.[activeRound.name] || a.roundEvaluations?.[activeRound.name]?.status === 'Pending' || a.roundEvaluations?.[activeRound.name]?.status === 'Applied').length;
+
+                return (
+                  <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    
+                    {/* Round Header & Metrics */}
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', background: '#2563eb', color: '#ffffff' }}>
+                            Round {selectedRoundIndex + 1} of {currentJobRounds.length}
+                          </span>
+                          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                            {activeRound.name}
+                          </h3>
+                        </div>
+                        <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>
+                          {selectedRoundIndex === 0 
+                            ? 'All student applicants enrolled in the primary assessment stage.' 
+                            : `Candidates qualified and advanced from ${prevRound || 'previous round'}.`}
+                        </p>
+                      </div>
+
+                      {/* 4 Mini Round KPIs */}
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ padding: '5px 10px', borderRadius: '8px', background: '#eff6ff', color: '#1e40af', fontSize: '0.78rem', fontWeight: 800 }}>
+                          Total in Round: {roundCandidates.length}
+                        </span>
+                        <span style={{ padding: '5px 10px', borderRadius: '8px', background: '#dcfce7', color: '#15803d', fontSize: '0.78rem', fontWeight: 800 }}>
+                          ✓ Qualified: {qualifiedCount}
+                        </span>
+                        <span style={{ padding: '5px 10px', borderRadius: '8px', background: '#fef3c7', color: '#b45309', fontSize: '0.78rem', fontWeight: 800 }}>
+                          🏆 Selected: {selectedCount}
+                        </span>
+                        <span style={{ padding: '5px 10px', borderRadius: '8px', background: '#fee2e2', color: '#991b1b', fontSize: '0.78rem', fontWeight: 800 }}>
+                          ❌ Rejected: {rejectedCount}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Round Actions Bar */}
+                    <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      <div style={{ position: 'relative', width: '260px' }}>
+                        <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input 
+                          value={search} 
+                          onChange={e => setSearch(e.target.value)} 
+                          placeholder="Filter candidates..." 
+                          style={{ padding: '6px 10px 6px 32px', borderRadius: 8, border: '1px solid var(--border-color, #cbd5e1)', background: 'var(--bg-primary, #ffffff)', color: 'var(--text-main, #0f172a)', fontSize: '0.8rem', width: '100%', outline: 'none' }} 
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const headers = ['Register No', 'Student Name', 'Department', 'CGPA', 'Round Name', 'Round Status', 'Evaluation Notes'];
+                            const rows = roundCandidates.map(a => {
+                              const rData = a.roundEvaluations?.[activeRound.name] || {};
+                              return [
+                                a.regNo || a.studentId,
+                                a.student || a.name,
+                                a.dept || 'General',
+                                a.cgpa || 0,
+                                activeRound.name,
+                                rData.status || a.status || 'Pending',
+                                rData.notes || ''
+                              ];
+                            });
+                            exportCSV(`Evaluation_${activeRound.name.replace(/\s+/g, '_')}`, headers, rows);
+                          }}
+                          style={{ padding: '6px 12px', background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Download size={13} /> Export Round Sheet (.CSV)
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => showToast(`Dispatched alert to ${roundCandidates.length} scholars for ${activeRound.name}!`)}
+                          style={{ padding: '6px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', color: '#2563eb', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Notify Candidates for Round
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Candidate Evaluation Table */}
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                        <thead>
+                          <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
+                            <th style={{ padding: '12px 16px', textAlign: 'left' }}>Register No</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left' }}>Student Scholar</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'center' }}>Department</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'center' }}>Live CGPA</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'center' }}>Backlogs</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'center' }}>Attendance</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', minWidth: '180px' }}>Round Evaluation Remarks / Score</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'right', minWidth: '190px' }}>Round Result / Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {roundCandidates
+                            .filter(a => 
+                              (a.student || a.name || '').toLowerCase().includes(search.toLowerCase()) || 
+                              (a.regNo || '').toLowerCase().includes(search.toLowerCase()) ||
+                              (a.dept || '').toLowerCase().includes(search.toLowerCase())
+                            )
+                            .map((app, cIdx) => {
+                              const rData = app.roundEvaluations?.[activeRound.name] || {};
+                              const currentStatus = rData.status || (selectedRoundIndex === 0 ? app.status : 'Pending');
+                              const currentNotes = rData.notes || '';
+
+                              return (
+                                <tr key={app._id || app.applicationId || cIdx} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
+                                  <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--text-muted)' }}>
+                                    {app.regNo}
+                                  </td>
+                                  <td style={{ padding: '12px 16px' }}>
+                                    <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{app.student || app.name}</div>
+                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Candidate ID: {app.applicationId || app._id}</div>
+                                  </td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                    <span style={{ padding: '2px 8px', borderRadius: 4, background: '#f1f5f9', color: '#475569', fontSize: '0.75rem', fontWeight: 600 }}>
+                                      {app.dept || 'General'}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 800, color: '#2563eb' }}>
+                                    {app.cgpa ?? 'N/A'}
+                                  </td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: (app.arrears || 0) === 0 ? '#15803d' : '#dc2626' }}>
+                                    {app.arrears ?? '0'}
+                                  </td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#15803d' }}>
+                                    {app.attendance || '100%'}
+                                  </td>
+                                  <td style={{ padding: '12px 16px' }}>
+                                    <input
+                                      type="text"
+                                      defaultValue={currentNotes}
+                                      placeholder="e.g. 85/100, Good in DSA"
+                                      onBlur={(e) => {
+                                        if (e.target.value !== currentNotes) {
+                                          handleUpdateStudentRoundStatus(app, activeRound.name, selectedRoundIndex, currentStatus, e.target.value);
+                                        }
+                                      }}
+                                      style={{
+                                        padding: '5px 10px',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border-color, #cbd5e1)',
+                                        background: 'var(--bg-primary, #ffffff)',
+                                        fontSize: '0.78rem',
+                                        width: '100%',
+                                        color: 'var(--text-main, #0f172a)'
+                                      }}
+                                    />
+                                  </td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                                    <select
+                                      value={currentStatus}
+                                      onChange={(e) => handleUpdateStudentRoundStatus(app, activeRound.name, selectedRoundIndex, e.target.value, currentNotes)}
+                                      style={{
+                                        padding: '5px 10px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 800,
+                                        border: '1px solid var(--border-color, #cbd5e1)',
+                                        cursor: 'pointer',
+                                        outline: 'none',
+                                        background: 
+                                          currentStatus === 'Qualified' ? '#dcfce7' : 
+                                          currentStatus === 'Selected' ? '#fef3c7' : 
+                                          currentStatus === 'Rejected' ? '#fee2e2' : 
+                                          currentStatus === 'Absent' ? '#f1f5f9' : '#eff6ff',
+                                        color: 
+                                          currentStatus === 'Qualified' ? '#15803d' : 
+                                          currentStatus === 'Selected' ? '#b45309' : 
+                                          currentStatus === 'Rejected' ? '#dc2626' : 
+                                          currentStatus === 'Absent' ? '#64748b' : '#2563eb'
+                                      }}
+                                    >
+                                      <option value="Pending">⏳ Pending</option>
+                                      <option value="Qualified">✓ Qualified (Next Round)</option>
+                                      <option value="Selected">🏆 Selected (Final Offer)</option>
+                                      <option value="Rejected">❌ Rejected</option>
+                                      <option value="Absent">🚫 Absent</option>
+                                    </select>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+
+                          {roundCandidates.length === 0 && (
+                            <tr>
+                              <td colSpan={8} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                  <Users size={32} color="#94a3b8" />
+                                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                                    {selectedRoundIndex === 0 
+                                      ? 'No registered candidates found in Round 1.' 
+                                      : `No candidates qualified yet from ${prevRound || 'previous round'}.`}
+                                  </div>
+                                  <p style={{ margin: 0, fontSize: '0.8rem', maxWidth: '420px', color: 'var(--text-muted)' }}>
+                                    {selectedRoundIndex === 0
+                                      ? 'You can automatically enroll all eligible students based on CGPA and department cutoffs.'
+                                      : 'Evaluate scholars in the previous round and mark them as "Qualified" to advance them here.'}
+                                  </p>
+                                  {selectedRoundIndex === 0 && currentInterviewJob && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleBulkEnrollEligibleStudents(currentInterviewJob)}
+                                      style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                                    >
+                                      <Zap size={15} /> Enroll All {liveEligible.length} Eligible Scholars Now
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                  </div>
+                );
+              })()}
+
+            </div>
+          )}
+
+          {/* SCHEDULED INTERVIEW SESSIONS TABLE */}
+          <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', marginTop: '8px' }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                🗓 Scheduled Interview Sessions & Virtual Meeting Links ({interviews.length})
+              </h3>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Company</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Job Role</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Assessment Round</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Date & Time</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Venue / Mode</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'right' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {interviews.map((int, idx) => (
+                    <tr key={int._id || int.interviewId || idx} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
+                      <td style={{ padding: '12px 18px', fontWeight: 800, color: '#2563eb' }}>{int.company}</td>
+                      <td style={{ padding: '12px 18px', fontWeight: 600 }}>{int.role}</td>
+                      <td style={{ padding: '12px 18px' }}>
+                        <span style={{ padding: '3px 8px', borderRadius: 4, background: '#eff6ff', color: '#2563eb', fontWeight: 700, fontSize: '0.75rem' }}>
+                          {int.round}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 18px', textAlign: 'center' }}>{int.date ? new Date(int.date).toLocaleDateString() : 'TBA'} ({int.time || '10:00 AM'})</td>
+                      <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                        <span style={{ padding: '3px 8px', borderRadius: 6, background: int.mode === 'Online' ? '#eff6ff' : '#f1f5f9', color: int.mode === 'Online' ? '#2563eb' : '#475569', fontWeight: 700, fontSize: '0.75rem' }}>
+                          {int.mode || 'Online'} • {int.venue}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                        <button 
+                          type="button" 
+                          onClick={() => showToast(`Notification dispatched to candidates for ${int.company} interview!`)}
+                          style={{ padding: '5px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', color: '#2563eb', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                        >
+                          Notify Candidates
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {interviews.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                        No interview sessions scheduled yet. Click "+ Schedule Interview Session" to create one.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* 6.5 TRAINING PROGRAMS */}
+      {activeTab === 'Training Programs' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                📚 Campus Training & Skill Development Programs ({trainingPrograms.length})
+              </h3>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>
+                Technical bootcamps, quantitative aptitude, mock interviews, and corporate soft skills workshops.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button 
+                type="button" 
+                onClick={() => {
+                  const headers = ['Program ID', 'Title', 'Trainer', 'Department', 'Date', 'Time', 'Venue', 'Mode', 'Status'];
+                  const rows = trainingPrograms.map(p => [p.id, p.title, p.trainer, p.targetDepartment, p.date, p.time, p.venue, p.mode, p.status]);
+                  exportCSV('Placement_Training_Programs', headers, rows);
+                }}
+                style={{ padding: '8px 14px', background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Download size={14} /> Export Schedule (.CSV)
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setShowTrainingModal(true)} 
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                <Plus size={16} /> Schedule Training Program
+              </button>
+            </div>
+          </div>
+
+          {/* 4 Executive KPI Cards for Training */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>Total Modules</span>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(37,99,235,0.1)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <BookOpen size={16} />
+                </div>
+              </div>
+              <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', marginTop: '4px' }}>{trainingPrograms.length}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: '2px' }}>Curriculum Bootcamps</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>Active / Upcoming</span>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(22,163,74,0.1)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Calendar size={16} />
+                </div>
+              </div>
+              <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#15803d', marginTop: '4px' }}>
+                {trainingPrograms.filter(p => p.status === 'Scheduled').length}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#16a34a', marginTop: '2px', fontWeight: 600 }}>Scheduled Sessions</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' }}>Eligible Students</span>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(124,58,237,0.1)', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Users size={16} />
+                </div>
+              </div>
+              <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#6d28d9', marginTop: '4px' }}>{allStudents.length}</div>
+              <div style={{ fontSize: '0.72rem', color: '#7c3aed', marginTop: '2px', fontWeight: 600 }}>Enrolled Scholars</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#d97706', textTransform: 'uppercase' }}>Targeted Rounds</span>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(217,119,6,0.1)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Layers size={16} />
+                </div>
+              </div>
+              <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#b45309', marginTop: '4px' }}>
+                Round 1 - 3
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#d97706', marginTop: '2px', fontWeight: 600 }}>Aptitude, Tech & HR</div>
+            </div>
+          </div>
+
+          {/* Interview Round Filter Bar for Training Programs */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', background: 'var(--bg-card, #ffffff)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', marginRight: '4px' }}>
+              🎯 Filter by Target Interview Round:
+            </span>
+            {[
+              { id: 'ALL', label: 'All Training Modules' },
+              { id: 'Round 1', label: 'Round 1 Prep (Aptitude & Online Test)' },
+              { id: 'Round 2', label: 'Round 2 Prep (Technical & Coding)' },
+              { id: 'Round 3', label: 'Round 3 Prep (HR & Soft Skills)' }
+            ].map(f => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setTrainingRoundFilter(f.id)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '8px',
+                  border: trainingRoundFilter === f.id ? '1px solid #2563eb' : '1px solid var(--border-color, #cbd5e1)',
+                  background: trainingRoundFilter === f.id ? '#2563eb' : 'var(--bg-primary, #ffffff)',
+                  color: trainingRoundFilter === f.id ? '#ffffff' : 'var(--text-main, #0f172a)',
+                  fontWeight: 700,
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Programs Table */}
+          <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Module / Program Title</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Targeted Interview Round</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Trainer / Partner</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Target Department</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Date & Timing</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Venue / Mode</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Status</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trainingPrograms
+                    .filter(p => {
+                      if (trainingRoundFilter === 'ALL') return true;
+                      const r = String(p.targetRound || p.title || '').toLowerCase();
+                      if (trainingRoundFilter === 'Round 1') return r.includes('round 1') || r.includes('aptitude') || r.includes('quantitative');
+                      if (trainingRoundFilter === 'Round 2') return r.includes('round 2') || r.includes('technical') || r.includes('coding') || r.includes('full stack');
+                      if (trainingRoundFilter === 'Round 3') return r.includes('round 3') || r.includes('hr') || r.includes('soft skills') || r.includes('gd');
+                      return true;
+                    })
+                    .map(prog => (
+                      <tr key={prog.id} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
+                        <td style={{ padding: '12px 18px' }}>
+                          <div style={{ fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>{prog.title}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)', marginTop: '2px' }}>{prog.description || 'Professional placement readiness module'}</div>
+                        </td>
+                        <td style={{ padding: '12px 18px' }}>
+                          <span style={{ 
+                            padding: '4px 10px', borderRadius: '6px', 
+                            background: 
+                              String(prog.targetRound || prog.title).toLowerCase().includes('aptitude') || String(prog.targetRound || prog.title).toLowerCase().includes('round 1') ? '#eff6ff' :
+                              String(prog.targetRound || prog.title).toLowerCase().includes('tech') || String(prog.targetRound || prog.title).toLowerCase().includes('round 2') ? '#f5f3ff' :
+                              String(prog.targetRound || prog.title).toLowerCase().includes('hr') || String(prog.targetRound || prog.title).toLowerCase().includes('round 3') ? '#fef3c7' : '#f0fdf4',
+                            color: 
+                              String(prog.targetRound || prog.title).toLowerCase().includes('aptitude') || String(prog.targetRound || prog.title).toLowerCase().includes('round 1') ? '#1d4ed8' :
+                              String(prog.targetRound || prog.title).toLowerCase().includes('tech') || String(prog.targetRound || prog.title).toLowerCase().includes('round 2') ? '#6d28d9' :
+                              String(prog.targetRound || prog.title).toLowerCase().includes('hr') || String(prog.targetRound || prog.title).toLowerCase().includes('round 3') ? '#b45309' : '#15803d',
+                            fontWeight: 800, fontSize: '0.75rem' 
+                          }}>
+                            {prog.targetRound || (
+                              String(prog.title).toLowerCase().includes('aptitude') ? 'Round 1 (Aptitude)' :
+                              String(prog.title).toLowerCase().includes('java') || String(prog.title).toLowerCase().includes('tech') ? 'Round 2 (Technical)' :
+                              String(prog.title).toLowerCase().includes('hr') || String(prog.title).toLowerCase().includes('soft') ? 'Round 3 (HR & GD)' : 'All Interview Rounds'
+                            )}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#2563eb' }}>
+                          {prog.trainer}
+                        </td>
+                        <td style={{ padding: '12px 18px' }}>
+                          <span style={{ padding: '3px 8px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontWeight: 700, fontSize: '0.75rem' }}>
+                            {prog.targetDepartment}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                          <div style={{ fontWeight: 700 }}>{new Date(prog.date).toLocaleDateString()}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)' }}>{prog.time}</div>
+                        </td>
+                        <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                          <span style={{ 
+                            padding: '3px 8px', borderRadius: '6px', 
+                            background: prog.mode === 'Online' ? '#e0e7ff' : prog.mode === 'Hybrid' ? '#fef3c7' : '#f1f5f9', 
+                            color: prog.mode === 'Online' ? '#4338ca' : prog.mode === 'Hybrid' ? '#b45309' : '#334155', 
+                            fontWeight: 700, fontSize: '0.75rem' 
+                          }}>
+                            {prog.mode} • {prog.venue}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                          <span style={{ 
+                            padding: '3px 8px', borderRadius: '6px', 
+                            background: prog.status === 'Completed' ? '#dcfce7' : '#eff6ff', 
+                            color: prog.status === 'Completed' ? '#15803d' : '#2563eb', 
+                            fontWeight: 800, fontSize: '0.75rem' 
+                          }}>
+                            {prog.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTrainingForAttendance(prog)}
+                              style={{ padding: '5px 10px', fontSize: '0.75rem', fontWeight: 700, borderRadius: '6px', background: '#2563eb', color: '#ffffff', border: 'none', cursor: 'pointer' }}
+                            >
+                              Student Roster
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTrainingProgram(prog.id)}
+                              style={{ padding: '5px 8px', fontSize: '0.75rem', fontWeight: 700, borderRadius: '6px', background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', cursor: 'pointer' }}
+                              title="Remove program"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  {trainingPrograms.length === 0 && (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted, #64748b)' }}>
+                        No training programs scheduled yet. Click "+ Schedule Training Program" to add one.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* 7. SELECTIONS & OFFERS */}
+      {activeTab === 'Selected Students' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                🏆 Verified Placement Selections & Offer Roll ({selections.length})
+              </h3>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                type="button" 
+                onClick={() => {
+                  const headers = ['Register No', 'Student Name', 'Company', 'Designation', 'Package (CTC)', 'Offer Date'];
+                  const rows = selections.map(s => [s.regNo, s.student, s.company, s.role, s.ctc, s.date]);
+                  exportCSV('Verified_Selections_Offers', headers, rows);
+                }}
+                style={{ padding: '8px 14px', background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Download size={14} /> Export Offer Roll (.CSV)
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setShowSelectionModal(true)} 
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                <Plus size={16} /> Record Student Selection
+              </button>
+            </div>
+          </div>
+
+          <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Register No</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Student Name</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Recruiting Company</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Job Designation</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Package (CTC)</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'right' }}>Offer Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selections.map((sel, idx) => (
+                    <tr key={sel._id || sel.selectionId || idx} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
+                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-muted)' }}>{sel.regNo}</td>
+                      <td style={{ padding: '12px 18px', fontWeight: 800, color: 'var(--text-main)' }}>{sel.student}</td>
+                      <td style={{ padding: '12px 18px', fontWeight: 800, color: '#2563eb' }}>{sel.company}</td>
+                      <td style={{ padding: '12px 18px', fontWeight: 600 }}>{sel.role}</td>
+                      <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                        <span style={{ padding: '3px 8px', borderRadius: '6px', background: '#dcfce7', color: '#15803d', fontWeight: 800, fontSize: '0.8rem' }}>
+                          {sel.ctc}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 18px', textAlign: 'right', color: 'var(--text-muted)' }}>
+                        {sel.date ? new Date(sel.date).toLocaleDateString() : 'Active'}
+                      </td>
+                    </tr>
+                  ))}
+                  {selections.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                        No corporate placement selections recorded yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* 8. REPORTS & ANALYTICS */}
+      {activeTab === 'Reports' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+          
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '24px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(37,99,235,0.1)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+                <FileText size={22} />
+              </div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                Official NIRF Placement Audit Report
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                Generates accredited institutional report for NAAC/NIRF audits containing verified registration numbers, recruiting companies, designations, and salary brackets.
+              </p>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => {
+                const headers = ["Registration Number", "Student Name", "Placed Company", "Role", "Package (CTC)"];
+                const rows = selections.map(sel => [sel.regNo, sel.student, sel.company, sel.role, sel.ctc]);
+                setReportPreview({ title: "NIRF Placement Audit Report", headers, rows });
+              }}
+              style={{ marginTop: '20px', padding: '10px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              Generate NIRF Report
+            </button>
+          </div>
+
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '24px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(22,163,74,0.1)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+                <Building size={22} />
+              </div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                Department Placement Summary
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                Department-wise recruitment coverage, total scholars enrolled, clearance ratios, and active corporate recruiter partnerships.
+              </p>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => {
+                const headers = ["Department", "Total Enrolled Scholars", "Placed Scholars", "Placement Ratio (%)"];
+                const rows = deptStats.map(d => [d.dept, d.total, d.placed, `${d.percentage}%`]);
+                setReportPreview({ title: "Department Placement Summary Report", headers, rows });
+              }}
+              style={{ marginTop: '20px', padding: '10px 16px', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              Generate Department Summary
+            </button>
+          </div>
+
+        </div>
+      )}
+
+      {/* ── REAL-TIME ERP MODALS ── */}
+
+      {/* 1. Add Company Modal */}
+      {showCompanyModal && (
+        <div className="erp-modal-overlay">
+          <div className="erp-modal-box" style={{ maxWidth: '640px', width: '100%' }}>
+            
+            <div className="erp-modal-header">
+              <div className="erp-modal-header-info">
+                <div className="erp-modal-icon-badge" style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}>
+                  <Building size={20} />
+                </div>
+                <div>
+                  <h2 className="erp-modal-title">Add Partner Recruiter</h2>
+                  <p className="erp-modal-subtitle">Register corporate profile, HR point of contact, and industry sector.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowCompanyModal(false)} className="erp-modal-close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCompany} className="erp-modal-form">
+              <div className="erp-modal-body">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Building size={14} color="#2563eb" /> Company Name <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Building size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={companyForm.name} 
+                        onChange={e => setCompanyForm({...companyForm, name: e.target.value})} 
+                        required 
+                        placeholder="e.g. Zoho Corp" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Briefcase size={14} color="#2563eb" /> Industry Sector
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Briefcase size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={companyForm.sector} 
+                        onChange={e => setCompanyForm({...companyForm, sector: e.target.value})} 
+                        placeholder="e.g. IT & Software" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <MapPin size={14} color="#2563eb" /> Location (HQ)
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <MapPin size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={companyForm.location} 
+                        onChange={e => setCompanyForm({...companyForm, location: e.target.value})} 
+                        placeholder="e.g. Chennai / Bengaluru" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Users size={14} color="#2563eb" /> HR Lead Name
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Users size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={companyForm.hrName} 
+                        onChange={e => setCompanyForm({...companyForm, hrName: e.target.value})} 
+                        placeholder="e.g. Ramesh Kumar" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Phone size={14} color="#2563eb" /> HR Contact Phone
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Phone size={16} />
+                      </div>
+                      <input 
+                        type="tel" 
+                        value={companyForm.hrContact} 
+                        onChange={e => setCompanyForm({...companyForm, hrContact: e.target.value})} 
+                        placeholder="e.g. +91 9876543210" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Mail size={14} color="#2563eb" /> HR Official Email
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Mail size={16} />
+                      </div>
+                      <input 
+                        type="email" 
+                        value={companyForm.hrEmail} 
+                        onChange={e => setCompanyForm({...companyForm, hrEmail: e.target.value})} 
+                        placeholder="e.g. campus@company.com" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="erp-modal-footer">
+                <button type="button" onClick={() => setShowCompanyModal(false)} className="erp-btn-cancel">
+                  Cancel
+                </button>
+                <button type="submit" className="erp-btn-submit">
+                  <Building size={16} /> Save Partner Recruiter
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* 2. Post Job Modal */}
+      {showJobModal && (
+        <div className="erp-modal-overlay">
+          <div className="erp-modal-box" style={{ maxWidth: '680px', width: '100%' }}>
+            
+            <div className="erp-modal-header">
+              <div className="erp-modal-header-info">
+                <div className="erp-modal-icon-badge" style={{ background: 'rgba(22,163,74,0.1)', color: '#16a34a' }}>
+                  <Briefcase size={20} />
+                </div>
+                <div>
+                  <h2 className="erp-modal-title">Post Campus Recruitment Drive</h2>
+                  <p className="erp-modal-subtitle">Configure package CTC, eligibility cutoffs, departments, and deadline.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowJobModal(false)} className="erp-modal-close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddJob} className="erp-modal-form">
+              <div className="erp-modal-body">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Building size={14} color="#16a34a" /> Recruiting Company <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Building size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={jobForm.company} 
+                        onChange={e => setJobForm({...jobForm, company: e.target.value})} 
+                        required 
+                        placeholder="Select or type company..." 
+                        list="partner-companies-modal-list"
+                        className="erp-input-field" 
+                      />
+                      <datalist id="partner-companies-modal-list">
+                        {companies.map(c => <option key={c._id || c.companyId || c.name} value={c.name} />)}
+                      </datalist>
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Briefcase size={14} color="#16a34a" /> Job Designation / Role <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Briefcase size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={jobForm.role} 
+                        onChange={e => setJobForm({...jobForm, role: e.target.value})} 
+                        required 
+                        placeholder="e.g. Graduate Engineer Trainee" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <DollarSign size={14} color="#16a34a" /> Package CTC (LPA) <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <DollarSign size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={jobForm.ctc} 
+                        onChange={e => setJobForm({...jobForm, ctc: e.target.value})} 
+                        required 
+                        placeholder="e.g. 6.5 LPA" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Award size={14} color="#16a34a" /> Minimum CGPA Cutoff
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Award size={16} />
+                      </div>
+                      <input 
+                        type="number" 
+                        step="0.1" 
+                        min="0" 
+                        max="10" 
+                        value={jobForm.minCgpa} 
+                        onChange={e => setJobForm({...jobForm, minCgpa: Number(e.target.value)})} 
+                        placeholder="e.g. 6.0" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <AlertCircle size={14} color="#16a34a" /> Max Active Arrears Allowed
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <AlertCircle size={16} />
+                      </div>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        max="10" 
+                        value={jobForm.maxArrears} 
+                        onChange={e => setJobForm({...jobForm, maxArrears: Number(e.target.value)})} 
+                        placeholder="0 for zero backlogs" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Users size={14} color="#16a34a" /> Eligible Departments
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Users size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={jobForm.eligibleDepartments.join(', ')} 
+                        onChange={e => setJobForm({...jobForm, eligibleDepartments: e.target.value.split(',').map(d=>d.trim())})} 
+                        placeholder="e.g. CSE, IT, ECE or ALL" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Calendar size={14} color="#16a34a" /> Drive Date
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Calendar size={16} />
+                      </div>
+                      <input 
+                        type="date" 
+                        value={jobForm.driveDate} 
+                        onChange={e => setJobForm({...jobForm, driveDate: e.target.value})} 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Clock size={14} color="#16a34a" /> Application Deadline <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Clock size={16} />
+                      </div>
+                      <input 
+                        type="date" 
+                        value={jobForm.deadline} 
+                        onChange={e => setJobForm({...jobForm, deadline: e.target.value})} 
+                        required 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Interview Rounds Configuration */}
+                <div style={{
+                  marginTop: '16px',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  background: 'var(--bg-secondary, #f8fafc)',
+                  border: '1px solid var(--border-color, #e2e8f0)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Target size={16} color="#16a34a" /> Selection Process & Interview Rounds
+                      </h4>
+                      <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)' }}>
+                        Specify how many interview rounds will be conducted. Dedicated evaluation forms will be auto-generated for each round.
+                      </p>
+                    </div>
+
+                    {/* Quick Round Count Selector */}
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted, #64748b)' }}>Rounds:</span>
+                      {[1, 2, 3, 4, 5].map(num => (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => handleRoundCountChange(num)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            border: (jobForm.totalRounds || (jobForm.rounds ? jobForm.rounds.length : 3)) === num ? '2px solid #16a34a' : '1px solid var(--border-color, #cbd5e1)',
+                            background: (jobForm.totalRounds || (jobForm.rounds ? jobForm.rounds.length : 3)) === num ? '#16a34a' : 'var(--card-bg, #ffffff)',
+                            color: (jobForm.totalRounds || (jobForm.rounds ? jobForm.rounds.length : 3)) === num ? '#ffffff' : 'var(--text-main, #334155)',
+                            fontWeight: 800,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {num} {num === 1 ? 'Round' : 'Rounds'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* List of Rounds */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {(jobForm.rounds || []).map((rnd, idx) => (
+                      <div 
+                        key={idx} 
+                        style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: '90px 1fr 140px', 
+                          gap: '8px', 
+                          alignItems: 'center',
+                          padding: '8px 10px',
+                          background: 'var(--card-bg, #ffffff)',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color, #e2e8f0)'
+                        }}
+                      >
+                        <div style={{ 
+                          fontSize: '0.78rem', 
+                          fontWeight: 800, 
+                          color: '#16a34a',
+                          background: 'rgba(22,163,74,0.1)',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          textAlign: 'center'
+                        }}>
+                          Round {idx + 1}
+                        </div>
+                        <input
+                          type="text"
+                          value={rnd.name}
+                          onChange={(e) => handleRoundDetailChange(idx, 'name', e.target.value)}
+                          placeholder={`Round ${idx + 1} Name / Description`}
+                          className="erp-input-field"
+                          style={{ fontSize: '0.82rem', padding: '6px 10px' }}
+                          required
+                        />
+                        <select
+                          value={rnd.type || 'Technical'}
+                          onChange={(e) => handleRoundDetailChange(idx, 'type', e.target.value)}
+                          className="erp-select-field"
+                          style={{ fontSize: '0.82rem', padding: '6px 8px' }}
+                        >
+                          <option value="Aptitude">Aptitude</option>
+                          <option value="Technical">Technical</option>
+                          <option value="Coding">Coding</option>
+                          <option value="GD">GD / Discussion</option>
+                          <option value="HR">HR / Fitment</option>
+                          <option value="Assessment">Assessment</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="erp-modal-footer">
+                <button type="button" onClick={() => setShowJobModal(false)} className="erp-btn-cancel">
+                  Cancel
+                </button>
+                <button type="submit" className="erp-btn-submit green">
+                  <Briefcase size={16} /> Publish Recruitment Drive
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* 3. Schedule Interview Modal */}
+      {showInterviewModal && (
+        <div className="erp-modal-overlay">
+          <div className="erp-modal-box" style={{ maxWidth: '640px', width: '100%' }}>
+            
+            <div className="erp-modal-header">
+              <div className="erp-modal-header-info">
+                <div className="erp-modal-icon-badge" style={{ background: 'rgba(124,58,237,0.1)', color: '#7c3aed' }}>
+                  <Calendar size={20} />
+                </div>
+                <div>
+                  <h2 className="erp-modal-title">Schedule Interview Session</h2>
+                  <p className="erp-modal-subtitle">Set up recruitment round, date/time, and virtual or campus venue.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowInterviewModal(false)} className="erp-modal-close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddInterview} className="erp-modal-form">
+              <div className="erp-modal-body">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Building size={14} color="#7c3aed" /> Company <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Building size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={interviewForm.company} 
+                        onChange={e => setInterviewForm({...interviewForm, company: e.target.value})} 
+                        required 
+                        placeholder="e.g. Zoho" 
+                        list="interview-companies-list"
+                        className="erp-input-field" 
+                      />
+                      <datalist id="interview-companies-list">
+                        {companies.map(c => <option key={c._id || c.companyId || c.name} value={c.name} />)}
+                      </datalist>
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Briefcase size={14} color="#7c3aed" /> Role <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Briefcase size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={interviewForm.role} 
+                        onChange={e => setInterviewForm({...interviewForm, role: e.target.value})} 
+                        required 
+                        placeholder="e.g. Software Developer" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Target size={14} color="#7c3aed" /> Assessment Round <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Target size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={interviewForm.round} 
+                        onChange={e => setInterviewForm({...interviewForm, round: e.target.value})} 
+                        required 
+                        placeholder="e.g. Technical Round 1" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Clock size={14} color="#7c3aed" /> Time Slot
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Clock size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={interviewForm.time} 
+                        onChange={e => setInterviewForm({...interviewForm, time: e.target.value})} 
+                        placeholder="e.g. 10:00 AM" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Calendar size={14} color="#7c3aed" /> Date <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Calendar size={16} />
+                      </div>
+                      <input 
+                        type="date" 
+                        value={interviewForm.date} 
+                        onChange={e => setInterviewForm({...interviewForm, date: e.target.value})} 
+                        required 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Eye size={14} color="#7c3aed" /> Interview Mode
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Eye size={16} />
+                      </div>
+                      <select 
+                        value={interviewForm.mode} 
+                        onChange={e => setInterviewForm({...interviewForm, mode: e.target.value})} 
+                        className="erp-select-field"
+                      >
+                        <option value="Online">Online (Zoom / Google Meet)</option>
+                        <option value="Offline">Offline (Campus Premises)</option>
+                        <option value="Hybrid">Hybrid Assessment</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="erp-form-group">
+                  <label className="erp-form-label">
+                    <MapPin size={14} color="#7c3aed" /> Venue / Meeting Link
+                  </label>
+                  <div className="erp-input-group">
+                    <div className="erp-input-icon-box">
+                      <MapPin size={16} />
+                    </div>
+                    <input 
+                      type="text" 
+                      value={interviewForm.venue} 
+                      onChange={e => setInterviewForm({...interviewForm, venue: e.target.value})} 
+                      placeholder="e.g. Placement Block Lab 2 / Zoom URL" 
+                      className="erp-input-field" 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="erp-modal-footer">
+                <button type="button" onClick={() => setShowInterviewModal(false)} className="erp-btn-cancel">
+                  Cancel
+                </button>
+                <button type="submit" className="erp-btn-submit" style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)' }}>
+                  <Calendar size={16} /> Schedule Interview Session
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* 4. Add Selection Modal */}
+      {showSelectionModal && (
+        <div className="erp-modal-overlay">
+          <div className="erp-modal-box" style={{ maxWidth: '640px', width: '100%' }}>
+            
+            <div className="erp-modal-header">
+              <div className="erp-modal-header-info">
+                <div className="erp-modal-icon-badge" style={{ background: 'rgba(217,119,6,0.1)', color: '#d97706' }}>
+                  <Award size={20} />
+                </div>
+                <div>
+                  <h2 className="erp-modal-title">Record Verified Placement Offer</h2>
+                  <p className="erp-modal-subtitle">Issue accredited placement selection record, candidate roll number, and package.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowSelectionModal(false)} className="erp-modal-close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSelection} className="erp-modal-form">
+              <div className="erp-modal-body">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Users size={14} color="#d97706" /> Student Name <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Users size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={selectionForm.student} 
+                        onChange={e => setSelectionForm({...selectionForm, student: e.target.value})} 
+                        required 
+                        placeholder="e.g. Priya Kumar R" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <ShieldCheck size={14} color="#d97706" /> Register No <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <ShieldCheck size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={selectionForm.regNo} 
+                        onChange={e => setSelectionForm({...selectionForm, regNo: e.target.value})} 
+                        required 
+                        placeholder="e.g. 71762104001" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Building size={14} color="#d97706" /> Recruiting Company <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Building size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={selectionForm.company} 
+                        onChange={e => setSelectionForm({...selectionForm, company: e.target.value})} 
+                        required 
+                        placeholder="e.g. TCS Digital" 
+                        list="selections-companies-list"
+                        className="erp-input-field" 
+                      />
+                      <datalist id="selections-companies-list">
+                        {companies.map(c => <option key={c._id || c.companyId || c.name} value={c.name} />)}
+                      </datalist>
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Briefcase size={14} color="#d97706" /> Designation Role <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Briefcase size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={selectionForm.role} 
+                        onChange={e => setSelectionForm({...selectionForm, role: e.target.value})} 
+                        required 
+                        placeholder="e.g. Software Engineer" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <DollarSign size={14} color="#d97706" /> Package CTC (LPA) <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <DollarSign size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={selectionForm.ctc} 
+                        onChange={e => setSelectionForm({...selectionForm, ctc: e.target.value})} 
+                        required 
+                        placeholder="e.g. 7.5 LPA" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Calendar size={14} color="#d97706" /> Offer Date
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Calendar size={16} />
+                      </div>
+                      <input 
+                        type="date" 
+                        value={selectionForm.date} 
+                        onChange={e => setSelectionForm({...selectionForm, date: e.target.value})} 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="erp-modal-footer">
+                <button type="button" onClick={() => setShowSelectionModal(false)} className="erp-btn-cancel">
+                  Cancel
+                </button>
+                <button type="submit" className="erp-btn-submit green">
+                  <Award size={16} /> Record Verified Offer
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* 5. Report Preview Modal */}
+      {reportPreview && (
+        <div className="erp-modal-overlay">
+          <div className="erp-modal-box" style={{ maxWidth: '880px', width: '100%' }}>
+            
+            <div className="erp-modal-header">
+              <div className="erp-modal-header-info">
+                <div className="erp-modal-icon-badge" style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}>
+                  <FileText size={22} />
+                </div>
+                <div>
+                  <h2 className="erp-modal-title">{reportPreview.title}</h2>
+                  <p className="erp-modal-subtitle">Official accredited report preview with instant CSV export and print.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setReportPreview(null)} className="erp-modal-close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="erp-modal-body" style={{ maxHeight: '60vh' }}>
+              <div style={{ border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '12px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
+                      {reportPreview.headers.map((h, i) => (
+                        <th key={i} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 800, color: 'var(--text-muted, #64748b)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportPreview.rows.map((row, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
+                        {row.map((cell, j) => (
+                          <td key={j} style={{ padding: '12px 16px', fontWeight: j === 1 || j === 2 ? 800 : 500, color: 'var(--text-main, #0f172a)' }}>
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    {reportPreview.rows.length === 0 && (
+                      <tr>
+                        <td colSpan={reportPreview.headers.length} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                          No records available for this report period.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="erp-modal-footer">
+              <button 
+                type="button" 
+                onClick={() => exportCSV(reportPreview.title.replace(/\s+/g, '_'), reportPreview.headers, reportPreview.rows)}
+                className="erp-btn-submit"
+              >
+                <Download size={15}/> Export (.CSV)
+              </button>
+              <button 
+                type="button" 
+                onClick={() => window.print()}
+                className="erp-btn-cancel"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <FileText size={15}/> Print Document
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Training Program Modal */}
+      {showTrainingModal && (
+        <div className="erp-modal-overlay">
+          <div className="erp-modal-box" style={{ maxWidth: '640px', width: '100%' }}>
+            
+            <div className="erp-modal-header">
+              <div className="erp-modal-header-info">
+                <div className="erp-modal-icon-badge" style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}>
+                  <BookOpen size={20} />
+                </div>
+                <div>
+                  <h2 className="erp-modal-title">Schedule Training & Skill Program</h2>
+                  <p className="erp-modal-subtitle">Organize bootcamps, technical modules, or aptitude workshops for candidates.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowTrainingModal(false)} className="erp-modal-close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTrainingProgram} className="erp-modal-form">
+              <div className="erp-modal-body">
+                <div className="erp-form-group">
+                  <label className="erp-form-label">
+                    <BookOpen size={14} color="#2563eb" /> Module / Program Title <span className="req">*</span>
+                  </label>
+                  <div className="erp-input-group">
+                    <div className="erp-input-icon-box">
+                      <BookOpen size={16} />
+                    </div>
+                    <input 
+                      type="text" 
+                      value={trainingForm.title} 
+                      onChange={e => setTrainingForm({...trainingForm, title: e.target.value})} 
+                      required 
+                      placeholder="e.g. Full Stack Cloud & Microservices Bootcamp" 
+                      className="erp-input-field" 
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Users size={14} color="#2563eb" /> Trainer / Training Partner <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Users size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={trainingForm.trainer} 
+                        onChange={e => setTrainingForm({...trainingForm, trainer: e.target.value})} 
+                        required 
+                        placeholder="e.g. TalentSprint / Corporate Trainer" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Building size={14} color="#2563eb" /> Target Department
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Building size={16} />
+                      </div>
+                      <select 
+                        value={trainingForm.targetDepartment} 
+                        onChange={e => setTrainingForm({...trainingForm, targetDepartment: e.target.value})} 
+                        className="erp-input-field"
+                      >
+                        <option value="ALL">ALL Departments</option>
+                        <option value="Computer Science and Engineering">Computer Science and Engineering</option>
+                        <option value="Electronics and Communication">Electronics and Communication</option>
+                        <option value="Mechanical Engineering">Mechanical Engineering</option>
+                        <option value="Civil Engineering">Civil Engineering</option>
+                        <option value="Commerce & Finance">Commerce & Finance</option>
+                        <option value="Arts & Science">Arts & Science</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Calendar size={14} color="#2563eb" /> Scheduled Date <span className="req">*</span>
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Calendar size={16} />
+                      </div>
+                      <input 
+                        type="date" 
+                        value={trainingForm.date} 
+                        onChange={e => setTrainingForm({...trainingForm, date: e.target.value})} 
+                        required 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Clock size={14} color="#2563eb" /> Timing / Duration
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Clock size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={trainingForm.time} 
+                        onChange={e => setTrainingForm({...trainingForm, time: e.target.value})} 
+                        placeholder="e.g. 09:30 AM - 01:00 PM" 
+                        className="erp-input-field" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Target size={14} color="#2563eb" /> Target Interview Round
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Target size={16} />
+                      </div>
+                      <select 
+                        value={trainingForm.targetRound || 'ALL'} 
+                        onChange={e => setTrainingForm({...trainingForm, targetRound: e.target.value})} 
+                        className="erp-input-field"
+                      >
+                        <option value="ALL">All Rounds (Comprehensive Preparation)</option>
+                        <option value="Round 1 (Aptitude & Assessment)">Round 1: Online Aptitude & Assessment</option>
+                        <option value="Round 2 (Technical & Coding)">Round 2: Technical & Coding Assessment</option>
+                        <option value="Round 3 (HR & Mock Interview)">Round 3: HR, GD & Mock Interview</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="erp-form-group">
+                    <label className="erp-form-label">
+                      <Award size={14} color="#2563eb" /> Delivery Mode
+                    </label>
+                    <div className="erp-input-group">
+                      <div className="erp-input-icon-box">
+                        <Award size={16} />
+                      </div>
+                      <select 
+                        value={trainingForm.mode} 
+                        onChange={e => setTrainingForm({...trainingForm, mode: e.target.value})} 
+                        className="erp-input-field"
+                      >
+                        <option value="Offline">Offline (Campus)</option>
+                        <option value="Online">Online (Virtual Portal)</option>
+                        <option value="Hybrid">Hybrid</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="erp-form-group">
+                  <label className="erp-form-label">
+                    <MapPin size={14} color="#2563eb" /> Venue / Room / Virtual Link
+                  </label>
+                  <div className="erp-input-group">
+                    <div className="erp-input-icon-box">
+                      <MapPin size={16} />
+                    </div>
+                    <input 
+                      type="text" 
+                      value={trainingForm.venue} 
+                      onChange={e => setTrainingForm({...trainingForm, venue: e.target.value})} 
+                      placeholder="e.g. Main Auditorium / LAB-4 / Zoom URL" 
+                      className="erp-input-field" 
+                    />
+                  </div>
+                </div>
+
+                <div className="erp-form-group">
+                  <label className="erp-form-label">
+                    <FileText size={14} color="#2563eb" /> Syllabus / Description
+                  </label>
+                  <div className="erp-input-group">
+                    <textarea 
+                      value={trainingForm.description} 
+                      onChange={e => setTrainingForm({...trainingForm, description: e.target.value})} 
+                      placeholder="Brief overview of curriculum topics covered..." 
+                      className="erp-input-field" 
+                      style={{ height: '54px', resize: 'none' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="erp-modal-footer">
+                <button type="button" onClick={() => setShowTrainingModal(false)} className="erp-btn-cancel">
+                  Cancel
+                </button>
+                <button type="submit" className="erp-btn-submit">
+                  <CheckCircle size={16} /> Schedule Program
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* Training Program Student Roster & Attendance Modal */}
+      {selectedTrainingForAttendance && (
+        <div className="erp-modal-overlay">
+          <div className="erp-modal-box" style={{ maxWidth: '780px', width: '100%' }}>
+            
+            <div className="erp-modal-header">
+              <div className="erp-modal-header-info">
+                <div className="erp-modal-icon-badge" style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}>
+                  <Users size={22} />
+                </div>
+                <div>
+                  <h2 className="erp-modal-title">{selectedTrainingForAttendance.title}</h2>
+                  <p className="erp-modal-subtitle">
+                    Conducted by <strong>{selectedTrainingForAttendance.trainer}</strong> • {new Date(selectedTrainingForAttendance.date).toLocaleDateString()} ({selectedTrainingForAttendance.time})
+                  </p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setSelectedTrainingForAttendance(null)} className="erp-modal-close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="erp-modal-body" style={{ maxHeight: '60vh' }}>
+              <div style={{ border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '12px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
+                      <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 800, color: 'var(--text-muted, #64748b)', fontSize: '0.72rem', textTransform: 'uppercase' }}>Student Name</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 800, color: 'var(--text-muted, #64748b)', fontSize: '0.72rem', textTransform: 'uppercase' }}>Register No</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 800, color: 'var(--text-muted, #64748b)', fontSize: '0.72rem', textTransform: 'uppercase' }}>Department</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, color: 'var(--text-muted, #64748b)', fontSize: '0.72rem', textTransform: 'uppercase' }}>Attendance Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allStudents.map(st => {
+                      const key = `${st.id || st.rollNo || st.regNo}-${selectedTrainingForAttendance.id}`;
+                      const status = studentTrainingStatus[key] || 'Pending';
+                      return (
+                        <tr key={st.id || st.rollNo || st.regNo} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
+                          <td style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>{st.name}</td>
+                          <td style={{ padding: '10px 14px', fontFamily: 'monospace', color: 'var(--text-muted, #64748b)' }}>{st.id || st.rollNo || st.regNo}</td>
+                          <td style={{ padding: '10px 14px', color: 'var(--text-muted, #64748b)' }}>{st.dept || st.department || 'General'}</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                            <select 
+                              value={status} 
+                              onChange={(e) => handleUpdateTrainingAttendance(key, e.target.value)}
+                              style={{ 
+                                padding: '4px 10px', borderRadius: 6, fontSize: '0.78rem', fontWeight: 700,
+                                background: status === 'Completed' ? '#d1fae5' : status === 'Absent' ? '#fee2e2' : status === 'Present' ? '#eff6ff' : '#fef3c7',
+                                color: status === 'Completed' ? '#065f46' : status === 'Absent' ? '#991b1b' : status === 'Present' ? '#1e40af' : '#92400e',
+                                border: '1px solid var(--border-color, #e2e8f0)', outline: 'none', cursor: 'pointer'
+                              }}
+                            >
+                              <option value="Pending">Pending</option>
+                              <option value="Present">Present</option>
+                              <option value="Completed">Completed</option>
+                              <option value="Absent">Absent</option>
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="erp-modal-footer">
+              <button 
+                type="button" 
+                onClick={() => setSelectedTrainingForAttendance(null)} 
+                className="erp-btn-submit"
+              >
+                Close Roster
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div style={{
+          position: 'fixed', bottom: '24px', right: '24px', background: '#10b981', color: '#ffffff',
+          padding: '12px 22px', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          fontWeight: 700, fontSize: '0.88rem', zIndex: 9999, display: 'flex', alignItems: 'center', gap: '8px'
+        }}>
+          <CheckCircle size={18} />
+          <span>{toastMsg}</span>
         </div>
       )}
 

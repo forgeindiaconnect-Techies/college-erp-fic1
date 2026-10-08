@@ -46,15 +46,26 @@ const CollegeInfoCard = () => {
       import('../../api/index').then(({ getMyProfile }) => {
         getMyProfile().then(res => {
           if (res.data) {
+            const freshPlan = res.data.planName || res.data.subscriptionPlan || (res.data.isTrial ? 'Trial' : 'Basic');
+            const freshStatus = res.data.subscriptionStatus || 'Active';
+            
             setCollegeData(prev => ({
               ...prev,
               collegeName: res.data.collegeName || prev.collegeName,
-              tenantId: res.data.tenantId || prev.tenantId
+              tenantId: res.data.tenantId || prev.tenantId,
+              plan: freshPlan,
+              status: freshStatus
             }));
             
             // Quietly update session storage to fix caching globally
             if (sessionData) {
               sessionData.collegeName = res.data.collegeName || sessionData.collegeName;
+              sessionData.subscriptionPlan = freshPlan;
+              sessionData.subscriptionStatus = freshStatus;
+              if (sessionData.subscription) {
+                sessionData.subscription.planName = freshPlan;
+                sessionData.subscription.status = freshStatus;
+              }
               sessionStorage.setItem(`${activeRole}_session`, JSON.stringify(sessionData));
             }
           }

@@ -25,8 +25,15 @@ const collegeSchema = new mongoose.Schema({
   },
   subscriptionPlan: {
     type: String,
-    enum: ['Trial', 'Starter', 'Premium', 'Elite'],
     default: 'Trial'
+  },
+  subscriptionAmount: {
+    type: Number,
+    default: 0
+  },
+  billingCycle: {
+    type: String,
+    default: 'Monthly'
   },
   isActive: {
     type: Boolean,

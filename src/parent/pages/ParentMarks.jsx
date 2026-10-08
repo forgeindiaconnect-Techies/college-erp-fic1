@@ -73,6 +73,17 @@ const ParentMarks = () => {
 
         setStudentDetails(student);
 
+        if (student?.name && (!activeSession.childName || activeSession.childName === 'John Doe')) {
+          sessionStorage.setItem('parent_session', JSON.stringify({
+            ...activeSession,
+            childName: student.name,
+            childId: student.id || studentId,
+            childDept: student.dept || student.department,
+            childSem: student.sem || student.semester
+          }));
+          window.dispatchEvent(new Event('parent_session_updated'));
+        }
+
         const backendMarks = Array.isArray(marksRes?.data) ? marksRes.data : (marksRes?.data?.marks || []);
 
         let localMarks = [];

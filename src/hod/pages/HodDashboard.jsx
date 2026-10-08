@@ -48,28 +48,17 @@ export const isSameDepartment = (candidateDept, hodDept) => {
   const c = String(candidateDept).trim().toLowerCase();
   const h = String(hodDept).trim().toLowerCase();
   
-  if (c === h) return true;
+  if (c === h || c.includes(h) || h.includes(c)) return true;
 
   const cleanTokens = (str) => str.replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(Boolean);
   const cTokens = cleanTokens(c);
   const hTokens = cleanTokens(h);
 
-  const isCS = (tokens) => tokens.some(t => ['cs', 'cse', 'computer', 'software', 'bca', 'mca', 'it', 'information'].includes(t));
-  const isCommerce = (tokens) => tokens.some(t => ['commerce', 'bcom', 'mcom', 'finance', 'accounting', 'corporate'].includes(t));
-  const isArts = (tokens) => tokens.some(t => ['arts', 'history', 'tamil', 'english', 'literature', 'economics'].includes(t));
-  const isMath = (tokens) => tokens.some(t => ['math', 'mathematics', 'stats', 'statistics'].includes(t));
-  const isScience = (tokens) => tokens.some(t => ['chemistry', 'physics', 'biotech', 'biotechnology', 'botany', 'zoology', 'biochem'].includes(t));
-  const isManagement = (tokens) => tokens.some(t => ['management', 'bba', 'mba', 'business'].includes(t));
+  const ignoreWords = ['engineering', 'department', 'dept', 'of', 'and', 'bsc', 'btech', 'be', 'bcom', 'ba', 'ma', 'msc', 'program', 'degree', 'studies'];
+  const significantHTokens = hTokens.filter(t => !ignoreWords.includes(t));
+  const significantCTokens = cTokens.filter(t => !ignoreWords.includes(t));
 
-  if (isCS(hTokens)) return isCS(cTokens) && !isCommerce(cTokens) && !isArts(cTokens) && !isScience(cTokens);
-  if (isCommerce(hTokens)) return isCommerce(cTokens) && !isCS(cTokens) && !isArts(cTokens);
-  if (isArts(hTokens)) return isArts(cTokens) && !isCS(cTokens) && !isCommerce(cTokens);
-  if (isMath(hTokens)) return isMath(cTokens);
-  if (isManagement(hTokens)) return isManagement(cTokens) && !isCS(cTokens);
-  
-  const ignoreWords = ['engineering', 'department', 'dept', 'of', 'and', 'bsc', 'btech', 'be', 'bcom', 'ba', 'ma', 'msc', 'program'];
-  const matchedTokens = cTokens.filter(t => hTokens.includes(t) && !ignoreWords.includes(t));
-  return matchedTokens.length > 0;
+  return significantHTokens.some(t => significantCTokens.includes(t));
 };
 
 const HodDashboard = () => {
@@ -814,6 +803,16 @@ const HodDashboard = () => {
           <BookOpen size={22} />
           <span>Total Subjects</span>
           <strong>{departmentSubjects.length}</strong>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/hod/timetable')}
+          className="hod-summary-card"
+        >
+          <Calendar size={22} color="#2563eb" />
+          <span>Class Timetable</span>
+          <strong>Weekly Matrix</strong>
         </button>
 
         <button
@@ -1702,19 +1701,27 @@ const HodDashboard = () => {
 
       {/* TODAY'S LIVE CLASS EXECUTION MONITORING TABLE */}
       <div className="mb-6 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
           <div>
             <h2 className="text-base font-bold text-gray-800 flex items-center gap-2">
               <Activity className="text-blue-600" size={20} /> Today's Live Class Execution Monitoring
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">Real-time status of today's scheduled classes and attendance submissions.</p>
           </div>
-          <button 
-            onClick={() => navigate('/hod/substitution')}
-            className="px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-bold transition-all flex items-center gap-1"
-          >
-            <UserCheck size={14} /> Faculty Substitution
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => navigate('/hod/timetable')}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-xs"
+            >
+              <Calendar size={14} /> Full Class Timetable
+            </button>
+            <button 
+              onClick={() => navigate('/hod/substitution')}
+              className="px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+            >
+              <UserCheck size={14} /> Faculty Substitution
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -1722,6 +1729,7 @@ const HodDashboard = () => {
             <thead>
               <tr className="bg-gray-100 text-gray-700 uppercase tracking-wider border-b border-gray-200">
                 <th className="p-3 font-bold">Faculty Member</th>
+                <th className="p-3 font-bold">Class / Sem</th>
                 <th className="p-3 font-bold">Subject</th>
                 <th className="p-3 font-bold">Period / Time</th>
                 <th className="p-3 font-bold">Room Venue</th>
@@ -1732,11 +1740,11 @@ const HodDashboard = () => {
             <tbody>
               {loadingMonitoring ? (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-gray-400 font-medium">Loading live class execution data...</td>
+                  <td colSpan={7} className="p-6 text-center text-gray-400 font-medium">Loading live class execution data...</td>
                 </tr>
               ) : liveMonitoring.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-gray-400 font-medium">No classes scheduled for today in {deptName}.</td>
+                  <td colSpan={7} className="p-6 text-center text-gray-400 font-medium">No classes scheduled for today in {deptName}.</td>
                 </tr>
               ) : (
                 liveMonitoring.map((slot, idx) => {
@@ -1752,6 +1760,12 @@ const HodDashboard = () => {
                             Substituted (Reg: {slot.regularFaculty})
                           </span>
                         )}
+                      </td>
+
+                      <td className="p-3 font-semibold text-gray-700">
+                        <span className="bg-blue-50 border border-blue-200 text-blue-800 px-2 py-0.5 rounded text-[11px] font-bold">
+                          {slot.semester ? `${slot.semester} • Sec ${slot.section || 'A'}` : 'Department'}
+                        </span>
                       </td>
 
                       <td className="p-3 font-semibold text-blue-900">

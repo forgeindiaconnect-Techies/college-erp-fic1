@@ -9,11 +9,11 @@ import './HodStudents.css';
 // Dynamic HOD session loader
 const getHodSession = () => {
   try {
-    return JSON.parse(sessionStorage.getItem('hod_session')) || {
-      name: 'Prof. Rajan Iyer', dept: 'Computer Science', deptCode: 'CSE', role: 'HOD'
-    };
+    const raw = sessionStorage.getItem('hod_session') || localStorage.getItem('erp_user');
+    if (raw) return JSON.parse(raw);
+    return { name: 'HOD', dept: 'TAMIL', role: 'HOD' };
   } catch (e) {
-    return { name: 'Prof. Rajan Iyer', dept: 'Computer Science', deptCode: 'CSE', role: 'HOD' };
+    return { name: 'HOD', dept: 'TAMIL', role: 'HOD' };
   }
 };
 
@@ -38,27 +38,10 @@ const DEPT_CODE_MAP = {
   'Electrical Engg.': 'EE',
   'Mechanical Engg.': 'MECH',
   'Bachelor of Computer App.': 'BCA',
-  'Master of Business Admin.': 'MBA'
+  'Master of Business Admin.': 'MBA',
+  'Tamil': 'TAM',
+  'TAMIL': 'TAM'
 };
-
-const MOCK_STUDENTS_FALLBACK = [
-  // CSE Students
-  { id: "CSE001", name: "Arun", rollNo: "CSE001", sem: "Sem 1", year: "1st Year", section: "A", attendance: "92%", cgpa: 8.5, feeStatus: "Paid", status: "Active", deptCode: "CSE", dept: "Computer Science", email: "arun@college.edu", phone: "9876543201" },
-  { id: "CSE002", name: "Divya", rollNo: "CSE002", sem: "Sem 3", year: "2nd Year", section: "A", attendance: "88%", cgpa: 8.8, feeStatus: "Paid", status: "Active", deptCode: "CSE", dept: "Computer Science", email: "divya@college.edu", phone: "9876543202" },
-  { id: "CSE003", name: "Suresh Kumar", rollNo: "CSE003", sem: "Sem 5", year: "3rd Year", section: "B", attendance: "95%", cgpa: 9.0, feeStatus: "Paid", status: "Active", deptCode: "CSE", dept: "Computer Science", email: "suresh@college.edu", phone: "9876543203" },
-  { id: "CSE004", name: "Priya Dharshini", rollNo: "CSE004", sem: "Sem 7", year: "4th Year", section: "A", attendance: "76%", cgpa: 7.9, feeStatus: "Paid", status: "Active", deptCode: "CSE", dept: "Computer Science", email: "priya@college.edu", phone: "9876543204" },
-  { id: "CSE005", name: "Rahul Sharma", rollNo: "CSE005", sem: "Sem 3", year: "2nd Year", section: "B", attendance: "68%", cgpa: 6.5, feeStatus: "Pending", status: "Inactive", deptCode: "CSE", dept: "Computer Science", email: "rahul@college.edu", phone: "9876543205" },
-
-  // ECE Students
-  { id: "ECE001", name: "Adithya", rollNo: "ECE001", sem: "Sem 1", year: "1st Year", section: "A", attendance: "91%", cgpa: 8.4, feeStatus: "Paid", status: "Active", deptCode: "ECE", dept: "Electronics & Comm.", email: "adithya@college.edu", phone: "9876543206" },
-  { id: "ECE002", name: "Anitha", rollNo: "ECE002", sem: "Sem 3", year: "2nd Year", section: "B", attendance: "89%", cgpa: 8.9, feeStatus: "Paid", status: "Active", deptCode: "ECE", dept: "Electronics & Comm.", email: "anitha@college.edu", phone: "9876543207" },
-  { id: "ECE003", name: "Ganesh", rollNo: "ECE003", sem: "Sem 5", year: "3rd Year", section: "A", attendance: "94%", cgpa: 9.2, feeStatus: "Paid", status: "Active", deptCode: "ECE", dept: "Electronics & Comm.", email: "ganesh@college.edu", phone: "9876543208" },
-
-  // MECH Students
-  { id: "MECH001", name: "Manoj", rollNo: "MECH001", sem: "Sem 1", year: "1st Year", section: "A", attendance: "85%", cgpa: 7.5, feeStatus: "Paid", status: "Active", deptCode: "MECH", dept: "Mechanical Engg.", email: "manoj@college.edu", phone: "9876543209" },
-  { id: "MECH002", name: "Vikram", rollNo: "MECH002", sem: "Sem 5", year: "3rd Year", section: "B", attendance: "82%", cgpa: 8.1, feeStatus: "Paid", status: "Active", deptCode: "MECH", dept: "Mechanical Engg.", email: "vikram@college.edu", phone: "9876543210" },
-  { id: "MECH003", name: "Karthik", rollNo: "MECH003", sem: "Sem 3", year: "2nd Year", section: "A", attendance: "78%", cgpa: 7.9, feeStatus: "Paid", status: "Active", deptCode: "MECH", dept: "Mechanical Engg.", email: "karthik@college.edu", phone: "9876543211" }
-];
 
 const SEMESTERS = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6', 'Sem 7', 'Sem 8'];
 const FEE_STATUS = ['Paid', 'Pending', 'Partial', 'Waived'];
@@ -105,28 +88,17 @@ const isSameDepartment = (candidateDept, hodDept) => {
   if (!candidateDept || !hodDept) return false;
   const c = String(candidateDept).trim().toLowerCase();
   const h = String(hodDept).trim().toLowerCase();
-  if (c === h) return true;
+  if (c === h || c.includes(h) || h.includes(c)) return true;
 
   const cleanTokens = (str) => str.replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(Boolean);
   const cTokens = cleanTokens(c);
   const hTokens = cleanTokens(h);
 
-  const isCS = (tokens) => tokens.some(t => ['cs', 'cse', 'computer', 'software', 'bca', 'mca', 'it', 'information'].includes(t));
-  const isCommerce = (tokens) => tokens.some(t => ['commerce', 'bcom', 'mcom', 'finance', 'accounting', 'corporate'].includes(t));
-  const isArts = (tokens) => tokens.some(t => ['arts', 'history', 'tamil', 'english', 'literature', 'economics'].includes(t));
-  const isMath = (tokens) => tokens.some(t => ['math', 'mathematics', 'stats', 'statistics'].includes(t));
-  const isScience = (tokens) => tokens.some(t => ['chemistry', 'physics', 'biotech', 'biotechnology', 'botany', 'zoology', 'biochem'].includes(t));
-  const isManagement = (tokens) => tokens.some(t => ['management', 'bba', 'mba', 'business'].includes(t));
+  const ignoreWords = ['engineering', 'department', 'dept', 'of', 'and', 'bsc', 'btech', 'be', 'bcom', 'ba', 'ma', 'msc', 'program', 'degree', 'studies'];
+  const significantHTokens = hTokens.filter(t => !ignoreWords.includes(t));
+  const significantCTokens = cTokens.filter(t => !ignoreWords.includes(t));
 
-  if (isCS(hTokens)) return isCS(cTokens) && !isCommerce(cTokens) && !isArts(cTokens) && !isScience(cTokens);
-  if (isCommerce(hTokens)) return isCommerce(cTokens) && !isCS(cTokens) && !isArts(cTokens);
-  if (isArts(hTokens)) return isArts(cTokens) && !isCS(cTokens) && !isCommerce(cTokens);
-  if (isMath(hTokens)) return isMath(cTokens);
-  if (isManagement(hTokens)) return isManagement(cTokens) && !isCS(cTokens);
-  
-  const ignoreWords = ['engineering', 'department', 'dept', 'of', 'and', 'bsc', 'btech', 'be', 'bcom', 'ba', 'ma', 'msc', 'program'];
-  const matchedTokens = cTokens.filter(t => hTokens.includes(t) && !ignoreWords.includes(t));
-  return matchedTokens.length > 0;
+  return significantHTokens.some(t => significantCTokens.includes(t));
 };
 
 const HodStudents = () => {

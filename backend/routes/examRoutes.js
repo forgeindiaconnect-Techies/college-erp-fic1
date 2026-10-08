@@ -26,7 +26,15 @@ router.get('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff', 'Studen
 
     const query = {};
     if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
-      query.$or = [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }];
+      query.$or = [
+        { collegeId: targetCollegeId },
+        { tenantId: targetCollegeId },
+        { collegeId: 'unassigned_college' },
+        { tenantId: 'unassigned_college' },
+        { collegeId: 'mock_college_id' },
+        { collegeId: { $exists: false } },
+        { collegeId: null }
+      ];
     }
 
     if (dept && dept !== 'all' && dept !== 'All') query.dept = dept;
@@ -185,14 +193,20 @@ router.put('/:id', protect, authorize('Admin', 'HOD', 'Principal', 'Super Admin'
       subjectId: req.body.subjectId || null
     };
 
-    const updated = await Exam.findByIdAndUpdate(
-      req.params.id,
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = { _id: req.params.id };
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      filter.$or = [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }];
+    }
+
+    const updated = await Exam.findOneAndUpdate(
+      filter,
       updateData,
       { new: true }
     );
     if (!updated) return res.status(404).json({ message: 'Exam slot not found' });
     
-    const collegeId = updated.collegeId || req.collegeId || 'unassigned_college';
+    const collegeId = updated.collegeId || targetCollegeId || 'unassigned_college';
     await sendNotification(req, {
       targetRoles: ['Student', 'Staff', 'Parent'],
       collegeId,
@@ -213,7 +227,13 @@ router.put('/:id', protect, authorize('Admin', 'HOD', 'Principal', 'Super Admin'
 // DELETE exam schedule
 router.delete('/:id', protect, authorize('Admin', 'HOD', 'Principal', 'Super Admin'), collegeScope, async (req, res) => {
   try {
-    const deleted = await Exam.findByIdAndDelete(req.params.id);
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = { _id: req.params.id };
+    if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+      filter.$or = [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }];
+    }
+
+    const deleted = await Exam.findOneAndDelete(filter);
     if (!deleted) return res.status(404).json({ message: 'Exam slot not found' });
     req.app.get('io')?.emit('dataUpdated', { module: 'exams', action: 'deleted' });
     res.json({ message: 'Exam schedule deleted successfully' });

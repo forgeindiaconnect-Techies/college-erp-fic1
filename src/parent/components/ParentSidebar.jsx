@@ -1,26 +1,106 @@
-import React from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { SettingsContext } from '../../App';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarCheck, BookOpenCheck,
-  CreditCard, Calendar, FileText, Bell, LogOut, ChevronRight, ChevronDown
+  CreditCard, Calendar, FileText, Bell, LogOut, ChevronRight, ChevronDown,
+  X, Bus, User, GraduationCap
 } from 'lucide-react';
+import { getStudentById, getStudents } from '../../api/index';
 import '../../components/layout/Sidebar.css';
 
-const getParentSession = () => {
-  return JSON.parse(sessionStorage.getItem('parent_session') || 'null') || {
-    name: 'Parent Name',
-    childName: 'Child Name',
-    childId: 'CS2022001',
-  };
-};
-
 const ParentSidebar = ({ isOpen, onClose }) => {
-  const { collegeSettings } = React.useContext(SettingsContext) || {};
+  const { collegeSettings } = useContext(SettingsContext) || {};
   const navigate = useNavigate();
-  const parent = getParentSession();
+  const location = useLocation();
 
-  const [expandedGroups, setExpandedGroups] = React.useState({});
+  const [parentSession, setParentSession] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('parent_session') || '{}');
+    } catch (e) {
+      return {};
+    }
+  });
+
+  const [childInfo, setChildInfo] = useState({
+    name: '',
+    id: ''
+  });
+
+  const [expandedGroups, setExpandedGroups] = useState({
+    'Child Academics': true,
+    'Administration': true
+  });
+
+  // Sync session and resolve authentic student profile
+  const syncStudentProfile = async () => {
+    let session = {};
+    try {
+      session = JSON.parse(sessionStorage.getItem('parent_session') || '{}');
+      setParentSession(session);
+    } catch (e) {}
+
+    const studentId = session.childId || session.referenceId || session.parentOf || session.id || 'TAM2026-001';
+    let currentChildName = session.childName;
+
+    // If childName is missing, placeholder 'John Doe', or generic, resolve authentic DB record
+    if (!currentChildName || currentChildName === 'John Doe' || currentChildName === 'Child Name' || currentChildName === 'Student') {
+      try {
+        let resolvedStudent = null;
+        if (studentId) {
+          const res = await getStudentById(studentId).catch(() => null);
+          if (res?.data) resolvedStudent = res.data;
+        }
+
+        if (!resolvedStudent) {
+          const allStudsRes = await getStudents().catch(() => null);
+          const allStuds = Array.isArray(allStudsRes?.data) ? allStudsRes.data : [];
+          if (allStuds.length > 0) {
+            resolvedStudent = allStuds.find(s => 
+              (s.id && String(s.id).toLowerCase() === String(studentId).toLowerCase()) ||
+              (s.rollNo && String(s.rollNo).toLowerCase() === String(studentId).toLowerCase()) ||
+              (s._id && String(s._id) === String(studentId))
+            ) || allStuds[0];
+          }
+        }
+
+        if (resolvedStudent?.name) {
+          currentChildName = resolvedStudent.name;
+          const updatedSession = {
+            ...session,
+            childName: resolvedStudent.name,
+            childId: resolvedStudent.id || resolvedStudent.rollNo || studentId,
+            childDept: resolvedStudent.dept || resolvedStudent.department,
+            childSem: resolvedStudent.sem || resolvedStudent.semester
+          };
+          sessionStorage.setItem('parent_session', JSON.stringify(updatedSession));
+          setParentSession(updatedSession);
+        }
+      } catch (e) {}
+    }
+
+    setChildInfo({
+      name: currentChildName || 'Student Scholar',
+      id: session.childId || session.referenceId || session.parentOf || studentId
+    });
+  };
+
+  useEffect(() => {
+    syncStudentProfile();
+
+    const handleUpdate = () => syncStudentProfile();
+    window.addEventListener('parent_session_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    return () => {
+      window.removeEventListener('parent_session_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  const isItemActive = (path) => {
+    return location.pathname === path;
+  };
 
   const toggleGroup = (groupName) => {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
@@ -33,7 +113,7 @@ const ParentSidebar = ({ isOpen, onClose }) => {
       items: [
         { name: 'Child Attendance', path: '/parent/attendance', icon: <CalendarCheck size={20} /> },
         { name: 'Child Marks', path: '/parent/marks', icon: <BookOpenCheck size={20} /> },
-        { name: 'Timetable', path: '/parent/timetable', icon: <Calendar size={20} /> }
+        { name: 'Timetable & Exams', path: '/parent/timetable', icon: <Calendar size={20} /> }
       ]
     },
     {
@@ -42,6 +122,7 @@ const ParentSidebar = ({ isOpen, onClose }) => {
       items: [
         { name: 'Fee Status', path: '/parent/fees', icon: <CreditCard size={20} /> },
         { name: 'Leave Status', path: '/parent/leaves', icon: <FileText size={20} /> },
+        { name: 'Transport & Bus', path: '/parent/transport', icon: <Bus size={20} /> },
         { name: 'Notifications', path: '/parent/notifications', icon: <Bell size={20} /> }
       ]
     }
@@ -53,42 +134,53 @@ const ParentSidebar = ({ isOpen, onClose }) => {
     navigate('/login');
   };
 
-  const getParentSession = () => {
-    try {
-      return JSON.parse(sessionStorage.getItem('parent_session') || '{}');
-    } catch(e) {
-      return {};
-    }
-  };
-  const parentSession = getParentSession();
-  const displayCollegeName = parentSession?.collegeName || collegeSettings?.collegeName || 'Institution Portal';
+  const displayCollegeName = parentSession?.collegeName 
+    || (collegeSettings?.collegeName && collegeSettings.collegeName !== 'Campus ERP Portal' ? collegeSettings.collegeName : 'Arignar Anna College');
 
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
-      {/* Brand */}
-      <div className="sidebar-header">
-        {collegeSettings?.collegeLogo ? (
-          <img 
-            src={collegeSettings.collegeLogo} 
-            alt={displayCollegeName} 
-            style={{ height: '32px', objectFit: 'contain' }} 
-          />
-        ) : (
-          <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+      {/* Brand Header */}
+      <div className="sidebar-header" style={{ padding: '1rem 1.25rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+          <div 
+            style={{ fontWeight: '700', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }} 
+            title={displayCollegeName}
+          >
             {displayCollegeName}
           </div>
-        )}
+          <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 500, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+            Parent Portal
+          </span>
+        </div>
+        <button className="sidebar-close-btn" onClick={onClose}>
+          <X size={20} />
+        </button>
       </div>
 
-      
+      {/* Child Profile Quick Badge */}
+      <div style={{ padding: '0.75rem 1rem', margin: '0.5rem 0.85rem 0.75rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <GraduationCap size={18} />
+        </div>
+        <div style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.55)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>Ward</span>
+          <span style={{ fontSize: '0.88rem', color: '#fff', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {childInfo.name || 'Student'}
+          </span>
+          <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.7)' }}>
+            ID: {childInfo.id || 'TAM2026-001'}
+          </span>
+        </div>
+      </div>
 
       {/* Nav links */}
-      <nav className="sidebar-nav">
+      <nav className="sidebar-nav" style={{ overflowY: 'auto', flex: 1, paddingBottom: '2rem' }}>
         <ul>
           <li style={{ marginBottom: '0.5rem' }}>
             <NavLink
               to="/parent/dashboard"
-              className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              end={true}
+              className={() => isItemActive('/parent/dashboard') ? 'nav-link active' : 'nav-link'}
             >
               <LayoutDashboard size={20} />
               <span>Dashboard</span>
@@ -113,7 +205,7 @@ const ParentSidebar = ({ isOpen, onClose }) => {
                   <li key={i}>
                     <NavLink
                       to={item.path}
-                      className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+                      className={() => isItemActive(item.path) ? 'nav-link active' : 'nav-link'}
                       style={{ paddingLeft: '2.8rem' }}
                     >
                       {item.icon}
@@ -126,6 +218,8 @@ const ParentSidebar = ({ isOpen, onClose }) => {
           ))}
         </ul>
       </nav>
+
+      {/* Sidebar Footer */}
       <div className="sidebar-footer" style={{ marginTop: 'auto', padding: '1rem', borderTop: '1px solid var(--sidebar-border)' }}>
         <button 
           onClick={handleLogout} 

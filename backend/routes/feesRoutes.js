@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import mongoose from 'mongoose';
 import Fee from '../models/Fee.js';
 import Student from '../models/Student.js';
@@ -28,7 +28,7 @@ const processFeePayload = (data) => {
   };
 };
 
-const updateStudentFeeStatus = async (studentId) => {
+const updateStudentFeeStatus = async (studentId, collegeId = null) => {
   try {
     if (!studentId) return;
     const isValidObjId = mongoose.Types.ObjectId.isValid(studentId);
@@ -43,22 +43,42 @@ const updateStudentFeeStatus = async (studentId) => {
       feeFilter.push({ studentId: new mongoose.Types.ObjectId(studentId) });
     }
 
-    const fees = await Fee.find({ $or: feeFilter });
+    let feeQuery = { $or: feeFilter };
+    if (collegeId && collegeId !== 'system') {
+      feeQuery = {
+        $and: [
+          { $or: feeFilter },
+          { $or: [{ collegeId }, { tenantId: collegeId }] }
+        ]
+      };
+    }
+
+    const fees = await Fee.find(feeQuery);
     
     let totalPaidFromReceipts = 0;
     for (const f of fees) {
       totalPaidFromReceipts += Number(f.paidAmount !== undefined ? f.paidAmount : (f.amount || 0)) || 0;
     }
     
-    const studentQuery = [
+    const studentFilter = [
       { id: studentId },
       { admissionNo: studentId }
     ];
     if (isValidObjId) {
-      studentQuery.push({ _id: studentId });
+      studentFilter.push({ _id: studentId });
     }
 
-    const student = await Student.findOne({ $or: studentQuery });
+    let studentQuery = { $or: studentFilter };
+    if (collegeId && collegeId !== 'system') {
+      studentQuery = {
+        $and: [
+          { $or: studentFilter },
+          { $or: [{ collegeId }, { tenantId: collegeId }] }
+        ]
+      };
+    }
+
+    const student = await Student.findOne(studentQuery);
     if (student) {
       const studentTotalFee = Number(
         student.finalFee !== undefined && Number(student.finalFee) > 0
@@ -90,8 +110,21 @@ const updateStudentFeeStatus = async (studentId) => {
 // Helper to notify student & parent of fee updates
 const notifyFeeUpdate = async (req, feeRecord) => {
   try {
-    const collegeId = req.collegeId || req.user?.collegeId || 'unassigned_college';
-    const studentUser = await User.findOne({ referenceId: feeRecord.studentId });
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId || 'unassigned_college';
+
+    const userQuery = {
+      referenceId: feeRecord.studentId
+    };
+
+    if (collegeId && collegeId !== 'system') {
+      userQuery.$or = [
+        { collegeId },
+        { tenantId: collegeId }
+      ];
+    }
+
+    const studentUser = await User.findOne(userQuery);
+
     if (studentUser) {
       await sendNotification(req, {
         receiverId: studentUser._id,
@@ -352,17 +385,39 @@ router.get('/', protect, authorize('Admin', 'Principal', 'Accounts', 'HOD'), dep
 router.get('/student/:studentId', protect, collegeScope, async (req, res) => {
   try {
     const sId = req.params.studentId;
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+
     const query = {
       $or: [
         { studentId: sId },
         { registerNo: sId },
-        { studentName: new RegExp(`^${sId.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
+        {
+          studentName: new RegExp(
+            `^${sId.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`,
+            'i'
+          )
+        }
       ]
     };
+
+    // Strict college isolation
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      query.$and = [
+        {
+          $or: [
+            { collegeId },
+            { tenantId: collegeId }
+          ]
+        }
+      ];
+    }
+
     if (req.user?.name && (req.user.role === 'Student' || req.user.role === 'Parent')) {
       query.$or.push({ studentName: req.user.name });
     }
+
     const fees = await Fee.find(query).sort({ createdAt: -1 });
+
     res.json(fees);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -372,133 +427,260 @@ router.get('/student/:studentId', protect, collegeScope, async (req, res) => {
 // Get fee structure for a specific student
 router.get('/structure/:studentId', protect, collegeScope, async (req, res) => {
   try {
-    const student = await Student.findOne({ id: req.params.studentId }) || await Student.findById(req.params.studentId);
-    let structure = null;
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const sId = req.params.studentId;
+    const isValidObjId = mongoose.Types.ObjectId.isValid(sId);
 
-    if (student) {
-      // 1. If student already has stored feeBreakdown from admission registration
-      if (student.feeBreakdown && Object.keys(student.feeBreakdown).length > 0) {
-        structure = {
-          studentId: student.id || student._id,
-          tuitionFee: Number(student.feeBreakdown.tuitionFee) || 0,
-          admissionFee: Number(student.feeBreakdown.admissionFee) || 0,
-          universityFee: Number(student.feeBreakdown.universityFee) || 0,
-          marksheetVerification: Number(student.feeBreakdown.marksheetVerification) || 0,
-          specialFee: Number(student.feeBreakdown.specialFee) || 0,
-          englishLabNssId: Number(student.feeBreakdown.englishLabNssId) || 0,
-          computerLab: Number(student.feeBreakdown.computerLab) || 0,
-          stationary: Number(student.feeBreakdown.stationary) || 0,
-          pta: Number(student.feeBreakdown.pta) || 0,
-          examFee: Number(student.feeBreakdown.examFee) || 0,
-          libraryFee: Number(student.feeBreakdown.libraryFee) || 0,
-          otherFee: Number(student.feeBreakdown.otherFee) || 0,
-          hostelFee: student.hostelFeeAmount || (student.hostelRequired === 'yes' || student.hostelRequired === 'Yes' || student.dormFacility ? 40000 : 0),
-          transportFee: student.transportFeeAmount || (student.transportRequired === 'yes' || student.transportRequired === 'Yes' || student.busFacility ? 15000 : 0),
-          totalAmount: Number(student.totalFee) || 0
-        };
-      } else {
-        // 2. Search configured FeeStructure OR FeePlan
-        const deptName = student.department || student.dept || '';
-        const courseName = student.course || '';
-        const semNum = Number(student.semester) || 1;
-        const collegeId = student.collegeId || req.collegeId;
+    let studentQuery = {
+      $or: [
+        { id: sId },
+        { admissionNo: sId },
+        ...(isValidObjId ? [{ _id: sId }] : [])
+      ]
+    };
 
-        const [matchedStructure, matchedPlan] = await Promise.all([
-          FeeStructure.findOne({
-            collegeId,
-            department: new RegExp(`^${deptName.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i'),
-            course: new RegExp(`^${courseName.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i')
-          }),
-          FeePlan.findOne({
-            collegeId,
-            $or: [
-              { departmentName: new RegExp(`^${deptName.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
-              { departmentId: deptName }
-            ]
-          })
-        ]);
-
-        if (matchedStructure && matchedStructure.fees && matchedStructure.fees.length > 0) {
-          const mapped = {};
-          matchedStructure.fees.forEach(f => {
-            const fType = (f.feeType || '').toLowerCase();
-            if (fType.includes('tuition')) mapped.tuitionFee = Number(f.amount) || 0;
-            else if (fType.includes('admission')) mapped.admissionFee = Number(f.amount) || 0;
-            else if (fType.includes('univ') || fType.includes('exam')) mapped.examFee = Number(f.amount) || 0;
-            else if (fType.includes('lab') || fType.includes('computer')) mapped.computerLab = Number(f.amount) || 0;
-            else if (fType.includes('lib')) mapped.libraryFee = Number(f.amount) || 0;
-            else if (fType.includes('hostel')) mapped.hostelFee = Number(f.amount) || 0;
-            else if (fType.includes('transport')) mapped.transportFee = Number(f.amount) || 0;
-            else mapped.otherFee = (mapped.otherFee || 0) + (Number(f.amount) || 0);
-          });
-          structure = {
-            studentId: student.id,
-            ...mapped,
-            totalAmount: matchedStructure.totalAmount || Object.values(mapped).reduce((a, b) => a + b, 0)
-          };
-        } else if (matchedPlan) {
-          structure = {
-            studentId: student.id,
-            tuitionFee: Number(matchedPlan.tuitionFee) || 0,
-            examFee: Number(matchedPlan.examFee) || 0,
-            computerLab: Number(matchedPlan.labFee) || 0,
-            libraryFee: Number(matchedPlan.libraryFee) || 0,
-            transportFee: Number(matchedPlan.transportFee) || 0,
-            hostelFee: Number(matchedPlan.hostelFee) || 0,
-            totalAmount: (Number(matchedPlan.tuitionFee) || 0) +
-                         (Number(matchedPlan.examFee) || 0) +
-                         (Number(matchedPlan.labFee) || 0) +
-                         (Number(matchedPlan.libraryFee) || 0) +
-                         (Number(matchedPlan.transportFee) || 0) +
-                         (Number(matchedPlan.hostelFee) || 0)
-          };
-        } else {
-          // 3. Fallback based on real Department
-          const dLower = String(deptName).toLowerCase();
-          if (dLower.includes('computer') || dLower.includes('cse') || dLower.includes('tech') || dLower.includes('engineering')) {
-            structure = {
-              studentId: student.id,
-              tuitionFee: 35000,
-              admissionFee: 5000,
-              universityFee: 2500,
-              specialFee: 5000,
-              computerLab: 4000,
-              stationary: 1500,
-              pta: 1000,
-              otherFee: 1500
-            };
-          } else if (dLower.includes('food') || dLower.includes('nutrition') || dLower.includes('science') || dLower.includes('math')) {
-            structure = {
-              studentId: student.id,
-              tuitionFee: 22000,
-              admissionFee: 3500,
-              universityFee: 2000,
-              specialFee: 3500,
-              computerLab: 3000,
-              stationary: 1000,
-              pta: 1000,
-              otherFee: 1000
-            };
-          } else {
-            // Arts / History / Tamil / General
-            structure = {
-              studentId: student.id,
-              tuitionFee: 15000,
-              admissionFee: 2500,
-              universityFee: 1500,
-              specialFee: 2000,
-              computerLab: 1000,
-              stationary: 1000,
-              pta: 500,
-              otherFee: 1000
-            };
-          }
-        }
-      }
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      studentQuery = {
+        $and: [
+          { $or: studentQuery.$or },
+          { $or: [{ collegeId }, { tenantId: collegeId }] }
+        ]
+      };
     }
 
-    res.json(structure || { tuitionFee: 15000, admissionFee: 2500, universityFee: 1500 });
+    const student = await Student.findOne(studentQuery);
+
+    if (!student) {
+      return res.json(null);
+    }
+
+    const deptName = String(student.department || student.dept || '').trim();
+    const courseName = String(student.course || '').trim();
+    const semNum = Number(student.semester || student.sem || 1);
+
+    const targetColId = student.collegeId || collegeId;
+
+    const collegeFilter =
+      req.user?.role !== 'Super Admin' &&
+      targetColId &&
+      targetColId !== 'system'
+        ? { $or: [{ collegeId: targetColId }, { tenantId: targetColId }] }
+        : {};
+
+    const escapeRegex = (value) =>
+      String(value || '').replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+    /*
+     * IMPORTANT:
+     * Admin FeeStructure is the PRIMARY source of truth.
+     * Old student.feeBreakdown must NOT override the Admin structure.
+     */
+    const structureQuery = {
+      ...collegeFilter,
+      department: new RegExp(`^${escapeRegex(deptName)}$`, 'i'),
+      course: new RegExp(`^${escapeRegex(courseName)}$`, 'i'),
+      semester: semNum
+    };
+
+    let matchedStructure = await FeeStructure.findOne(structureQuery)
+      .sort({ updatedAt: -1 });
+
+    /*
+     * If semester-specific structure is not found, try the same
+     * department/course without semester for older records.
+     */
+    if (!matchedStructure) {
+      matchedStructure = await FeeStructure.findOne({
+        ...collegeFilter,
+        department: new RegExp(`^${escapeRegex(deptName)}$`, 'i'),
+        course: new RegExp(`^${escapeRegex(courseName)}$`, 'i')
+      }).sort({ updatedAt: -1 });
+    }
+
+    /*
+     * Map Admin FeeStructure fees[] into the same field names
+     * used by Accounts FeesCollection.jsx.
+     */
+    if (matchedStructure && Array.isArray(matchedStructure.fees) && matchedStructure.fees.length > 0) {
+      const mapped = {
+        studentId: student.id || student._id,
+        tuitionFee: 0,
+        admissionFee: 0,
+        universityFee: 0,
+        marksheetVerification: 0,
+        specialFee: 0,
+        englishLabNssId: 0,
+        computerLab: 0,
+        stationary: 0,
+        pta: 0,
+        examFee: 0,
+        libraryFee: 0,
+        hostelFee: 0,
+        transportFee: 0,
+        otherFee: 0
+      };
+
+      for (const item of matchedStructure.fees) {
+        const type = String(item.feeType || '').toLowerCase();
+        const amount = Number(item.amount) || 0;
+
+        if (type.includes('tuition')) {
+          mapped.tuitionFee += amount;
+        } else if (type.includes('admission') || type.includes('processing')) {
+          mapped.admissionFee += amount;
+        } else if (type.includes('marksheet') || type.includes('verification')) {
+          mapped.marksheetVerification += amount;
+        } else if (type.includes('university') || type.includes('affiliation')) {
+          mapped.universityFee += amount;
+        } else if (type.includes('exam')) {
+          mapped.examFee += amount;
+        } else if (type.includes('computer')) {
+          mapped.computerLab += amount;
+        } else if (type.includes('english') || type.includes('nss') || type.includes('id')) {
+          mapped.englishLabNssId += amount;
+        } else if (type.includes('special') || type.includes('lab')) {
+          mapped.specialFee += amount;
+        } else if (type.includes('station') || type.includes('syllabus')) {
+          mapped.stationary += amount;
+        } else if (type.includes('pta')) {
+          mapped.pta += amount;
+        } else if (type.includes('library')) {
+          mapped.libraryFee += amount;
+        } else if (type.includes('hostel')) {
+          mapped.hostelFee += amount;
+        } else if (type.includes('transport')) {
+          mapped.transportFee += amount;
+        } else {
+          mapped.otherFee += amount;
+        }
+      }
+
+      const calculatedTotal = [
+        mapped.tuitionFee,
+        mapped.admissionFee,
+        mapped.universityFee,
+        mapped.marksheetVerification,
+        mapped.specialFee,
+        mapped.englishLabNssId,
+        mapped.computerLab,
+        mapped.stationary,
+        mapped.pta,
+        mapped.examFee,
+        mapped.libraryFee,
+        mapped.hostelFee,
+        mapped.transportFee,
+        mapped.otherFee
+      ].reduce((sum, value) => sum + value, 0);
+
+      mapped.totalAmount =
+        Number(matchedStructure.totalAmount) || calculatedTotal;
+
+      mapped.allFees = mapped.totalAmount;
+
+      return res.json(mapped);
+    }
+
+    /*
+     * SECONDARY SOURCE:
+     * FeePlan created/synced by Admin.
+     */
+    const matchedPlan = await FeePlan.findOne({
+      ...collegeFilter,
+      $or: [
+        {
+          departmentName: new RegExp(`^${escapeRegex(deptName)}$`, 'i'),
+          courseName: new RegExp(`^${escapeRegex(courseName)}$`, 'i')
+        },
+        { departmentId: deptName }
+      ],
+      semester: `Sem ${semNum}`
+    }).sort({ updatedAt: -1 });
+
+    if (matchedPlan) {
+      const planTotal =
+        (Number(matchedPlan.tuitionFee) || 0) +
+        (Number(matchedPlan.examFee) || 0) +
+        (Number(matchedPlan.labFee) || 0) +
+        (Number(matchedPlan.libraryFee) || 0) +
+        (Number(matchedPlan.transportFee) || 0) +
+        (Number(matchedPlan.hostelFee) || 0);
+
+      return res.json({
+        studentId: student.id || student._id,
+        tuitionFee: Number(matchedPlan.tuitionFee) || 0,
+        examFee: Number(matchedPlan.examFee) || 0,
+        computerLab: Number(matchedPlan.labFee) || 0,
+        libraryFee: Number(matchedPlan.libraryFee) || 0,
+        transportFee: Number(matchedPlan.transportFee) || 0,
+        hostelFee: Number(matchedPlan.hostelFee) || 0,
+        allFees: planTotal,
+        totalAmount: planTotal
+      });
+    }
+
+    /*
+     * LAST FALLBACK:
+     * Existing student feeBreakdown is used only when there is
+     * no Admin FeeStructure and no FeePlan.
+     */
+    if (student.feeBreakdown && Object.keys(student.feeBreakdown).length > 0) {
+      const fb = student.feeBreakdown;
+
+      const fallback = {
+        studentId: student.id || student._id,
+        tuitionFee: Number(fb.tuitionFee) || 0,
+        admissionFee: Number(fb.admissionFee) || 0,
+        universityFee: Number(fb.universityFee) || 0,
+        marksheetVerification: Number(fb.marksheetVerification) || 0,
+        specialFee: Number(fb.specialFee) || 0,
+        englishLabNssId: Number(fb.englishLabNssId) || 0,
+        computerLab: Number(fb.computerLab) || 0,
+        stationary: Number(fb.stationary) || 0,
+        pta: Number(fb.pta) || 0,
+        examFee: Number(fb.examFee) || 0,
+        libraryFee: Number(fb.libraryFee) || 0,
+        otherFee: Number(fb.otherFee) || 0,
+        hostelFee: Number(student.hostelFeeAmount) || 0,
+        transportFee: Number(student.transportFeeAmount) || 0
+      };
+
+      fallback.allFees =
+        Number(student.totalFee) ||
+        Object.values(fallback)
+          .filter(v => typeof v === 'number')
+          .reduce((sum, value) => sum + value, 0);
+
+      fallback.totalAmount = fallback.allFees;
+
+      return res.json(fallback);
+    }
+
+    /*
+     * No configured fee exists.
+     * Return zero instead of inventing a hardcoded fee.
+     */
+    return res.json({
+      studentId: student.id || student._id,
+      tuitionFee: 0,
+      admissionFee: 0,
+      universityFee: 0,
+      marksheetVerification: 0,
+      specialFee: 0,
+      englishLabNssId: 0,
+      computerLab: 0,
+      stationary: 0,
+      pta: 0,
+      examFee: 0,
+      libraryFee: 0,
+      hostelFee: 0,
+      transportFee: 0,
+      otherFee: 0,
+      allFees: 0,
+      totalAmount: 0
+    });
+
   } catch (err) {
+    console.error('GET /fees/structure/:studentId error:', err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -517,7 +699,7 @@ router.post('/', protect, authorize('Admin', 'Principal', 'Accounts', 'Student')
       
       const studentIds = [...new Set(newRecords.map(r => r.studentId))];
       for (const id of studentIds) {
-        await updateStudentFeeStatus(id);
+        await updateStudentFeeStatus(id, collegeId);
       }
       for (const record of newRecords) {
         await notifyFeeUpdate(req, record);
@@ -531,7 +713,7 @@ router.post('/', protect, authorize('Admin', 'Principal', 'Accounts', 'Student')
         tenantId: collegeId
       });
       const newRecord = await fee.save();
-      await updateStudentFeeStatus(newRecord.studentId);
+      await updateStudentFeeStatus(newRecord.studentId, collegeId);
       await notifyFeeUpdate(req, newRecord);
       req.app.get('io')?.emit('dataUpdated', { module: 'fees', action: 'created', studentId: newRecord.studentId });
       return res.status(201).json(newRecord);
@@ -544,16 +726,31 @@ router.post('/', protect, authorize('Admin', 'Principal', 'Accounts', 'Student')
 // Update fee status (e.g. Pending -> Paid)
 router.put('/:id', protect, authorize('Admin', 'Principal', 'Accounts', 'Student'), collegeScope, async (req, res) => {
   try {
-    const updatedFee = await Fee.findByIdAndUpdate(
-      req.params.id, 
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = {
+      $or: [
+        ...(mongoose.Types.ObjectId.isValid(req.params.id) ? [{ _id: req.params.id }] : []),
+        { id: req.params.id },
+        { receiptNo: req.params.id }
+      ]
+    };
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      filter.$and = [
+        { $or: [{ collegeId }, { tenantId: collegeId }] }
+      ];
+    }
+
+    const updatedFee = await Fee.findOneAndUpdate(
+      filter, 
       processFeePayload(req.body), 
       { new: true }
     );
-    if (updatedFee) {
-      await updateStudentFeeStatus(updatedFee.studentId);
-      await notifyFeeUpdate(req, updatedFee);
+    if (!updatedFee) {
+      return res.status(404).json({ message: 'Fee record not found' });
     }
-    req.app.get('io').emit('dataUpdated', { module: 'fees', action: 'updated', studentId: updatedFee.studentId });
+    await updateStudentFeeStatus(updatedFee.studentId, collegeId);
+    await notifyFeeUpdate(req, updatedFee);
+    req.app.get('io')?.emit('dataUpdated', { module: 'fees', action: 'updated', studentId: updatedFee.studentId });
     res.json(updatedFee);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -563,12 +760,25 @@ router.put('/:id', protect, authorize('Admin', 'Principal', 'Accounts', 'Student
 // Delete fee record
 router.delete('/:id', protect, authorize('Admin', 'Principal', 'Accounts'), collegeScope, async (req, res) => {
   try {
-    const record = await Fee.findById(req.params.id);
-    if (record) {
-      await Fee.findByIdAndDelete(req.params.id);
-      await updateStudentFeeStatus(record.studentId);
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = {
+      $or: [
+        ...(mongoose.Types.ObjectId.isValid(req.params.id) ? [{ _id: req.params.id }] : []),
+        { id: req.params.id }
+      ]
+    };
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      filter.$and = [
+        { $or: [{ collegeId }, { tenantId: collegeId }] }
+      ];
     }
-    req.app.get('io').emit('dataUpdated', { module: 'fees', action: 'deleted' });
+
+    const record = await Fee.findOneAndDelete(filter);
+    if (!record) {
+      return res.status(404).json({ message: 'Fee record not found' });
+    }
+    await updateStudentFeeStatus(record.studentId, collegeId);
+    req.app.get('io')?.emit('dataUpdated', { module: 'fees', action: 'deleted' });
     res.json({ message: 'Fee record deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -576,4 +786,5 @@ router.delete('/:id', protect, authorize('Admin', 'Principal', 'Accounts'), coll
 });
 
 export default router;
+
 

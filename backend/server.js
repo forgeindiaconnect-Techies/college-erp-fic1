@@ -3,6 +3,7 @@ try {
   dns.setServers(['8.8.8.8', '8.8.4.4']);
   if (dns.setDefaultResultOrder) dns.setDefaultResultOrder('ipv4first');
 } catch (e) {}
+// Schema and routes updated for custom subscription plan & amount management
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -75,6 +76,7 @@ import superadminRoutes from './routes/superadminRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import accountsOfficerRoutes from './routes/accountsOfficerRoutes.js';
 import librarianRoutes from './routes/librarianRoutes.js';
+import placementOfficerRoutes from './routes/placementOfficerRoutes.js';
 import employeeAttendanceRoutes from './routes/employeeAttendanceRoutes.js';
 import subjectRoutes from './routes/subjectRoutes.js';
 import academicRoutes from './routes/academicRoutes.js';
@@ -156,11 +158,11 @@ io.on('connection', (socket) => {
         console.log(`🔌 Socket ${socket.id} joined user room: ${userData.userId}`);
       }
       if (userData.tenantId) {
-        socket.join(userData.tenantId.toString());
+        socket.join("college:" + userData.tenantId);
         console.log(`🔌 Socket ${socket.id} joined tenant room: ${userData.tenantId}`);
       }
       if (userData.collegeId) {
-        socket.join(userData.collegeId.toString());
+        socket.join("college:" + userData.collegeId);
         console.log(`🔌 Socket ${socket.id} joined college room: ${userData.collegeId}`);
       }
       if (userData.role) {
@@ -292,6 +294,9 @@ const autoSeedIfEmpty = async () => {
         { name: 'Dr. Agila (HOD)', email: 'agila@gmail.com', password: 'agila', role: 'HOD', department: 'Information Technology', referenceId: 'HOD001', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Pooja (Staff)', email: 'pooja@gmail.com', password: 'pooja', role: 'Staff', department: 'Computer Science', referenceId: 'STF008', subjects: ['Data Structures'], tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Accounts Officer', email: 'accounts@college.edu', password: 'password123', role: 'Accounts', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Menaka (Placement Officer)', email: 'menaka@gmail.com', password: 'menaka', role: 'Placement', department: 'Training & Placement Officer', referenceId: 'PLC-002', phone: '8987676567', tenantId: 'COL004-3190860', collegeId: 'COL004-3190860' },
+        { name: 'Karthick (Placement Officer)', email: 'karthick@gmail.com', password: 'karthick', role: 'Placement', department: 'Training & Placement Officer', referenceId: 'PLC-001', phone: '9878987678', tenantId: 'COL004-3190860', collegeId: 'COL004-3190860' },
+        { name: 'Dr. Suresh Kumar (Placement Officer)', email: 'placement@college.edu', password: 'password123', role: 'Placement', department: 'Training & Placement Cell', referenceId: 'PLC-001', tenantId: 'COL004-3190860', collegeId: 'COL004-3190860' },
       ];
 
       // Find the primary/active college in the system
@@ -988,6 +993,7 @@ app.use('/api/superadmin', superadminRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/accounts-officer', accountsOfficerRoutes);
 app.use('/api/librarian', librarianRoutes);
+app.use('/api/placement-officers', placementOfficerRoutes);
 app.use('/api/employee-attendance', employeeAttendanceRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/academic', academicRoutes);
@@ -1141,3 +1147,10 @@ const startServer = async () => {
 };
 
 startServer();
+
+
+
+
+
+
+

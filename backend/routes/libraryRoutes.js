@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Book from '../models/Book.js';
 import LibraryTransaction from '../models/LibraryTransaction.js';
 import BookCopy from '../models/BookCopy.js';
@@ -8,6 +9,7 @@ import LibraryReturnRequest from '../models/LibraryReturnRequest.js';
 import LibraryClearance from '../models/LibraryClearance.js';
 import Student from '../models/Student.js';
 import User from '../models/User.js';
+import Staff from '../models/Staff.js';
 import { sendNotification } from '../utils/notificationHelper.js';
 import {
   protect,
@@ -24,7 +26,11 @@ const getUserId = (req) => {
 };
 
 const getUserType = (req) => {
-  return req.user.role === 'Staff' ? 'Staff' : 'Student';
+  const r = String(req.user?.role || '').trim();
+  if (r === 'HOD' || r.toLowerCase() === 'hod') return 'HOD';
+  if (r === 'Staff' || r === 'Teacher' || r.toLowerCase() === 'staff') return 'Staff';
+  if (r === 'Principal' || r === 'Admin' || r === 'Sub Admin') return r;
+  return 'Student';
 };
 
 const getTenantFilter = (req) => {
@@ -34,7 +40,7 @@ const getTenantFilter = (req) => {
 
   const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
   if (!collegeId || collegeId === 'system') {
-    return {};
+    return { collegeId: '__NO_COLLEGE__' };
   }
 
   return {
@@ -286,7 +292,8 @@ router.post(
             userId,
             userType,
             status: 'Pending',
-            collegeId: tenantCollegeId
+            collegeId: tenantCollegeId,
+            tenantId: tenantCollegeId
           },
           { upsert: true, new: true, setDefaultsOnInsert: true }
         );
@@ -409,13 +416,15 @@ router.get(
       }
 
       if (!isStudent && !isStaff) {
-        const allRes = await LibraryReservation.find({})
+        const tenantFilter = getTenantFilter(req);
+        const allRes = await LibraryReservation.find(tenantFilter)
           .populate('bookId')
           .populate('bookCopyId')
           .sort({ createdAt: -1 })
           .lean();
         const allTx = await LibraryTransaction.find({
-          status: { $in: ['Pending', 'Approved', 'Reserved'] }
+          status: { $in: ['Pending', 'Approved', 'Reserved'] },
+          ...tenantFilter
         })
           .populate('bookId')
           .populate('bookCopyId')
@@ -451,8 +460,11 @@ router.get(
         }
       }
 
-      // Ensure book details are populated even if populate missed
+      // Ensure book details and approvedDate are populated
       for (const r of reservations) {
+        if (!r.approvedDate && (r.status === 'Approved' || r.status === 'Completed' || r.status === 'Issued')) {
+          r.approvedDate = r.updatedAt || r.createdAt || new Date();
+        }
         if (!r.bookId || typeof r.bookId === 'string' || !r.bookId.title) {
           const rawId = r.bookId?._id || r.bookId;
           if (rawId) {
@@ -477,59 +489,96 @@ router.get(
 router.put(
   '/reservations/:id/approve',
   protect,
-  authorize('Admin', 'Sub Admin', 'Principal', 'Librarian', 'Library', 'HOD'),
+  authorize('Admin', 'Super Admin', 'Sub Admin', 'Principal', 'Librarian', 'Library', 'HOD', 'Staff'),
   collegeScope,
   async (req, res) => {
     try {
       const now = new Date();
-      let reservation = await LibraryReservation.findById(req.params.id);
+      const rawId = req.params.id;
+      let reservation = null;
+      let tx = null;
 
-      if (!reservation) {
-        // If it's a pending transaction ID
-        const tx = await LibraryTransaction.findById(req.params.id);
-        if (tx) {
-          tx.status = 'Approved';
-          tx.approvedDate = now;
-          await tx.save();
-
-          reservation = await LibraryReservation.findOneAndUpdate(
-            { bookId: tx.bookId, userId: tx.userId },
-            {
-              bookId: tx.bookId,
-              userId: tx.userId,
-              userType: tx.userType || 'Student',
-              status: 'Approved',
-              approvedDate: now,
-              collegeId: tx.collegeId || req.collegeId || 'COL001'
-            },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
-          );
+      if (mongoose.isValidObjectId(rawId)) {
+        reservation = await LibraryReservation.findById(rawId);
+        if (!reservation) {
+          tx = await LibraryTransaction.findById(rawId);
         }
-      } else {
-        reservation.status = 'Approved';
-        reservation.approvedDate = now;
-        await reservation.save();
-
-        await LibraryTransaction.updateMany(
-          { bookId: reservation.bookId, userId: reservation.userId, status: { $in: ['Pending', 'Reserved'] } },
-          { status: 'Approved', approvedDate: now }
-        );
       }
 
-      if (!reservation) {
+      if (!reservation && !tx) {
+        reservation = await LibraryReservation.findOne({
+          $or: [
+            { userId: rawId },
+            { _id: rawId }
+          ]
+        }).sort({ createdAt: -1 });
+      }
+
+      if (!reservation && !tx) {
+        tx = await LibraryTransaction.findOne({
+          $or: [
+            { userId: rawId },
+            { _id: rawId }
+          ]
+        }).sort({ createdAt: -1 });
+      }
+
+      if (!reservation && !tx) {
         return res.status(404).json({
           message: 'Reservation or request not found'
         });
       }
 
+      if (tx) {
+        tx.status = 'Approved';
+        tx.approvedDate = now;
+        await tx.save();
+
+        const bId = tx.bookId?._id || tx.bookId;
+        const uId = String(tx.userId);
+        const collegeId = tx.collegeId || req.collegeId || req.user?.collegeId || req.user?.tenantId || 'COL001';
+
+        reservation = await LibraryReservation.findOneAndUpdate(
+          { bookId: bId, userId: uId },
+          {
+            bookId: bId,
+            userId: uId,
+            userType: tx.userType || 'Student',
+            status: 'Approved',
+            approvedDate: now,
+            collegeId,
+            tenantId: collegeId
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+      } else if (reservation) {
+        reservation.status = 'Approved';
+        reservation.approvedDate = now;
+        await reservation.save();
+
+        const bId = reservation.bookId?._id || reservation.bookId;
+        const uId = String(reservation.userId);
+
+        await LibraryTransaction.updateMany(
+          { bookId: bId, userId: uId, status: { $in: ['Pending', 'Reserved'] } },
+          { status: 'Approved', approvedDate: now }
+        );
+      }
+
+      try {
+        if (reservation && reservation.bookId) {
+          await reservation.populate('bookId');
+        }
+      } catch (e) {}
+
       res.json({
         message: 'Reservation approved successfully',
-        reservation
+        reservation: reservation || tx
       });
     } catch (error) {
       console.error('Approve reservation error:', error);
       res.status(500).json({
-        message: 'Failed to approve reservation'
+        message: error.message || 'Failed to approve reservation'
       });
     }
   }
@@ -538,22 +587,47 @@ router.put(
 router.put(
   '/reservations/:id/reject',
   protect,
-  authorize('Admin', 'Sub Admin', 'Principal', 'Librarian', 'Library'),
+  authorize('Admin', 'Super Admin', 'Sub Admin', 'Principal', 'Librarian', 'Library', 'HOD', 'Staff'),
   collegeScope,
   async (req, res) => {
     try {
-      let reservation = await LibraryReservation.findById(req.params.id);
+      const rawId = req.params.id;
+      let reservation = null;
+      let tx = null;
+
+      if (mongoose.isValidObjectId(rawId)) {
+        reservation = await LibraryReservation.findById(rawId);
+        if (!reservation) {
+          tx = await LibraryTransaction.findById(rawId);
+        }
+      }
 
       if (reservation) {
         reservation.status = 'Rejected';
         await reservation.save();
 
+        const bId = reservation.bookId?._id || reservation.bookId;
+        const uId = String(reservation.userId);
+
         await LibraryTransaction.updateMany(
-          { bookId: reservation.bookId, userId: reservation.userId, status: { $in: ['Pending', 'Approved'] } },
+          { bookId: bId, userId: uId, status: { $in: ['Pending', 'Approved', 'Reserved'] } },
+          { status: 'Rejected' }
+        );
+      } else if (tx) {
+        tx.status = 'Rejected';
+        await tx.save();
+
+        const bId = tx.bookId?._id || tx.bookId;
+        const uId = String(tx.userId);
+
+        await LibraryReservation.updateMany(
+          { bookId: bId, userId: uId, status: { $in: ['Pending', 'Approved', 'Reserved'] } },
           { status: 'Rejected' }
         );
       } else {
-        await LibraryTransaction.findByIdAndUpdate(req.params.id, { status: 'Rejected' });
+        return res.status(404).json({
+          message: 'Reservation or request not found'
+        });
       }
 
       res.json({
@@ -562,7 +636,7 @@ router.put(
     } catch (error) {
       console.error('Reject reservation error:', error);
       res.status(500).json({
-        message: 'Failed to reject reservation'
+        message: error.message || 'Failed to reject reservation'
       });
     }
   }
@@ -585,14 +659,35 @@ router.put(
   async (req, res) => {
     try {
       const { bookCopyId, dueDate } = req.body;
+      const rawId = req.params.id;
 
-      let reservation = await LibraryReservation.findOne({
-        _id: req.params.id,
-        ...getTenantFilter(req)
-      });
+      let reservation = null;
+      if (mongoose.isValidObjectId(rawId)) {
+        reservation = await LibraryReservation.findOne({
+          _id: rawId,
+          ...getTenantFilter(req)
+        });
+        if (!reservation) {
+          reservation = await LibraryReservation.findById(rawId);
+        }
+      }
 
-      if (!reservation) {
-        reservation = await LibraryReservation.findById(req.params.id);
+      if (!reservation && mongoose.isValidObjectId(rawId)) {
+        const tx = await LibraryTransaction.findById(rawId);
+        if (tx) {
+          reservation = await LibraryReservation.findOneAndUpdate(
+            { bookId: tx.bookId, userId: tx.userId },
+            {
+              bookId: tx.bookId,
+              userId: tx.userId,
+              userType: tx.userType || 'Student',
+              status: tx.status === 'Approved' ? 'Approved' : 'Pending',
+              collegeId: tx.collegeId || req.collegeId || 'COL001',
+              tenantId: tx.collegeId || req.collegeId || 'COL001'
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+          );
+        }
       }
 
       if (!reservation) {
@@ -713,15 +808,20 @@ router.put(
           userId: reservation.userId,
           userType: reservation.userType || 'Student',
           status: 'Issued',
+          approvedDate: reservation.approvedDate || issueDate,
           issueDate,
           dueDate: finalDueDate,
           fineAmount: 0,
-          collegeId: tenantId
+          collegeId: tenantId,
+          tenantId: tenantId
         });
 
         const savedTransaction = await transaction.save();
 
         reservation.status = 'Completed';
+        if (!reservation.approvedDate) {
+          reservation.approvedDate = issueDate;
+        }
         await reservation.save();
 
         book.availableCopies = Math.max(0, currentAvail - 1);
@@ -760,9 +860,9 @@ router.get(
   async (req, res) => {
     try {
       const { department, category, search } = req.query;
+      const tenantFilter = getTenantFilter(req);
 
-      // Ensure all library catalog books across college records are discoverable
-      const allBooks = await Book.find({}).setOptions({ skipTenant: true }).sort({ title: 1 }).lean();
+      const allBooks = await Book.find(tenantFilter).sort({ title: 1 }).lean();
       let mergedBooks = allBooks || [];
 
       if (department && department !== 'All Departments') {
@@ -972,12 +1072,14 @@ router.post(
         });
       }
 
+      const tenantVal = book.collegeId || req.collegeId || req.user?.tenantId || req.user?.collegeId || 'COL001';
       const transaction = new LibraryTransaction({
         bookId: book._id,
         userId,
         userType,
         status: 'Pending',
-        collegeId: book.collegeId || req.collegeId || req.user?.tenantId || req.user?.collegeId || 'COL001'
+        collegeId: tenantVal,
+        tenantId: tenantVal
       });
 
       const savedTransaction = await transaction.save();
@@ -996,7 +1098,8 @@ router.post(
             userType,
             status: 'Pending',
             requestDate: new Date(),
-            collegeId: book.collegeId || req.collegeId || req.user?.tenantId || req.user?.collegeId || 'COL001'
+            collegeId: tenantVal,
+            tenantId: tenantVal
           },
           { upsert: true, new: true, setDefaultsOnInsert: true }
         );
@@ -1044,35 +1147,71 @@ router.get(
       if (req.user?.rollNo) possibleIds.add(String(req.user.rollNo));
       if (req.user?.email) possibleIds.add(String(req.user.email));
 
-      // Also check Student collection for this user's email, name, or referenceId
-      try {
-        const studentQueries = [];
-        if (req.user?.email) studentQueries.push({ email: req.user.email });
-        if (req.user?.name) studentQueries.push({ name: { $regex: new RegExp(`^${req.user.name.trim()}$`, 'i') } });
-        if (req.user?.referenceId) {
-          studentQueries.push({ id: req.user.referenceId });
-          studentQueries.push({ referenceId: req.user.referenceId });
-          studentQueries.push({ rollNo: req.user.referenceId });
-        }
-        if (req.user?.studentId) {
-          studentQueries.push({ id: req.user.studentId });
-          studentQueries.push({ studentId: req.user.studentId });
-        }
+      const isStudent = req.user?.role === 'Student';
+      const isStaff = req.user?.role === 'Staff' || req.user?.role === 'Teacher';
+      const isHod = req.user?.role === 'HOD' || String(req.user?.role).toLowerCase() === 'hod';
 
-        if (studentQueries.length > 0) {
-          const studentDocs = await Student.find({ $or: studentQueries }).lean();
-          for (const studentDoc of studentDocs) {
-            if (studentDoc._id) possibleIds.add(String(studentDoc._id));
-            if (studentDoc.id) possibleIds.add(String(studentDoc.id));
-            if (studentDoc.referenceId) possibleIds.add(String(studentDoc.referenceId));
-            if (studentDoc.studentId) possibleIds.add(String(studentDoc.studentId));
-            if (studentDoc.rollNo) possibleIds.add(String(studentDoc.rollNo));
-            if (studentDoc.name) possibleIds.add(String(studentDoc.name));
-            if (studentDoc.email) possibleIds.add(String(studentDoc.email));
+      if (isStudent) {
+        try {
+          const studentQueries = [];
+          if (req.user?.email) studentQueries.push({ email: req.user.email });
+          if (req.user?.name) studentQueries.push({ name: { $regex: new RegExp(`^${req.user.name.trim()}$`, 'i') } });
+          if (req.user?.referenceId) {
+            studentQueries.push({ id: req.user.referenceId });
+            studentQueries.push({ referenceId: req.user.referenceId });
+            studentQueries.push({ rollNo: req.user.referenceId });
           }
+          if (req.user?.studentId) {
+            studentQueries.push({ id: req.user.studentId });
+            studentQueries.push({ studentId: req.user.studentId });
+          }
+
+          if (studentQueries.length > 0) {
+            const studentDocs = await Student.find({ $or: studentQueries }).lean();
+            for (const studentDoc of studentDocs) {
+              if (studentDoc._id) possibleIds.add(String(studentDoc._id));
+              if (studentDoc.id) possibleIds.add(String(studentDoc.id));
+              if (studentDoc.referenceId) possibleIds.add(String(studentDoc.referenceId));
+              if (studentDoc.studentId) possibleIds.add(String(studentDoc.studentId));
+              if (studentDoc.rollNo) possibleIds.add(String(studentDoc.rollNo));
+              if (studentDoc.name) possibleIds.add(String(studentDoc.name));
+              if (studentDoc.email) possibleIds.add(String(studentDoc.email));
+            }
+          }
+        } catch (e) {
+          console.warn('my-transactions student resolution error:', e);
         }
-      } catch (e) {
-        console.warn('my-transactions student resolution error:', e);
+      } else if (isStaff || isHod) {
+        try {
+          const staffQueries = [];
+          if (req.user?.email) staffQueries.push({ email: req.user.email });
+          if (req.user?.name) staffQueries.push({ name: { $regex: new RegExp(`^${req.user.name.trim()}$`, 'i') } });
+          if (req.user?.referenceId) {
+            staffQueries.push({ id: req.user.referenceId });
+            staffQueries.push({ staffId: req.user.referenceId });
+          }
+
+          if (staffQueries.length > 0) {
+            const staffDocs = await Staff.find({ $or: staffQueries }).lean();
+            for (const s of staffDocs) {
+              if (s._id) possibleIds.add(String(s._id));
+              if (s.id) possibleIds.add(String(s.id));
+              if (s.staffId) possibleIds.add(String(s.staffId));
+              if (s.name) possibleIds.add(String(s.name));
+              if (s.email) possibleIds.add(String(s.email));
+            }
+            const userDocs = await User.find({ $or: staffQueries }).lean();
+            for (const u of userDocs) {
+              if (u._id) possibleIds.add(String(u._id));
+              if (u.id) possibleIds.add(String(u.id));
+              if (u.referenceId) possibleIds.add(String(u.referenceId));
+              if (u.name) possibleIds.add(String(u.name));
+              if (u.email) possibleIds.add(String(u.email));
+            }
+          }
+        } catch (e) {
+          console.warn('my-transactions staff/hod resolution error:', e);
+        }
       }
 
       const idList = Array.from(possibleIds).filter(Boolean);
@@ -1185,7 +1324,8 @@ router.put(
           userType: transaction.userType || 'Student',
           status: 'Approved',
           approvedDate: now,
-          collegeId: transaction.collegeId || req.collegeId || 'COL001'
+          collegeId: transaction.collegeId || req.collegeId || 'COL001',
+          tenantId: transaction.collegeId || req.collegeId || 'COL001'
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
@@ -2443,6 +2583,27 @@ router.get(
         .select('-password')
         .lean();
 
+      // Fetch Staff Members
+      const staffFilter = targetCollegeId ? {
+        $or: [
+          { collegeId: targetCollegeId },
+          { tenantId: targetCollegeId }
+        ]
+      } : {};
+      let staffMembers = await Staff.find(staffFilter).lean();
+
+      // Fetch Staff / HOD Users
+      const staffUserFilter = targetCollegeId ? {
+        role: { $in: ['Staff', 'HOD', 'Teacher', 'staff', 'hod'] },
+        $or: [
+          { collegeId: targetCollegeId },
+          { tenantId: targetCollegeId }
+        ]
+      } : {
+        role: { $in: ['Staff', 'HOD', 'Teacher', 'staff', 'hod'] }
+      };
+      let staffUsers = await User.find(staffUserFilter).select('-password').lean();
+
       const map = new Map();
       (students || []).forEach(s => {
         const id = s.id || s.referenceId || s.studentId || s.rollNo || (s._id ? String(s._id) : null);
@@ -2457,7 +2618,9 @@ router.get(
             dept: s.dept || s.department || 'General',
             department: s.dept || s.department || 'General',
             sem: s.sem || s.semester || 'Sem 1',
-            rollNo: s.rollNo || id
+            rollNo: s.rollNo || id,
+            role: 'Student',
+            userType: 'Student'
           });
         }
       });
@@ -2475,7 +2638,51 @@ router.get(
             dept: u.department || u.dept || 'General',
             department: u.department || u.dept || 'General',
             sem: u.semester || u.sem || 'Sem 1',
-            rollNo: u.rollNo || id
+            rollNo: u.rollNo || id,
+            role: 'Student',
+            userType: 'Student'
+          });
+        }
+      });
+
+      (staffMembers || []).forEach(stf => {
+        const id = stf.id || stf.referenceId || (stf._id ? String(stf._id) : null);
+        const isHod = stf.designation === 'HOD' || stf.role === 'HOD';
+        const role = isHod ? 'HOD' : 'Staff';
+        if (id) {
+          map.set(String(id), {
+            _id: stf._id,
+            id: id,
+            referenceId: id,
+            staffId: id,
+            name: stf.name || 'Faculty Staff',
+            email: stf.email || '',
+            dept: stf.dept || stf.department || 'General',
+            department: stf.dept || stf.department || 'General',
+            role: role,
+            userType: role,
+            designation: stf.designation || (isHod ? 'HOD' : 'Faculty')
+          });
+        }
+      });
+
+      (staffUsers || []).forEach(u => {
+        const id = u.referenceId || u.id || (u._id ? String(u._id) : null);
+        const isHod = String(u.role).toUpperCase() === 'HOD';
+        const role = isHod ? 'HOD' : 'Staff';
+        if (id && !map.has(String(id))) {
+          map.set(String(id), {
+            _id: u._id,
+            id: id,
+            referenceId: id,
+            staffId: id,
+            name: u.name || 'Faculty Staff',
+            email: u.email || '',
+            dept: u.department || u.dept || 'General',
+            department: u.department || u.dept || 'General',
+            role: role,
+            userType: role,
+            designation: u.role || (isHod ? 'HOD' : 'Faculty')
           });
         }
       });
@@ -2701,7 +2908,8 @@ router.get(
   collegeScope,
   async (req, res) => {
     try {
-      const requests = await LibraryReturnRequest.find({})
+      const tenantFilter = getTenantFilter(req);
+      const requests = await LibraryReturnRequest.find(tenantFilter)
         .populate('bookId')
         .populate('bookCopyId')
         .populate('transactionId')
@@ -2963,15 +3171,47 @@ router.get(
           { referenceId: req.user?.referenceId },
           { rollNo: req.user?.rollNo },
           { _id: req.user?._id }
-        ]
+        ].filter(Boolean)
       }).lean();
 
+      const possibleIds = new Set();
+      if (student?._id) possibleIds.add(String(student._id));
+      if (student?.id) possibleIds.add(String(student.id));
+      if (student?.referenceId) possibleIds.add(String(student.referenceId));
+      if (student?.rollNo) possibleIds.add(String(student.rollNo));
+      if (req.user?.referenceId) possibleIds.add(String(req.user.referenceId));
+      if (req.user?.rollNo) possibleIds.add(String(req.user.rollNo));
+      if (req.user?.id) possibleIds.add(String(req.user.id));
+      if (req.user?._id) possibleIds.add(String(req.user._id));
+
+      const idList = Array.from(possibleIds).filter(Boolean);
+
+      // Check if student has active book loans or pending returns
+      const activeTransactionsCount = await LibraryTransaction.countDocuments({
+        userId: { $in: idList },
+        status: { $in: ['Issued', 'Overdue', 'Pending'] }
+      });
+
+      const pendingReturnsCount = await LibraryReturnRequest.countDocuments({
+        userId: { $in: idList },
+        status: 'Pending'
+      });
+
+      if (activeTransactionsCount > 0 || pendingReturnsCount > 0) {
+        return res.json(null);
+      }
+
+      const matchQueries = [];
+      if (student?._id) matchQueries.push({ studentId: student._id });
+      if (idList.length > 0) matchQueries.push({ admissionNumber: { $in: idList } });
+      if (req.user?.name) matchQueries.push({ studentName: req.user.name });
+
+      if (matchQueries.length === 0) {
+        return res.json(null);
+      }
+
       const clearance = await LibraryClearance.findOne({
-        $or: [
-          ...(student ? [{ studentId: student._id }] : []),
-          { admissionNumber: req.user?.referenceId || req.user?.rollNo || req.user?.id },
-          { studentName: req.user?.name }
-        ]
+        $or: matchQueries
       }).sort({ createdAt: -1 });
 
       res.json(clearance || null);
@@ -3301,17 +3541,11 @@ router.get(
   async (req, res) => {
     try {
       const tenantFilter = getTenantFilter(req);
-      let list = await LibraryClearance.find(tenantFilter)
+      const list = await LibraryClearance.find(tenantFilter)
         .populate('studentId')
         .sort({ createdAt: -1 });
 
-      if (!list || list.length === 0) {
-        list = await LibraryClearance.find({})
-          .populate('studentId')
-          .sort({ createdAt: -1 });
-      }
-
-      res.json(list);
+      res.json(list || []);
     } catch (err) {
       console.error('GET /library/clearance:', err);
       res.status(500).json({ message: err.message });
@@ -3645,9 +3879,21 @@ router.delete(
   collegeScope,
   async (req, res) => {
     try {
-      const reservation = await LibraryReservation.findById(req.params.id);
+      let reservation = await LibraryReservation.findById(req.params.id);
 
       if (!reservation) {
+        const tx = await LibraryTransaction.findById(req.params.id);
+        if (tx) {
+          await LibraryReservation.deleteMany({
+            bookId: tx.bookId,
+            userId: tx.userId,
+            status: { $in: ['Pending', 'Rejected'] }
+          });
+          await LibraryTransaction.findByIdAndDelete(req.params.id);
+          return res.json({
+            message: 'Reservation cancelled successfully'
+          });
+        }
         return res.status(404).json({
           message: 'Reservation not found'
         });
@@ -3677,9 +3923,21 @@ router.post(
   collegeScope,
   async (req, res) => {
     try {
-      const reservation = await LibraryReservation.findById(req.params.id);
+      let reservation = await LibraryReservation.findById(req.params.id);
 
       if (!reservation) {
+        const tx = await LibraryTransaction.findById(req.params.id);
+        if (tx) {
+          await LibraryReservation.deleteMany({
+            bookId: tx.bookId,
+            userId: tx.userId,
+            status: { $in: ['Pending', 'Rejected'] }
+          });
+          await LibraryTransaction.findByIdAndDelete(req.params.id);
+          return res.json({
+            message: 'Reservation cancelled successfully'
+          });
+        }
         return res.status(404).json({
           message: 'Reservation not found'
         });

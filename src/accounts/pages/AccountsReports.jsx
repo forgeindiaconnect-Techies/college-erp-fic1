@@ -538,7 +538,7 @@ const AccountsReports = () => {
         <div class="header-box">
           <h1 class="college-name">${(() => {
             try {
-              const s = JSON.parse(sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || '{}');
+              const s = JSON.parse(sessionStorage.getItem('accounts_session') || '{}');
               return s.collegeName || 'Institution';
             } catch(e) { return 'Institution'; }
           })()}</h1>
@@ -672,7 +672,7 @@ const AccountsReports = () => {
   const handleExportMasterCSV = () => {
     let collegeName = 'INSTITUTION';
     try {
-      const s = JSON.parse(sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || '{}');
+      const s = JSON.parse(sessionStorage.getItem('accounts_session') || '{}');
       if (s.collegeName) collegeName = s.collegeName.toUpperCase();
     } catch(e) {}
     let csvContent = 'data:text/csv;charset=utf-8,';

@@ -19,6 +19,9 @@ import {
   manualIssueLibraryBook, 
   rejectLibraryRequest, 
   getStudents,
+  getStaff,
+  getAllStaff,
+  getUsers,
   getBookCopies,
   createBookCopy,
   updateBookCopy,
@@ -56,13 +59,14 @@ import LibraryNoDueCertificateModal from '../../components/LibraryNoDueCertifica
 const FALLBACK_CATEGORIES = ['Computer Science', 'Information Technology', 'Mechanical Engineering', 'Electronics & Communication', 'Electrical Engineering', 'Civil Engineering', 'Mathematics', 'Physics', 'Chemistry', 'Management Studies'];
 const FALLBACK_DEPARTMENTS = ['Computer Science and Engineering', 'Information Technology', 'Mechanical Engineering', 'Electronics and Communication', 'Electrical and Electronics', 'Civil Engineering', 'Management Studies'];
 
-const MOCK_DIGITAL = [
+const MOCK_DIGITAL = []; // empty by default
+/* const _UNUSED_MOCK_DIGITAL = [];
   { id: 'D001', title: 'Data Structures & Algorithms Lecture Notes', author: 'Prof. Cormen & Dept. CSE', type: 'PDF', size: '4.2 MB', downloads: 342, dept: 'Computer Science' },
   { id: 'D002', title: 'Database Management Systems Handbook', author: 'Prof. Korth & Dept. CSE', type: 'PDF', size: '3.1 MB', downloads: 285, dept: 'Computer Science' },
   { id: 'D003', title: 'Thermodynamics & Fluid Mechanics Notes', author: 'Dept. of Mechanical Engg.', type: 'PDF', size: '5.6 MB', downloads: 156, dept: 'Mechanical Engg.' },
   { id: 'D004', title: 'Digital Signal Processing Lab Manual', author: 'Dept. of ECE', type: 'PDF', size: '2.8 MB', downloads: 412, dept: 'Electronics & Comm.' },
   { id: 'D005', title: 'Engineering Mathematics Formula Book', author: 'Dept. of Mathematics', type: 'PDF', size: '1.9 MB', downloads: 680, dept: 'General' },
-];
+]; */
 
 const TABS = [
   'Dashboard', 
@@ -72,7 +76,7 @@ const TABS = [
   'Return Requests',
   'Clearance Requests',
   'Reservations', 
-  'Student Members', 
+  'Library Members',
   'Reports & Analytics', 
   'Digital Library'
 ];
@@ -86,7 +90,7 @@ const normalizeTab = (tab) => {
   if (t.includes('inventory') || t.includes('catalog') || t === 'books' || t.includes('book inventory')) return 'Book Inventory';
   if (t.includes('issue') || t.includes('circulation')) return 'Issued Books';
   if (t.includes('reserv')) return 'Reservations';
-  if (t.includes('member') || t.includes('student')) return 'Student Members';
+  if (t.includes('member') || t.includes('student') || t.includes('staff') || t.includes('hod')) return 'Library Members';
   if (t.includes('fine') || t.includes('report') || t.includes('analytic')) return 'Reports & Analytics';
   if (t.includes('digit')) return 'Digital Library';
   return 'Dashboard';
@@ -117,6 +121,9 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
 
   // Member search state
   const [memberSearch, setMemberSearch] = useState('');
+  const [activeMemberSubTab, setActiveMemberSubTab] = useState('students'); // 'students' | 'staff' | 'hod'
+  const [staffList, setStaffList] = useState([]);
+  const [usersList, setUsersList] = useState([]);
   const [selectedMemberForDetails, setSelectedMemberForDetails] = useState(null);
   const [activeReportSubTab, setActiveReportSubTab] = useState('weekly');
   const [selectedReportWeekDate, setSelectedReportWeekDate] = useState(new Date().toISOString().slice(0, 10));
@@ -138,6 +145,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
     'Clearance Requests': '/librarian/clearance',
     'Reservations': '/librarian/reservations',
     'Digital Library': '/librarian/digital',
+    'Library Members': '/librarian/members',
     'Student Members': '/librarian/members',
     'Reports & Analytics': '/librarian/reports',
     'Fines & Analytics': '/librarian/reports'
@@ -267,6 +275,8 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
       let rData = [];
       let rrData = [];
       let clData = [];
+      let stfData = [];
+      let usrData = [];
 
       try {
         const booksRes = await getLibraryBooks();
@@ -289,6 +299,18 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
         sData = Array.isArray(studentsRes.data) ? studentsRes.data : [];
       } catch (e) {
         console.warn('getLibraryBorrowers fallback', e);
+      }
+      try {
+        const staffRes = await getStaff().catch(() => ({ data: [] }));
+        stfData = Array.isArray(staffRes.data) ? staffRes.data : [];
+      } catch (e) {
+        console.warn('getStaff fallback', e);
+      }
+      try {
+        const usersRes = await getUsers().catch(() => ({ data: [] }));
+        usrData = Array.isArray(usersRes.data) ? usersRes.data : (Array.isArray(usersRes.data?.users) ? usersRes.data.users : []);
+      } catch (e) {
+        console.warn('getUsers fallback', e);
       }
       try {
         const reservationsRes = await getLibraryReservations();
@@ -351,6 +373,8 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
       setReservations(rData);
       setReturnRequests(rrData);
       setClearanceRequests(clData);
+      setStaffList(stfData);
+      setUsersList(usrData);
 
       try {
         const paymentRes = await getLibraryFinePayments();
@@ -974,6 +998,102 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
     return matchSearch && matchCategory && matchDept && matchStatus;
   });
 
+  // Unified Borrower Resolver (Students, Staff, HOD)
+  const getBorrowerInfo = (userId, userType) => {
+    const cleanId = String(userId || '').trim();
+    const cleanType = String(userType || '').trim();
+
+    const student = (students || []).find(s => 
+      String(s.id || s.referenceId || s.studentId || s.rollNo || s.registerNumber || s._id) === cleanId ||
+      (s.name && s.name.toLowerCase() === cleanId.toLowerCase())
+    );
+
+    const staff = (staffList || []).find(stf => 
+      String(stf.id || stf.referenceId || stf._id || stf.email) === cleanId ||
+      (stf.name && stf.name.toLowerCase() === cleanId.toLowerCase())
+    );
+
+    const user = (usersList || []).find(u => 
+      String(u.referenceId || u.id || u._id || u.email) === cleanId ||
+      (u.name && u.name.toLowerCase() === cleanId.toLowerCase())
+    );
+
+    let detectedRole = 'Student';
+    if (cleanType === 'HOD' || staff?.designation === 'HOD' || staff?.role === 'HOD' || user?.role === 'HOD') {
+      detectedRole = 'HOD';
+    } else if (cleanType === 'Staff' || cleanType === 'Teacher' || staff || user?.role === 'Staff') {
+      detectedRole = 'Staff';
+    } else if (student || cleanType === 'Student') {
+      detectedRole = 'Student';
+    } else if (user?.role) {
+      detectedRole = user.role;
+    }
+
+    const name = student?.name || staff?.name || user?.name || cleanId || 'Borrower';
+    const dept = student?.dept || student?.department || staff?.dept || staff?.department || user?.department || user?.dept || 'General';
+    const displayId = student?.rollNo || student?.registerNumber || student?.studentId || staff?.id || user?.referenceId || cleanId;
+    const email = student?.email || staff?.email || user?.email || '';
+
+    const roleBadge = detectedRole === 'HOD'
+      ? { label: 'HOD', bg: 'bg-purple-100 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800' }
+      : detectedRole === 'Staff'
+      ? { label: 'Staff', bg: 'bg-blue-100 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800' }
+      : { label: 'Student', bg: 'bg-emerald-100 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800' };
+
+    return {
+      name,
+      id: displayId,
+      rawId: cleanId,
+      dept,
+      role: detectedRole,
+      roleBadge,
+      email,
+      rawObj: student || staff || user || null
+    };
+  };
+
+  // Directory Member Categories
+  const studentsOnly = (students || []).filter(s => s.role !== 'Staff' && s.role !== 'HOD' && s.userType !== 'Staff' && s.userType !== 'HOD');
+  
+  const staffMap = new Map();
+  (staffList || []).forEach(stf => {
+    const id = stf.id || stf.referenceId || (stf._id ? String(stf._id) : null);
+    if (id) {
+      staffMap.set(String(id), {
+        _id: stf._id,
+        id: id,
+        name: stf.name || 'Staff Member',
+        email: stf.email || '',
+        dept: stf.dept || stf.department || 'General',
+        department: stf.dept || stf.department || 'General',
+        designation: stf.designation || 'Staff',
+        role: (stf.designation === 'HOD' || stf.role === 'HOD') ? 'HOD' : 'Staff'
+      });
+    }
+  });
+  (usersList || []).forEach(u => {
+    if (['Staff', 'HOD', 'Teacher', 'staff', 'hod'].includes(u.role)) {
+      const id = u.referenceId || u.id || (u._id ? String(u._id) : null);
+      if (id && !staffMap.has(String(id))) {
+        const isHod = String(u.role).toUpperCase() === 'HOD';
+        staffMap.set(String(id), {
+          _id: u._id,
+          id: id,
+          name: u.name || 'Faculty Staff',
+          email: u.email || '',
+          dept: u.department || u.dept || 'General',
+          department: u.department || u.dept || 'General',
+          designation: isHod ? 'HOD' : 'Faculty',
+          role: isHod ? 'HOD' : 'Staff'
+        });
+      }
+    }
+  });
+
+  const allStaffAndHod = Array.from(staffMap.values());
+  const facultyOnly = allStaffAndHod.filter(s => s.role !== 'HOD' && s.designation !== 'HOD');
+  const hodOnly = allStaffAndHod.filter(s => s.role === 'HOD' || s.designation === 'HOD');
+
   // Real-time Calculations
   const totalBookTitles = books.length;
   const totalPhysicalCopies = books.reduce((acc, curr) => acc + (Number(curr.totalCopies) || Number(curr.copies) || 1), 0);
@@ -1065,9 +1185,30 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
   };
 
   // Student members list
-  const filteredStudents = students.filter(s => {
+  const filteredStudents = studentsOnly.filter(s => {
     const q = memberSearch.toLowerCase();
     const idToUse = s.id || s.referenceId || s.studentId || s.rollNo || '';
+    return (
+      (s.name || '').toLowerCase().includes(q) ||
+      idToUse.toLowerCase().includes(q) ||
+      (s.dept || s.department || '').toLowerCase().includes(q)
+    );
+  });
+
+  const filteredFaculty = facultyOnly.filter(s => {
+    const q = memberSearch.toLowerCase();
+    const idToUse = s.id || s.referenceId || '';
+    return (
+      (s.name || '').toLowerCase().includes(q) ||
+      idToUse.toLowerCase().includes(q) ||
+      (s.dept || s.department || '').toLowerCase().includes(q) ||
+      (s.designation || '').toLowerCase().includes(q)
+    );
+  });
+
+  const filteredHods = hodOnly.filter(s => {
+    const q = memberSearch.toLowerCase();
+    const idToUse = s.id || s.referenceId || '';
     return (
       (s.name || '').toLowerCase().includes(q) ||
       idToUse.toLowerCase().includes(q) ||
@@ -1708,14 +1849,14 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
     }, 400);
   };
 
-  if (isInitialLoading && books.length === 0 && issues.length === 0) {
-    return (
-      <div className="p-12 text-center text-muted animate-fade-in flex flex-col items-center justify-center gap-3">
-        <RefreshCw size={32} className="animate-spin text-primary" />
-        <p className="font-semibold text-base">Loading Library Records & Central ERP Inventory...</p>
-      </div>
-    );
-  }
+
+
+
+
+
+
+
+
 
   return (
     <div className="library-page animate-fade-in">
@@ -2611,8 +2752,8 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
               ADD NEW BOOK MODAL WITH REAL-TIME DEPT & COURSE SELECTORS
               ========================================================= */}
           {showAddModal && (
-            <div className="lib-modal-overlay" onClick={() => setShowAddModal(false)}>
-              <div className="lib-modal-card animate-fade-in" style={{ maxWidth: '650px', width: '90%' }} onClick={e => e.stopPropagation()}>
+            <div className="lib-modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '4vh' }} onClick={() => setShowAddModal(false)}>
+              <div className="lib-modal-card animate-fade-in" style={{ maxWidth: '820px', width: '95%' }} onClick={e => e.stopPropagation()}>
                 <div className="lib-modal-header border-b border-[var(--border-color)] pb-3">
                   <div>
                     <h2 className="text-xl font-bold flex items-center gap-2">
@@ -2624,7 +2765,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                     <X size={20}/>
                   </button>
                 </div>
-                <form onSubmit={handleAddBookSubmit} className="lib-modal-form space-y-4">
+                <form onSubmit={handleAddBookSubmit} className="lib-modal-form">
                   <div className="form-grid">
                     <div className="form-group">
                       <label className="text-xs font-bold text-muted">Book ID / Code *</label>
@@ -2943,12 +3084,20 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                         </div>
                       </td>
                       <td>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-gray-800 dark:text-white">
-                            {students.find(s => s.id === issue.userId || s.referenceId === issue.userId)?.name || issue.userId}
-                          </span>
-                          <span className="text-xs text-muted">{issue.userId} • {issue.userType}</span>
-                        </div>
+                        {(() => {
+                          const bInfo = getBorrowerInfo(issue.userId, issue.userType);
+                          return (
+                            <div className="flex flex-col">
+                              <span className="font-bold text-gray-800 dark:text-white flex items-center gap-1.5 flex-wrap">
+                                {bInfo.name}
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${bInfo.roleBadge.bg} ${bInfo.roleBadge.text} ${bInfo.roleBadge.border}`}>
+                                  {bInfo.role}
+                                </span>
+                              </span>
+                              <span className="text-xs text-muted font-mono">{bInfo.id} • {bInfo.dept}</span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td>{issue.issueDate ? new Date(issue.issueDate).toLocaleDateString() : '-'}</td>
                       <td className={issue.status === 'Overdue' ? 'text-danger font-bold' : ''}>
@@ -3078,9 +3227,9 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                       <td>
                         <div className="flex flex-col">
                           <span className="font-bold text-gray-800 dark:text-white">
-                            {students.find(s => s.id === issue.userId || s.referenceId === issue.userId)?.name || issue.userId}
+                            {(() => { const b = getBorrowerInfo(issue.userId, issue.userType); return <span className="flex items-center gap-1.5 flex-wrap">{b.name} <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${b.roleBadge.bg} ${b.roleBadge.text} ${b.roleBadge.border}`}>{b.role}</span></span>; })()}
                           </span>
-                          <span className="text-xs text-muted">{issue.userId} • {issue.userType}</span>
+                          <span className="text-xs text-muted font-mono">{getBorrowerInfo(issue.userId, issue.userType).id} • {getBorrowerInfo(issue.userId, issue.userType).dept}</span>
                         </div>
                       </td>
                       <td>{issue.issueDate ? new Date(issue.issueDate).toLocaleDateString() : '-'}</td>
@@ -3282,7 +3431,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
               <table>
                 <thead>
                   <tr>
-                    <th>Student Borrower</th>
+                    <th>Borrower (Student / Staff / HOD)</th>
                     <th>Book Details</th>
                     <th>Allocated Copy</th>
                     <th>Loan Timeline</th>
@@ -3298,8 +3447,8 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                       const tx = req.transactionId || {};
                       const bk = req.bookId || tx.bookId || {};
                       const cp = req.bookCopyId || tx.bookCopyId || {};
-                      const student = students.find(s => s.id === req.userId || s.referenceId === req.userId || s._id === req.userId || s.studentId === req.userId || s.rollNo === req.userId || s.name === req.userId);
-                      const studentName = student?.name || req.userId || '';
+                      const bInfo = getBorrowerInfo(req.userId, req.userType || req.transactionId?.userType);
+                      const studentName = bInfo.name;
 
                       const matchSearch = !q || 
                         (req.userId || '').toLowerCase().includes(q) ||
@@ -3347,8 +3496,8 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                       const transaction = request.transactionId || {};
                       const book = request.bookId || transaction.bookId || {};
                       const copy = request.bookCopyId || transaction.bookCopyId || {};
-                      const student = students.find(s => s.id === request.userId || s.referenceId === request.userId || s._id === request.userId || s.studentId === request.userId || s.rollNo === request.userId || s.name === request.userId);
-                      const studentName = student?.name || request.userId || 'Student';
+                      const bInfo = getBorrowerInfo(request.userId, request.userType || request.transactionId?.userType);
+                      const studentName = bInfo.name;
                       const initials = studentName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || 'ST';
 
                       const isOverdue = transaction.dueDate && new Date() > new Date(transaction.dueDate);
@@ -3365,11 +3514,11 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                               </div>
                               <div className="flex flex-col">
                                 <span className="font-bold text-slate-900 dark:text-white text-xs">
-                                  {studentName}
+                                  {studentName} <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${bInfo.roleBadge.bg} ${bInfo.roleBadge.text} ${bInfo.roleBadge.border}`}>{bInfo.role}</span>
                                 </span>
                                 <span className="text-[11px] text-muted flex items-center gap-1">
-                                  <span className="font-mono">{request.userId}</span>
-                                  {student?.department && <span>• {student.department}</span>}
+                                  <span className="font-mono">{bInfo.id}</span>
+                                  <span>• {bInfo.dept}</span>
                                 </span>
                               </div>
                             </div>
@@ -3715,7 +3864,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                           {/* Student */}
                           <td>
                             <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                              <div className={`w-8 h-8 rounded-full border flex items-center justify-center font-bold text-xs flex-shrink-0 ${bInfo.roleBadge.bg} ${bInfo.roleBadge.text} ${bInfo.roleBadge.border}`}>
                                 {initials}
                               </div>
                               <div className="flex flex-col">
@@ -3993,6 +4142,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                     <th>Book Requested</th>
                     <th>Department / Cat</th>
                     <th>Date Requested</th>
+                    <th>Approved Date</th>
                     <th>Status</th>
                     <th style={{ textAlign: 'right' }}>Workflow Action</th>
                   </tr>
@@ -4028,7 +4178,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                     if (filtered.length === 0) {
                       return (
                         <tr>
-                          <td colSpan="7" className="text-center p-12">
+                          <td colSpan="8" className="text-center p-12">
                             <div className="flex flex-col items-center justify-center gap-2.5 text-muted">
                               <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
                                 <BookmarkCheck size={26} />
@@ -4046,17 +4196,10 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                     }
 
                     return filtered.map(res => {
-                      const studentObj = students.find(s =>
-                        s.id === res.userId ||
-                        s.referenceId === res.userId ||
-                        s.studentId === res.userId ||
-                        s.rollNo === res.userId ||
-                        s.registerNumber === res.userId ||
-                        String(s._id) === String(res.userId)
-                      );
-                      const studentName = studentObj?.name || res.userName || res.userId;
-                      const studentRoll = studentObj?.rollNo || studentObj?.registerNumber || studentObj?.studentId || res.userId;
-                      const studentDept = studentObj?.department || studentObj?.course || res.userType;
+                      const bInfo = getBorrowerInfo(res.userId, res.userType);
+                      const studentName = bInfo.name;
+                      const studentRoll = bInfo.id;
+                      const studentDept = bInfo.dept;
                       const bookTitle = res.bookId?.title || 'Book Title N/A';
                       const bookAuthor = res.bookId?.author || 'Author N/A';
                       const bookCategory = res.bookId?.category || res.bookId?.department || 'General';
@@ -4071,9 +4214,9 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                       <td>
                         <div className="flex flex-col">
                           <span className="font-bold text-gray-800 dark:text-white">
-                            {studentName}
+                            {studentName} <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${bInfo.roleBadge.bg} ${bInfo.roleBadge.text} ${bInfo.roleBadge.border}`}>{bInfo.role}</span>
                           </span>
-                          <span className="text-xs text-muted">{studentRoll} • {studentDept} • {res.userType}</span>
+                          <span className="text-xs text-muted font-mono">{studentRoll} • {studentDept}</span>
                         </div>
                       </td>
                       <td>
@@ -4088,6 +4231,20 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                         </span>
                       </td>
                       <td>{new Date(res.requestDate || res.createdAt).toLocaleDateString()}</td>
+                      <td>
+                        {(res.approvedDate || ((res.status === 'Approved' || res.status === 'Completed' || res.status === 'Issued') ? (res.updatedAt || res.createdAt) : null)) ? (
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-xs text-emerald-700 dark:text-emerald-400">
+                              {new Date(res.approvedDate || res.updatedAt || res.createdAt).toLocaleDateString()}
+                            </span>
+                            <span className="text-[10px] text-muted">
+                              {new Date(res.approvedDate || res.updatedAt || res.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted">-</span>
+                        )}
+                      </td>
                       <td>
                         <span className={`font-bold text-xs uppercase px-2 py-0.5 rounded inline-block ${
                           res.status === 'Approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' :
@@ -4143,24 +4300,75 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
       {/* =========================================================
           TAB 5: STUDENT MEMBERS (AUTOMATIC ERP STUDENTS)
           ========================================================= */}
-      {activeTab === 'Student Members' && (
+      {(activeTab === 'Library Members' || activeTab === 'Student Members') && (
         <div className="lib-tab-content animate-fade-in space-y-4">
           <div className="flex flex-wrap justify-between items-center gap-3">
             <div>
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Users className="text-primary" size={20} /> Student Library Members
+                <Users className="text-primary" size={20} /> Library Members Directory
               </h2>
-              <p className="text-xs text-muted">Automatically synced with ERP student registry with active loan counts and fine records.</p>
+              <p className="text-xs text-muted">Complete academic directory of Students, Faculty Staff, and Department HODs with active book loans and fine records.</p>
             </div>
             <div className="search-box" style={{ maxWidth: '320px' }}>
               <Search size={16} className="text-muted" />
               <input 
                 type="text" 
-                placeholder="Search by student name, register no, dept..." 
+                placeholder="Search by member name, ID, department..." 
                 value={memberSearch}
                 onChange={e => setMemberSearch(e.target.value)}
               />
             </div>
+          </div>
+
+          {/* Member Category Switcher */}
+          <div className="flex items-center gap-2 border-b border-[var(--border-color)] pb-3 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setActiveMemberSubTab('students')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                activeMemberSubTab === 'students'
+                  ? 'bg-primary text-white shadow-glow'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              <GraduationCap size={15} />
+              <span>Student Members</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeMemberSubTab === 'students' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}>
+                {studentsOnly.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMemberSubTab('staff')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                activeMemberSubTab === 'staff'
+                  ? 'bg-blue-600 text-white shadow-glow'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              <UserCheck size={15} />
+              <span>Staff / Faculty Members</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeMemberSubTab === 'staff' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}>
+                {facultyOnly.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMemberSubTab('hod')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                activeMemberSubTab === 'hod'
+                  ? 'bg-purple-600 text-white shadow-glow'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              <Building size={15} />
+              <span>Department HODs</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeMemberSubTab === 'hod' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}>
+                {hodOnly.length}
+              </span>
+            </button>
           </div>
 
           <div className="table-wrapper">
@@ -4168,9 +4376,9 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
               <table>
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Register No</th>
-                    <th>Department</th>
+                    <th>Member Name</th>
+                    <th>{activeMemberSubTab === 'students' ? 'Register No' : activeMemberSubTab === 'hod' ? 'HOD ID' : 'Staff ID'}</th>
+                    <th>Department & Designation</th>
                     <th>Books Borrowed</th>
                     <th>Outstanding Fine</th>
                     <th>Clearance Status</th>
@@ -4178,7 +4386,23 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredStudents.map(student => {
+                  {(() => {
+                    const currentList = activeMemberSubTab === 'hod' ? filteredHods : activeMemberSubTab === 'staff' ? filteredFaculty : filteredStudents;
+                    if (currentList.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="7" className="text-center py-10 text-muted">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <Users size={32} className="text-slate-300 dark:text-slate-600 mb-1" />
+                              <p className="font-semibold text-sm text-slate-700 dark:text-slate-300">
+                                {memberSearch ? `No members match "${memberSearch}"` : `No ${activeMemberSubTab === 'hod' ? 'Department HODs' : activeMemberSubTab === 'staff' ? 'Staff / Faculty members' : 'Student members'} found.`}
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return currentList.map(student => {
                     const studentId = student.id || student.referenceId || student.studentId || student.rollNo || student._id;
                     const studentLoans = issues.filter(i => i.userId === studentId && ['Issued', 'Overdue'].includes(i.status));
                     const studentFines = studentLoans.reduce((acc, curr) => acc + (curr.fineAmount || 0), 0);
@@ -4199,7 +4423,16 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                         </td>
                         <td className="font-mono text-sm font-semibold">{studentId}</td>
                         <td>
-                          <span className="text-sm">{student.dept || student.department || 'CSE'}</span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-sm font-semibold">{student.dept || student.department || 'General'}</span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border w-max ${
+                              student.role === 'HOD' ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 border-purple-200 dark:border-purple-800' :
+                              student.role === 'Staff' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border-blue-200 dark:border-blue-800' :
+                              'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                            }`}>
+                              {student.role === 'HOD' ? 'HOD' : student.role === 'Staff' ? (student.designation || 'Staff') : 'Student'}
+                            </span>
+                          </div>
                         </td>
                         <td>
                           <span className={`px-2 py-0.5 rounded text-xs font-bold ${studentLoans.length > 0 ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}>
@@ -4226,7 +4459,8 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                         </td>
                       </tr>
                     );
-                  })}
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -4239,10 +4473,10 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                 <div className="lib-modal-header border-b border-[var(--border-color)] pb-3">
                   <div>
                     <h2 className="text-lg font-bold flex items-center gap-2">
-                      <Users className="text-primary" size={20} /> Student Library History
+                      <Users className="text-primary" size={20} /> Member Library Card & History
                     </h2>
                     <p className="text-xs text-muted">
-                      {selectedMemberForDetails.student.name} • {selectedMemberForDetails.student.id || selectedMemberForDetails.student.rollNo}
+                      {(selectedMemberForDetails.member?.name || selectedMemberForDetails.student?.name)} • {(selectedMemberForDetails.member?.id || selectedMemberForDetails.member?.referenceId || selectedMemberForDetails.student?.id || selectedMemberForDetails.student?.rollNo)}
                     </p>
                   </div>
                   <button className="modal-close-btn" onClick={() => setSelectedMemberForDetails(null)}><X size={20}/></button>
@@ -4251,7 +4485,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                   <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 text-xs">
                     <div>
                       <span className="text-muted block">Department:</span>
-                      <span className="font-bold">{selectedMemberForDetails.student.dept || selectedMemberForDetails.student.department || 'CSE'}</span>
+                      <span className="font-bold">{selectedMemberForDetails.member?.dept || selectedMemberForDetails.member?.department || selectedMemberForDetails.student?.dept || selectedMemberForDetails.student?.department || 'General'}</span>
                     </div>
                     <div>
                       <span className="text-muted block">Outstanding Fine:</span>
@@ -5784,7 +6018,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                   </div>
                   <button className="modal-close-btn" onClick={() => setShowUploadDigitalModal(false)}><X size={20}/></button>
                 </div>
-                <form onSubmit={handleAddDigitalSubmit} className="lib-modal-form space-y-4">
+                <form onSubmit={handleAddDigitalSubmit} className="lib-modal-form">
                   <div className="form-group">
                     <label className="text-xs font-bold text-muted">Resource Title *</label>
                     <input 
@@ -5840,7 +6074,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
               </div>
               <button className="modal-close-btn" onClick={() => setShowIssueModal(false)}><X size={20}/></button>
             </div>
-            <form onSubmit={handleIssueSubmit} className="lib-modal-form space-y-4">
+            <form onSubmit={handleIssueSubmit} className="lib-modal-form">
               <div className="form-group">
                 <label className="text-xs font-bold text-muted">Select Catalog Book *</label>
                 <select 
@@ -5858,12 +6092,44 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
               </div>
 
               <div className="form-group">
-                <label className="text-xs font-bold text-muted">Select Borrower Student *</label>
+                <label className="text-xs font-bold text-muted mb-1.5 block">Borrower Category *</label>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  {[
+                    { key: 'Student', label: '🎓 Student', count: studentsOnly.length },
+                    { key: 'Staff', label: '👨‍🏫 Staff / Faculty', count: facultyOnly.length },
+                    { key: 'HOD', label: '🏛️ Dept HOD', count: hodOnly.length }
+                  ].map(bType => (
+                    <button
+                      key={bType.key}
+                      type="button"
+                      onClick={() => {
+                        setIssueFormData({
+                          ...issueFormData,
+                          userType: bType.key,
+                          regNo: '',
+                          studentName: ''
+                        });
+                      }}
+                      className={`py-2 px-2 rounded-lg text-xs font-bold border transition-all text-center flex flex-col items-center gap-0.5 ${
+                        (issueFormData.userType || 'Student') === bType.key
+                          ? 'bg-primary/10 border-primary text-primary shadow-sm font-extrabold'
+                          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span>{bType.label}</span>
+                      <span className="text-[10px] font-normal opacity-75">({bType.count})</span>
+                    </button>
+                  ))}
+                </div>
+                <label className="text-xs font-bold text-muted">
+                  Select {issueFormData.userType === 'HOD' ? 'Department HOD' : issueFormData.userType === 'Staff' ? 'Staff / Faculty Member' : 'Student'} *
+                </label>
                 <select 
                   required 
                   value={issueFormData.regNo}
                   onChange={e => {
-                    const sel = students.find(s => (s.id || s.referenceId || s.studentId || s._id) === e.target.value);
+                    const currentList = issueFormData.userType === 'HOD' ? hodOnly : issueFormData.userType === 'Staff' ? facultyOnly : studentsOnly;
+                    const sel = currentList.find(s => String(s.id || s.referenceId || s.studentId || s.rollNo || s._id) === e.target.value);
                     setIssueFormData({
                       ...issueFormData,
                       regNo: e.target.value,
@@ -5871,12 +6137,12 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                     });
                   }}
                 >
-                  <option value="">-- Choose Student --</option>
-                  {students.map(s => {
+                  <option value="">-- Choose {issueFormData.userType === 'HOD' ? 'HOD' : issueFormData.userType === 'Staff' ? 'Staff Member' : 'Student'} --</option>
+                  {(issueFormData.userType === 'HOD' ? hodOnly : issueFormData.userType === 'Staff' ? facultyOnly : studentsOnly).map(s => {
                     const sid = s.id || s.referenceId || s.studentId || s._id;
                     return (
                       <option key={s._id || sid} value={sid}>
-                        {s.name} ({sid}) - {s.dept || s.department || 'CSE'}
+                        {s.name} ({sid}) - {s.dept || s.department || 'General'}{s.designation ? ` [${s.designation}]` : ''}
                       </option>
                     );
                   })}
