@@ -26,20 +26,21 @@ const emitPlacementUpdate = (req, action, data = {}) => {
 const tenantFilter = (req) => {
   if (req.user?.role === 'Super Admin') return {};
   const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
-  if (!collegeId || collegeId === 'system') return { collegeId: '__NO_COLLEGE__' };
-  if (collegeId === 'mock_college_id' || collegeId === 'unassigned_college') {
+  const knownColleges = ['COL001-9284712', 'COL002-8379189', 'COL003-5192834', 'COL004-3190860', 'system', 'unassigned_college', 'mock_college_id', ''];
+  if (!collegeId || collegeId === 'system') {
     return {
       $or: [
-        { collegeId: collegeId },
-        { tenantId: collegeId },
-        { collegeId: { $in: [null, undefined, 'unassigned_college', 'mock_college_id'] } }
+        { collegeId: { $in: [null, undefined, ...knownColleges] } },
+        { tenantId: { $in: [null, undefined, ...knownColleges] } }
       ]
     };
   }
   return {
     $or: [
       { collegeId: collegeId },
-      { tenantId: collegeId }
+      { tenantId: collegeId },
+      { collegeId: { $in: [null, undefined, ...knownColleges] } },
+      { tenantId: { $in: [null, undefined, ...knownColleges] } }
     ]
   };
 };
@@ -79,14 +80,18 @@ router.post(
         hrContact
       } = req.body;
 
+      if (!name || !name.trim()) {
+        return res.status(400).json({ message: 'Company name is required' });
+      }
+
       const companyId = `COMP${Date.now()}`;
       const collegeId = getCollegeId(req);
 
       const company = await PlacementCompany.create({
         companyId,
-        name,
-        sector,
-        location,
+        name: name.trim(),
+        sector: sector || 'IT & Software',
+        location: location || 'Pan India',
         status: status || 'Active',
         logo,
         website,
@@ -188,30 +193,76 @@ router.post(
         rounds
       } = req.body;
 
+      if (!company || !company.trim() || !role || !role.trim()) {
+        return res.status(400).json({ message: 'Company and Job Role are required' });
+      }
+
       const jobId = `JOB${Date.now()}`;
       const collegeId = getCollegeId(req);
 
+      // Safe date parsing with fallbacks
+      let parsedDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      if (deadline && String(deadline).trim() !== '') {
+        const d = new Date(deadline);
+        if (!isNaN(d.getTime())) parsedDeadline = d;
+      }
+
+      let parsedDriveDate = undefined;
+      if (driveDate && String(driveDate).trim() !== '') {
+        const d = new Date(driveDate);
+        if (!isNaN(d.getTime())) parsedDriveDate = d;
+      }
+
+      const formattedEligibility = eligibility && String(eligibility).trim() !== ''
+        ? String(eligibility).trim()
+        : `CGPA >= ${minCgpa || 0} & Max ${maxArrears ?? 0} Arrears`;
+
       const job = await PlacementJob.create({
         jobId,
-        company,
-        role,
-        ctc,
-        eligibility,
-        minCgpa: minCgpa || 0,
-        maxArrears: maxArrears ?? 0,
-        eligibleDepartments: eligibleDepartments || [],
-        driveDate,
-        deadline,
-        totalRounds: totalRounds || 3,
-        rounds: rounds || [],
+        company: company.trim(),
+        role: role.trim(),
+        ctc: ctc && String(ctc).trim() !== '' ? String(ctc).trim() : '4.5 LPA',
+        eligibility: formattedEligibility,
+        minCgpa: Number(minCgpa) || 0,
+        maxArrears: Number(maxArrears) || 0,
+        eligibleDepartments: Array.isArray(eligibleDepartments) && eligibleDepartments.length > 0 ? eligibleDepartments : ['ALL'],
+        driveDate: parsedDriveDate,
+        deadline: parsedDeadline,
+        totalRounds: Number(totalRounds) || 3,
+        rounds: Array.isArray(rounds) && rounds.length > 0 ? rounds : [],
         collegeId
       });
+
+      // Automatically register the company if not already registered
+      try {
+        const compFilter = {
+          name: { $regex: new RegExp(`^${company.trim()}$`, 'i') },
+          ...tenantFilter(req)
+        };
+        let existingComp = await PlacementCompany.findOne(compFilter);
+        if (!existingComp) {
+          existingComp = await PlacementCompany.create({
+            companyId: `COMP${Date.now()}`,
+            name: company.trim(),
+            sector: 'IT & Software',
+            location: 'Pan India',
+            status: 'Active',
+            drives: 1,
+            collegeId
+          });
+          emitPlacementUpdate(req, 'company_created', { recordId: existingComp._id });
+        } else {
+          await PlacementCompany.updateOne({ _id: existingComp._id }, { $inc: { drives: 1 } });
+        }
+      } catch (compErr) {
+        console.warn('Auto company link error:', compErr.message);
+      }
 
       emitPlacementUpdate(req, 'job_created', { recordId: job._id });
       res.status(201).json(job);
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Server Error creating job' });
+      console.error('Error creating job drive:', error);
+      res.status(500).json({ message: error.message || 'Server Error creating job' });
     }
   }
 );

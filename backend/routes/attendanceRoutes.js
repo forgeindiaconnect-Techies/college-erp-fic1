@@ -25,7 +25,7 @@ const updateStudentAttendancePercentage = async (studentId, req) => {
 };
 
 // Get all attendance records
-router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff'), requirePermission('view_attendance'), departmentScope, collegeScope, async (req, res) => {
+router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff', 'Super Admin', 'Placement', 'Placement Officer', 'PlacementOfficer', 'Placement Cell'), requirePermission('view_attendance'), departmentScope, collegeScope, async (req, res) => {
   try {
     const dept = req.dept || req.query.dept;
     const query = dept ? { department: dept } : {}; if (req.collegeId) query.tenantId = req.collegeId;

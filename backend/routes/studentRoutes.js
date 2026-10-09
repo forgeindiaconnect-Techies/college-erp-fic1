@@ -22,7 +22,7 @@ router.delete('/:id/payment/:paymentId', protect, authorize('Admin', 'Sub Admin'
 
 
 // Get all students
-router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff', 'Accounts', 'Hostel', 'Librarian', 'Library', 'Super Admin'), collegeScope, async (req, res) => {
+router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff', 'Accounts', 'Hostel', 'Librarian', 'Library', 'Super Admin', 'Placement', 'Placement Officer', 'PlacementOfficer', 'Placement Cell'), collegeScope, async (req, res) => {
   try {
     const dept = req.dept || req.query.dept;
     const targetCollegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;

@@ -205,25 +205,91 @@ export default function HodPlacements() {
 
       const deptStudentRegNos = enrichedStudents.map(s => (s.id || s.rollNo || s.regNo || '').toLowerCase());
 
-      // Jobs
-      const rawJobs = Array.isArray(jobsRes.data) ? jobsRes.data : (jobsRes.data?.jobs || []);
-      setJobs(rawJobs);
+      // Jobs with multi-key scanning
+      let rawJobs = Array.isArray(jobsRes.data) ? jobsRes.data : (jobsRes.data?.jobs || []);
+      const jobMap = new Map();
+      rawJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_jobs')) {
+          try {
+            const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(localItems)) {
+              localItems.forEach(lj => {
+                const ljId = String(lj._id || lj.jobId || lj.id);
+                if (ljId && !jobMap.has(ljId)) jobMap.set(ljId, lj);
+              });
+            }
+          } catch (e) {}
+        }
+      }
+      setJobs(Array.from(jobMap.values()));
 
-      // Applications
-      const rawApps = Array.isArray(appsRes.data) ? appsRes.data : (appsRes.data?.applications || []);
-      const deptApps = rawApps.filter(app => 
+      // Applications with multi-key scanning
+      let rawApps = Array.isArray(appsRes.data) ? appsRes.data : (appsRes.data?.applications || []);
+      const appMap = new Map();
+      rawApps.forEach(a => appMap.set(String(a._id || a.appId || a.id || `${a.regNo}_${a.jobId}`), a));
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_applications')) {
+          try {
+            const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(localItems)) {
+              localItems.forEach(la => {
+                const laId = String(la._id || la.appId || la.id || `${la.regNo}_${la.jobId}`);
+                if (laId && !appMap.has(laId)) appMap.set(laId, la);
+              });
+            }
+          } catch (e) {}
+        }
+      }
+      const deptApps = Array.from(appMap.values()).filter(app => 
         isSameDepartment(app.dept || app.department, deptName) || deptStudentRegNos.includes((app.regNo || '').toLowerCase())
       );
       setApplications(deptApps);
 
-      // Interviews
-      setInterviews(Array.isArray(intRes.data) ? intRes.data : (intRes.data?.interviews || []));
+      // Interviews with multi-key scanning
+      let rawInt = Array.isArray(intRes.data) ? intRes.data : (intRes.data?.interviews || []);
+      const intMap = new Map();
+      rawInt.forEach(it => intMap.set(String(it._id || it.intId || it.id || `${it.candidateName}_${it.company}`), it));
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_interviews')) {
+          try {
+            const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(localItems)) {
+              localItems.forEach(lit => {
+                const litId = String(lit._id || lit.intId || lit.id || `${lit.candidateName}_${lit.company}`);
+                if (litId && !intMap.has(litId)) intMap.set(litId, lit);
+              });
+            }
+          } catch (e) {}
+        }
+      }
+      setInterviews(Array.from(intMap.values()));
 
-      // Selections
-      const rawSelections = Array.isArray(selRes.data) 
-        ? selRes.data.filter(s => isSameDepartment(s.dept || s.department, deptName))
-        : (Array.isArray(selRes.data?.selections) ? selRes.data.selections.filter(s => isSameDepartment(s.dept || s.department, deptName)) : []);
-      setSelections(rawSelections);
+      // Selections with multi-key scanning
+      let rawSelections = Array.isArray(selRes.data) ? selRes.data : (selRes.data?.selections || []);
+      const selMap = new Map();
+      rawSelections.forEach(s => selMap.set(String(s._id || s.selId || s.id || `${s.regNo}_${s.company}`), s));
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_selections')) {
+          try {
+            const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(localItems)) {
+              localItems.forEach(ls => {
+                const lsId = String(ls._id || ls.selId || ls.id || `${ls.regNo}_${ls.company}`);
+                if (lsId && !selMap.has(lsId)) selMap.set(lsId, ls);
+              });
+            }
+          } catch (e) {}
+        }
+      }
+      const deptSelections = Array.from(selMap.values()).filter(sel => 
+        isSameDepartment(sel.dept || sel.department, deptName) || deptStudentRegNos.includes((sel.regNo || '').toLowerCase())
+      );
+      setSelections(deptSelections);
 
     } catch (err) {
       console.error("Failed to fetch HOD placement data", err);

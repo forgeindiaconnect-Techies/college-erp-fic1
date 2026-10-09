@@ -23,7 +23,8 @@ import {
   getAllFees,
   getAllMarks,
   createMark,
-  approveMark
+  approveMark,
+  getPlacementJobs
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
@@ -79,6 +80,7 @@ const HodDashboard = () => {
   const [approvingBatchId, setApprovingBatchId] = useState(null);
   const [liveMonitoring, setLiveMonitoring] = useState([]);
   const [loadingMonitoring, setLoadingMonitoring] = useState(true);
+  const [placementJobs, setPlacementJobs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Student Directory Filters in Dashboard
@@ -111,7 +113,8 @@ const HodDashboard = () => {
         attendanceResponse,
         feesResponse,
         marksResponse,
-        monitoringResponse
+        monitoringResponse,
+        jobsResponse
       ] = await Promise.all([
         getStudents().catch(() => ({ data: [] })),
         getStaff().catch(() => ({ data: [] })),
@@ -120,8 +123,31 @@ const HodDashboard = () => {
         getAllAttendance().catch(() => ({ data: [] })),
         getAllFees().catch(() => ({ data: [] })),
         getAllMarks().catch(() => ({ data: [] })),
-        getHodClassMonitoring(deptName).catch(() => ({ data: [] }))
+        getHodClassMonitoring(deptName).catch(() => ({ data: [] })),
+        getPlacementJobs().catch(() => ({ data: [] }))
       ]);
+
+      // Multi-key placement jobs loader
+      let rawJobs = Array.isArray(jobsResponse?.data) ? jobsResponse.data : (jobsResponse?.data?.jobs || []);
+      const jobMap = new Map();
+      rawJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_jobs')) {
+          try {
+            const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(localItems)) {
+              localItems.forEach(lj => {
+                const ljId = String(lj._id || lj.jobId || lj.id);
+                if (ljId && !jobMap.has(ljId)) {
+                  jobMap.set(ljId, lj);
+                }
+              });
+            }
+          } catch (err) {}
+        }
+      }
+      setPlacementJobs(Array.from(jobMap.values()));
 
       const readArray = (response, key) => {
         const data = response?.data;
@@ -243,6 +269,7 @@ const HodDashboard = () => {
 
     window.addEventListener('erp_marks_updated', handleMarksRefresh);
     window.addEventListener('erp_marks_submitted', handleMarksRefresh);
+    window.addEventListener('erp_placement_updated', handleMarksRefresh);
     window.addEventListener('storage', handleMarksRefresh);
 
     const timer = setTimeout(() => setAnimate(true), 100);
@@ -250,6 +277,7 @@ const HodDashboard = () => {
       clearTimeout(timer);
       window.removeEventListener('erp_marks_updated', handleMarksRefresh);
       window.removeEventListener('erp_marks_submitted', handleMarksRefresh);
+      window.removeEventListener('erp_placement_updated', handleMarksRefresh);
       window.removeEventListener('storage', handleMarksRefresh);
     };
   }, [navigate, fetchLiveData, hodSession]);
@@ -834,6 +862,108 @@ const HodDashboard = () => {
           <span>Upcoming Exams</span>
           <strong>{upcomingExams}</strong>
         </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/hod/placements')}
+          className="hod-summary-card"
+          style={{ border: '1px solid #10b981', background: '#ecfdf5' }}
+        >
+          <Briefcase size={22} color="#059669" />
+          <span style={{ color: '#047857' }}>Placement Drives</span>
+          <strong style={{ color: '#059669' }}>{placementJobs.length} Active</strong>
+        </button>
+      </div>
+
+      {/* ======================================================== */}
+      {/* 💼 DEPARTMENT CAMPUS PLACEMENT & RECRUITMENT DRIVES      */}
+      {/* ======================================================== */}
+      <div style={{
+        background: '#ffffff',
+        borderRadius: '16px',
+        border: '1px solid #e2e8f0',
+        padding: '20px 24px',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(5,150,105,0.2)' }}>
+              <Briefcase size={20} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                Department Placement & Campus Hiring Drives ({placementJobs.length})
+              </h3>
+              <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                Active campus recruitment drives, student eligibility, corporate CTC compensation packages, and selection offers.
+              </p>
+            </div>
+          </div>
+
+          <button 
+            type="button" 
+            onClick={() => navigate('/hod/placements')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#059669', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Placement Cell & Applications ({placementJobs.length} Drives) →
+          </button>
+        </div>
+
+        {placementJobs.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+            {placementJobs.slice(0, 3).map((job, idx) => (
+              <div 
+                key={job._id || job.jobId || idx}
+                onClick={() => navigate('/hod/placements')}
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
+                      {job.company || job.companyName || 'Corporate Recruiter'}
+                    </h4>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                      {job.role || job.title || job.designation || 'Software Engineer / Analyst'}
+                    </p>
+                  </div>
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: job.status === 'Active' || job.status === 'Ongoing' || !job.status ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
+                    color: job.status === 'Active' || job.status === 'Ongoing' || !job.status ? '#059669' : '#64748b',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {job.status || 'Active Drive'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', color: '#475569', paddingTop: '8px', borderTop: '1px dashed #e2e8f0' }}>
+                  <span>Package: <strong style={{ color: '#059669' }}>{job.package || job.ctc || job.salary || '4.5 - 8.0 LPA'}</strong></span>
+                  <span>Min CGPA: <strong>{job.minCgpa || job.eligibilityCgpa || '6.0'}</strong></span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: '20px', textAlign: 'center', background: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1' }}>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>No active campus placement drives found.</p>
+          </div>
+        )}
       </div>
 
       {/* ======================================================== */}

@@ -25,41 +25,52 @@
   margin-bottom: 24px;
 }
 
-/* ── Modern Bulletproof ERP Modal Styling (Zero-Scrollbar Compact Layout) ── */
+/* ── Modern User-Friendly ERP Modal Styling ── */
 .modal-overlay, .erp-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(15, 23, 42, 0.72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 99999;
-  padding: 16px;
-  overflow: hidden;
-  animation: erpModalFadeIn 0.2s ease-out;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(15, 23, 42, 0.75) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 999999 !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+  animation: erpModalFadeIn 0.18s ease-out;
 }
 
 .modal-content, .erp-modal-box {
-  background: var(--bg-card, #ffffff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 16px;
-  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1);
-  overflow: hidden;
-  max-height: 94vh;
-  margin: auto;
-  display: flex;
-  flex-direction: column;
-  position: relative;
+  background: var(--bg-card, #ffffff) !important;
+  border: 1px solid var(--border-color, #e2e8f0) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.15) !important;
+  width: 100% !important;
+  max-width: 860px !important;
+  max-height: min(92vh, 800px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+  overflow: hidden !important;
+  margin: auto !important;
   animation: erpModalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .erp-modal-box > form,
 .erp-modal-form {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: calc(min(92vh, 800px) - 65px) !important;
+  overflow: hidden !important;
 }
 
 @keyframes erpModalFadeIn {
@@ -68,30 +79,31 @@
 }
 
 @keyframes erpModalScaleIn {
-  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  from { opacity: 0; transform: scale(0.97) translateY(8px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .erp-modal-header {
-  padding: 14px 20px;
-  background: var(--bg-secondary, #f8fafc);
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
+  padding: 14px 22px !important;
+  background: var(--bg-secondary, #f8fafc) !important;
+  border-bottom: 1px solid var(--border-color, #e2e8f0) !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+  z-index: 10 !important;
 }
 
 .erp-modal-header-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .erp-modal-icon-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -100,23 +112,23 @@
 
 .erp-modal-title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-weight: 800;
   color: var(--text-main, #0f172a);
   letter-spacing: -0.01em;
 }
 
 .erp-modal-subtitle {
-  margin: 1px 0 0 0;
-  font-size: 0.75rem;
+  margin: 2px 0 0 0;
+  font-size: 0.78rem;
   color: var(--text-muted, #64748b);
   font-weight: 500;
 }
 
 .erp-modal-close {
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   border: 1px solid var(--border-color, #e2e8f0);
   background: #ffffff;
   color: var(--text-muted, #64748b);
@@ -136,17 +148,31 @@
 }
 
 .erp-modal-body {
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
+  padding: 18px 22px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.erp-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.erp-modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 
 .erp-form-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .erp-form-label {
@@ -155,7 +181,7 @@
   color: var(--text-main, #334155);
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .erp-form-label .req {
@@ -167,17 +193,17 @@
   display: flex;
   align-items: center;
   width: 100%;
-  height: 38px;
+  height: 40px;
   background: var(--bg-card, #ffffff);
   border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 8px;
+  border-radius: 9px;
   transition: all 0.15s ease;
   overflow: hidden;
 }
 
 .erp-input-group:focus-within {
-  border-color: #2563eb !important;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14) !important;
+  border-color: #16a34a !important;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15) !important;
   background: #ffffff;
 }
 
@@ -185,7 +211,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 6px 0 10px;
+  padding: 0 8px 0 10px;
   color: #64748b;
   flex-shrink: 0;
   background: transparent;
@@ -197,9 +223,9 @@
   height: 100%;
   border: none !important;
   background: transparent !important;
-  padding: 0 10px 0 2px !important;
+  padding: 0 10px 0 4px !important;
   color: var(--text-main, #0f172a) !important;
-  font-size: 0.84rem !important;
+  font-size: 0.85rem !important;
   font-weight: 500 !important;
   outline: none !important;
   box-shadow: none !important;
@@ -217,9 +243,9 @@
   height: 100%;
   border: none !important;
   background: transparent !important;
-  padding: 0 10px 0 2px !important;
+  padding: 0 10px 0 4px !important;
   color: var(--text-main, #0f172a) !important;
-  font-size: 0.84rem !important;
+  font-size: 0.85rem !important;
   font-weight: 500 !important;
   outline: none !important;
   cursor: pointer;
@@ -227,24 +253,25 @@
 }
 
 .erp-modal-footer {
-  padding: 12px 20px;
-  background: var(--bg-secondary, #f8fafc);
-  border-top: 1px solid var(--border-color, #e2e8f0);
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
+  padding: 12px 20px !important;
+  background: var(--bg-secondary, #f8fafc) !important;
+  border-top: 1px solid var(--border-color, #e2e8f0) !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-shrink: 0 !important;
+  z-index: 10 !important;
 }
 
 .erp-btn-cancel {
-  padding: 7px 16px;
+  padding: 9px 18px;
   background: #ffffff;
   border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 8px;
+  border-radius: 9px;
   color: #475569;
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -252,36 +279,37 @@
 .erp-btn-cancel:hover {
   background: #f1f5f9;
   color: #0f172a;
+  border-color: #94a3b8;
 }
 
 .erp-btn-submit {
-  padding: 7px 18px;
+  padding: 9px 22px;
   background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   border: none;
-  border-radius: 8px;
+  border-radius: 9px;
   color: #ffffff;
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 7px;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
   transition: all 0.15s ease;
 }
 
 .erp-btn-submit:hover {
   background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
   transform: translateY(-1px);
 }
 
 .erp-btn-submit.green {
   background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
 }
 
 .erp-btn-submit.green:hover {
   background: linear-gradient(135deg, #15803d 0%, #166534 100%);
-  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.35);
+  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.35);
 }

@@ -7,13 +7,14 @@ import {
 import {
   ClipboardList, BookOpen, AlertCircle, FileText,
   Percent, Calendar, ShieldAlert, Clock, MapPin, Play, CheckCircle2, Download, ExternalLink,
-  GraduationCap, CreditCard, Sparkles, RefreshCw, ChevronRight, Award, UserCheck, Inbox
+  GraduationCap, CreditCard, Sparkles, RefreshCw, ChevronRight, Award, UserCheck, Inbox,
+  Briefcase, Building
 } from 'lucide-react';
 import { 
   getStudentById, getAttendanceByStudent, 
   getMarksByStudent, getFeesByStudent, getExams,
   getTimetable, getNotifications, getMyLibraryTransactions, getSubjects,
-  getClassAdvisorInfo, getStudentLiveClass, getAssignments
+  getClassAdvisorInfo, getStudentLiveClass, getAssignments, getPlacementJobs
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import './StudentDashboard.css';
@@ -42,6 +43,7 @@ const StudentDashboard = () => {
   // Live Class State
   const [liveClassSession, setLiveClassSession] = useState(null);
   const [todayMaterials, setTodayMaterials] = useState([]);
+  const [activeDrives, setActiveDrives] = useState([]);
 
   const loadLiveSession = useCallback(async () => {
     try {
@@ -336,6 +338,32 @@ const StudentDashboard = () => {
 
       setTodaySchedule(mappedSchedule);
 
+      // 10. Active Placement Drives
+      try {
+        const jobsRes = await getPlacementJobs().catch(() => ({ data: [] }));
+        let rawJobs = Array.isArray(jobsRes?.data) ? jobsRes.data : (jobsRes?.data?.jobs || []);
+        const jobMap = new Map();
+        rawJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
+
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('erp_placement_jobs')) {
+            try {
+              const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+              if (Array.isArray(localItems)) {
+                localItems.forEach(lj => {
+                  const ljId = String(lj._id || lj.jobId || lj.id);
+                  if (ljId && !jobMap.has(ljId)) {
+                    jobMap.set(ljId, lj);
+                  }
+                });
+              }
+            } catch (err) {}
+          }
+        }
+        setActiveDrives(Array.from(jobMap.values()));
+      } catch (e) {}
+
       // Fetch live session and uploaded class notes
       await loadLiveSession();
 
@@ -594,6 +622,71 @@ const StudentDashboard = () => {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* ── Campus Placement & Career Drives Highlight Banner ── */}
+      <div className="glass-card" style={{ padding: '20px', background: 'linear-gradient(135deg, rgba(37,99,235,0.04) 0%, rgba(22,163,74,0.04) 100%)', border: '1px solid var(--border-color, #e2e8f0)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: 42, height: 42, borderRadius: '12px', background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(37,99,235,0.2)' }}>
+              <Briefcase size={22} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                Campus Placement & Career Opportunities ({activeDrives.length})
+              </h3>
+              <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)' }}>
+                Apply for active corporate recruitment drives, track eligibility cutoffs, and view interview calls.
+              </p>
+            </div>
+          </div>
+
+          <button 
+            type="button" 
+            onClick={() => navigate('/student/placements')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 6px rgba(37,99,235,0.2)' }}
+          >
+            Explore Placement Cell ({activeDrives.length} Drives) →
+          </button>
+        </div>
+
+        {activeDrives.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+            {activeDrives.slice(0, 3).map((job, idx) => (
+              <div 
+                key={job._id || job.jobId || idx}
+                onClick={() => navigate('/student/placements')}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid var(--border-color, #e2e8f0)',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '10px',
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '2px 6px', borderRadius: '4px', display: 'inline-block', marginBottom: '4px' }}>
+                    {job.ctc || '4.5 LPA'}
+                  </div>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>{job.role}</h4>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#2563eb', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Building size={12} /> {job.company}
+                  </p>
+                </div>
+                <ChevronRight size={18} color="#94a3b8" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: '12px', textAlign: 'center', background: 'rgba(255,255,255,0.6)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            No active campus drives scheduled right now. Check back soon for upcoming corporate drives!
+          </div>
+        )}
       </div>
 
       {/* ── Quick Operations Action Bar ── */}

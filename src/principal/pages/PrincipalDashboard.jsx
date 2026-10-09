@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getUsers, getStaffSupportRequests, getClassMonitoringDailyStatus, getPrincipalClassSummary } from '../../api/index';
+import { getUsers, getStaffSupportRequests, getClassMonitoringDailyStatus, getPrincipalClassSummary, getPlacementJobs } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import { 
   Building2, Users, GraduationCap, UserCheck, 
@@ -17,6 +17,7 @@ export default function PrincipalDashboard() {
   
   // Data State
   const [allUsers, setAllUsers] = useState([]);
+  const [placementJobs, setPlacementJobs] = useState([]);
   const [metrics, setMetrics] = useState({
     students: 0,
     staff: 0,
@@ -34,10 +35,33 @@ export default function PrincipalDashboard() {
     pendingAttendance: 0
   });
 
-  // Fetch Users from Database
+  // Fetch Users and Placement Data from Database
   const fetchData = useCallback(() => {
     getPrincipalClassSummary()
       .then(res => { if (res?.data) setAcademicSummary(res.data); })
+      .catch(err => console.error(err));
+
+    getPlacementJobs()
+      .then(res => {
+        let rawJobs = Array.isArray(res?.data) ? res.data : (res?.data?.jobs || []);
+        const jobMap = new Map();
+        rawJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('erp_placement_jobs')) {
+            try {
+              const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+              if (Array.isArray(localItems)) {
+                localItems.forEach(lj => {
+                  const ljId = String(lj._id || lj.jobId || lj.id);
+                  if (ljId && !jobMap.has(ljId)) jobMap.set(ljId, lj);
+                });
+              }
+            } catch (err) {}
+          }
+        }
+        setPlacementJobs(Array.from(jobMap.values()));
+      })
       .catch(err => console.error(err));
 
     getUsers()
@@ -86,6 +110,16 @@ export default function PrincipalDashboard() {
         console.error(e);
       }
     }
+
+    const handlePlacementRefresh = () => {
+      fetchData();
+    };
+    window.addEventListener('erp_placement_updated', handlePlacementRefresh);
+    window.addEventListener('storage', handlePlacementRefresh);
+    return () => {
+      window.removeEventListener('erp_placement_updated', handlePlacementRefresh);
+      window.removeEventListener('storage', handlePlacementRefresh);
+    };
   }, [fetchData]);
 
   if (loading) {
@@ -409,15 +443,105 @@ export default function PrincipalDashboard() {
           </div>
         </div>
 
-        <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', borderLeft: '4px solid #EC4899' }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(236, 72, 153, 0.1)', color: '#EC4899', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Users size={22} />
+        <div className="glass-card" onClick={() => navigate('/principal/placements')} style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', borderLeft: '4px solid #2563EB', cursor: 'pointer' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(37, 99, 235, 0.1)', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Briefcase size={22} />
           </div>
           <div>
-            <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Enrolled Students</p>
-            <h3 style={{ margin: '2px 0 0', fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{metrics.students}</h3>
+            <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Placement Drives</p>
+            <h3 style={{ margin: '2px 0 0', fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{placementJobs.length}</h3>
           </div>
         </div>
+      </div>
+
+      {/* Institutional Campus Placements & Hiring Drives Showcase */}
+      <div style={{
+        background: 'var(--bg-card, #ffffff)',
+        borderRadius: '16px',
+        border: '1px solid var(--border-color, #e2e8f0)',
+        padding: '20px 24px',
+        boxShadow: 'var(--shadow-card, 0 2px 10px rgba(0,0,0,0.02))',
+        marginBottom: '1.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(37,99,235,0.2)' }}>
+              <Briefcase size={20} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                Institutional Campus Placements & Hiring Drives ({placementJobs.length})
+              </h3>
+              <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)' }}>
+                College-wide corporate recruitment drives, CTC packages, eligibility thresholds, and campus hiring offers.
+              </p>
+            </div>
+          </div>
+
+          <button 
+            type="button" 
+            onClick={() => navigate('/principal/placements')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Institutional Placement Console ({placementJobs.length} Drives) →
+          </button>
+        </div>
+
+        {placementJobs.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+            {placementJobs.slice(0, 3).map((job, idx) => (
+              <div 
+                key={job._id || job.jobId || idx}
+                onClick={() => navigate('/principal/placements')}
+                style={{
+                  background: 'var(--bg-primary, #f8fafc)',
+                  border: '1px solid var(--border-color, #e2e8f0)',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                      {job.company || job.companyName || 'Corporate Recruiter'}
+                    </h4>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', fontWeight: 600 }}>
+                      {job.role || job.title || job.designation || 'Graduate Engineer / Associate'}
+                    </p>
+                  </div>
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: job.status === 'Active' || job.status === 'Ongoing' || !job.status ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
+                    color: job.status === 'Active' || job.status === 'Ongoing' || !job.status ? '#059669' : '#64748b',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {job.status || 'Active Drive'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', color: 'var(--text-muted, #475569)', paddingTop: '8px', borderTop: '1px dashed var(--border-color, #e2e8f0)' }}>
+                  <span>Package: <strong style={{ color: '#059669' }}>{job.package || job.ctc || job.salary || '4.5 - 8.0 LPA'}</strong></span>
+                  <span>Min CGPA: <strong>{job.minCgpa || job.eligibilityCgpa || '6.0'}</strong></span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: '20px', textAlign: 'center', background: 'var(--bg-primary, #f8fafc)', borderRadius: '10px', border: '1px dashed var(--border-color, #cbd5e1)' }}>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted, #64748b)' }}>No active campus placement drives found.</p>
+          </div>
+        )}
       </div>
 
     </div>

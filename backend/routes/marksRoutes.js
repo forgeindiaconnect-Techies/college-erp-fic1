@@ -212,7 +212,7 @@ const processMarkPayload = (data) => {
 };
 
 // Get all marks
-router.get('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff'), departmentScope, collegeScope, async (req, res) => {
+router.get('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff', 'Super Admin', 'Placement', 'Placement Officer', 'PlacementOfficer', 'Placement Cell'), departmentScope, collegeScope, async (req, res) => {
   try {
     const dept = req.dept || req.query.dept;
     const query = { collegeId: req.collegeId };

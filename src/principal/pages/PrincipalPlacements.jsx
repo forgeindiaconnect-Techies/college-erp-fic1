@@ -29,17 +29,84 @@ export default function PrincipalPlacements() {
 
   const fetchData = async () => {
     setLoading(true);
+    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
     try {
       const [studentsRes, jobsRes, appsRes, selRes] = await Promise.all([
-        getStudents(),
-        getPlacementJobs(),
-        getPlacementApplications(),
-        getPlacementSelections()
+        getStudents().catch(() => ({ data: [] })),
+        getPlacementJobs().catch(() => ({ data: [] })),
+        getPlacementApplications().catch(() => ({ data: [] })),
+        getPlacementSelections().catch(() => ({ data: [] }))
       ]);
-      setStudents(studentsRes.data);
-      setJobs(jobsRes.data);
-      setApplications(appsRes.data);
-      setSelections(selRes.data);
+
+      let rawStudents = Array.isArray(studentsRes.data) ? studentsRes.data : (studentsRes.data?.students || []);
+      if (rawStudents.length === 0) {
+        try {
+          const local = localStorage.getItem(`erp_students_${tenantId}`) || localStorage.getItem('erp_students');
+          if (local) rawStudents = JSON.parse(local);
+        } catch {}
+      }
+      setStudents(rawStudents);
+
+      // Jobs with multi-key scanning
+      let rawJobs = Array.isArray(jobsRes.data) ? jobsRes.data : (jobsRes.data?.jobs || []);
+      const jobMap = new Map();
+      rawJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_jobs')) {
+          try {
+            const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(localItems)) {
+              localItems.forEach(lj => {
+                const ljId = String(lj._id || lj.jobId || lj.id);
+                if (ljId && !jobMap.has(ljId)) jobMap.set(ljId, lj);
+              });
+            }
+          } catch (e) {}
+        }
+      }
+      setJobs(Array.from(jobMap.values()));
+
+      // Applications with multi-key scanning
+      let rawApps = Array.isArray(appsRes.data) ? appsRes.data : (appsRes.data?.applications || []);
+      const appMap = new Map();
+      rawApps.forEach(a => appMap.set(String(a._id || a.appId || a.id || `${a.regNo}_${a.jobId}`), a));
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_applications')) {
+          try {
+            const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(localItems)) {
+              localItems.forEach(la => {
+                const laId = String(la._id || la.appId || la.id || `${la.regNo}_${la.jobId}`);
+                if (laId && !appMap.has(laId)) appMap.set(laId, la);
+              });
+            }
+          } catch (e) {}
+        }
+      }
+      setApplications(Array.from(appMap.values()));
+
+      // Selections with multi-key scanning
+      let rawSelections = Array.isArray(selRes.data) ? selRes.data : (selRes.data?.selections || []);
+      const selMap = new Map();
+      rawSelections.forEach(s => selMap.set(String(s._id || s.selId || s.id || `${s.regNo}_${s.company}`), s));
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_selections')) {
+          try {
+            const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(localItems)) {
+              localItems.forEach(ls => {
+                const lsId = String(ls._id || ls.selId || ls.id || `${ls.regNo}_${ls.company}`);
+                if (lsId && !selMap.has(lsId)) selMap.set(lsId, ls);
+              });
+            }
+          } catch (e) {}
+        }
+      }
+      setSelections(Array.from(selMap.values()));
+
     } catch (err) {
       console.error(err);
     } finally {

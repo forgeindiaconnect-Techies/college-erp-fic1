@@ -4,7 +4,7 @@ import {
   BookOpen, Users, CalendarCheck, CheckCircle, Clock,
   ArrowRight, Activity, Plus, AlertCircle, GraduationCap, Play, CheckCircle2,
   Calendar, FileText, Bookmark, Sparkles, Award, ShieldAlert, Zap,
-  TrendingUp, RefreshCw, ChevronRight, Bell
+  TrendingUp, RefreshCw, ChevronRight, Bell, Briefcase
 } from 'lucide-react';
 import {
   getStudents,
@@ -18,7 +18,8 @@ import {
   startClassSession,
   getAssignments,
   getMyFacultyAllocations,
-  getSubjects
+  getSubjects,
+  getPlacementJobs
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import LiveClassModal from '../components/LiveClassModal';
@@ -64,6 +65,7 @@ const StaffDashboard = () => {
   const [exams, setExams] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [advisingClass, setAdvisingClass] = useState(null);
+  const [placementJobs, setPlacementJobs] = useState([]);
 
   // Day filter for schedule hub
   const currentDayIndex = new Date().getDay();
@@ -97,7 +99,8 @@ const StaffDashboard = () => {
         timetableRes,
         assignmentRes,
         allocationRes,
-        subjectRes
+        subjectRes,
+        jobsRes
       ] = await Promise.all([
         getStudents().catch(() => ({ data: [] })),
         getAllMarks().catch(() => ({ data: [] })),
@@ -109,8 +112,31 @@ const StaffDashboard = () => {
         getMyTimetable().catch(() => ({ data: [] })),
         getAssignments().catch(() => ({ data: [] })),
         getMyFacultyAllocations().catch(() => ({ data: [] })),
-        getSubjects().catch(() => ({ data: [] }))
+        getSubjects().catch(() => ({ data: [] })),
+        getPlacementJobs().catch(() => ({ data: [] }))
       ]);
+
+      // Multi-key placement jobs loader
+      let rawJobs = Array.isArray(jobsRes?.data) ? jobsRes.data : (jobsRes?.data?.jobs || []);
+      const jobMap = new Map();
+      rawJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_jobs')) {
+          try {
+            const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(localItems)) {
+              localItems.forEach(lj => {
+                const ljId = String(lj._id || lj.jobId || lj.id);
+                if (ljId && !jobMap.has(ljId)) {
+                  jobMap.set(ljId, lj);
+                }
+              });
+            }
+          } catch (err) {}
+        }
+      }
+      setPlacementJobs(Array.from(jobMap.values()));
 
       if (notifRes?.data && Array.isArray(notifRes.data)) setNotifications(notifRes.data);
       if (advisorRes?.data?.isAdvisor && advisorRes?.data?.data) {
@@ -207,8 +233,19 @@ const StaffDashboard = () => {
       try { setLeaves(JSON.parse(leaveRaw)); } catch (e) {}
     }
 
+    const handlePlacementUpdate = () => {
+      loadDashboardData();
+    };
+
+    window.addEventListener('erp_placement_updated', handlePlacementUpdate);
+    window.addEventListener('storage', handlePlacementUpdate);
+
     const t = setTimeout(() => setAnimate(true), 100);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('erp_placement_updated', handlePlacementUpdate);
+      window.removeEventListener('storage', handlePlacementUpdate);
+    };
   }, [loadDashboardData, navigate]);
 
   useRealtimeSync(loadDashboardData, ['timetable', 'attendance', 'substitutions', 'assignments', 'marks']);
@@ -524,6 +561,107 @@ const StaffDashboard = () => {
             <span style={{ color: '#8B5CF6', fontWeight: 700 }}>Manage →</span>
           </div>
         </div>
+
+        <div 
+          onClick={() => navigate('/staff/placements')}
+          style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #10B981', padding: '18px 20px', borderRadius: '14px', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Placement Drives</span>
+              <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                {placementJobs.length} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>Active</span>
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Briefcase size={22} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#10B981', fontWeight: 600 }}>Campus Recruitment</span>
+            <span style={{ color: '#10B981', fontWeight: 700 }}>Drives →</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Campus Recruitment & Placement Drives Showcase */}
+      <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(16,185,129,0.2)' }}>
+              <Briefcase size={20} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                Department Campus Recruitment & Placement Drives ({placementJobs.length})
+              </h3>
+              <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                Active campus hiring drives, corporate packages, student eligibility cutoffs, and selection rosters.
+              </p>
+            </div>
+          </div>
+
+          <button 
+            type="button" 
+            onClick={() => navigate('/staff/placements')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Manage Department Placements ({placementJobs.length} Drives) →
+          </button>
+        </div>
+
+        {placementJobs.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+            {placementJobs.slice(0, 3).map((job, idx) => (
+              <div 
+                key={job._id || job.jobId || idx}
+                onClick={() => navigate('/staff/placements')}
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
+                      {job.company || job.companyName || 'Corporate Recruiter'}
+                    </h4>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                      {job.role || job.title || job.designation || 'Software Engineer / Associate'}
+                    </p>
+                  </div>
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: job.status === 'Active' || job.status === 'Ongoing' || !job.status ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
+                    color: job.status === 'Active' || job.status === 'Ongoing' || !job.status ? '#059669' : '#64748b',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {job.status || 'Active Drive'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', color: '#475569', paddingTop: '8px', borderTop: '1px dashed #e2e8f0' }}>
+                  <span>Package: <strong style={{ color: '#059669' }}>{job.package || job.ctc || job.salary || '4.5 - 8.0 LPA'}</strong></span>
+                  <span>Min CGPA: <strong>{job.minCgpa || job.eligibilityCgpa || '6.0'}</strong></span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: '20px', textAlign: 'center', background: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1' }}>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>No campus placement drives currently published.</p>
+          </div>
+        )}
       </div>
 
       {/* QUICK COMMAND LAUNCHPAD (Real-Time ERP Tools) */}
