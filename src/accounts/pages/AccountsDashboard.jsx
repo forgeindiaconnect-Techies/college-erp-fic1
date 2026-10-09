@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
   Tooltip, BarChart, Bar, CartesianGrid,
@@ -8,15 +8,20 @@ import {
 import {
   CreditCard, AlertCircle, Banknote,
   ArrowUpRight, ArrowDownRight, Activity, Users,
-  PieChart as PieChartIcon, RefreshCw, Building2, Layers
+  PieChart as PieChartIcon, RefreshCw, Building2, Layers,
+  CalendarCheck, LayoutDashboard, ShieldCheck
 } from 'lucide-react';
 import { getAllFees, getSalaries, getExpenses, getStudents, getDepartments, getFeeStructures, getFeePlans } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
+import DailyAttendance from './DailyAttendance';
 import './AccountsDashboard.css';
 
 const AccountsDashboard = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'attendance' ? 'attendance' : 'finance';
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [loading, setLoading] = useState(true);
   const [accountsSession, setAccountsSession] = useState(null);
   const [fees, setFees] = useState([]);
@@ -286,10 +291,139 @@ const AccountsDashboard = () => {
         </div>
       </div>
 
-      {/* Employee Check-In / Check-Out */}
-      <div className="mb-6">
-        <EmployeeAttendanceCard />
+      {/* Tab Navigation Bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        margin: '1.25rem 0',
+        borderBottom: '2px solid var(--border-color, #e2e8f0)',
+        paddingBottom: '2px'
+      }}>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('finance');
+            setSearchParams({ tab: 'finance' });
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 20px',
+            border: 'none',
+            background: activeTab === 'finance' ? 'var(--primary, #3b82f6)' : 'transparent',
+            color: activeTab === 'finance' ? '#ffffff' : 'var(--text-muted, #64748b)',
+            fontWeight: 700,
+            fontSize: '0.92rem',
+            borderRadius: '10px 10px 0 0',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: activeTab === 'finance' ? '0 4px 12px rgba(59, 130, 246, 0.25)' : 'none'
+          }}
+        >
+          <CreditCard size={18} />
+          <span>Financial Overview & Fees</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('attendance');
+            setSearchParams({ tab: 'attendance' });
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 20px',
+            border: 'none',
+            background: activeTab === 'attendance' ? 'var(--primary, #3b82f6)' : 'transparent',
+            color: activeTab === 'attendance' ? '#ffffff' : 'var(--text-muted, #64748b)',
+            fontWeight: 700,
+            fontSize: '0.92rem',
+            borderRadius: '10px 10px 0 0',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: activeTab === 'attendance' ? '0 4px 12px rgba(59, 130, 246, 0.25)' : 'none'
+          }}
+        >
+          <CalendarCheck size={18} />
+          <span>Centralized Daily Attendance</span>
+          <span style={{
+            fontSize: '0.72rem',
+            padding: '2px 8px',
+            borderRadius: '12px',
+            background: activeTab === 'attendance' ? 'rgba(255, 255, 255, 0.25)' : '#e0e7ff',
+            color: activeTab === 'attendance' ? '#ffffff' : '#3730a3',
+            fontWeight: 700
+          }}>
+            Duty Roster
+          </span>
+        </button>
       </div>
+
+      {/* TAB CONTENT: Centralized Daily Attendance */}
+      {activeTab === 'attendance' && (
+        <div className="accounts-tab-attendance animate-fade-in" style={{ marginBottom: '2rem' }}>
+          <DailyAttendance />
+        </div>
+      )}
+
+      {/* TAB CONTENT: Financial Overview */}
+      {activeTab === 'finance' && (
+        <>
+          {/* Employee Attendance & Centralized Daily Attendance Hub */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px', marginBottom: '1.5rem' }}>
+            <EmployeeAttendanceCard layout="card" />
+            <div className="glass-card" style={{
+              background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.04) 0%, rgba(99, 102, 241, 0.08) 100%)',
+              border: '1px solid rgba(99, 102, 241, 0.2)',
+              borderRadius: '16px',
+              padding: '1.25rem 1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4f46e5', fontWeight: '700', fontSize: '15px' }}>
+                    <CalendarCheck size={20} />
+                    <span>Centralized Daily Attendance</span>
+                  </div>
+                  <span style={{ fontSize: '11px', background: '#e0e7ff', color: '#4338ca', padding: '3px 8px', borderRadius: '12px', fontWeight: '600' }}>Live Sync</span>
+                </div>
+                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'var(--text-muted, #64748b)', lineHeight: '1.4' }}>
+                  Monitor and record daily Present / Absent / Leave status for <strong>Teaching Staff</strong>, <strong>Non-Teaching Staff</strong>, and <strong>Drivers</strong>.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('attendance');
+                  setSearchParams({ tab: 'attendance' });
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '10px 16px',
+                  background: '#4f46e5',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(79, 70, 229, 0.25)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <CalendarCheck size={16} /> Open Attendance Tab &rarr;
+              </button>
+            </div>
+          </div>
 
       {/* Metrics Row (6 Live Cards) */}
       <div className="accounts-metrics-grid">
@@ -584,6 +718,8 @@ const AccountsDashboard = () => {
           </table>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

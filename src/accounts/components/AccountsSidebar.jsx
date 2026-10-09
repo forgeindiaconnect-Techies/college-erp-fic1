@@ -5,7 +5,7 @@ import {
   LayoutDashboard, CreditCard, AlertCircle, Banknote,
   Receipt, FileText, LogOut, ChevronRight, ChevronDown,
   History, PieChart, Award, X, Wallet, FileBarChart,
-  UserPlus, Layers, ShieldCheck
+  UserPlus, Layers, ShieldCheck, CalendarCheck
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -82,6 +82,7 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
       name: 'Financial Operations',
       icon: <Banknote size={20} />,
       items: [
+        { name: 'Daily Attendance', path: '/accounts/daily-attendance', icon: <CalendarCheck size={20} /> },
         { name: 'Salary Management', path: '/accounts/salary', icon: <Banknote size={20} /> },
         { name: 'Expense Tracking', path: '/accounts/expenses', icon: <PieChart size={20} /> },
         { name: 'Receipt Generation', path: '/accounts/receipts', icon: <Receipt size={20} /> },

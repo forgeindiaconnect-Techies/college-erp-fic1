@@ -433,7 +433,7 @@ const DriverDashboard = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
           {/* Employee Attendance Punch Card */}
-          <EmployeeAttendanceCard />
+          <EmployeeAttendanceCard layout="card" />
 
           {/* Vehicle Diagnostic Summary */}
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>

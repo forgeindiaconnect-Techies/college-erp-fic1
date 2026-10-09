@@ -204,6 +204,7 @@ import PendingFees from './accounts/pages/PendingFees';
 import Salary from './accounts/pages/Salary';
 import Receipts from './accounts/pages/Receipts';
 import AccountsReports from './accounts/pages/AccountsReports';
+import DailyAttendance from './accounts/pages/DailyAttendance';
 
 // Driver Layout & Pages
 import DriverLayout from './driver/components/DriverLayout';
@@ -474,6 +475,7 @@ function App() {
               <Route path="hostel"        element={<HostelDashboard />} />
               <Route path="hostel-dashboard" element={<HostelDashboard />} />
               <Route path="placement"     element={<PlacementManagement />} />
+              <Route path="placements"    element={<PlacementManagement />} />
               <Route path="placement-management" element={<PlacementOfficerManagement />} />
               <Route path="assignments"   element={<AdminAssignments />} />
               <Route path="accounts-management" element={<AccountsOfficerManagement />} />
@@ -509,6 +511,7 @@ function App() {
               <Route path="staff-support" element={<PrincipalStaffSupport />} />
               <Route path="reports"       element={<PrincipalReports />} />
               <Route path="placement"     element={<PrincipalPlacements />} />
+              <Route path="placements"    element={<PrincipalPlacements />} />
               <Route path="settings"      element={<Settings />} />
             </Route>
 
@@ -532,6 +535,7 @@ function App() {
               <Route path="payroll"       element={<HodPayroll />} />
               <Route path="support"       element={<HodSupport />} />
               <Route path="placement"     element={<HodPlacements />} />
+              <Route path="placements"    element={<HodPlacements />} />
               <Route path="library"       element={<HodLibrary />} />
               <Route path="settings"      element={<HodSettings />} />
             </Route>
@@ -550,6 +554,7 @@ function App() {
               <Route path="exams"      element={<StaffExams />} />
               <Route path="payroll"    element={<StaffPayroll />} />
               <Route path="placement"  element={<StaffPlacements />} />
+              <Route path="placements" element={<StaffPlacements />} />
               <Route path="library"    element={<StaffLibrary />} />
               <Route path="support"    element={<StaffSupport />} />
             </Route>
@@ -569,6 +574,7 @@ function App() {
               <Route path="exams"       element={<StudentExams />} />
               <Route path="hostel"      element={<StudentHostel />} />
               <Route path="placement"   element={<StudentPlacements />} />
+              <Route path="placements"  element={<StudentPlacements />} />
               <Route path="library"     element={<StudentLibrary />} />
               <Route path="welfare"     element={<StudentWelfare />} />
             </Route>
@@ -598,6 +604,8 @@ function App() {
               <Route path="fees-collection" element={<FeesCollection />} />
               <Route path="pending-fees" element={<PendingFees />} />
               <Route path="payment-history" element={<PaymentHistory />} />
+              <Route path="daily-attendance" element={<DailyAttendance />} />
+              <Route path="attendance" element={<DailyAttendance />} />
               <Route path="salary" element={<Salary />} />
               <Route path="receipts" element={<Receipts />} />
               <Route path="expenses" element={<Expenses />} />

@@ -220,6 +220,11 @@ export default function PrincipalDashboard() {
           </span>
         </div>
 
+        {/* Principal Duty Attendance Card */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <EmployeeAttendanceCard />
+        </div>
+
         {/* 6 Summary Cards */}
         <div style={{
           display: 'grid',
@@ -443,7 +448,7 @@ export default function PrincipalDashboard() {
           </div>
         </div>
 
-        <div className="glass-card" onClick={() => navigate('/principal/placements')} style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', borderLeft: '4px solid #2563EB', cursor: 'pointer' }}>
+        <div className="glass-card" onClick={() => navigate('/principal/placement')} style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', borderLeft: '4px solid #2563EB', cursor: 'pointer' }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(37, 99, 235, 0.1)', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Briefcase size={22} />
           </div>
@@ -483,7 +488,7 @@ export default function PrincipalDashboard() {
 
           <button 
             type="button" 
-            onClick={() => navigate('/principal/placements')}
+            onClick={() => navigate('/principal/placement')}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
           >
             Institutional Placement Console ({placementJobs.length} Drives) →
@@ -495,7 +500,7 @@ export default function PrincipalDashboard() {
             {placementJobs.slice(0, 3).map((job, idx) => (
               <div 
                 key={job._id || job.jobId || idx}
-                onClick={() => navigate('/principal/placements')}
+                onClick={() => navigate('/principal/placement')}
                 style={{
                   background: 'var(--bg-primary, #f8fafc)',
                   border: '1px solid var(--border-color, #e2e8f0)',

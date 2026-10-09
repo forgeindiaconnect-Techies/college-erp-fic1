@@ -14,6 +14,7 @@ const menuGroups = [
     name: 'Catalog & Books',
     icon: <BookOpen size={20} />,
     items: [
+      { name: 'Library Overview', path: '/librarian/dashboard', icon: <LayoutDashboard size={18} /> },
       { name: 'Book Inventory', path: '/librarian/books', icon: <BookOpen size={18} /> },
       { name: 'Digital Library', path: '/librarian/digital', icon: <FileText size={18} /> },
     ]

@@ -21,6 +21,7 @@ import {
   ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 import './PlacementManagement.css';
+import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
 
 const CHART_DATA_FALLBACK = [
   { month: 'Jul', placed: 15 }, { month: 'Aug', placed: 35 },
@@ -140,69 +141,27 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
   
   const [reportPreview, setReportPreview] = useState(null);
 
-  // Training Programs State
+  // Training Programs State (Real-time live synced)
   const [trainingPrograms, setTrainingPrograms] = useState(() => {
     try {
-      const saved = localStorage.getItem('erp_placement_training_programs');
-      if (saved) return JSON.parse(saved);
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const saved = localStorage.getItem(`erp_placement_training_programs_${tenantId}`) || localStorage.getItem('erp_placement_training_programs');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(p => !['TP-101', 'TP-102', 'TP-103', 'TP-104'].includes(p.id));
+        }
+      }
     } catch (e) {
       console.error(e);
     }
-    return [
-      {
-        id: 'TP-101',
-        title: 'Aptitude & Quantitative Problem Solving Bootcamp',
-        trainer: 'Placement Training Cell / Dr. Ramanathan',
-        targetDepartment: 'ALL',
-        date: '2026-10-15',
-        time: '09:30 AM - 12:30 PM',
-        venue: 'Main Auditorium & Online Portal',
-        mode: 'Hybrid',
-        status: 'Scheduled',
-        description: 'Comprehensive shortcuts, numerical reasoning, and data interpretation for tier-1 IT drives.'
-      },
-      {
-        id: 'TP-102',
-        title: 'Full Stack Java & Spring Cloud Microservices',
-        trainer: 'Corporate Tech Lead (Ex-Amazon)',
-        targetDepartment: 'Computer Science and Engineering',
-        date: '2026-10-22',
-        time: '10:00 AM - 01:00 PM',
-        venue: 'Advanced Computing Lab 4',
-        mode: 'Offline',
-        status: 'Scheduled',
-        description: 'System design, REST APIs, JPA Hibernate, and deployment architecture.'
-      },
-      {
-        id: 'TP-103',
-        title: 'Corporate Soft Skills, GD & Resume Mastery',
-        trainer: 'TalentSprint Senior HR Consultant',
-        targetDepartment: 'ALL',
-        date: '2026-10-28',
-        time: '02:00 PM - 05:00 PM',
-        venue: 'Seminar Hall B',
-        mode: 'Offline',
-        status: 'Scheduled',
-        description: 'HR interview simulations, communication etiquettes, and ATS resume verification.'
-      },
-      {
-        id: 'TP-104',
-        title: 'Mock Technical Coding & Live Debugging Workshop',
-        trainer: 'Alumni Industry Network',
-        targetDepartment: 'Computer Science and Engineering',
-        date: '2026-11-04',
-        time: '09:00 AM - 01:00 PM',
-        venue: 'Virtual Lab (HackerRank Platform)',
-        mode: 'Online',
-        status: 'Scheduled',
-        description: 'Live LeetCode / HackerRank timed coding assessments with one-on-one feedback.'
-      }
-    ];
+    return [];
   });
 
   const [studentTrainingStatus, setStudentTrainingStatus] = useState(() => {
     try {
-      const saved = localStorage.getItem('erp_placement_training_attendance');
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const saved = localStorage.getItem(`erp_placement_training_attendance_${tenantId}`) || localStorage.getItem('erp_placement_training_attendance');
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -227,6 +186,118 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
 
   // Eligibility tracker state
   const [selectedEligibleJob, setSelectedEligibleJob] = useState('');
+
+  // ── ADVANCED PLACEMENT REPORTS & ANALYTICS SUITE STATE ──
+  const [reportSubTab, setReportSubTab] = useState('summary');
+  const [reportDeptFilter, setReportDeptFilter] = useState('ALL');
+  const [reportCompanyFilter, setReportCompanyFilter] = useState('ALL');
+  const [reportStatusFilter, setReportStatusFilter] = useState('ALL');
+  const [reportYearFilter, setReportYearFilter] = useState('2026-2027');
+  const [reportSearch, setReportSearch] = useState('');
+  const [reportSort, setReportSort] = useState('default');
+  const [reportRoundJobId, setReportRoundJobId] = useState('');
+
+  // Multi-Worksheet XML Spreadsheet Excel Generator
+  const downloadMultiSheetExcel = (filename, worksheets, academicYear) => {
+    const escapeXml = (str) => {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    };
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+  <Title>College ERP - Campus Placement Audit & Executive Analytics Report</Title>
+  <Created>${new Date().toISOString()}</Created>
+ </DocumentProperties>
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Center"/>
+   <Borders/>
+   <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="11" ss:Color="#0F172A"/>
+  </Style>
+  <Style ss:ID="Header">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#CBD5E1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+   </Borders>
+   <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="11" ss:Color="#FFFFFF" ss:Bold="1"/>
+   <Interior ss:Color="#1E40AF" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="Title">
+   <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="14" ss:Color="#1E40AF" ss:Bold="1"/>
+  </Style>
+  <Style ss:ID="SubTitle">
+   <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="10" ss:Color="#64748B" ss:Italic="1"/>
+  </Style>
+  <Style ss:ID="DataCell">
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="HighlightCell">
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+   </Borders>
+   <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="11" ss:Color="#15803D" ss:Bold="1"/>
+   <Interior ss:Color="#DCFCE7" ss:Pattern="Solid"/>
+  </Style>
+ </Styles>`;
+
+    worksheets.forEach(sheet => {
+      const cleanName = (sheet.name || 'Sheet').replace(/[:\\/?*\[\]]/g, '_').slice(0, 31);
+      xml += `\n <Worksheet ss:Name="${escapeXml(cleanName)}">\n  <Table>`;
+      xml += `\n   <Row ss:Height="24"><Cell ss:StyleID="Title"><Data ss:Type="String">${escapeXml(sheet.title || sheet.name)}</Data></Cell></Row>`;
+      xml += `\n   <Row ss:Height="18"><Cell ss:StyleID="SubTitle"><Data ss:Type="String">Generated: ${new Date().toLocaleString()} | Academic Year: ${escapeXml(academicYear || 'Not specified')}</Data></Cell></Row>`;
+      xml += `\n   <Row><Cell><Data ss:Type="String"></Data></Cell></Row>`;
+      
+      xml += `\n   <Row ss:Height="22">`;
+      sheet.headers.forEach(h => {
+        xml += `<Cell ss:StyleID="Header"><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`;
+      });
+      xml += `</Row>`;
+
+      sheet.rows.forEach(row => {
+        xml += `\n   <Row ss:Height="20">`;
+        row.forEach(val => {
+          const isNum = typeof val === 'number';
+          xml += `<Cell ss:StyleID="DataCell"><Data ss:Type="${isNum ? 'Number' : 'String'}">${escapeXml(String(val ?? ''))}</Data></Cell>`;
+        });
+        xml += `</Row>`;
+      });
+
+      xml += `\n  </Table>\n </Worksheet>`;
+    });
+
+    xml += `\n</Workbook>`;
+
+    const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${filename}.xls`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const fetchPlacementData = useCallback(async () => {
     setLoading(true);
@@ -565,6 +636,47 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
       });
 
       setAllStudents(enrichedStudents);
+
+      // 5. Process Training Programs (Multi-key scan live)
+      let localTraining = [];
+      try {
+        const primary = localStorage.getItem(`erp_placement_training_programs_${tenantId}`) || localStorage.getItem('erp_placement_training_programs');
+        if (primary) {
+          const parsed = JSON.parse(primary);
+          if (Array.isArray(parsed)) {
+            localTraining = parsed.filter(p => !['TP-101', 'TP-102', 'TP-103', 'TP-104'].includes(p.id));
+          }
+        }
+      } catch (e) {}
+
+      const trainingMap = new Map();
+      if (Array.isArray(localTraining)) {
+        localTraining.forEach(t => trainingMap.set(String(t.id || t._id), t));
+      }
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_training_programs')) {
+          try {
+            const items = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(items)) {
+              items.forEach(it => {
+                const tId = String(it.id || it._id);
+                if (tId && !['TP-101', 'TP-102', 'TP-103', 'TP-104'].includes(tId) && !trainingMap.has(tId)) {
+                  trainingMap.set(tId, it);
+                }
+              });
+            }
+          } catch (e) {}
+        }
+      }
+      setTrainingPrograms(Array.from(trainingMap.values()));
+
+      // 6. Process Training Attendance
+      try {
+        const savedAtt = localStorage.getItem(`erp_placement_training_attendance_${tenantId}`) || localStorage.getItem('erp_placement_training_attendance');
+        if (savedAtt) setStudentTrainingStatus(JSON.parse(savedAtt));
+      } catch (e) {}
 
     } catch (error) {
       console.error('Failed to load placement data', error);
@@ -1177,6 +1289,95 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
     }));
   }, [allStudents, selections]);
 
+  // Handle Create Training Program
+  const handleCreateTrainingProgram = (e) => {
+    e.preventDefault();
+    if (!trainingForm.title.trim()) {
+      showToast('Please enter program title', 'warning');
+      return;
+    }
+    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+    const newProg = {
+      id: `TP-${Date.now().toString().slice(-4)}`,
+      _id: `TP_LOCAL_${Date.now()}`,
+      title: trainingForm.title.trim(),
+      trainer: trainingForm.trainer.trim() || 'Placement Training Cell',
+      targetDepartment: trainingForm.targetDepartment || 'ALL',
+      targetRound: trainingForm.targetRound || 'ALL',
+      date: trainingForm.date || new Date().toISOString().split('T')[0],
+      time: trainingForm.time || '09:30 AM - 12:30 PM',
+      venue: trainingForm.venue || 'Main Auditorium',
+      mode: trainingForm.mode || 'Offline',
+      status: trainingForm.status || 'Scheduled',
+      description: trainingForm.description || '',
+      createdAt: new Date().toISOString()
+    };
+
+    const updated = [newProg, ...trainingPrograms];
+    setTrainingPrograms(updated);
+
+    try {
+      localStorage.setItem(`erp_placement_training_programs_${tenantId}`, JSON.stringify(updated));
+      localStorage.setItem('erp_placement_training_programs', JSON.stringify(updated));
+    } catch (err) {
+      console.error(err);
+    }
+
+    setShowTrainingModal(false);
+    setTrainingForm({
+      title: '',
+      trainer: '',
+      targetDepartment: 'ALL',
+      targetRound: 'ALL',
+      date: new Date().toISOString().split('T')[0],
+      time: '09:30 AM - 12:30 PM',
+      venue: 'Main Auditorium',
+      mode: 'Offline',
+      status: 'Scheduled',
+      description: ''
+    });
+
+    window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: { type: 'training', program: newProg } }));
+    window.dispatchEvent(new Event('storage'));
+    showToast(`✓ Scheduled "${newProg.title}" successfully!`);
+  };
+
+  // Handle Delete Training Program
+  const handleDeleteTrainingProgram = (progId) => {
+    if (!window.confirm('Are you sure you want to remove this training program?')) return;
+    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+    const updated = trainingPrograms.filter(p => (p.id !== progId && p._id !== progId));
+    setTrainingPrograms(updated);
+
+    try {
+      localStorage.setItem(`erp_placement_training_programs_${tenantId}`, JSON.stringify(updated));
+      localStorage.setItem('erp_placement_training_programs', JSON.stringify(updated));
+    } catch (err) {
+      console.error(err);
+    }
+
+    window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: { type: 'training_delete', progId } }));
+    window.dispatchEvent(new Event('storage'));
+    showToast('Training program removed');
+  };
+
+  // Handle Update Training Attendance
+  const handleUpdateTrainingAttendance = (key, status) => {
+    const updated = {
+      ...studentTrainingStatus,
+      [key]: status
+    };
+    setStudentTrainingStatus(updated);
+
+    try {
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      localStorage.setItem(`erp_placement_training_attendance_${tenantId}`, JSON.stringify(updated));
+      localStorage.setItem('erp_placement_training_attendance', JSON.stringify(updated));
+    } catch (e) {}
+
+    window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: { type: 'training_attendance', key, status } }));
+  };
+
   // Header Titles
   const getHeaderInfo = () => {
     switch (activeTab) {
@@ -1230,61 +1431,6 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
 
   const headerInfo = getHeaderInfo();
 
-  // Training Program Handlers
-  const handleCreateTrainingProgram = (e) => {
-    e.preventDefault();
-    if (!trainingForm.title.trim()) return showToast('Please enter a training title', 'warning');
-    const newProg = {
-      ...trainingForm,
-      id: `TP-${Date.now().toString().slice(-4)}`
-    };
-    const updated = [newProg, ...trainingPrograms];
-    setTrainingPrograms(updated);
-    try {
-      localStorage.setItem('erp_placement_training_programs', JSON.stringify(updated));
-    } catch(err) {
-      console.error(err);
-    }
-    setShowTrainingModal(false);
-    setTrainingForm({
-      title: '',
-      trainer: '',
-      targetDepartment: 'ALL',
-      targetRound: 'ALL',
-      date: new Date().toISOString().split('T')[0],
-      time: '09:30 AM - 12:30 PM',
-      venue: 'Main Auditorium',
-      mode: 'Offline',
-      status: 'Scheduled',
-      description: ''
-    });
-    showToast('✓ Training program scheduled successfully');
-  };
-
-  const handleDeleteTrainingProgram = (id) => {
-    const updated = trainingPrograms.filter(p => p.id !== id);
-    setTrainingPrograms(updated);
-    try {
-      localStorage.setItem('erp_placement_training_programs', JSON.stringify(updated));
-    } catch(err) {
-      console.error(err);
-    }
-    showToast('Removed training program');
-  };
-
-  const handleUpdateTrainingAttendance = (studentKey, status) => {
-    setStudentTrainingStatus(prev => {
-      const next = { ...prev, [studentKey]: status };
-      try {
-        localStorage.setItem('erp_placement_training_attendance', JSON.stringify(next));
-      } catch(err) {
-        console.error(err);
-      }
-      return next;
-    });
-    showToast('Updated attendance status');
-  };
-
   // Export CSV Helper
   const exportCSV = (filename, headers, rows) => {
     let csv = `data:text/csv;charset=utf-8,${headers.join(',')}\n`;
@@ -1330,74 +1476,80 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
         </div>
       </div>
 
-      {/* ── Enterprise Placement Navigation Tabs ── */}
-      <div style={{
-        display: 'flex',
-        gap: '6px',
-        overflowX: 'auto',
-        padding: '6px 6px 0',
-        background: 'var(--bg-secondary, #f8fafc)',
-        borderRadius: '12px',
-        border: '1px solid var(--border-color, #e2e8f0)',
-        scrollbarWidth: 'none'
-      }}>
-        {[
-          { id: 'Dashboard', label: 'Overview', icon: <Briefcase size={16} /> },
-          { id: 'Job Openings', label: 'Recruitment Drives', icon: <Briefcase size={16} />, count: jobs.length },
-          { id: 'Companies', label: 'Partner Recruiters', icon: <Building size={16} />, count: companies.length },
-          { id: 'Applications', label: 'Applications', icon: <Users size={16} />, count: applications.length },
-          { id: 'Eligibility Tracker', label: 'Eligibility Matrix', icon: <UserCheck size={16} />, count: allStudents.length },
-          { id: 'Interviews', label: 'Interview Evaluator', icon: <Calendar size={16} />, count: interviews.length },
-          { id: 'Selected Students', label: 'Placed Students', icon: <Award size={16} />, count: selections.length },
-          { id: 'Training Programs', label: 'Training Hub', icon: <BookOpen size={16} /> },
-          { id: 'Reports', label: 'Analytics & Reports', icon: <TrendingUp size={16} /> }
-        ].map(tab => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleTabClick(tab.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '9px 16px',
-                borderRadius: '8px 8px 0 0',
-                border: 'none',
-                borderBottom: isActive ? '3px solid #2563eb' : '3px solid transparent',
-                background: isActive ? 'var(--bg-card, #ffffff)' : 'transparent',
-                color: isActive ? '#2563eb' : 'var(--text-muted, #64748b)',
-                fontWeight: isActive ? 800 : 600,
-                fontSize: '0.84rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                whiteSpace: 'nowrap',
-                boxShadow: isActive ? '0 -2px 6px rgba(0,0,0,0.03)' : 'none'
-              }}
-            >
-              {tab.icon}
-              <span>{tab.label}</span>
-              {tab.count !== undefined && (
-                <span style={{
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  padding: '1px 7px',
-                  borderRadius: '10px',
-                  background: isActive ? 'rgba(37,99,235,0.12)' : '#e2e8f0',
-                  color: isActive ? '#2563eb' : '#475569'
-                }}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* ── Enterprise Placement Navigation Tabs (Shown in Admin/Embedded views, hidden when dedicated sidebar is active) ── */}
+      {!location.pathname.startsWith('/placement') && (
+        <div style={{
+          display: 'flex',
+          gap: '6px',
+          overflowX: 'auto',
+          padding: '6px 6px 0',
+          background: 'var(--bg-secondary, #f8fafc)',
+          borderRadius: '12px',
+          border: '1px solid var(--border-color, #e2e8f0)',
+          scrollbarWidth: 'none'
+        }}>
+          {[
+            { id: 'Dashboard', label: 'Overview', icon: <Briefcase size={16} /> },
+            { id: 'Job Openings', label: 'Recruitment Drives', icon: <Briefcase size={16} />, count: jobs.length },
+            { id: 'Companies', label: 'Partner Recruiters', icon: <Building size={16} />, count: companies.length },
+            { id: 'Applications', label: 'Applications', icon: <Users size={16} />, count: applications.length },
+            { id: 'Eligibility Tracker', label: 'Eligibility Matrix', icon: <UserCheck size={16} />, count: allStudents.length },
+            { id: 'Interviews', label: 'Interview Evaluator', icon: <Calendar size={16} />, count: interviews.length },
+            { id: 'Selected Students', label: 'Placed Students', icon: <Award size={16} />, count: selections.length },
+            { id: 'Training Programs', label: 'Training Hub', icon: <BookOpen size={16} /> },
+            { id: 'Reports', label: 'Analytics & Reports', icon: <TrendingUp size={16} /> }
+          ].map(tab => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabClick(tab.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '9px 16px',
+                  borderRadius: '8px 8px 0 0',
+                  border: 'none',
+                  borderBottom: isActive ? '3px solid #2563eb' : '3px solid transparent',
+                  background: isActive ? 'var(--bg-card, #ffffff)' : 'transparent',
+                  color: isActive ? '#2563eb' : 'var(--text-muted, #64748b)',
+                  fontWeight: isActive ? 800 : 600,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                  boxShadow: isActive ? '0 -2px 6px rgba(0,0,0,0.03)' : 'none'
+                }}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+                {tab.count !== undefined && (
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    padding: '1px 7px',
+                    borderRadius: '10px',
+                    background: isActive ? 'rgba(37,99,235,0.12)' : '#e2e8f0',
+                    color: isActive ? '#2563eb' : '#475569'
+                  }}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── ONLY SHOW THE 6-KPI EXECUTIVE STRIP ON DASHBOARD / OVERVIEW TAB ── */}
       {activeTab === 'Dashboard' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '14px' }}>
+        <>
+          {/* Placement Officer Duty Attendance Widget */}
+          <EmployeeAttendanceCard />
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '14px' }}>
           
           <div 
             onClick={() => handleTabClick('Companies')}
@@ -1502,6 +1654,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
           </div>
 
         </div>
+        </>
       )}
 
       {/* ── Tabbed View Router Content ── */}
@@ -2312,107 +2465,241 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
 
       {/* 6. INTERVIEWS & ROUND-BY-ROUND EVALUATIONS */}
       {activeTab === 'Interviews' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* Top Bar with Drive Selector and Quick Actions */}
-          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 20px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(37,99,235,0.1)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Layers size={18} />
+          {/* ── UNIFIED ENTERPRISE RECRUITMENT CONTROL CARD ── */}
+          <div style={{ 
+            background: 'var(--bg-card, #ffffff)', 
+            borderRadius: '16px', 
+            border: '1px solid var(--border-color, #e2e8f0)', 
+            boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+            overflow: 'hidden'
+          }}>
+            {/* Top Row: Drive Selector & Primary Actions */}
+            <div style={{ 
+              padding: '18px 24px', 
+              background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)', 
+              borderBottom: '1px solid var(--border-color, #e2e8f0)',
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              flexWrap: 'wrap', 
+              gap: '16px' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                <div style={{ 
+                  width: '42px', 
+                  height: '42px', 
+                  borderRadius: '12px', 
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', 
+                  color: '#ffffff', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  boxShadow: '0 3px 8px rgba(37,99,235,0.25)'
+                }}>
+                  <Briefcase size={20} />
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Active Recruitment Drive</div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Active Recruitment Drive
+                  </div>
                   <select 
                     value={selectedInterviewJob} 
                     onChange={e => {
                       setSelectedInterviewJob(e.target.value);
                       setSelectedRoundIndex(0);
                     }}
-                    style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'var(--bg-primary, #ffffff)', color: 'var(--text-main, #0f172a)', fontWeight: 800, fontSize: '0.9rem', outline: 'none', cursor: 'pointer', minWidth: '280px' }}
+                    style={{ 
+                      marginTop: '2px',
+                      padding: '7px 14px', 
+                      borderRadius: '8px', 
+                      border: '1.5px solid #cbd5e1', 
+                      background: '#ffffff', 
+                      color: '#0f172a', 
+                      fontWeight: 700, 
+                      fontSize: '0.92rem', 
+                      outline: 'none', 
+                      cursor: 'pointer', 
+                      minWidth: '320px',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                    }}
                   >
                     {jobs.map(j => (
                       <option key={j._id || j.jobId || j.id} value={j._id || j.jobId || j.id}>
-                        {j.company} — {j.role} ({j.ctc || 'N/A'}) • {j.totalRounds || (j.rounds ? j.rounds.length : 3)} Rounds
+                        {j.company} — {j.role} ({j.ctc || 'N/A'})
                       </option>
                     ))}
                     {jobs.length === 0 && <option value="">No recruitment drives posted</option>}
                   </select>
                 </div>
               </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {currentInterviewJob && currentJobApplications.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleBulkEnrollEligibleStudents(currentInterviewJob)}
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '7px', 
+                      padding: '9px 16px', 
+                      background: '#fef3c7', 
+                      color: '#92400e', 
+                      border: '1px solid #fde68a', 
+                      borderRadius: '8px', 
+                      fontSize: '0.84rem', 
+                      fontWeight: 700, 
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Zap size={16} /> Auto-Enroll Eligible Scholars ({liveEligible.length})
+                  </button>
+                )}
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    if (currentInterviewJob) {
+                      setInterviewForm(prev => ({
+                        ...prev,
+                        company: currentInterviewJob.company,
+                        role: currentInterviewJob.role,
+                        round: currentJobRounds[selectedRoundIndex]?.name || `Round ${selectedRoundIndex + 1}`
+                      }));
+                    }
+                    setShowInterviewModal(true);
+                  }} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '7px', 
+                    padding: '9px 18px', 
+                    background: '#2563eb', 
+                    color: '#ffffff', 
+                    border: 'none', 
+                    borderRadius: '8px', 
+                    fontSize: '0.84rem', 
+                    fontWeight: 700, 
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Plus size={16} /> Schedule Interview Session
+                </button>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-              {currentInterviewJob && currentJobApplications.length === 0 && (
-                <button
-                  type="button"
-                  onClick={() => handleBulkEnrollEligibleStudents(currentInterviewJob)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#f59e0b', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  <Zap size={15} /> Auto-Enroll Eligible Scholars ({liveEligible.length})
-                </button>
-              )}
-              <button 
-                type="button" 
-                onClick={() => {
-                  if (currentInterviewJob) {
-                    setInterviewForm(prev => ({
-                      ...prev,
-                      company: currentInterviewJob.company,
-                      role: currentInterviewJob.role,
-                      round: currentJobRounds[selectedRoundIndex]?.name || `Round ${selectedRoundIndex + 1}`
-                    }));
-                  }
-                  setShowInterviewModal(true);
-                }} 
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
-              >
-                <Plus size={15} /> Schedule Interview Session
-              </button>
-            </div>
+            {/* Bottom Row: Role, Eligibility Specs & Live KPI Counters */}
+            {currentInterviewJob && (
+              <div style={{ 
+                padding: '16px 24px', 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                flexWrap: 'wrap', 
+                gap: '16px',
+                background: '#ffffff'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                    <span style={{ 
+                      padding: '3px 10px', 
+                      borderRadius: '6px', 
+                      background: '#eff6ff', 
+                      color: '#1e40af', 
+                      fontSize: '0.78rem', 
+                      fontWeight: 800, 
+                      border: '1px solid #bfdbfe' 
+                    }}>
+                      🏢 {currentInterviewJob.company}
+                    </span>
+                    <span style={{ 
+                      padding: '3px 10px', 
+                      borderRadius: '6px', 
+                      background: '#ecfdf5', 
+                      color: '#065f46', 
+                      fontSize: '0.78rem', 
+                      fontWeight: 800, 
+                      border: '1px solid #a7f3d0' 
+                    }}>
+                      💼 {currentInterviewJob.ctc || 'Negotiable'}
+                    </span>
+                    <span style={{ 
+                      padding: '3px 10px', 
+                      borderRadius: '6px', 
+                      background: '#f8fafc', 
+                      color: '#475569', 
+                      fontSize: '0.78rem', 
+                      fontWeight: 700, 
+                      border: '1px solid #e2e8f0' 
+                    }}>
+                      🎯 {currentJobRounds.length} Total Rounds
+                    </span>
+                  </div>
+                  <h2 style={{ margin: '4px 0', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                    {currentInterviewJob.role}
+                  </h2>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
+                    <span>Min CGPA: <strong style={{ color: '#0f172a' }}>{currentInterviewJob.minCgpa ?? 'None'}</strong></span>
+                    <span>•</span>
+                    <span>Max Arrears: <strong style={{ color: '#0f172a' }}>{currentInterviewJob.maxArrears ?? 0}</strong></span>
+                    <span>•</span>
+                    <span>Eligible Depts: <strong style={{ color: '#0f172a' }}>{Array.isArray(currentInterviewJob.eligibleDepartments) ? currentInterviewJob.eligibleDepartments.join(', ') : 'ALL'}</strong></span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                  <div style={{ 
+                    textAlign: 'center', 
+                    background: '#f8fafc', 
+                    border: '1px solid #e2e8f0', 
+                    padding: '10px 20px', 
+                    borderRadius: '10px',
+                    minWidth: '110px'
+                  }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>
+                      {currentJobApplications.length}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                      Total Applied
+                    </div>
+                  </div>
+
+                  <div style={{ 
+                    textAlign: 'center', 
+                    background: '#ecfdf5', 
+                    border: '1px solid #a7f3d0', 
+                    padding: '10px 20px', 
+                    borderRadius: '10px',
+                    minWidth: '110px'
+                  }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#059669' }}>
+                      {currentJobApplications.filter(a => a.status === 'Selected').length}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#065f46', fontWeight: 700, textTransform: 'uppercase' }}>
+                      Offers Issued
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Drive Snapshot Card if job exists */}
+          {/* ── REFINED PIPELINE STEPPER & CANDIDATE EVALUATION ── */}
           {currentInterviewJob && (
-            <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: '#ffffff', borderRadius: '14px', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(59,130,246,0.25)', color: '#60a5fa', fontSize: '0.72rem', fontWeight: 800 }}>
-                    {currentInterviewJob.company}
-                  </span>
-                  <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(34,197,94,0.25)', color: '#4ade80', fontSize: '0.72rem', fontWeight: 800 }}>
-                    💰 {currentInterviewJob.ctc}
-                  </span>
-                  <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(245,158,11,0.25)', color: '#fcd34d', fontSize: '0.72rem', fontWeight: 800 }}>
-                    🎯 {currentJobRounds.length} Interview Rounds Specified
-                  </span>
-                </div>
-                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>{currentInterviewJob.role}</h2>
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '4px' }}>
-                  Min CGPA: <strong>{currentInterviewJob.minCgpa ?? 'None'}</strong> • Max Backlogs: <strong>{currentInterviewJob.maxArrears ?? 0}</strong> • Departments: <strong>{Array.isArray(currentInterviewJob.eligibleDepartments) ? currentInterviewJob.eligibleDepartments.join(', ') : 'ALL'}</strong>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.06)', padding: '8px 16px', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#38bdf8' }}>{currentJobApplications.length}</div>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Total Applied</div>
-                </div>
-                <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.06)', padding: '8px 16px', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#4ade80' }}>
-                    {currentJobApplications.filter(a => a.status === 'Selected').length}
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Offers Issued</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* DYNAMIC ROUND-BY-ROUND TABS BAR */}
-          {currentInterviewJob && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               
-              <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
+              {/* Stepper / Round Tabs */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '12px', 
+                overflowX: 'auto', 
+                padding: '4px 2px 8px',
+                scrollbarWidth: 'none'
+              }}>
                 {currentJobRounds.map((rnd, idx) => {
                   const isSelected = selectedRoundIndex === idx;
                   const roundName = rnd.name || `Round ${idx + 1}`;
@@ -2437,32 +2724,39 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                       style={{
                         padding: '12px 18px',
                         borderRadius: '12px',
-                        border: isSelected ? '2px solid #2563eb' : '1px solid var(--border-color, #e2e8f0)',
-                        background: isSelected ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' : 'var(--bg-card, #ffffff)',
-                        color: isSelected ? '#ffffff' : 'var(--text-main, #0f172a)',
+                        border: isSelected ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                        background: isSelected ? '#ffffff' : '#f8fafc',
+                        color: isSelected ? '#1e40af' : '#475569',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '10px',
-                        minWidth: '220px',
-                        boxShadow: isSelected ? '0 4px 14px rgba(37,99,235,0.25)' : '0 1px 3px rgba(0,0,0,0.02)',
-                        transition: 'all 0.2s ease',
+                        gap: '12px',
+                        minWidth: '240px',
+                        boxShadow: isSelected ? '0 4px 12px rgba(37,99,235,0.1)' : 'none',
+                        transition: 'all 0.15s ease',
                         textAlign: 'left'
                       }}
                     >
                       <div style={{
-                        width: '28px', height: '28px', borderRadius: '8px',
-                        background: isSelected ? 'rgba(255,255,255,0.2)' : '#eff6ff',
-                        color: isSelected ? '#ffffff' : '#2563eb',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontWeight: 800, fontSize: '0.85rem'
+                        width: '32px', 
+                        height: '32px', 
+                        borderRadius: '10px',
+                        background: isSelected ? '#2563eb' : '#e2e8f0',
+                        color: isSelected ? '#ffffff' : '#64748b',
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        fontWeight: 800, 
+                        fontSize: '0.85rem'
                       }}>
                         {idx + 1}
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '0.84rem', fontWeight: 800 }}>{rnd.name || `Round ${idx + 1}`}</div>
-                        <div style={{ fontSize: '0.72rem', color: isSelected ? 'rgba(255,255,255,0.8)' : 'var(--text-muted, #64748b)', marginTop: '2px' }}>
-                          Type: {rnd.type || 'Assessment'} • <strong>{candidateCount} Candidates</strong>
+                        <div style={{ fontSize: '0.86rem', fontWeight: 800, color: isSelected ? '#0f172a' : '#334155' }}>
+                          {rnd.name || `Round ${idx + 1}`}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                          {rnd.type || 'Assessment'} • <strong style={{ color: isSelected ? '#2563eb' : '#475569' }}>{candidateCount} Candidates</strong>
                         </div>
                       </div>
                     </button>
@@ -2486,59 +2780,91 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                 const qualifiedCount = roundCandidates.filter(a => a.roundEvaluations?.[activeRound.name]?.status === 'Qualified').length;
                 const selectedCount = roundCandidates.filter(a => a.roundEvaluations?.[activeRound.name]?.status === 'Selected').length;
                 const rejectedCount = roundCandidates.filter(a => a.roundEvaluations?.[activeRound.name]?.status === 'Rejected').length;
-                const pendingCount = roundCandidates.filter(a => !a.roundEvaluations?.[activeRound.name] || a.roundEvaluations?.[activeRound.name]?.status === 'Pending' || a.roundEvaluations?.[activeRound.name]?.status === 'Applied').length;
 
                 return (
-                  <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                  <div style={{ 
+                    background: 'var(--bg-card, #ffffff)', 
+                    borderRadius: '16px', 
+                    border: '1px solid var(--border-color, #e2e8f0)', 
+                    overflow: 'hidden', 
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.03)' 
+                  }}>
                     
                     {/* Round Header & Metrics */}
-                    <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ 
+                      padding: '16px 22px', 
+                      borderBottom: '1px solid var(--border-color, #e2e8f0)', 
+                      background: '#f8fafc', 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      flexWrap: 'wrap', 
+                      gap: '14px' 
+                    }}>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', background: '#2563eb', color: '#ffffff' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', background: '#2563eb', color: '#ffffff' }}>
                             Round {selectedRoundIndex + 1} of {currentJobRounds.length}
                           </span>
-                          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
                             {activeRound.name}
                           </h3>
                         </div>
-                        <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>
+                        <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
                           {selectedRoundIndex === 0 
                             ? 'All student applicants enrolled in the primary assessment stage.' 
                             : `Candidates qualified and advanced from ${prevRound || 'previous round'}.`}
                         </p>
                       </div>
 
-                      {/* 4 Mini Round KPIs */}
+                      {/* 4 Clean Round KPIs */}
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ padding: '5px 10px', borderRadius: '8px', background: '#eff6ff', color: '#1e40af', fontSize: '0.78rem', fontWeight: 800 }}>
-                          Total in Round: {roundCandidates.length}
+                        <span style={{ padding: '5px 12px', borderRadius: '8px', background: '#eff6ff', color: '#1e40af', fontSize: '0.78rem', fontWeight: 700, border: '1px solid #bfdbfe' }}>
+                          Total: <strong>{roundCandidates.length}</strong>
                         </span>
-                        <span style={{ padding: '5px 10px', borderRadius: '8px', background: '#dcfce7', color: '#15803d', fontSize: '0.78rem', fontWeight: 800 }}>
-                          ✓ Qualified: {qualifiedCount}
+                        <span style={{ padding: '5px 12px', borderRadius: '8px', background: '#ecfdf5', color: '#065f46', fontSize: '0.78rem', fontWeight: 700, border: '1px solid #a7f3d0' }}>
+                          Qualified: <strong>{qualifiedCount}</strong>
                         </span>
-                        <span style={{ padding: '5px 10px', borderRadius: '8px', background: '#fef3c7', color: '#b45309', fontSize: '0.78rem', fontWeight: 800 }}>
-                          🏆 Selected: {selectedCount}
+                        <span style={{ padding: '5px 12px', borderRadius: '8px', background: '#fffbeb', color: '#92400e', fontSize: '0.78rem', fontWeight: 700, border: '1px solid #fde68a' }}>
+                          Selected: <strong>{selectedCount}</strong>
                         </span>
-                        <span style={{ padding: '5px 10px', borderRadius: '8px', background: '#fee2e2', color: '#991b1b', fontSize: '0.78rem', fontWeight: 800 }}>
-                          ❌ Rejected: {rejectedCount}
+                        <span style={{ padding: '5px 12px', borderRadius: '8px', background: '#fef2f2', color: '#991b1b', fontSize: '0.78rem', fontWeight: 700, border: '1px solid #fecaca' }}>
+                          Rejected: <strong>{rejectedCount}</strong>
                         </span>
                       </div>
                     </div>
 
                     {/* Round Actions Bar */}
-                    <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                      <div style={{ position: 'relative', width: '260px' }}>
-                        <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <div style={{ 
+                      padding: '12px 22px', 
+                      borderBottom: '1px solid var(--border-color, #e2e8f0)', 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      flexWrap: 'wrap', 
+                      gap: '12px',
+                      background: '#ffffff'
+                    }}>
+                      <div style={{ position: 'relative', width: '280px' }}>
+                        <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                         <input 
                           value={search} 
                           onChange={e => setSearch(e.target.value)} 
-                          placeholder="Filter candidates..." 
-                          style={{ padding: '6px 10px 6px 32px', borderRadius: 8, border: '1px solid var(--border-color, #cbd5e1)', background: 'var(--bg-primary, #ffffff)', color: 'var(--text-main, #0f172a)', fontSize: '0.8rem', width: '100%', outline: 'none' }} 
+                          placeholder="Filter candidates by name, reg no, dept..." 
+                          style={{ 
+                            padding: '7px 12px 7px 34px', 
+                            borderRadius: '8px', 
+                            border: '1px solid #cbd5e1', 
+                            background: '#f8fafc', 
+                            color: '#0f172a', 
+                            fontSize: '0.82rem', 
+                            width: '100%', 
+                            outline: 'none' 
+                          }} 
                         />
                       </div>
 
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                         <button
                           type="button"
                           onClick={() => {
@@ -2557,17 +2883,38 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                             });
                             exportCSV(`Evaluation_${activeRound.name.replace(/\s+/g, '_')}`, headers, rows);
                           }}
-                          style={{ padding: '6px 12px', background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          style={{ 
+                            padding: '7px 14px', 
+                            background: '#ffffff', 
+                            border: '1px solid #cbd5e1', 
+                            borderRadius: '8px', 
+                            fontSize: '0.8rem', 
+                            fontWeight: 700, 
+                            color: '#334155',
+                            cursor: 'pointer', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '6px' 
+                          }}
                         >
-                          <Download size={13} /> Export Round Sheet (.CSV)
+                          <Download size={14} /> Export CSV
                         </button>
 
                         <button
                           type="button"
                           onClick={() => showToast(`Dispatched alert to ${roundCandidates.length} scholars for ${activeRound.name}!`)}
-                          style={{ padding: '6px 12px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', color: '#2563eb', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                          style={{ 
+                            padding: '7px 14px', 
+                            background: '#eff6ff', 
+                            border: '1px solid #bfdbfe', 
+                            borderRadius: '8px', 
+                            color: '#2563eb', 
+                            fontSize: '0.8rem', 
+                            fontWeight: 700, 
+                            cursor: 'pointer' 
+                          }}
                         >
-                          Notify Candidates for Round
+                          Notify Candidates
                         </button>
                       </div>
                     </div>
@@ -2576,15 +2923,23 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                     <div style={{ overflowX: 'auto' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                         <thead>
-                          <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
-                            <th style={{ padding: '12px 16px', textAlign: 'left' }}>Register No</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'left' }}>Student Scholar</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'center' }}>Department</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'center' }}>Live CGPA</th>
+                          <tr style={{ 
+                            background: '#f8fafc', 
+                            borderBottom: '1.5px solid #e2e8f0', 
+                            color: '#475569', 
+                            textTransform: 'uppercase', 
+                            fontSize: '0.72rem', 
+                            fontWeight: 800,
+                            letterSpacing: '0.04em'
+                          }}>
+                            <th style={{ padding: '12px 20px', textAlign: 'left' }}>Register No</th>
+                            <th style={{ padding: '12px 20px', textAlign: 'left' }}>Student Scholar</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'center' }}>Dept</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'center' }}>CGPA</th>
                             <th style={{ padding: '12px 16px', textAlign: 'center' }}>Backlogs</th>
                             <th style={{ padding: '12px 16px', textAlign: 'center' }}>Attendance</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'left', minWidth: '180px' }}>Round Evaluation Remarks / Score</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'right', minWidth: '190px' }}>Round Result / Status</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', minWidth: '200px' }}>Evaluation Remarks</th>
+                            <th style={{ padding: '12px 20px', textAlign: 'right', minWidth: '200px' }}>Round Status</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2600,74 +2955,75 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                               const currentNotes = rData.notes || '';
 
                               return (
-                                <tr key={app._id || app.applicationId || cIdx} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
-                                  <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--text-muted)' }}>
-                                    {app.regNo}
+                                <tr key={app._id || app.applicationId || cIdx} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.1s ease' }}>
+                                  <td style={{ padding: '14px 20px', fontFamily: 'monospace', fontWeight: 700, color: '#64748b' }}>
+                                    {app.regNo || app.studentId}
                                   </td>
-                                  <td style={{ padding: '12px 16px' }}>
-                                    <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{app.student || app.name}</div>
-                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Candidate ID: {app.applicationId || app._id}</div>
+                                  <td style={{ padding: '14px 20px' }}>
+                                    <div style={{ fontWeight: 800, color: '#0f172a' }}>{app.student || app.name}</div>
+                                    <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>ID: {app.applicationId || app._id}</div>
                                   </td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                    <span style={{ padding: '2px 8px', borderRadius: 4, background: '#f1f5f9', color: '#475569', fontSize: '0.75rem', fontWeight: 600 }}>
+                                  <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                                    <span style={{ padding: '3px 8px', borderRadius: '6px', background: '#f1f5f9', color: '#334155', fontSize: '0.75rem', fontWeight: 700 }}>
                                       {app.dept || 'General'}
                                     </span>
                                   </td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 800, color: '#2563eb' }}>
+                                  <td style={{ padding: '14px 16px', textAlign: 'center', fontWeight: 800, color: '#2563eb' }}>
                                     {app.cgpa ?? 'N/A'}
                                   </td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: (app.arrears || 0) === 0 ? '#15803d' : '#dc2626' }}>
+                                  <td style={{ padding: '14px 16px', textAlign: 'center', fontWeight: 700, color: (app.arrears || 0) === 0 ? '#15803d' : '#dc2626' }}>
                                     {app.arrears ?? '0'}
                                   </td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#15803d' }}>
+                                  <td style={{ padding: '14px 16px', textAlign: 'center', fontWeight: 600, color: '#15803d' }}>
                                     {app.attendance || '100%'}
                                   </td>
-                                  <td style={{ padding: '12px 16px' }}>
+                                  <td style={{ padding: '14px 16px' }}>
                                     <input
                                       type="text"
                                       defaultValue={currentNotes}
-                                      placeholder="e.g. 85/100, Good in DSA"
+                                      placeholder="e.g. 85/100, Strong in DSA"
                                       onBlur={(e) => {
                                         if (e.target.value !== currentNotes) {
                                           handleUpdateStudentRoundStatus(app, activeRound.name, selectedRoundIndex, currentStatus, e.target.value);
                                         }
                                       }}
                                       style={{
-                                        padding: '5px 10px',
+                                        padding: '6px 12px',
                                         borderRadius: '6px',
-                                        border: '1px solid var(--border-color, #cbd5e1)',
-                                        background: 'var(--bg-primary, #ffffff)',
-                                        fontSize: '0.78rem',
+                                        border: '1px solid #cbd5e1',
+                                        background: '#f8fafc',
+                                        fontSize: '0.8rem',
                                         width: '100%',
-                                        color: 'var(--text-main, #0f172a)'
+                                        color: '#0f172a',
+                                        outline: 'none'
                                       }}
                                     />
                                   </td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                                  <td style={{ padding: '14px 20px', textAlign: 'right' }}>
                                     <select
                                       value={currentStatus}
                                       onChange={(e) => handleUpdateStudentRoundStatus(app, activeRound.name, selectedRoundIndex, e.target.value, currentNotes)}
                                       style={{
-                                        padding: '5px 10px',
-                                        borderRadius: '6px',
-                                        fontSize: '0.78rem',
+                                        padding: '6px 12px',
+                                        borderRadius: '8px',
+                                        fontSize: '0.8rem',
                                         fontWeight: 800,
-                                        border: '1px solid var(--border-color, #cbd5e1)',
+                                        border: '1.5px solid #cbd5e1',
                                         cursor: 'pointer',
                                         outline: 'none',
                                         background: 
-                                          currentStatus === 'Qualified' ? '#dcfce7' : 
-                                          currentStatus === 'Selected' ? '#fef3c7' : 
-                                          currentStatus === 'Rejected' ? '#fee2e2' : 
+                                          currentStatus === 'Qualified' ? '#ecfdf5' : 
+                                          currentStatus === 'Selected' ? '#fffbeb' : 
+                                          currentStatus === 'Rejected' ? '#fef2f2' : 
                                           currentStatus === 'Absent' ? '#f1f5f9' : '#eff6ff',
                                         color: 
-                                          currentStatus === 'Qualified' ? '#15803d' : 
-                                          currentStatus === 'Selected' ? '#b45309' : 
-                                          currentStatus === 'Rejected' ? '#dc2626' : 
-                                          currentStatus === 'Absent' ? '#64748b' : '#2563eb'
+                                          currentStatus === 'Qualified' ? '#065f46' : 
+                                          currentStatus === 'Selected' ? '#92400e' : 
+                                          currentStatus === 'Rejected' ? '#991b1b' : 
+                                          currentStatus === 'Absent' ? '#64748b' : '#1e40af'
                                       }}
                                     >
-                                      <option value="Pending">⏳ Pending</option>
+                                      <option value="Pending">⏳ Pending Evaluation</option>
                                       <option value="Qualified">✓ Qualified (Next Round)</option>
                                       <option value="Selected">🏆 Selected (Final Offer)</option>
                                       <option value="Rejected">❌ Rejected</option>
@@ -2680,15 +3036,15 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
 
                           {roundCandidates.length === 0 && (
                             <tr>
-                              <td colSpan={8} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)' }}>
+                              <td colSpan={8} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: '#64748b' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                                  <Users size={32} color="#94a3b8" />
-                                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                                  <Users size={36} color="#94a3b8" />
+                                  <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>
                                     {selectedRoundIndex === 0 
                                       ? 'No registered candidates found in Round 1.' 
                                       : `No candidates qualified yet from ${prevRound || 'previous round'}.`}
                                   </div>
-                                  <p style={{ margin: 0, fontSize: '0.8rem', maxWidth: '420px', color: 'var(--text-muted)' }}>
+                                  <p style={{ margin: 0, fontSize: '0.82rem', maxWidth: '420px', color: '#64748b' }}>
                                     {selectedRoundIndex === 0
                                       ? 'You can automatically enroll all eligible students based on CGPA and department cutoffs.'
                                       : 'Evaluate scholars in the previous round and mark them as "Qualified" to advance them here.'}
@@ -2697,9 +3053,22 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                                     <button
                                       type="button"
                                       onClick={() => handleBulkEnrollEligibleStudents(currentInterviewJob)}
-                                      style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                                      style={{ 
+                                        marginTop: '10px', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: '6px', 
+                                        padding: '9px 18px', 
+                                        background: '#2563eb', 
+                                        color: '#ffffff', 
+                                        border: 'none', 
+                                        borderRadius: '8px', 
+                                        fontSize: '0.84rem', 
+                                        fontWeight: 700, 
+                                        cursor: 'pointer' 
+                                      }}
                                     >
-                                      <Zap size={15} /> Enroll All {liveEligible.length} Eligible Scholars Now
+                                      <Zap size={16} /> Enroll All {liveEligible.length} Eligible Scholars Now
                                     </button>
                                   )}
                                 </div>
@@ -3094,62 +3463,1229 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
         </div>
       )}
 
-      {/* 8. REPORTS & ANALYTICS */}
-      {activeTab === 'Reports' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+      {/* 8. COMPLETE ENTERPRISE PLACEMENT REPORTS & ANALYTICS SUITE */}
+      {activeTab === 'Reports' && (() => {
+        // ── LIVE REPORT METRIC COMPUTATIONS ──
+        const totalStudentsCount = allStudents.length || 0;
+        
+        // Unique Applied Students
+        const uniqueAppliedRegNos = new Set(applications.map(a => a.regNo || a.studentId || a.id).filter(Boolean));
+        const totalAppliedStudentsCount = uniqueAppliedRegNos.size;
+
+        // Unique Placed Students (from selections + selected applications)
+        const uniquePlacedRegNos = new Set([
+          ...selections.map(s => s.regNo).filter(Boolean),
+          ...applications.filter(a => a.status === 'Selected').map(a => a.regNo || a.studentId || a.id).filter(Boolean)
+        ]);
+        const totalPlacedStudentsCount = uniquePlacedRegNos.size;
+        const totalNotPlacedStudentsCount = Math.max(0, totalStudentsCount - totalPlacedStudentsCount);
+
+        // Drives & Companies
+        const totalCompaniesCount = companies.length || new Set(jobs.map(j => j.company)).size;
+        const totalJobDrivesCount = jobs.length;
+
+        // Offers, Active In Rounds & Rejections
+        const totalOffersCount = selections.length + applications.filter(a => a.status === 'Selected' && !selections.some(s => s.regNo === (a.regNo || a.studentId))).length;
+        const totalAttendingRoundsCount = applications.filter(a => !['Selected', 'Rejected', 'Absent'].includes(a.status)).length;
+        const totalRejectedCount = applications.filter(a => a.status === 'Rejected').length;
+        const overallPlacementRate = totalStudentsCount > 0 ? ((totalPlacedStudentsCount / totalStudentsCount) * 100).toFixed(1) : '0.0';
+
+        // Available Filter Options
+        const uniqueDepts = Array.from(new Set([
+          ...allStudents.map(s => s.dept).filter(Boolean),
+          ...applications.map(a => a.dept).filter(Boolean),
+          ...selections.map(s => s.dept).filter(Boolean),
+          'TAMIL', 'ENGLISH', 'COMMERCE', 'BScCs', 'BCA', 'MATHS', 'MANAGEMENT'
+        ]));
+
+        const uniqueCompanies = Array.from(new Set([
+          ...companies.map(c => c.name).filter(Boolean),
+          ...jobs.map(j => j.company).filter(Boolean),
+          ...applications.map(a => a.company).filter(Boolean),
+          ...selections.map(s => s.company).filter(Boolean)
+        ]));
+
+        // Global Filter Matching Helper
+        const matchesGlobalFilters = (item) => {
+          const q = (reportSearch || '').trim().toLowerCase();
+          const matchQuery = !q || 
+            String(item.student || item.studentName || item.name || '').toLowerCase().includes(q) ||
+            String(item.regNo || item.studentId || item.id || '').toLowerCase().includes(q) ||
+            String(item.company || '').toLowerCase().includes(q) ||
+            String(item.role || item.jobTitle || '').toLowerCase().includes(q) ||
+            String(item.dept || '').toLowerCase().includes(q);
+
+          const matchDept = reportDeptFilter === 'ALL' || (item.dept || 'TAMIL').toUpperCase() === reportDeptFilter.toUpperCase();
+          const matchCompany = reportCompanyFilter === 'ALL' || String(item.company || '').toLowerCase() === reportCompanyFilter.toLowerCase();
           
-          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '24px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(37,99,235,0.1)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-                <FileText size={22} />
-              </div>
-              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                Official NIRF Placement Audit Report
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                Generates accredited institutional report for NAAC/NIRF audits containing verified registration numbers, recruiting companies, designations, and salary brackets.
-              </p>
-            </div>
-            <button 
-              type="button" 
-              onClick={() => {
-                const headers = ["Registration Number", "Student Name", "Placed Company", "Role", "Package (CTC)"];
-                const rows = selections.map(sel => [sel.regNo, sel.student, sel.company, sel.role, sel.ctc]);
-                setReportPreview({ title: "NIRF Placement Audit Report", headers, rows });
-              }}
-              style={{ marginTop: '20px', padding: '10px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-            >
-              Generate NIRF Report
-            </button>
-          </div>
+          let matchStatus = true;
+          if (reportStatusFilter === 'Placed') matchStatus = item.status === 'Selected' || item.isPlaced;
+          else if (reportStatusFilter === 'Attending') matchStatus = !['Selected', 'Rejected', 'Absent'].includes(item.status);
+          else if (reportStatusFilter === 'Rejected') matchStatus = item.status === 'Rejected';
+          else if (reportStatusFilter === 'OfferReleased') matchStatus = item.status === 'Selected' || Boolean(item.ctc);
 
-          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '24px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(22,163,74,0.1)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-                <Building size={22} />
-              </div>
-              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                Department Placement Summary
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                Department-wise recruitment coverage, total scholars enrolled, clearance ratios, and active corporate recruiter partnerships.
-              </p>
-            </div>
-            <button 
-              type="button" 
-              onClick={() => {
-                const headers = ["Department", "Total Enrolled Scholars", "Placed Scholars", "Placement Ratio (%)"];
-                const rows = deptStats.map(d => [d.dept, d.total, d.placed, `${d.percentage}%`]);
-                setReportPreview({ title: "Department Placement Summary Report", headers, rows });
-              }}
-              style={{ marginTop: '20px', padding: '10px 16px', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-            >
-              Generate Department Summary
-            </button>
-          </div>
+          return matchQuery && matchDept && matchCompany && matchStatus;
+        };
 
-        </div>
-      )}
+        // 1. Department-Wise Dataset
+        const deptWiseRows = applications.filter(matchesGlobalFilters).map((app, idx) => {
+          const matchingJob = jobs.find(j => (j._id && j._id === app.jobId) || (j.company === app.company && j.role === app.role));
+          const totalRounds = matchingJob?.totalRounds || (matchingJob?.rounds ? matchingJob.rounds.length : 3);
+          const isSelected = app.status === 'Selected';
+          const isRejected = app.status === 'Rejected';
+          
+          return {
+            id: app._id || app.applicationId || idx,
+            dept: app.dept || 'TAMIL',
+            student: app.student || app.name || 'Candidate Scholar',
+            regNo: app.regNo || app.studentId || 'N/A',
+            batch: app.batch || 'UG 2023-2027',
+            company: app.company || 'Corporate Recruiter',
+            role: app.role || 'Associate',
+            appDate: app.appliedDate || app.date ? new Date(app.appliedDate || app.date).toLocaleDateString() : '2026-10-09',
+            currentRound: isSelected ? `Completed (Round ${totalRounds})` : isRejected ? `Eliminated in Round ${app.currentRound || 1}` : `Round ${app.currentRound || 1}`,
+            totalRounds,
+            status: app.status || 'Applied',
+            offerStatus: isSelected ? 'Offer Released' : isRejected ? 'Not Applicable' : 'Pending Evaluation'
+          };
+        });
+
+        // 2. Company-Wise Dataset
+        const companyWiseRows = (reportCompanyFilter === 'ALL' ? uniqueCompanies : [reportCompanyFilter]).map(compName => {
+          const compJobs = jobs.filter(j => (j.company || '').toLowerCase() === compName.toLowerCase());
+          const compApps = applications.filter(a => (a.company || '').toLowerCase() === compName.toLowerCase());
+          const compSels = selections.filter(s => (s.company || '').toLowerCase() === compName.toLowerCase());
+          
+          const primaryJob = compJobs[0];
+          const openings = compJobs.reduce((acc, j) => acc + (j.openings || 1), 0) || 1;
+          const applied = compApps.length;
+          const shortlisted = compApps.filter(a => a.status === 'Shortlisted' || a.status === 'Qualified' || a.status === 'Selected' || (a.currentRound || 1) > 1).length;
+          
+          const r1Passed = compApps.filter(a => (a.currentRound || 1) > 1 || a.status === 'Selected' || a.roundEvaluations?.['Round 1']?.status === 'Qualified').length;
+          const r2Passed = compApps.filter(a => (a.currentRound || 1) > 2 || a.status === 'Selected' || a.roundEvaluations?.['Round 2']?.status === 'Qualified').length;
+          const r3Passed = compApps.filter(a => (a.currentRound || 1) > 3 || a.status === 'Selected' || a.roundEvaluations?.['Round 3']?.status === 'Qualified').length;
+          
+          const rejected = compApps.filter(a => a.status === 'Rejected').length;
+          const completedAll = compApps.filter(a => a.status === 'Selected' || (a.currentRound || 1) >= (primaryJob?.rounds?.length || 3)).length;
+          const finalSelected = compSels.length || compApps.filter(a => a.status === 'Selected').length;
+          // Offer tracking fields are not currently stored in the model.
+          const offersReleased = 0;
+          const offersAccepted = 0;
+          const offersDeclinedOrPending = 0;
+
+          return {
+            company: compName,
+            role: primaryJob?.role || 'Various Placement Roles',
+            openings,
+            applied,
+            shortlisted,
+            r1Passed,
+            r2Passed,
+            r3Passed,
+            rejected,
+            completedAll,
+            finalSelected,
+            offersReleased,
+            offersAccepted,
+            offersDeclinedOrPending
+          };
+        }).filter(r => r.applied > 0 || r.finalSelected > 0 || reportCompanyFilter !== 'ALL');
+
+        // 3. Round-Wise Dataset for selected or active drive
+        const activeReportJob = jobs.find(j => (j._id || j.jobId || j.id) === (reportRoundJobId || selectedInterviewJob)) || jobs[0];
+        const activeJobRounds = activeReportJob?.rounds && activeReportJob.rounds.length > 0 
+          ? activeReportJob.rounds 
+          : generateDefaultRounds(activeReportJob?.totalRounds || 3);
+
+        const getRoundOutcome = (app, roundName, roundNum) => {
+          const evaluation = app.roundEvaluations?.[roundName];
+
+          // Always trust an explicitly recorded round result.
+          if (evaluation?.status) return evaluation.status;
+
+          // Fallback for older applications without round evaluations.
+          if (app.status === 'Selected') return 'Selected';
+
+          if (
+            app.status === 'Rejected' &&
+            (app.currentRound || 1) === roundNum
+          ) {
+            return 'Rejected';
+          }
+
+          if ((app.currentRound || 1) > roundNum) {
+            return 'Qualified';
+          }
+
+          return 'Pending';
+        };
+
+        const roundWiseData = activeJobRounds.map((rnd, rIdx) => {
+          const rNum = rIdx + 1;
+          const roundName = rnd.name || `Round ${rNum}`;
+
+          const jobApps = applications.filter(a =>
+            activeReportJob
+              ? (
+                  a.jobId &&
+                  a.jobId === (activeReportJob._id || activeReportJob.jobId)
+                ) ||
+                (
+                  a.company === activeReportJob.company &&
+                  a.role === activeReportJob.role
+                )
+              : true
+          );
+
+          const attended = rIdx === 0
+            ? jobApps.length
+            : jobApps.filter(a => {
+                const previousRound =
+                  activeJobRounds[rIdx - 1]?.name || `Round ${rIdx}`;
+
+                const outcome = getRoundOutcome(
+                  a,
+                  previousRound,
+                  rIdx
+                );
+
+                return outcome === 'Qualified' || outcome === 'Selected';
+              }).length;
+
+          const selectedNext = jobApps.filter(a => {
+            const outcome = getRoundOutcome(a, roundName, rNum);
+            return outcome === 'Qualified' || outcome === 'Selected';
+          }).length;
+
+          const rejected = jobApps.filter(a =>
+            getRoundOutcome(a, roundName, rNum) === 'Rejected'
+          ).length;
+
+          const awaiting = Math.max(
+            0,
+            attended - selectedNext - rejected
+          );
+
+          return {
+            roundNum: rNum,
+            roundName,
+            type: rnd.type || 'Assessment',
+            attended,
+            selectedNext,
+            rejected,
+            awaiting
+          };
+        });
+
+        // 4. Salary Package Dataset
+        const parseCtcNum = (ctcStr) => {
+          if (!ctcStr) return 0;
+
+          const value = String(ctcStr)
+            .replace(/,/g, '')
+            .match(/(\d+(?:\.\d+)?)/);
+
+          if (!value) return 0;
+
+          const amount = Number(value[1]);
+          const text = String(ctcStr).toLowerCase();
+
+          // Normalize salary values to LPA.
+          if (text.includes('crore') || text.includes('cr')) {
+            return amount * 100;
+          }
+
+          if (
+            text.includes('lakh') ||
+            text.includes('lac') ||
+            text.includes('lpa')
+          ) {
+            return amount;
+          }
+
+          if (text.includes('per month') || text.includes('/month')) {
+            return (amount * 12) / 100000;
+          }
+
+          if (
+            text.includes('₹') ||
+            text.includes('rs.') ||
+            text.includes('inr')
+          ) {
+            return amount / 100000;
+          }
+
+          // Unmarked numbers are assumed to be LPA.
+          return amount;
+        };
+
+        const salaryRows = selections
+          .filter(matchesGlobalFilters)
+          .map((sel, sIdx) => {
+            const ctcVal = parseCtcNum(sel.ctc);
+            const monthlyEst = ctcVal > 0
+              ? Math.round((ctcVal * 100000) / 12)
+              : 0;
+
+            return {
+              id: sel._id || sel.selectionId || sIdx,
+              student: sel.student || 'N/A',
+              regNo: sel.regNo || 'N/A',
+              dept: sel.dept || 'Not Recorded',
+              company: sel.company || 'N/A',
+              role: sel.role || 'N/A',
+              ctcNum: ctcVal,
+              ctcDisplay: sel.ctc || 'Not Recorded',
+              monthlySalary: monthlyEst > 0
+                ? `₹ ${monthlyEst.toLocaleString('en-IN')}`
+                : 'Not Recorded',
+              offerDate: sel.date
+                ? new Date(sel.date).toLocaleDateString()
+                : 'Not Recorded',
+              status: 'Not Recorded'
+            };
+          });
+
+        if (reportSort === 'ctc_desc') {
+          salaryRows.sort((a, b) => b.ctcNum - a.ctcNum);
+        } else if (reportSort === 'ctc_asc') {
+          salaryRows.sort((a, b) => a.ctcNum - b.ctcNum);
+        }
+
+        const salaryNumbers = salaryRows
+          .map(s => s.ctcNum)
+          .filter(n => Number.isFinite(n) && n > 0);
+
+        const highestPackageVal = salaryNumbers.length
+          ? Math.max(...salaryNumbers).toFixed(2)
+          : 'N/A';
+
+        const lowestPackageVal = salaryNumbers.length
+          ? Math.min(...salaryNumbers).toFixed(2)
+          : 'N/A';
+
+        const avgPackageVal = salaryNumbers.length
+          ? (
+              salaryNumbers.reduce((sum, n) => sum + n, 0) /
+              salaryNumbers.length
+            ).toFixed(2)
+          : 'N/A';
+
+        // 5. Offer Letter Tracking Dataset
+        const offerLetterRows = selections
+          .filter(matchesGlobalFilters)
+          .map((sel, idx) => ({
+            id: sel._id || sel.selectionId || idx,
+            student: sel.student || 'N/A',
+            regNo: sel.regNo || 'N/A',
+            dept: sel.dept || 'Not Recorded',
+            company: sel.company || 'N/A',
+            role: sel.role || 'N/A',
+            interviewDate: 'Not Recorded',
+            offerReleaseDate: 'Not Recorded',
+            letterStatus: 'Not Recorded',
+            acceptanceStatus: 'Not Recorded',
+            joiningDate: 'Not Recorded'
+          }));
+
+        // ── MASTER EXCEL DOWNLOAD HANDLER (ALL 6 WORKSHEETS) ──
+        const handleDownloadMasterExcel = () => {
+          const worksheets = [
+            // Sheet 1: Placement Summary
+            {
+              name: '1_Placement_Summary',
+              title: 'College ERP — Overall Campus Placement Summary & KPIs',
+              headers: ['Metric Name', 'Count / Value', 'Description & Notes'],
+              rows: [
+                ['Academic Year', reportYearFilter, 'Official Placement Evaluation Cycle'],
+                ['Total Registered Students', totalStudentsCount, 'Total scholars enrolled in graduating batch'],
+                ['Total Students Applied for Jobs', totalAppliedStudentsCount, 'Scholars submitted at least 1 job application'],
+                ['Total Students Placed (Unique)', totalPlacedStudentsCount, 'Unique scholars with confirmed placement offers'],
+                ['Total Students Not Yet Placed', totalNotPlacedStudentsCount, 'Scholars pending final placement offers'],
+                ['Total Partner Companies', totalCompaniesCount, 'Active corporate recruiters with posted drives'],
+                ['Total Job Openings / Drives', totalJobDrivesCount, 'Total campus recruitment drives published'],
+                ['Total Offers Issued', totalOffersCount, 'Cumulative offer letters released across all drives'],
+                ['Total Attending Interview Rounds', totalAttendingRoundsCount, 'Scholars actively participating in interview rounds'],
+                ['Total Candidates Rejected', totalRejectedCount, 'Scholars not qualified during evaluation rounds'],
+                ['Overall Placement Rate (%)', `${overallPlacementRate}%`, 'Unique placed scholars / Total enrolled scholars']
+              ]
+            },
+            // Sheet 2: Department-Wise Placement
+            {
+              name: '2_Department_Wise',
+              title: 'Department-Wise Student Placement Breakdown',
+              headers: ['Department', 'Student Name', 'Register No', 'Batch', 'Company', 'Job Title', 'Application Date', 'Current Round', 'Total Rounds', 'Selection Status', 'Offer Status'],
+              rows: deptWiseRows.map(r => [
+                r.dept, r.student, r.regNo, r.batch, r.company, r.role, r.appDate, r.currentRound, r.totalRounds, r.status, r.offerStatus
+              ])
+            },
+            // Sheet 3: Company-Wise Recruitment
+            {
+              name: '3_Company_Wise',
+              title: 'Company-Wise Campus Recruitment & Conversion Funnel',
+              headers: ['Company Name', 'Job Role', 'Openings', 'Applied', 'Shortlisted', 'Round 1 Passed', 'Round 2 Passed', 'Round 3 Passed', 'Rejected', 'Completed All Rounds', 'Final Selected', 'Offers Released', 'Offers Accepted', 'Offers Declined/Pending'],
+              rows: companyWiseRows.map(r => [
+                r.company, r.role, r.openings, r.applied, r.shortlisted, r.r1Passed, r.r2Passed, r.r3Passed, r.rejected, r.completedAll, r.finalSelected, r.offersReleased, r.offersAccepted, r.offersDeclinedOrPending
+              ])
+            },
+            // Sheet 4: Round-Wise Evaluations
+            {
+              name: '4_Round_Wise_Results',
+              title: `Interview Round-Wise Progression Report (${activeReportJob?.company || 'All Drives'} - ${activeReportJob?.role || 'Roles'})`,
+              headers: ['Round No', 'Round Name', 'Assessment Type', 'Total Attended', 'Selected / Qualified to Next', 'Rejected', 'Awaiting Results'],
+              rows: roundWiseData.map(r => [
+                r.roundNum, r.roundName, r.type, r.attended, r.selectedNext, r.rejected, r.awaiting
+              ])
+            },
+            // Sheet 5: Salary Package Details
+            {
+              name: '5_Salary_Package_Report',
+              title: 'Campus Placement Compensation & Salary Packages Report',
+              headers: ['Student Scholar', 'Register No', 'Department', 'Company Name', 'Job Title', 'Annual Salary CTC', 'Estimated Monthly (₹)', 'Offer Release Date', 'Offer Acceptance Status'],
+              rows: salaryRows.map(r => [
+                r.student, r.regNo, r.dept, r.company, r.role, r.ctcDisplay, r.monthlySalary, r.offerDate, r.status
+              ])
+            },
+            // Sheet 6: Offer Letters Tracking
+            {
+              name: '6_Offer_Letters_Tracking',
+              title: 'Official Placement Offer Letters & Joining Verification Roll',
+              headers: ['Student Scholar', 'Register No', 'Department', 'Company Name', 'Job Title', 'Interview Date', 'Offer Release Date', 'Offer Letter Status', 'Acceptance Status', 'Joining Date'],
+              rows: offerLetterRows.map(r => [
+                r.student, r.regNo, r.dept, r.company, r.role, r.interviewDate, r.offerReleaseDate, r.letterStatus, r.acceptanceStatus, r.joiningDate
+              ])
+            }
+          ];
+
+          downloadMultiSheetExcel(
+            `College_ERP_Placement_Master_Report_${reportYearFilter}`,
+            worksheets,
+            reportYearFilter
+          );
+          showToast('✓ Master Excel Workbook downloaded with all 6 comprehensive worksheets!');
+        };
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* ── TOP ACTION & GLOBAL FILTERS HEADER ── */}
+            <div style={{ 
+              background: 'var(--bg-card, #ffffff)', 
+              borderRadius: '16px', 
+              border: '1px solid var(--border-color, #e2e8f0)', 
+              boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+              padding: '20px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              
+              {/* Row 1: Title & Master Excel Download Button */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FileText size={20} />
+                    </div>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                        Campus Recruitment & Placement Analytics Suite
+                      </h2>
+                      <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                        Real-time verified departmental summaries, company funnels, round progressions, salary packages, and offer letter rolls.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={handleDownloadMasterExcel}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 20px',
+                      background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '0.88rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 3px 10px rgba(22,163,74,0.25)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Download size={16} /> Download Master Excel (.XLS • 6 Worksheets)
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 2: Comprehensive Global Filter Bar */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '12px', 
+                flexWrap: 'wrap', 
+                alignItems: 'center',
+                paddingTop: '12px',
+                borderTop: '1px solid #f1f5f9'
+              }}>
+                
+                {/* Search */}
+                <div style={{ position: 'relative', width: '260px' }}>
+                  <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  <input
+                    value={reportSearch}
+                    onChange={e => setReportSearch(e.target.value)}
+                    placeholder="Search by student, reg no, role..."
+                    style={{
+                      width: '100%',
+                      padding: '7px 10px 7px 32px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      fontSize: '0.8rem',
+                      color: '#0f172a',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Academic Year Filter */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b' }}>Year:</span>
+                  <select
+                    value={reportYearFilter}
+                    onChange={e => setReportYearFilter(e.target.value)}
+                    style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', cursor: 'pointer', outline: 'none' }}
+                  >
+                    <option value="2026-2027">2026-2027 (Current)</option>
+                    <option value="2025-2026">2025-2026</option>
+                    <option value="2024-2025">2024-2025</option>
+                  </select>
+                </div>
+
+                {/* Department Filter */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b' }}>Dept:</span>
+                  <select
+                    value={reportDeptFilter}
+                    onChange={e => setReportDeptFilter(e.target.value)}
+                    style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', cursor: 'pointer', outline: 'none' }}
+                  >
+                    <option value="ALL">All Departments</option>
+                    {uniqueDepts.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+
+                {/* Company Filter */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b' }}>Company:</span>
+                  <select
+                    value={reportCompanyFilter}
+                    onChange={e => setReportCompanyFilter(e.target.value)}
+                    style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', cursor: 'pointer', outline: 'none' }}
+                  >
+                    <option value="ALL">All Companies</option>
+                    {uniqueCompanies.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                {/* Status Filter */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b' }}>Status:</span>
+                  <select
+                    value={reportStatusFilter}
+                    onChange={e => setReportStatusFilter(e.target.value)}
+                    style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', cursor: 'pointer', outline: 'none' }}
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="Placed">🏆 Placed / Selected</option>
+                    <option value="Attending">⏳ Attending Rounds</option>
+                    <option value="OfferReleased">📜 Offer Released</option>
+                    <option value="Rejected">❌ Rejected</option>
+                  </select>
+                </div>
+
+                {/* Clear Filters Button */}
+                {(reportSearch || reportDeptFilter !== 'ALL' || reportCompanyFilter !== 'ALL' || reportStatusFilter !== 'ALL') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportSearch('');
+                      setReportDeptFilter('ALL');
+                      setReportCompanyFilter('ALL');
+                      setReportStatusFilter('ALL');
+                    }}
+                    style={{ padding: '6px 10px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, color: '#475569', cursor: 'pointer' }}
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+
+            </div>
+
+            {/* ── 6 REPORT SUB-NAVIGATION TABS ── */}
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              overflowX: 'auto',
+              background: '#f8fafc',
+              padding: '6px 6px 0',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              scrollbarWidth: 'none'
+            }}>
+              {[
+                { id: 'summary', label: '1. Overall Summary', icon: <Briefcase size={16} /> },
+                { id: 'department', label: '2. Department-Wise Placement', icon: <Building size={16} />, count: deptWiseRows.length },
+                { id: 'company', label: '3. Company-Wise Analytics', icon: <Layers size={16} />, count: companyWiseRows.length },
+                { id: 'rounds', label: '4. Interview Round-Wise', icon: <Calendar size={16} /> },
+                { id: 'salary', label: '5. Salary Packages & CTC', icon: <DollarSign size={16} />, count: salaryRows.length },
+                { id: 'offerLetters', label: '6. Offer Letters & Verification', icon: <Award size={16} />, count: offerLetterRows.length }
+              ].map(sub => {
+                const isActive = reportSubTab === sub.id;
+                return (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => setReportSubTab(sub.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 16px',
+                      borderRadius: '8px 8px 0 0',
+                      border: 'none',
+                      borderBottom: isActive ? '3px solid #2563eb' : '3px solid transparent',
+                      background: isActive ? '#ffffff' : 'transparent',
+                      color: isActive ? '#2563eb' : '#64748b',
+                      fontWeight: isActive ? 800 : 600,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {sub.icon}
+                    <span>{sub.label}</span>
+                    {sub.count !== undefined && (
+                      <span style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        padding: '1px 6px',
+                        borderRadius: '10px',
+                        background: isActive ? 'rgba(37,99,235,0.12)' : '#e2e8f0',
+                        color: isActive ? '#2563eb' : '#475569'
+                      }}>
+                        {sub.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* ── SUB-TAB 1: OVERALL PLACEMENT SUMMARY REPORT ── */}
+            {reportSubTab === 'summary' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                
+                {/* 10 Master Summary Metric KPI Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+                  
+                  <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>1. Total Enrolled</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>{totalStudentsCount}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Graduating Scholars Batch</div>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#7c3aed', textTransform: 'uppercase' }}>2. Total Applied</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#6d28d9', marginTop: '4px' }}>{totalAppliedStudentsCount}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Submitted Drive Applications</div>
+                  </div>
+
+                  <div style={{ background: '#ecfdf5', padding: '16px 20px', borderRadius: '14px', border: '1px solid #a7f3d0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#065f46', textTransform: 'uppercase' }}>3. Placed Scholars</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#059669', marginTop: '4px' }}>{totalPlacedStudentsCount}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#065f46', marginTop: '2px', fontWeight: 700 }}>{overallPlacementRate}% Placement Rate</div>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase' }}>4. Not Yet Placed</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#b45309', marginTop: '4px' }}>{totalNotPlacedStudentsCount}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Seeking Opportunities</div>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase' }}>5. Total Companies</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0369a1', marginTop: '4px' }}>{totalCompaniesCount}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Recruiters Participated</div>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#4338ca', textTransform: 'uppercase' }}>6. Total Job Openings</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#3730a3', marginTop: '4px' }}>{totalJobDrivesCount}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Published Campus Drives</div>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase' }}>7. Total Offers Issued</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#047857', marginTop: '4px' }}>{totalOffersCount}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Verified Corporate Offers</div>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>8. Attending Rounds</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1e40af', marginTop: '4px' }}>{totalAttendingRoundsCount}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Active in Interview Rounds</div>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase' }}>9. Total Rejected</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#991b1b', marginTop: '4px' }}>{totalRejectedCount}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Eliminated in Selection</div>
+                  </div>
+
+                  <div style={{ background: '#eff6ff', padding: '16px 20px', borderRadius: '14px', border: '1.5px solid #bfdbfe', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>10. Overall Placement %</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1e40af', marginTop: '4px' }}>{overallPlacementRate}%</div>
+                    <div style={{ fontSize: '0.75rem', color: '#1e40af', marginTop: '2px', fontWeight: 700 }}>NIRF Accredited Benchmark</div>
+                  </div>
+
+                </div>
+
+                {/* Department Summary Table */}
+                <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                  <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+                      Department-Wise Performance Matrix
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const headers = ['Department', 'Enrolled Scholars', 'Applied', 'Placed', 'Placement Ratio (%)'];
+                        const rows = deptStats.map(d => [d.dept, d.total, applications.filter(a => (a.dept || 'TAMIL') === d.dept).length, d.placed, `${d.percentage}%`]);
+                        exportCSV('Department_Placement_Summary', headers, rows);
+                      }}
+                      style={{ padding: '5px 12px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Download size={13} /> Export CSV
+                    </button>
+                  </div>
+
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 800 }}>
+                          <th style={{ padding: '12px 18px', textAlign: 'left' }}>Department</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'center' }}>Enrolled Scholars</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'center' }}>Applied for Jobs</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'center' }}>Verified Placed</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'center' }}>Placement Ratio (%)</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'right' }}>Performance Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deptStats.map(d => {
+                          const deptApplied = applications.filter(a => (a.dept || 'TAMIL') === d.dept).length;
+                          return (
+                            <tr key={d.dept} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                              <td style={{ padding: '12px 18px', fontWeight: 800, color: '#0f172a' }}>{d.dept}</td>
+                              <td style={{ padding: '12px 18px', textAlign: 'center' }}>{d.total}</td>
+                              <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 700, color: '#2563eb' }}>{deptApplied}</td>
+                              <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 800, color: '#059669' }}>{d.placed}</td>
+                              <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                                <span style={{ padding: '3px 8px', borderRadius: '6px', background: '#ecfdf5', color: '#065f46', fontWeight: 800 }}>
+                                  {d.percentage}%
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                                <span style={{ padding: '3px 8px', borderRadius: '6px', background: d.percentage >= 50 ? '#dcfce7' : '#fef3c7', color: d.percentage >= 50 ? '#15803d' : '#b45309', fontSize: '0.75rem', fontWeight: 700 }}>
+                                  {d.percentage >= 80 ? '🌟 Outstanding' : d.percentage >= 50 ? '✓ On Track' : '⚡ Drives in Progress'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* ── SUB-TAB 2: DEPARTMENT-WISE PLACEMENT REPORT ── */}
+            {reportSubTab === 'department' && (
+              <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#0f172a' }}>
+                      Department-Wise Student Placement Roster ({deptWiseRows.length})
+                    </h3>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                      Detailed audit log of candidates, applied roles, current interview stages, and final offer releases.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const headers = ['Department', 'Student Name', 'Register No', 'Batch', 'Company', 'Job Title', 'Application Date', 'Current Round', 'Total Rounds', 'Selection Status', 'Offer Status'];
+                      const rows = deptWiseRows.map(r => [r.dept, r.student, r.regNo, r.batch, r.company, r.role, r.appDate, r.currentRound, r.totalRounds, r.status, r.offerStatus]);
+                      exportCSV(`Department_Wise_Placement_Report_${reportDeptFilter}`, headers, rows);
+                    }}
+                    style={{ padding: '6px 14px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Download size={14} /> Export Department Sheet (.CSV)
+                  </button>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 800 }}>
+                        <th style={{ padding: '12px 16px', textAlign: 'left' }}>Department</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left' }}>Student Name</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left' }}>Register No</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left' }}>Course & Batch</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left' }}>Company</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left' }}>Job Role</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'center' }}>App Date</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'center' }}>Interview Stage</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'center' }}>Status</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'right' }}>Offer Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deptWiseRows.map(row => (
+                        <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '12px 16px', fontWeight: 800, color: '#0f172a' }}>
+                            <span style={{ padding: '2px 8px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontSize: '0.74rem' }}>
+                              {row.dept}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', fontWeight: 800, color: '#0f172a' }}>{row.student}</td>
+                          <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontWeight: 700, color: '#64748b' }}>{row.regNo}</td>
+                          <td style={{ padding: '12px 16px', color: '#64748b' }}>{row.batch}</td>
+                          <td style={{ padding: '12px 16px', fontWeight: 700, color: '#2563eb' }}>{row.company}</td>
+                          <td style={{ padding: '12px 16px' }}>{row.role}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center', color: '#64748b' }}>{row.appDate}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.74rem', padding: '2px 7px', borderRadius: '4px', background: '#f1f5f9', color: '#334155', fontWeight: 700 }}>
+                              {row.currentRound} of {row.totalRounds}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                            <span style={{
+                              padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 800,
+                              background: row.status === 'Selected' ? '#ecfdf5' : row.status === 'Rejected' ? '#fef2f2' : '#eff6ff',
+                              color: row.status === 'Selected' ? '#065f46' : row.status === 'Rejected' ? '#991b1b' : '#1e40af'
+                            }}>
+                              {row.status === 'Selected' ? '🏆 Selected' : row.status === 'Rejected' ? '❌ Rejected' : '⏳ In Progress'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <span style={{
+                              padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 800,
+                              background: row.offerStatus === 'Offer Released' ? '#ecfdf5' : '#f1f5f9',
+                              color: row.offerStatus === 'Offer Released' ? '#059669' : '#64748b'
+                            }}>
+                              {row.offerStatus}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+
+                      {deptWiseRows.length === 0 && (
+                        <tr>
+                          <td colSpan={10} style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                            No student placement records found matching the active filters.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── SUB-TAB 3: COMPANY-WISE PLACEMENT REPORT ── */}
+            {reportSubTab === 'company' && (
+              <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#0f172a' }}>
+                      Company-Wise Recruitment Funnel & Offer Roster ({companyWiseRows.length})
+                    </h3>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                      Tracks round-by-round candidate clearance, final selections, and accepted offer counts per company.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const headers = ['Company Name', 'Job Role', 'Openings', 'Applied', 'Shortlisted', 'Round 1 Passed', 'Round 2 Passed', 'Round 3 Passed', 'Rejected', 'Completed All Rounds', 'Final Selected', 'Offers Released', 'Offers Accepted', 'Offers Declined/Pending'];
+                      const rows = companyWiseRows.map(r => [r.company, r.role, r.openings, r.applied, r.shortlisted, r.r1Passed, r.r2Passed, r.r3Passed, r.rejected, r.completedAll, r.finalSelected, r.offersReleased, r.offersAccepted, r.offersDeclinedOrPending]);
+                      exportCSV('Company_Wise_Placement_Analytics', headers, rows);
+                    }}
+                    style={{ padding: '6px 14px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Download size={14} /> Export Company Sheet (.CSV)
+                  </button>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 800 }}>
+                        <th style={{ padding: '12px 14px', textAlign: 'left' }}>Company</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'left' }}>Job Role</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center' }}>Openings</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center' }}>Applied</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center' }}>Shortlisted</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center' }}>R1 Pass</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center' }}>R2 Pass</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center' }}>R3 Pass</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center' }}>Rejected</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center' }}>All Done</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center' }}>Selected</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'center' }}>Offers Released</th>
+                        <th style={{ padding: '12px 14px', textAlign: 'right' }}>Accepted</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {companyWiseRows.map((r, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '12px 14px', fontWeight: 800, color: '#0f172a' }}>{r.company}</td>
+                          <td style={{ padding: '12px 14px', color: '#475569' }}>{r.role}</td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>{r.openings}</td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, color: '#2563eb' }}>{r.applied}</td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>{r.shortlisted}</td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center', color: '#059669', fontWeight: 700 }}>{r.r1Passed}</td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center', color: '#059669', fontWeight: 700 }}>{r.r2Passed}</td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center', color: '#059669', fontWeight: 700 }}>{r.r3Passed}</td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center', color: '#dc2626', fontWeight: 700 }}>{r.rejected}</td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>{r.completedAll}</td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 800, color: '#059669' }}>{r.finalSelected}</td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            <span style={{ padding: '2px 7px', borderRadius: '4px', background: '#ecfdf5', color: '#065f46', fontWeight: 800 }}>
+                              {r.offersReleased}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: '#16a34a' }}>
+                            {r.offersAccepted}
+                          </td>
+                        </tr>
+                      ))}
+
+                      {companyWiseRows.length === 0 && (
+                        <tr>
+                          <td colSpan={13} style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                            No company recruitment records found for the selected filters.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── SUB-TAB 4: INTERVIEW ROUND-WISE REPORT ── */}
+            {reportSubTab === 'rounds' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                
+                {/* Drive Selector */}
+                <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>Select Recruitment Drive:</label>
+                    <select
+                      value={reportRoundJobId || activeReportJob?._id || ''}
+                      onChange={e => setReportRoundJobId(e.target.value)}
+                      style={{ padding: '6px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', background: '#ffffff', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', minWidth: '280px' }}
+                    >
+                      {jobs.map(j => (
+                        <option key={j._id || j.jobId || j.id} value={j._id || j.jobId || j.id}>
+                          {j.company} — {j.role} ({j.ctc || 'N/A'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const headers = ['Round No', 'Round Name', 'Assessment Type', 'Total Attended', 'Selected / Qualified to Next', 'Rejected', 'Awaiting Results'];
+                      const rows = roundWiseData.map(r => [r.roundNum, r.roundName, r.type, r.attended, r.selectedNext, r.rejected, r.awaiting]);
+                      exportCSV(`Round_Wise_Report_${activeReportJob?.company || 'Drive'}`, headers, rows);
+                    }}
+                    style={{ padding: '6px 14px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Download size={14} /> Export Round Summary (.CSV)
+                  </button>
+                </div>
+
+                {/* Dynamic Rounds Cards Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                  {roundWiseData.map(r => (
+                    <div key={r.roundNum} style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ padding: '3px 8px', borderRadius: '6px', background: '#2563eb', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800 }}>
+                          Round {r.roundNum}
+                        </span>
+                        <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
+                          Type: {r.type}
+                        </span>
+                      </div>
+
+                      <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                        {r.roundName}
+                      </h4>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '6px', borderTop: '1px solid #f1f5f9' }}>
+                        <div style={{ background: '#f8fafc', padding: '8px', borderRadius: '8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#2563eb' }}>{r.attended}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>Attended</div>
+                        </div>
+                        <div style={{ background: '#ecfdf5', padding: '8px', borderRadius: '8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#059669' }}>{r.selectedNext}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#065f46', fontWeight: 700 }}>Passed Round</div>
+                        </div>
+                        <div style={{ background: '#fef2f2', padding: '8px', borderRadius: '8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#dc2626' }}>{r.rejected}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#991b1b', fontWeight: 700 }}>Rejected</div>
+                        </div>
+                        <div style={{ background: '#fffbeb', padding: '8px', borderRadius: '8px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#b45309' }}>{r.awaiting}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#92400e', fontWeight: 700 }}>In Progress</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+              </div>
+            )}
+
+            {/* ── SUB-TAB 5: SALARY PACKAGE REPORT ── */}
+            {reportSubTab === 'salary' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                
+                {/* 4 Salary Statistic Banners */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+                  <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #fde68a', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase' }}>Highest Package (CTC)</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#b45309', marginTop: '4px' }}>₹ {highestPackageVal} LPA</div>
+                    <div style={{ fontSize: '0.74rem', color: '#92400e', marginTop: '2px' }}>Annual Institutional High</div>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #bfdbfe', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Average CTC (Mean)</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1e40af', marginTop: '4px' }}>₹ {avgPackageVal} LPA</div>
+                    <div style={{ fontSize: '0.74rem', color: '#1e40af', marginTop: '2px' }}>Overall Placed Average</div>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Lowest Package (CTC)</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#334155', marginTop: '4px' }}>₹ {lowestPackageVal} LPA</div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>Baseline Compensation</div>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '14px', border: '1px solid #a7f3d0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase' }}>Total Placed Scholars</span>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#047857', marginTop: '4px' }}>{salaryRows.length}</div>
+                    <div style={{ fontSize: '0.74rem', color: '#047857', marginTop: '2px' }}>Verified Corporate Packages</div>
+                  </div>
+                </div>
+
+                {/* Salary Package Roll Table */}
+                <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                  <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#0f172a' }}>
+                        Placed Students Salary Compensation Register ({salaryRows.length})
+                      </h3>
+                      
+                      {/* Sort Dropdown */}
+                      <select
+                        value={reportSort}
+                        onChange={e => setReportSort(e.target.value)}
+                        style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 700, color: '#0f172a', outline: 'none' }}
+                      >
+                        <option value="default">Default Sort</option>
+                        <option value="ctc_desc">Package: Highest First</option>
+                        <option value="ctc_asc">Package: Lowest First</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const headers = ['Student Scholar', 'Register No', 'Department', 'Company Name', 'Job Title', 'Annual Salary CTC', 'Estimated Monthly (₹)', 'Offer Release Date', 'Offer Acceptance Status'];
+                        const rows = salaryRows.map(r => [r.student, r.regNo, r.dept, r.company, r.role, r.ctcDisplay, r.monthlySalary, r.offerDate, r.status]);
+                        exportCSV('Salary_Packages_Report', headers, rows);
+                      }}
+                      style={{ padding: '6px 14px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Download size={14} /> Export Salary Roll (.CSV)
+                    </button>
+                  </div>
+
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 800 }}>
+                          <th style={{ padding: '12px 18px', textAlign: 'left' }}>Student Scholar</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'left' }}>Register No</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'center' }}>Department</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'left' }}>Company</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'left' }}>Job Designation</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'center' }}>Annual CTC (LPA)</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'center' }}>Monthly Salary</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'center' }}>Offer Date</th>
+                          <th style={{ padding: '12px 18px', textAlign: 'right' }}>Acceptance Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {salaryRows.map(row => (
+                          <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '12px 18px', fontWeight: 800, color: '#0f172a' }}>{row.student}</td>
+                            <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#64748b' }}>{row.regNo}</td>
+                            <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                              <span style={{ padding: '2px 8px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', fontWeight: 700, fontSize: '0.75rem' }}>
+                                {row.dept}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 18px', fontWeight: 700, color: '#2563eb' }}>{row.company}</td>
+                            <td style={{ padding: '12px 18px' }}>{row.role}</td>
+                            <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                              <span style={{ padding: '3px 8px', borderRadius: '6px', background: '#ecfdf5', color: '#065f46', fontWeight: 800 }}>
+                                💰 {row.ctcDisplay}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>
+                              {row.monthlySalary}
+                            </td>
+                            <td style={{ padding: '12px 18px', textAlign: 'center', color: '#64748b' }}>
+                              {row.offerDate}
+                            </td>
+                            <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                              <span style={{ padding: '3px 8px', borderRadius: '6px', background: '#dcfce7', color: '#15803d', fontSize: '0.75rem', fontWeight: 800 }}>
+                                ✓ {row.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+
+                        {salaryRows.length === 0 && (
+                          <tr>
+                            <td colSpan={9} style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                              No placement salary package records available for the selected filters.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* ── SUB-TAB 6: OFFER LETTER TRACKING REPORT ── */}
+            {reportSubTab === 'offerLetters' && (
+              <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#0f172a' }}>
+                      Official Offer Letter Release & Joining Verification Roll ({offerLetterRows.length})
+                    </h3>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                      Tracks offer release dates, dispatch statuses, candidate acceptances, and onboarding joining dates.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const headers = ['Student Scholar', 'Register No', 'Department', 'Company Name', 'Job Title', 'Interview Date', 'Offer Release Date', 'Offer Letter Status', 'Acceptance Status', 'Joining Date'];
+                      const rows = offerLetterRows.map(r => [r.student, r.regNo, r.dept, r.company, r.role, r.interviewDate, r.offerReleaseDate, r.letterStatus, r.acceptanceStatus, r.joiningDate]);
+                      exportCSV('Offer_Letters_Tracking_Roll', headers, rows);
+                    }}
+                    style={{ padding: '6px 14px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Download size={14} /> Export Offer Letters (.CSV)
+                  </button>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 800 }}>
+                        <th style={{ padding: '12px 18px', textAlign: 'left' }}>Student Scholar</th>
+                        <th style={{ padding: '12px 18px', textAlign: 'left' }}>Register No</th>
+                        <th style={{ padding: '12px 18px', textAlign: 'center' }}>Dept</th>
+                        <th style={{ padding: '12px 18px', textAlign: 'left' }}>Company</th>
+                        <th style={{ padding: '12px 18px', textAlign: 'left' }}>Job Designation</th>
+                        <th style={{ padding: '12px 18px', textAlign: 'center' }}>Interview Done</th>
+                        <th style={{ padding: '12px 18px', textAlign: 'center' }}>Offer Release Date</th>
+                        <th style={{ padding: '12px 18px', textAlign: 'center' }}>Offer Letter Status</th>
+                        <th style={{ padding: '12px 18px', textAlign: 'center' }}>Acceptance Status</th>
+                        <th style={{ padding: '12px 18px', textAlign: 'right' }}>Joining Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {offerLetterRows.map(row => (
+                        <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '12px 18px', fontWeight: 800, color: '#0f172a' }}>{row.student}</td>
+                          <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#64748b' }}>{row.regNo}</td>
+                          <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                            <span style={{ padding: '2px 8px', borderRadius: '6px', background: '#f1f5f9', color: '#334155', fontWeight: 700, fontSize: '0.75rem' }}>
+                              {row.dept}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 18px', fontWeight: 700, color: '#2563eb' }}>{row.company}</td>
+                          <td style={{ padding: '12px 18px' }}>{row.role}</td>
+                          <td style={{ padding: '12px 18px', textAlign: 'center', color: '#64748b' }}>{row.interviewDate}</td>
+                          <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 700, color: '#059669' }}>{row.offerReleaseDate}</td>
+                          <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                            <span style={{ padding: '3px 8px', borderRadius: '6px', background: '#ecfdf5', color: '#065f46', fontSize: '0.75rem', fontWeight: 800 }}>
+                              ✓ {row.letterStatus}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                            <span style={{ padding: '3px 8px', borderRadius: '6px', background: '#eff6ff', color: '#1e40af', fontSize: '0.75rem', fontWeight: 800 }}>
+                              {row.acceptanceStatus}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 18px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
+                            {row.joiningDate}
+                          </td>
+                        </tr>
+                      ))}
+
+                      {offerLetterRows.length === 0 && (
+                        <tr>
+                          <td colSpan={10} style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                            No offer letters currently recorded for the selected filters.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+          </div>
+        );
+      })()}
 
       {/* ── REAL-TIME ERP MODALS ── */}
 
@@ -4128,10 +5664,11 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                         className="erp-input-field"
                       >
                         <option value="ALL">ALL Departments</option>
+                        {Array.from(new Set(allStudents.map(s => s.dept || s.department).filter(Boolean))).map(d => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                        <option value="TAMIL">TAMIL</option>
                         <option value="Computer Science and Engineering">Computer Science and Engineering</option>
-                        <option value="Electronics and Communication">Electronics and Communication</option>
-                        <option value="Mechanical Engineering">Mechanical Engineering</option>
-                        <option value="Civil Engineering">Civil Engineering</option>
                         <option value="Commerce & Finance">Commerce & Finance</option>
                         <option value="Arts & Science">Arts & Science</option>
                       </select>

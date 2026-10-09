@@ -84,58 +84,5 @@ export const initCronJobs = () => {
       console.error('Error in daily subscription cron job:', error);
     }
   });
-
-  // Daily at 9:00 AM to mark LOP (Loss of Pay) for employees who haven't checked in
-  cron.schedule('0 9 * * *', async () => {
-    console.log('Running daily 9:00 AM LOP attendance check...');
-    try {
-      const User = (await import('../models/User.js')).default;
-      const EmployeeAttendance = (await import('../models/EmployeeAttendance.js')).default;
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Start of today
-
-      const employeeRoles = ['Principal', 'HOD', 'Staff', 'Accounts', 'Driver'];
-      
-      // Get all employees
-      const employees = await User.find({ role: { $in: employeeRoles } });
-      
-      for (const emp of employees) {
-        // Check if they already have an attendance record for today
-        const existingRecord = await EmployeeAttendance.findOne({
-          employeeId: emp._id,
-          date: { $gte: today }
-        });
-
-        if (!existingRecord) {
-          // Mark as Absent / LOP
-          await EmployeeAttendance.create({
-            tenantId: emp.tenantId || 'DEFAULT',
-            collegeId: emp.collegeId || 'DEFAULT',
-            employeeId: emp._id,
-            role: emp.role,
-            date: new Date(),
-            checkIn: new Date(), // Just setting a time, but status is Absent
-            status: 'Absent',
-            remarks: 'LOP - Late Check-In Blocked'
-          });
-
-          // Create Notification for the user
-          await Notification.create({
-            tenantId: emp.tenantId,
-            collegeId: emp.collegeId,
-            recipient: emp._id, // notify the user
-            receiverId: emp._id,
-            title: 'LOP - Late Check-In',
-            message: 'You have not checked in by 9:00 AM. Your attendance has been marked as LOP.',
-            category: 'staff',
-            type: 'Error'
-          });
-        }
-      }
-      console.log('Daily LOP attendance check completed.');
-    } catch (error) {
-      console.error('Error in LOP cron job:', error);
-    }
-  });
 };
+

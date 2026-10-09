@@ -54,6 +54,7 @@ import {
 import CustomSelect from '../../components/CustomSelect';
 import './LibraryManagement.css';
 import LibraryNoDueCertificateModal from '../../components/LibraryNoDueCertificateModal';
+import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
 
 // Default Fallback Categories if no courses exist yet
 const FALLBACK_CATEGORIES = ['Computer Science', 'Information Technology', 'Mechanical Engineering', 'Electronics & Communication', 'Electrical Engineering', 'Civil Engineering', 'Mathematics', 'Physics', 'Chemistry', 'Management Studies'];
@@ -1980,6 +1981,9 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
           ========================================================= */}
       {activeTab === 'Dashboard' && (
         <div className="lib-tab-content animate-fade-in space-y-6">
+
+          {/* Librarian Duty Attendance Widget */}
+          <EmployeeAttendanceCard />
 
           {/* 8 Real-Time KPI Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', width: '100%' }}>

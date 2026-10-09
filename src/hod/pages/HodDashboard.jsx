@@ -781,6 +781,11 @@ const HodDashboard = () => {
         </div>
       </div>
 
+      {/* HOD Duty Attendance Card */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <EmployeeAttendanceCard />
+      </div>
+
       {/* Operational Summary Strip with Real-time Badges */}
       <div className="hod-realtime-summary" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
         <button
@@ -865,7 +870,7 @@ const HodDashboard = () => {
 
         <button
           type="button"
-          onClick={() => navigate('/hod/placements')}
+          onClick={() => navigate('/hod/placement')}
           className="hod-summary-card"
           style={{ border: '1px solid #10b981', background: '#ecfdf5' }}
         >
@@ -905,7 +910,7 @@ const HodDashboard = () => {
 
           <button 
             type="button" 
-            onClick={() => navigate('/hod/placements')}
+            onClick={() => navigate('/hod/placement')}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#059669', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
           >
             Placement Cell & Applications ({placementJobs.length} Drives) →
@@ -917,7 +922,7 @@ const HodDashboard = () => {
             {placementJobs.slice(0, 3).map((job, idx) => (
               <div 
                 key={job._id || job.jobId || idx}
-                onClick={() => navigate('/hod/placements')}
+                onClick={() => navigate('/hod/placement')}
                 style={{
                   background: '#f8fafc',
                   border: '1px solid #e2e8f0',

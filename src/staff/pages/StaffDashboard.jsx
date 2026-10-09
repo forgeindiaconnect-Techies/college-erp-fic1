@@ -23,6 +23,7 @@ import {
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import LiveClassModal from '../components/LiveClassModal';
+import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
 import './StaffDashboard.css';
 
 const DEFAULT_SESSION = {
@@ -478,6 +479,11 @@ const StaffDashboard = () => {
         </div>
       )}
 
+      {/* Employee Daily Duty Attendance Card */}
+      <div style={{ marginBottom: '14px' }}>
+        <EmployeeAttendanceCard />
+      </div>
+
       {/* 4 Interactive ERP KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '14px' }}>
         <div 
@@ -563,7 +569,7 @@ const StaffDashboard = () => {
         </div>
 
         <div 
-          onClick={() => navigate('/staff/placements')}
+          onClick={() => navigate('/staff/placement')}
           style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #10B981', padding: '18px 20px', borderRadius: '14px', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -603,7 +609,7 @@ const StaffDashboard = () => {
 
           <button 
             type="button" 
-            onClick={() => navigate('/staff/placements')}
+            onClick={() => navigate('/staff/placement')}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
           >
             Manage Department Placements ({placementJobs.length} Drives) →
@@ -615,7 +621,7 @@ const StaffDashboard = () => {
             {placementJobs.slice(0, 3).map((job, idx) => (
               <div 
                 key={job._id || job.jobId || idx}
-                onClick={() => navigate('/staff/placements')}
+                onClick={() => navigate('/staff/placement')}
                 style={{
                   background: '#f8fafc',
                   border: '1px solid #e2e8f0',

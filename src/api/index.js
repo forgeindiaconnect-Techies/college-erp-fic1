@@ -3,14 +3,14 @@ import axios from 'axios';
 // In production (Vercel), use the Render backend URL.
 // In local dev, use localhost via the Vite proxy.
 const getBaseURL = () => {
+  // In local dev, always talk to the local backend on localhost:5000
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:5000/api';
+  }
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  // If running on Vercel (not localhost), use the Render backend directly
-  if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
-    return 'https://college-erp-software.onrender.com/api';
-  }
-  return 'http://localhost:5000/api';
+  return 'https://college-erp-software.onrender.com/api';
 };
 
 const api = axios.create({
@@ -665,8 +665,8 @@ export const deleteAccountsOfficer = (id) => api.delete(`/accounts-officer/${id}
 
 // Employee Attendance (Staff, HOD, Principal, Accounts, Driver)
 export const getTodayEmployeeAttendance = () => api.get('/employee-attendance/today');
-export const employeeCheckIn = () => api.post('/employee-attendance/checkin');
-export const employeeCheckOut = () => api.put('/employee-attendance/checkout');
+export const employeeCheckIn = (data = {}) => api.post('/employee-attendance/checkin', data);
+export const employeeCheckOut = (data = {}) => api.put('/employee-attendance/checkout', data);
 export const getEmployeeAttendanceHistory = () => api.get('/employee-attendance/history');
 export const getEmployeeAttendanceReports = (params) => api.get('/employee-attendance/admin/reports', { params });
 export const markStaffAttendance = (data) =>
@@ -763,3 +763,4 @@ export const getPlacementOfficers = () => api.get('/placement-officers');
 export const createPlacementOfficer = (data) => api.post('/placement-officers', data);
 export const updatePlacementOfficer = (id, data) => api.put(`/placement-officers/${id}`, data);
 export const deletePlacementOfficer = (id) => api.delete(`/placement-officers/${id}`);
+

@@ -643,7 +643,7 @@ const StudentDashboard = () => {
 
           <button 
             type="button" 
-            onClick={() => navigate('/student/placements')}
+            onClick={() => navigate('/student/placement')}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 6px rgba(37,99,235,0.2)' }}
           >
             Explore Placement Cell ({activeDrives.length} Drives) →
@@ -655,7 +655,7 @@ const StudentDashboard = () => {
             {activeDrives.slice(0, 3).map((job, idx) => (
               <div 
                 key={job._id || job.jobId || idx}
-                onClick={() => navigate('/student/placements')}
+                onClick={() => navigate('/student/placement')}
                 style={{
                   background: '#ffffff',
                   border: '1px solid var(--border-color, #e2e8f0)',

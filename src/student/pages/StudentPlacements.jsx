@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Briefcase, CheckCircle, XCircle, ChevronRight, FileText, 
   Building, Award, Calendar, MapPin, Search, AlertCircle, 
-  Clock, TrendingUp, UserCheck, ShieldCheck, CheckCircle2, Sparkles, RefreshCw
+  Clock, TrendingUp, UserCheck, ShieldCheck, CheckCircle2, Sparkles, RefreshCw,
+  Eye, Info, X, ChevronDown, Check, ArrowRight
 } from 'lucide-react';
 import { 
   getStudentById, getMarksByStudent, getAttendanceByStudent,
@@ -24,6 +25,7 @@ const StudentPlacements = () => {
   const [tab, setTab] = useState('drives'); // 'drives', 'applications', 'interviews', 'eligibility'
   const [search, setSearch] = useState('');
   const [toastMsg, setToastMsg] = useState('');
+  const [selectedAppForModal, setSelectedAppForModal] = useState(null);
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -662,26 +664,53 @@ const StudentPlacements = () => {
                   </div>
                 </div>
 
-                <div style={{ borderTop: '1px solid var(--border-color, #f1f5f9)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ borderTop: '1px solid var(--border-color, #f1f5f9)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ fontSize: '0.76rem', color: 'var(--text-muted, #64748b)' }}>
                     <div>Min CGPA: <strong>{minCgpa > 0 ? minCgpa : 'Any'}</strong></div>
                     <div style={{ fontSize: '0.72rem' }}>Deadline: {job.deadline ? new Date(job.deadline).toLocaleDateString() : 'Open'}</div>
                   </div>
 
                   {hasApplied ? (
-                    <span style={{ 
-                      padding: '6px 14px', 
-                      borderRadius: '8px', 
-                      fontSize: '0.8rem', 
-                      fontWeight: 700,
-                      background: existingApp.status === 'Selected' ? '#dcfce7' : 
-                                  existingApp.status === 'Shortlisted' ? '#fef3c7' : '#eff6ff',
-                      color: existingApp.status === 'Selected' ? '#15803d' : 
-                             existingApp.status === 'Shortlisted' ? '#b45309' : '#2563eb',
-                      border: '1px solid var(--border-color, #e2e8f0)'
-                    }}>
-                      ✓ {existingApp.status || 'Applied'}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ 
+                        padding: '5px 12px', 
+                        borderRadius: '8px', 
+                        fontSize: '0.78rem', 
+                        fontWeight: 800,
+                        background: existingApp.status === 'Selected' ? '#dcfce7' : 
+                                    existingApp.status === 'Shortlisted' ? '#fef3c7' : 
+                                    existingApp.status === 'Rejected' ? '#fee2e2' : '#eff6ff',
+                        color: existingApp.status === 'Selected' ? '#15803d' : 
+                               existingApp.status === 'Shortlisted' ? '#b45309' : 
+                               existingApp.status === 'Rejected' ? '#dc2626' : '#2563eb',
+                        border: '1px solid var(--border-color, #e2e8f0)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        {existingApp.status === 'Selected' ? '🏆 Selected' : (existingApp.status === 'Rejected' ? '✕ Not Selected' : `✓ ${existingApp.status || 'Applied'}`)}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAppForModal(existingApp)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          background: '#eff6ff',
+                          color: '#2563eb',
+                          border: '1px solid #bfdbfe',
+                          fontWeight: 700,
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Eye size={13} /> View Stage Details
+                      </button>
+                    </div>
                   ) : (
                     <button
                       type="button"
@@ -719,67 +748,295 @@ const StudentPlacements = () => {
 
       {/* ── TAB 2: My Applications ── */}
       {tab === 'applications' && (
-        <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
-              Submitted Applications Status Tracking
-            </h3>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, padding: '4px 10px', borderRadius: '8px', background: '#eff6ff', color: '#2563eb' }}>
-              {applications.length} Submitted
-            </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                  Submitted Applications & Recruitment Stage Status ({applications.length})
+                </h3>
+                <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Transparent stage-by-stage evaluation, interview progression, and corporate offer status.
+                </p>
+              </div>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, padding: '4px 12px', borderRadius: '8px', background: '#eff6ff', color: '#2563eb' }}>
+                {applications.length} Active Submissions
+              </span>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
+                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Company & Role</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Total Rounds</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Current Interview Stage</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Application Date</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Recruitment Status</th>
+                    <th style={{ padding: '12px 18px', textAlign: 'right' }}>Stage Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {applications.map((app, idx) => {
+                    const matchedJob = jobs.find(j => 
+                      (j.company || '').toLowerCase() === (app.company || '').toLowerCase() &&
+                      (j.role || '').toLowerCase() === (app.role || '').toLowerCase()
+                    );
+                    const totalRounds = matchedJob?.totalRounds || (matchedJob?.rounds ? matchedJob.rounds.length : 3);
+                    const roundsList = matchedJob?.rounds && matchedJob.rounds.length > 0
+                      ? matchedJob.rounds
+                      : [
+                          { name: 'Round 1: Aptitude Assessment', type: 'Aptitude' },
+                          { name: 'Round 2: Technical Interview', type: 'Technical' },
+                          { name: 'Round 3: HR Fitment', type: 'HR' }
+                        ];
+
+                    const currRoundNum = app.currentRound || 1;
+                    const currRoundObj = roundsList[currRoundNum - 1] || roundsList[0];
+                    const isSelected = app.status === 'Selected';
+                    const isRejected = app.status === 'Rejected';
+
+                    return (
+                      <tr key={app._id || app.applicationId || idx} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
+                        <td style={{ padding: '12px 18px' }}>
+                          <div style={{ fontWeight: 800, color: '#2563eb', fontSize: '0.92rem' }}>{app.company}</div>
+                          <div style={{ fontWeight: 600, color: 'var(--text-main, #0f172a)', fontSize: '0.82rem' }}>{app.role}</div>
+                        </td>
+                        <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: '#f1f5f9', color: '#475569' }}>
+                            {totalRounds} Rounds
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                          {isSelected ? (
+                            <span style={{ padding: '4px 10px', borderRadius: '8px', background: '#dcfce7', color: '#15803d', fontWeight: 800, fontSize: '0.78rem' }}>
+                              🏆 Cleared All {totalRounds} Rounds (Selected)
+                            </span>
+                          ) : isRejected ? (
+                            <span style={{ padding: '4px 10px', borderRadius: '8px', background: '#fee2e2', color: '#dc2626', fontWeight: 800, fontSize: '0.78rem' }}>
+                              ✕ Round {currRoundNum} (Not Shortlisted)
+                            </span>
+                          ) : (
+                            <span style={{ padding: '4px 10px', borderRadius: '8px', background: '#eff6ff', color: '#2563eb', fontWeight: 800, fontSize: '0.78rem' }}>
+                              ⏳ {currRoundObj?.name || `Round ${currRoundNum}`}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 18px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                          {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : 'Active'}
+                        </td>
+                        <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                          <span style={{ 
+                            padding: '4px 12px', 
+                            borderRadius: '20px', 
+                            fontSize: '0.78rem', 
+                            fontWeight: 800,
+                            background: isSelected ? '#dcfce7' : 
+                                        app.status === 'Shortlisted' ? '#fef3c7' : 
+                                        isRejected ? '#fee2e2' : '#eff6ff',
+                            color: isSelected ? '#15803d' : 
+                                   app.status === 'Shortlisted' ? '#b45309' : 
+                                   isRejected ? '#dc2626' : '#2563eb',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            {isSelected ? '✓ Corporate Offer Issued' : (isRejected ? '✕ Evaluated (Rejected)' : (app.status || 'Applied'))}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAppForModal(app)}
+                            style={{
+                              padding: '5px 12px',
+                              borderRadius: '8px',
+                              background: '#eff6ff',
+                              color: '#2563eb',
+                              border: '1px solid #bfdbfe',
+                              fontWeight: 700,
+                              fontSize: '0.78rem',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <Eye size={13} /> View Stepper
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {applications.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted, #64748b)' }}>
+                        You have not applied for any campus placement drives yet. Browse the active recruitment drives tab to submit applications.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
-                  <th style={{ padding: '12px 18px', textAlign: 'left' }}>Company</th>
-                  <th style={{ padding: '12px 18px', textAlign: 'left' }}>Job Designation</th>
-                  <th style={{ padding: '12px 18px', textAlign: 'center' }}>Registered Reg No</th>
-                  <th style={{ padding: '12px 18px', textAlign: 'center' }}>Application Date</th>
-                  <th style={{ padding: '12px 18px', textAlign: 'right' }}>Current Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {applications.map((app, idx) => (
-                  <tr key={app._id || app.applicationId || idx} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
-                    <td style={{ padding: '12px 18px', fontWeight: 800, color: '#2563eb' }}>{app.company}</td>
-                    <td style={{ padding: '12px 18px', fontWeight: 600, color: 'var(--text-main, #0f172a)' }}>{app.role}</td>
-                    <td style={{ padding: '12px 18px', textAlign: 'center', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{app.regNo || studentDetails.id}</td>
-                    <td style={{ padding: '12px 18px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                      {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : 'Active'}
-                    </td>
-                    <td style={{ padding: '12px 18px', textAlign: 'right' }}>
-                      <span style={{ 
-                        padding: '4px 12px', 
-                        borderRadius: '20px', 
-                        fontSize: '0.78rem', 
-                        fontWeight: 700,
-                        background: app.status === 'Selected' ? '#dcfce7' : 
-                                    app.status === 'Shortlisted' ? '#fef3c7' : 
-                                    app.status === 'Rejected' ? '#fee2e2' : '#eff6ff',
-                        color: app.status === 'Selected' ? '#15803d' : 
-                               app.status === 'Shortlisted' ? '#b45309' : 
-                               app.status === 'Rejected' ? '#dc2626' : '#2563eb',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        {app.status === 'Selected' ? '✓ Selected / Offer' : (app.status || 'Applied')}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {applications.length === 0 && (
-                  <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted, #64748b)' }}>
-                      You have not applied for any campus placement drives yet. Browse the active recruitment drives tab to submit applications.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {/* Detailed Stage-Wise Round Progression Cards */}
+          {applications.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                Detailed Stage-by-Stage Round Progression & Timelines:
+              </h4>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '18px' }}>
+                {applications.map((app, idx) => {
+                  const matchedJob = jobs.find(j => 
+                    (j.company || '').toLowerCase() === (app.company || '').toLowerCase() &&
+                    (j.role || '').toLowerCase() === (app.role || '').toLowerCase()
+                  );
+                  const totalRounds = matchedJob?.totalRounds || (matchedJob?.rounds ? matchedJob.rounds.length : 3);
+                  const roundsList = matchedJob?.rounds && matchedJob.rounds.length > 0
+                    ? matchedJob.rounds
+                    : [
+                        { name: 'Round 1: Aptitude Assessment', type: 'Aptitude' },
+                        { name: 'Round 2: Technical Interview', type: 'Technical' },
+                        { name: 'Round 3: HR Fitment', type: 'HR' }
+                      ];
+
+                  const currRoundNum = app.currentRound || 1;
+                  const isSelected = app.status === 'Selected';
+                  const isRejected = app.status === 'Rejected';
+
+                  return (
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        background: 'var(--bg-card, #ffffff)', 
+                        padding: '20px', 
+                        borderRadius: '16px', 
+                        border: `1px solid ${isSelected ? '#bbf7d0' : (isRejected ? '#fecaca' : '#e2e8f0')}`, 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '14px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#2563eb' }}>{app.company}</div>
+                          <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-main, #0f172a)' }}>{app.role}</div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Package: <strong>{matchedJob?.ctc || 'Corporate Standard'}</strong> • Total: {totalRounds} Stages
+                          </div>
+                        </div>
+                        <span style={{ 
+                          fontSize: '0.74rem', 
+                          fontWeight: 800, 
+                          padding: '4px 10px', 
+                          borderRadius: '8px', 
+                          background: isSelected ? '#dcfce7' : (isRejected ? '#fee2e2' : '#eff6ff'), 
+                          color: isSelected ? '#15803d' : (isRejected ? '#dc2626' : '#2563eb'),
+                          border: '1px solid var(--border-color, #e2e8f0)'
+                        }}>
+                          {isSelected ? '🏆 OFFER ISSUED' : (isRejected ? '✕ EVALUATED (NOT SELECTED)' : `ROUND ${currRoundNum} OF ${totalRounds}`)}
+                        </span>
+                      </div>
+
+                      {/* Status Banner */}
+                      {isSelected ? (
+                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'linear-gradient(135deg, #dcfce7, #f0fdf4)', border: '1px solid #86efac', color: '#166534', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Award size={18} color="#15803d" />
+                          <span>Congratulations! You have cleared all {totalRounds} interview stages and received an Official Corporate Offer Letter.</span>
+                        </div>
+                      ) : isRejected ? (
+                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: '#fee2e2', border: '1px solid #fca5a5', color: '#991b1b', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <XCircle size={18} color="#dc2626" />
+                          <span>Application evaluation concluded in Round {currRoundNum}. Keep participating in other open campus recruitment drives!</span>
+                        </div>
+                      ) : (
+                        <div style={{ padding: '10px 12px', borderRadius: '8px', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e40af', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Clock size={18} color="#2563eb" />
+                          <span>Currently active in Round {currRoundNum}: {roundsList[currRoundNum - 1]?.name || 'Assessment'}. Awaiting evaluator confirmation.</span>
+                        </div>
+                      )}
+
+                      {/* Round-by-Round Stepper */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {roundsList.map((r, rIdx) => {
+                          const rNum = rIdx + 1;
+                          const ev = app.roundEvaluations?.[r.name] || {};
+                          const isPassed = ev.status === 'Qualified' || (currRoundNum > rNum) || isSelected;
+                          const isCurrent = currRoundNum === rNum && !isSelected && !isRejected;
+                          const isFailed = ev.status === 'Rejected' || (currRoundNum === rNum && isRejected);
+
+                          return (
+                            <div key={rIdx} style={{
+                              padding: '10px 12px',
+                              borderRadius: '10px',
+                              background: isPassed ? 'rgba(22,163,74,0.06)' : (isCurrent ? 'rgba(37,99,235,0.06)' : (isFailed ? 'rgba(220,38,38,0.06)' : '#f8fafc')),
+                              border: isPassed ? '1px solid #bbf7d0' : (isCurrent ? '1px solid #bfdbfe' : (isFailed ? '1px solid #fecaca' : '1px solid #e2e8f0')),
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: '10px'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ width: '24px', height: '24px', borderRadius: '50%', background: isPassed ? '#16a34a' : (isCurrent ? '#2563eb' : (isFailed ? '#dc2626' : '#cbd5e1')), color: '#fff', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                                  {isPassed ? '✓' : (isFailed ? '✕' : rNum)}
+                                </span>
+                                <div>
+                                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }}>{r.name}</div>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Type: {r.type || 'Technical / Fitment'}</div>
+                                </div>
+                              </div>
+
+                              <div style={{ textAlign: 'right' }}>
+                                <span style={{ 
+                                  fontSize: '0.74rem', 
+                                  fontWeight: 800, 
+                                  color: isPassed ? '#15803d' : (isCurrent ? '#2563eb' : (isFailed ? '#dc2626' : '#94a3b8')),
+                                  display: 'block'
+                                }}>
+                                  {isPassed ? 'Passed ✓' : (isCurrent ? 'In Progress ⏳' : (isFailed ? 'Not Qualified ✕' : 'Upcoming'))}
+                                </span>
+                                {ev.updatedAt && (
+                                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                                    {new Date(ev.updatedAt).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div style={{ borderTop: '1px solid var(--border-color, #f1f5f9)', paddingTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAppForModal(app)}
+                          style={{
+                            padding: '6px 14px',
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '8px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            color: '#2563eb',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          <Info size={14} /> Full Stage Timeline & Evaluation
+                        </button>
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -925,6 +1182,266 @@ const StudentPlacements = () => {
 
         </div>
       )}
+
+      {/* ── Complete Round Progression & Stage Stepper Modal ── */}
+      {selectedAppForModal && (() => {
+        const modalJob = jobs.find(j => 
+          (j.company || '').toLowerCase() === (selectedAppForModal.company || '').toLowerCase() &&
+          (j.role || '').toLowerCase() === (selectedAppForModal.role || '').toLowerCase()
+        );
+        const modalRounds = modalJob?.rounds && modalJob.rounds.length > 0
+          ? modalJob.rounds
+          : [
+              { name: 'Round 1: Aptitude Assessment', type: 'Aptitude' },
+              { name: 'Round 2: Technical Interview', type: 'Technical' },
+              { name: 'Round 3: HR Fitment', type: 'HR' }
+            ];
+        const totalRounds = modalJob?.totalRounds || modalRounds.length;
+        const currRoundNum = selectedAppForModal.currentRound || 1;
+        const isSelected = selectedAppForModal.status === 'Selected';
+        const isRejected = selectedAppForModal.status === 'Rejected';
+
+        // Check if there is an interview scheduled for this application
+        const matchedInterviews = interviews.filter(it => 
+          (it.company || '').toLowerCase() === (selectedAppForModal.company || '').toLowerCase()
+        );
+
+        return (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px'
+          }}>
+            <div style={{
+              background: 'var(--bg-card, #ffffff)',
+              borderRadius: '20px',
+              maxWidth: '640px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '26px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '18px',
+              border: '1px solid var(--border-color, #e2e8f0)'
+            }}>
+              
+              {/* Modal Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color, #e2e8f0)', paddingBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: isSelected ? '#dcfce7' : (isRejected ? '#fee2e2' : '#eff6ff'), color: isSelected ? '#15803d' : (isRejected ? '#dc2626' : '#2563eb'), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Building size={24} />
+                  </div>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                      {selectedAppForModal.company}
+                    </h2>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted, #64748b)' }}>
+                      {selectedAppForModal.role} • Package: <span style={{ color: '#2563eb', fontWeight: 700 }}>{modalJob?.ctc || 'Standard CTC'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedAppForModal(null)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-muted, #64748b)',
+                    padding: '4px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Status Outcome Banner */}
+              {isSelected ? (
+                <div style={{
+                  background: 'linear-gradient(135deg, #dcfce7, #f0fdf4)',
+                  border: '1px solid #86efac',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                  color: '#166534'
+                }}>
+                  <Award size={24} style={{ color: '#15803d', shrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>Corporate Offer Issued — Selection Confirmed!</div>
+                    <div style={{ fontSize: '0.82rem', marginTop: '4px', lineHeight: '1.4' }}>
+                      You have passed all {totalRounds} recruitment stages for {selectedAppForModal.role} at {selectedAppForModal.company}. The official placement record is verified by the Placement Cell.
+                    </div>
+                  </div>
+                </div>
+              ) : isRejected ? (
+                <div style={{
+                  background: '#fee2e2',
+                  border: '1px solid #fca5a5',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                  color: '#991b1b'
+                }}>
+                  <XCircle size={24} style={{ color: '#dc2626', shrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>Recruitment Evaluation Concluded</div>
+                    <div style={{ fontSize: '0.82rem', marginTop: '4px', lineHeight: '1.4' }}>
+                      Your application was evaluated and not shortlisted in Round {currRoundNum}. You remain eligible for other open campus placement drives.
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                  color: '#1e40af'
+                }}>
+                  <Clock size={24} style={{ color: '#2563eb', shrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>Active Recruitment in Progress</div>
+                    <div style={{ fontSize: '0.82rem', marginTop: '4px', lineHeight: '1.4' }}>
+                      You are currently in <strong>Round {currRoundNum} of {totalRounds} ({modalRounds[currRoundNum - 1]?.name || 'Assessment'})</strong>. Check your interview schedule below.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Stage-by-Stage Detailed Breakdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                  Interview Rounds Pipeline & Status ({totalRounds} Total Rounds):
+                </h4>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {modalRounds.map((r, idx) => {
+                    const rNum = idx + 1;
+                    const ev = selectedAppForModal.roundEvaluations?.[r.name] || {};
+                    const isPassed = ev.status === 'Qualified' || (currRoundNum > rNum) || isSelected;
+                    const isCurrent = currRoundNum === rNum && !isSelected && !isRejected;
+                    const isFailed = ev.status === 'Rejected' || (currRoundNum === rNum && isRejected);
+                    const isUpcoming = rNum > currRoundNum && !isSelected;
+
+                    // Match schedule
+                    const matchedInt = matchedInterviews.find(it => (it.round || '').toLowerCase().includes(`round ${rNum}`) || (it.round || '').toLowerCase().includes(r.name.toLowerCase()));
+
+                    return (
+                      <div 
+                        key={idx}
+                        style={{
+                          background: isPassed ? '#f0fdf4' : (isCurrent ? '#f8fafc' : (isFailed ? '#fef2f2' : '#ffffff')),
+                          border: isPassed ? '1px solid #bbf7d0' : (isCurrent ? '2px solid #3b82f6' : (isFailed ? '1px solid #fecaca' : '1px solid #e2e8f0')),
+                          borderRadius: '12px',
+                          padding: '14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '50%',
+                              background: isPassed ? '#16a34a' : (isCurrent ? '#2563eb' : (isFailed ? '#dc2626' : '#cbd5e1')),
+                              color: '#fff',
+                              fontSize: '0.78rem',
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}>
+                              {isPassed ? '✓' : (isFailed ? '✕' : rNum)}
+                            </span>
+                            <div>
+                              <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                                {r.name}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)' }}>
+                                Assessment Type: {r.type || 'Technical & HR'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            background: isPassed ? '#dcfce7' : (isCurrent ? '#eff6ff' : (isFailed ? '#fee2e2' : '#f1f5f9')),
+                            color: isPassed ? '#15803d' : (isCurrent ? '#2563eb' : (isFailed ? '#dc2626' : '#64748b'))
+                          }}>
+                            {isPassed ? '✓ Cleared & Qualified' : (isCurrent ? '⏳ In Progress' : (isFailed ? '✕ Not Shortlisted' : 'Upcoming Stage'))}
+                          </span>
+                        </div>
+
+                        {/* Schedule info if available */}
+                        {matchedInt && (
+                          <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.75rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                            <span>📅 <strong>Interview Date:</strong> {new Date(matchedInt.date).toLocaleDateString()}</span>
+                            <span>⏰ <strong>Time:</strong> {matchedInt.time || '10:00 AM'}</span>
+                            <span>📍 <strong>Mode:</strong> {matchedInt.mode || matchedInt.venue || 'Campus Auditorium'}</span>
+                          </div>
+                        )}
+
+                        {/* Remarks if any */}
+                        {ev.notes && (
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', background: 'rgba(0,0,0,0.02)', padding: '6px 10px', borderRadius: '6px' }}>
+                            <strong>Evaluator Remarks:</strong> {ev.notes}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color, #e2e8f0)', paddingTop: '14px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedAppForModal(null)}
+                  style={{
+                    padding: '8px 22px',
+                    borderRadius: '8px',
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close Stage Overview
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Toast Notification */}
       {toastMsg && (

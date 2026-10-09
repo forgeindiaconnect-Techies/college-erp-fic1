@@ -10,9 +10,10 @@ const documentSchema = new mongoose.Schema({
 });
 
 const transportDriverSchema = new mongoose.Schema({
-  driverId: { type: String, required: true, unique: true }, // Auto-generated DRV-0001
+  driverId: { type: String, required: true }, // Auto-generated DRV-0001
   status: { type: String, enum: ['Active', 'Inactive', 'Suspended', 'On Leave'], default: 'Active' },
   collegeId: { type: String },
+  tenantId: { type: String },
   
   // 1. Profile
   name: { type: String, required: true },
@@ -48,7 +49,7 @@ const transportDriverSchema = new mongoose.Schema({
   licenseVerifiedBy: { type: String },
 
   // 4. Experience
-  experience: { type: String, required: true }, // total
+  experience: { type: String, default: '1 Year' }, // total
   heavyVehicleExperience: { type: String },
   previousEmployer: { type: String },
   previousEmploymentDuration: { type: String },

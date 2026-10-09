@@ -81,52 +81,97 @@ const CollegeInfoCard = () => {
 
   return (
     <div style={{
-      background: 'linear-gradient(135deg, rgba(59,130,246,0.05), rgba(139,92,246,0.05))',
-      border: '1px solid rgba(59,130,246,0.2)',
+      background: 'var(--bg-card, #ffffff)',
+      border: '1px solid var(--border-color, #e2e8f0)',
       borderRadius: '12px',
-      padding: '16px 20px',
-      marginBottom: '24px',
+      padding: '12px 18px',
+      marginBottom: '16px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
       flexWrap: 'wrap',
-      gap: '16px'
+      gap: '12px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ background: 'rgba(59,130,246,0.1)', padding: '12px', borderRadius: '10px', color: '#3b82f6' }}>
-          <Building size={24} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ 
+          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', 
+          width: '38px', 
+          height: '38px', 
+          borderRadius: '9px', 
+          color: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 3px 8px rgba(37,99,235,0.25)'
+        }}>
+          <Building size={20} />
         </div>
         <div>
-          <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>College Name</p>
-          <h3 style={{ margin: '4px 0 0 0', fontSize: '1.2rem', color: 'var(--text-main)', fontWeight: 700 }}>{collegeData.collegeName}</h3>
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #64748b)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Institution Profile
+          </span>
+          <h3 style={{ margin: '1px 0 0', fontSize: '1.05rem', color: 'var(--text-main, #0f172a)', fontWeight: 800, letterSpacing: '-0.01em' }}>
+            {collegeData.collegeName}
+          </h3>
         </div>
       </div>
       
-      <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ShieldCheck size={18} color="var(--text-muted)" />
-          <div>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>College ID</p>
-            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>{collegeData.tenantId}</p>
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* College ID */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '6px', 
+          padding: '5px 10px', 
+          borderRadius: '8px', 
+          background: 'var(--bg-secondary, #f8fafc)', 
+          border: '1px solid var(--border-color, #e2e8f0)' 
+        }}>
+          <ShieldCheck size={15} color="#6366f1" />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '0.62rem', color: 'var(--text-muted, #64748b)', fontWeight: 600, textTransform: 'uppercase', lineHeight: 1 }}>College ID</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>{collegeData.tenantId}</span>
           </div>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <CreditCard size={18} color="var(--text-muted)" />
-          <div>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Plan</p>
-            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)' }}>{collegeData.plan}</p>
+        {/* Subscription Plan */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '6px', 
+          padding: '5px 10px', 
+          borderRadius: '8px', 
+          background: 'var(--bg-secondary, #f8fafc)', 
+          border: '1px solid var(--border-color, #e2e8f0)' 
+        }}>
+          <CreditCard size={15} color="#0284c7" />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '0.62rem', color: 'var(--text-muted, #64748b)', fontWeight: 600, textTransform: 'uppercase', lineHeight: 1 }}>Plan</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>{collegeData.plan}</span>
           </div>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Activity size={18} color="var(--text-muted)" />
-          <div>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Status</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: collegeData.status === 'Active' ? 'var(--success)' : 'var(--danger)' }}></span>
-              <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: collegeData.status === 'Active' ? 'var(--success)' : 'var(--danger)' }}>{collegeData.status}</p>
-            </div>
+        {/* Status */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '6px', 
+          padding: '5px 10px', 
+          borderRadius: '8px', 
+          background: collegeData.status === 'Active' ? '#f0fdf4' : '#fef2f2', 
+          border: collegeData.status === 'Active' ? '1px solid #bbf7d0' : '1px solid #fecaca' 
+        }}>
+          <span style={{ 
+            width: '7px', 
+            height: '7px', 
+            borderRadius: '50%', 
+            background: collegeData.status === 'Active' ? '#16a34a' : '#dc2626',
+            boxShadow: collegeData.status === 'Active' ? '0 0 0 2px rgba(22, 163, 74, 0.2)' : 'none'
+          }} />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '0.62rem', color: collegeData.status === 'Active' ? '#166534' : '#991b1b', fontWeight: 600, textTransform: 'uppercase', lineHeight: 1 }}>Status</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: collegeData.status === 'Active' ? '#15803d' : '#b91c1c' }}>{collegeData.status}</span>
           </div>
         </div>
       </div>

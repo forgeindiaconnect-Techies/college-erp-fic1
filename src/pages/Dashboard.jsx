@@ -27,7 +27,8 @@ import {
   Award,
   Building,
   Bus,
-  ArrowRight
+  ArrowRight,
+  ChevronRight
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -37,6 +38,7 @@ import { getStudents, getStaff, getDepartments, getCourses, getAllFees, getAllAt
 import api from '../api';
 import './Dashboard.css';
 import CollegeInfoCard from '../components/common/CollegeInfoCard';
+import EmployeeAttendanceCard from '../components/common/EmployeeAttendanceCard';
 
 // Real-time zeroed weekly structure
 const DEFAULT_WEEK_ATTENDANCE = [
@@ -357,42 +359,37 @@ const Dashboard = () => {
         </div>
       )}
 
-      {!isTrial && isActivePlan && (
+      {/* Subscription Urgent Expiry / Renewal Notice (Only when <= 7 days) */}
+      {!isTrial && isActivePlan && daysToRenew <= 7 && (
         <div style={{
-          background: 'var(--primary)',
+          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
           color: 'white',
-          padding: '12px 24px',
-          borderRadius: '8px',
-          marginBottom: '20px',
+          padding: '10px 20px',
+          borderRadius: '10px',
+          marginBottom: '16px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          boxShadow: '0 4px 12px rgba(99,102,241,0.2)'
+          boxShadow: '0 4px 12px rgba(217,119,6,0.25)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 600 }}>
-            <Crown size={20} />
-            <span>{activePlanName} Plan</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 600, fontSize: '0.9rem' }}>
+            <Crown size={18} />
+            <span>{activePlanName} Plan Subscription expires in {daysToRenew} Days</span>
           </div>
-          <div style={{ fontSize: '14px', fontWeight: 500 }}>
-            Expires in {daysToRenew} Days
-          </div>
-          {daysToRenew <= 7 && (
-            <button 
-              onClick={() => navigate('/upgrade-plan')}
-              style={{
-                background: 'rgba(255,255,255,0.2)',
-                border: '1px solid rgba(255,255,255,0.4)',
-                color: 'white',
-                padding: '6px 16px',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: '13px',
-                transition: 'all 0.2s'
-              }}>
-              Renew Plan
-            </button>
-          )}
+          <button 
+            onClick={() => navigate('/upgrade-plan')}
+            style={{
+              background: 'white',
+              color: '#b45309',
+              border: 'none',
+              padding: '5px 14px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '12px'
+            }}>
+            Renew Now
+          </button>
         </div>
       )}
 
@@ -414,120 +411,154 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Admin Duty Attendance Card */}
+      <div style={{ marginBottom: '20px' }}>
+        <EmployeeAttendanceCard />
+      </div>
+
       {/* Primary KPI Stats Grid */}
       <div className="stats-grid">
-        <div className="stat-card glass-card">
-          <div className="stat-icon-wrapper bg-icon-primary" style={{ background: "#EEEDFE", color: "#3C3489" }}>
-            <Users size={18} />
+        {/* Total Students */}
+        <div className="admin-kpi-card" style={{ borderTop: '3px solid #4f46e5', background: 'linear-gradient(180deg, rgba(79, 70, 229, 0.04) 0%, var(--bg-card, #ffffff) 100%)' }}>
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-title">Total Students</span>
+            <div className="admin-kpi-icon" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', boxShadow: '0 3px 8px rgba(79, 70, 229, 0.22)' }}>
+              <Users size={16} />
+            </div>
           </div>
-          <div className="stat-details">
-            <h3>Total Students</h3>
-            <p className="stat-value">{totalStudentsCount.toLocaleString()}</p>
-            <p className="stat-change positive">
-              <TrendingUp size={12} /> Global Enrollment
-            </p>
+          <div className="admin-kpi-body">
+            <p className="admin-kpi-value">{totalStudentsCount.toLocaleString()}</p>
           </div>
-        </div>
-
-        <div className="stat-card glass-card">
-          <div className="stat-icon-wrapper bg-icon-primary" style={{ background: "#EEEDFE", color: "#3C3489" }}>
-            <Briefcase size={18} />
-          </div>
-          <div className="stat-details">
-            <h3>Total Staff</h3>
-            <p className="stat-value">{totalStaffCount}</p>
-            <p className="stat-change positive">
-              <TrendingUp size={12} /> Active Faculty
-            </p>
+          <div className="admin-kpi-footer">
+            <span className="admin-kpi-badge" style={{ background: '#e0e7ff', color: '#4338ca' }}>
+              <TrendingUp size={11} /> Global Enrollment
+            </span>
           </div>
         </div>
 
-        <div className="stat-card glass-card">
-          <div className="stat-icon-wrapper bg-icon-primary" style={{ background: "#EEEDFE", color: "#3C3489" }}>
-            <GraduationCap size={18} />
+        {/* Total Staff */}
+        <div className="admin-kpi-card" style={{ borderTop: '3px solid #9333ea', background: 'linear-gradient(180deg, rgba(147, 51, 234, 0.04) 0%, var(--bg-card, #ffffff) 100%)' }}>
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-title">Total Staff</span>
+            <div className="admin-kpi-icon" style={{ background: 'linear-gradient(135deg, #9333ea 0%, #a855f7 100%)', boxShadow: '0 3px 8px rgba(147, 51, 234, 0.22)' }}>
+              <Briefcase size={16} />
+            </div>
           </div>
-          <div className="stat-details">
-            <h3>Total HODs</h3>
-            <p className="stat-value">{totalHodsCount}</p>
-            <p className="stat-change positive">
-              <TrendingUp size={12} /> Assigned departments
-            </p>
+          <div className="admin-kpi-body">
+            <p className="admin-kpi-value">{totalStaffCount}</p>
           </div>
-        </div>
-
-        <div className="stat-card glass-card" onClick={() => navigate('/admin/departments')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon-wrapper bg-icon-primary" style={{ background: "#EEEDFE", color: "#3C3489" }}>
-            <Building2 size={18} />
-          </div>
-          <div className="stat-details">
-            <h3>Departments</h3>
-            <p className="stat-value">{totalDeptsCount}</p>
-            <p className="stat-change text-muted">Active divisions</p>
+          <div className="admin-kpi-footer">
+            <span className="admin-kpi-badge" style={{ background: '#f3e8ff', color: '#7e22ce' }}>
+              <TrendingUp size={11} /> Active Faculty
+            </span>
           </div>
         </div>
 
-        <div className="stat-card glass-card" onClick={() => navigate('/admin/academic')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon-wrapper bg-icon-primary" style={{ background: "#E0F2FE", color: "#0284C7" }}>
-            <BookOpen size={18} />
+        {/* Total HODs */}
+        <div className="admin-kpi-card" style={{ borderTop: '3px solid #0d9488', background: 'linear-gradient(180deg, rgba(13, 148, 136, 0.04) 0%, var(--bg-card, #ffffff) 100%)' }}>
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-title">Total HODs</span>
+            <div className="admin-kpi-icon" style={{ background: 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)', boxShadow: '0 3px 8px rgba(13, 148, 136, 0.22)' }}>
+              <GraduationCap size={16} />
+            </div>
           </div>
-          <div className="stat-details">
-            <h3>Total Courses</h3>
-            <p className="stat-value">{totalCoursesCount}</p>
-            <p className="stat-change positive">
-              <TrendingUp size={12} /> Live Programs
-            </p>
+          <div className="admin-kpi-body">
+            <p className="admin-kpi-value">{totalHodsCount}</p>
           </div>
-        </div>
-
-        <div className="stat-card glass-card">
-          <div className="stat-icon-wrapper bg-icon-warning" style={{ background: averageAttendance < 75 ? "#FAEEDA" : "#E1F5EE", color: averageAttendance < 75 ? "#854F0B" : "#10B981" }}>
-            <CalendarCheck size={18} />
-          </div>
-          <div className="stat-details">
-            <h3>Avg Attendance</h3>
-            <p className="stat-value">{averageAttendance}%</p>
-            <p className="stat-change positive">
-              <TrendingUp size={12} /> Overall rate
-            </p>
+          <div className="admin-kpi-footer">
+            <span className="admin-kpi-badge" style={{ background: '#ccfbf1', color: '#0f766e' }}>
+              <TrendingUp size={11} /> Assigned Depts
+            </span>
           </div>
         </div>
 
-        <div className="stat-card glass-card">
-          <div className="stat-icon-wrapper bg-icon-primary" style={{ background: feesDisplay === '₹0' ? "#FCEBEB" : "#E1F5EE", color: feesDisplay === '₹0' ? "#EF4444" : "#10B981" }}>
-            <Wallet size={18} />
+        {/* Departments */}
+        <div className="admin-kpi-card" onClick={() => navigate('/admin/departments')} style={{ cursor: 'pointer', borderTop: '3px solid #d97706', background: 'linear-gradient(180deg, rgba(217, 119, 6, 0.04) 0%, var(--bg-card, #ffffff) 100%)' }}>
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-title">Departments</span>
+            <div className="admin-kpi-icon" style={{ background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', boxShadow: '0 3px 8px rgba(217, 119, 6, 0.22)' }}>
+              <Building2 size={16} />
+            </div>
           </div>
-          <div className="stat-details">
-            <h3>Fees Collected</h3>
-            <p className="stat-value">{feesDisplay}</p>
-            <p className="stat-change positive">
-              <TrendingUp size={12} /> Mapped terms
-            </p>
+          <div className="admin-kpi-body">
+            <p className="admin-kpi-value">{totalDeptsCount}</p>
           </div>
-        </div>
-
-        <div className="stat-card glass-card">
-          <div className="stat-icon-wrapper bg-icon-primary" style={{ background: "#EEEDFE", color: "#3C3489" }}>
-            <Heart size={18} />
-          </div>
-          <div className="stat-details">
-            <h3>Parents Accounts</h3>
-            <p className="stat-value">{totalParentsCount.toLocaleString()}</p>
-            <p className="stat-change positive">
-              <TrendingUp size={12} /> Active links
-            </p>
+          <div className="admin-kpi-footer">
+            <span className="admin-kpi-badge" style={{ background: '#fef3c7', color: '#b45309' }}>
+              Active Divisions
+            </span>
           </div>
         </div>
 
-        <div className="stat-card glass-card" onClick={() => navigate('/placement')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon-wrapper bg-icon-primary" style={{ background: "#DCFCE7", color: "#15803D" }}>
-            <Briefcase size={18} />
+        {/* Total Courses */}
+        <div className="admin-kpi-card" onClick={() => navigate('/admin/academic')} style={{ cursor: 'pointer', borderTop: '3px solid #0284c7', background: 'linear-gradient(180deg, rgba(2, 132, 199, 0.04) 0%, var(--bg-card, #ffffff) 100%)' }}>
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-title">Total Courses</span>
+            <div className="admin-kpi-icon" style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%)', boxShadow: '0 3px 8px rgba(2, 132, 199, 0.22)' }}>
+              <BookOpen size={16} />
+            </div>
           </div>
-          <div className="stat-details">
-            <h3>Placement Drives</h3>
-            <p className="stat-value">{placementJobs.length}</p>
-            <p className="stat-change positive">
-              <TrendingUp size={12} /> Active Corporate Hiring
-            </p>
+          <div className="admin-kpi-body">
+            <p className="admin-kpi-value">{totalCoursesCount}</p>
+          </div>
+          <div className="admin-kpi-footer">
+            <span className="admin-kpi-badge" style={{ background: '#e0f2fe', color: '#0369a1' }}>
+              <TrendingUp size={11} /> Live Programs
+            </span>
+          </div>
+        </div>
+
+        {/* Avg Attendance */}
+        <div className="admin-kpi-card" style={{ borderTop: '3px solid #059669', background: 'linear-gradient(180deg, rgba(5, 150, 105, 0.04) 0%, var(--bg-card, #ffffff) 100%)' }}>
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-title">Avg Attendance</span>
+            <div className="admin-kpi-icon" style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', boxShadow: '0 3px 8px rgba(5, 150, 105, 0.22)' }}>
+              <CalendarCheck size={16} />
+            </div>
+          </div>
+          <div className="admin-kpi-body">
+            <p className="admin-kpi-value">{averageAttendance}%</p>
+          </div>
+          <div className="admin-kpi-footer">
+            <span className="admin-kpi-badge" style={{ background: averageAttendance < 75 ? '#fee2e2' : '#d1fae5', color: averageAttendance < 75 ? '#b91c1c' : '#047857' }}>
+              <TrendingUp size={11} /> Overall Rate
+            </span>
+          </div>
+        </div>
+
+        {/* Fees Collected */}
+        <div className="admin-kpi-card" style={{ borderTop: '3px solid #10b981', background: 'linear-gradient(180deg, rgba(16, 185, 129, 0.04) 0%, var(--bg-card, #ffffff) 100%)' }}>
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-title">Fees Collected</span>
+            <div className="admin-kpi-icon" style={{ background: 'linear-gradient(135deg, #047857 0%, #059669 100%)', boxShadow: '0 3px 8px rgba(5, 150, 105, 0.22)' }}>
+              <Wallet size={16} />
+            </div>
+          </div>
+          <div className="admin-kpi-body">
+            <p className="admin-kpi-value">{feesDisplay}</p>
+          </div>
+          <div className="admin-kpi-footer">
+            <span className="admin-kpi-badge" style={{ background: feesDisplay === '₹0' ? '#fee2e2' : '#d1fae5', color: feesDisplay === '₹0' ? '#b91c1c' : '#065f46' }}>
+              <TrendingUp size={11} /> Mapped Terms
+            </span>
+          </div>
+        </div>
+
+        {/* Parents Accounts */}
+        <div className="admin-kpi-card" style={{ borderTop: '3px solid #e11d48', background: 'linear-gradient(180deg, rgba(225, 29, 72, 0.04) 0%, var(--bg-card, #ffffff) 100%)' }}>
+          <div className="admin-kpi-top">
+            <span className="admin-kpi-title">Parents Accounts</span>
+            <div className="admin-kpi-icon" style={{ background: 'linear-gradient(135deg, #e11d48 0%, #f43f5e 100%)', boxShadow: '0 3px 8px rgba(225, 29, 72, 0.22)' }}>
+              <Heart size={16} />
+            </div>
+          </div>
+          <div className="admin-kpi-body">
+            <p className="admin-kpi-value">{totalParentsCount.toLocaleString()}</p>
+          </div>
+          <div className="admin-kpi-footer">
+            <span className="admin-kpi-badge" style={{ background: '#ffe4e6', color: '#be123c' }}>
+              <TrendingUp size={11} /> Active Links
+            </span>
           </div>
         </div>
       </div>
@@ -551,7 +582,7 @@ const Dashboard = () => {
 
           <button 
             type="button" 
-            onClick={() => navigate('/placement')}
+            onClick={() => navigate('/admin/placement')}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
           >
             Manage Placement Cell ({placementJobs.length} Drives) →
@@ -563,7 +594,7 @@ const Dashboard = () => {
             {placementJobs.slice(0, 4).map((job, idx) => (
               <div 
                 key={job._id || job.jobId || idx}
-                onClick={() => navigate('/placement')}
+                onClick={() => navigate('/admin/placement')}
                 style={{
                   background: '#ffffff',
                   border: '1px solid var(--border-color, #e2e8f0)',
@@ -830,85 +861,160 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Visual Analytics Charts Grid */}
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
-        <div className="chart-card glass-card col-span-2">
-          <div className="card-header">
-            <h3>Global Attendance Trends</h3>
+      {/* Super Admin Quick Actions Panel */}
+      <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+              Super Admin Quick Actions
+            </h3>
+            <p style={{ margin: '3px 0 0', fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>
+              Fast shortcuts to primary administrative portals, registrations, and system configurations.
+            </p>
           </div>
-          <div className="chart-container" style={{ minHeight: '300px', height: '100%' }}>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={attendanceData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorStudents" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.35}/>
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorStaff" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ec4899" stopOpacity={0.35}/>
-                    <stop offset="95%" stopColor="#ec4899" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
-                <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} />
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', background: 'var(--bg-secondary)', color: 'var(--text-main)', boxShadow: 'var(--shadow-md)' }} />
-                <Legend verticalAlign="top" height={36} />
-                <Area type="monotone" dataKey="students" name="Students Attendance" stroke="var(--primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorStudents)" />
-                <Area type="monotone" dataKey="staff" name="Staff Attendance" stroke="#ec4899" strokeWidth={3} fillOpacity={1} fill="url(#colorStaff)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          <span style={{ fontSize: '0.74rem', fontWeight: 700, padding: '3px 9px', borderRadius: '6px', background: '#e0e7ff', color: '#4338ca' }}>
+            6 Core Actions
+          </span>
         </div>
 
+        <div className="super-admin-quick-actions-grid">
+          {/* Enroll Student */}
+          <button 
+            type="button"
+            className="admin-quick-btn"
+            onClick={() => navigate('/admin/students')}
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.04) 0%, var(--bg-card, #ffffff) 100%)', 
+              borderLeft: '4px solid #4f46e5',
+              '--btn-accent': '#4f46e5'
+            }}
+          >
+            <div className="admin-quick-icon" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.28)' }}>
+              <Users size={22} />
+            </div>
+            <div className="admin-quick-text">
+              <h4 className="admin-quick-title">Enroll Student</h4>
+              <p className="admin-quick-desc">Admissions & Student Records</p>
+            </div>
+            <div className="admin-quick-arrow">
+              <ChevronRight size={18} />
+            </div>
+          </button>
 
+          {/* Register Staff */}
+          <button 
+            type="button"
+            className="admin-quick-btn"
+            onClick={() => navigate('/admin/staff')}
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.04) 0%, var(--bg-card, #ffffff) 100%)', 
+              borderLeft: '4px solid #9333ea',
+              '--btn-accent': '#9333ea'
+            }}
+          >
+            <div className="admin-quick-icon" style={{ background: 'linear-gradient(135deg, #9333ea 0%, #a855f7 100%)', boxShadow: '0 4px 12px rgba(147, 51, 234, 0.28)' }}>
+              <GraduationCap size={22} />
+            </div>
+            <div className="admin-quick-text">
+              <h4 className="admin-quick-title">Register Staff</h4>
+              <p className="admin-quick-desc">Faculty Onboarding & Roles</p>
+            </div>
+            <div className="admin-quick-arrow">
+              <ChevronRight size={18} />
+            </div>
+          </button>
 
-        <div className="chart-card glass-card col-span-2">
-          <div className="card-header">
-            <h3>College CGPA Academic Curve</h3>
-          </div>
-          <div className="chart-container" style={{ minHeight: '300px' }}>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={cgpaData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                <XAxis dataKey="semester" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
-                <YAxis domain={[5, 10]} stroke="var(--text-muted)" fontSize={11} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', background: 'var(--bg-secondary)', color: 'var(--text-main)', boxShadow: 'var(--shadow-md)' }} />
-                <Legend verticalAlign="top" height={36} />
-                <Line type="monotone" dataKey="avg" name="Average CGPA" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 8 }} />
-                <Line type="monotone" dataKey="top" name="Top CGPA" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+          {/* Register HOD */}
+          <button 
+            type="button"
+            className="admin-quick-btn"
+            onClick={() => navigate('/admin/hods')}
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(13, 148, 136, 0.04) 0%, var(--bg-card, #ffffff) 100%)', 
+              borderLeft: '4px solid #0d9488',
+              '--btn-accent': '#0d9488'
+            }}
+          >
+            <div className="admin-quick-icon" style={{ background: 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)', boxShadow: '0 4px 12px rgba(13, 148, 136, 0.28)' }}>
+              <UserPlus size={22} />
+            </div>
+            <div className="admin-quick-text">
+              <h4 className="admin-quick-title">Register HOD</h4>
+              <p className="admin-quick-desc">Department Heads & Leaders</p>
+            </div>
+            <div className="admin-quick-arrow">
+              <ChevronRight size={18} />
+            </div>
+          </button>
 
-        {/* Quick Actions Panel */}
-        <div className="glass-card">
-          <div className="card-header mb-4 px-6 pt-6">
-            <h3>Super Admin Quick Actions</h3>
-          </div>
-          <div className="quick-actions-grid p-6" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <button className="quick-action-btn" onClick={() => navigate('/admin/fee-structure')}>
-              <div className="action-icon bg-icon-primary"><Layers size={20} /></div>
-              <span>Fee Structure</span>
-            </button>
-            <button className="quick-action-btn" onClick={() => navigate('/admin/hods')}>
-              <div className="action-icon bg-icon-primary"><UserPlus size={20} /></div>
-              <span>Register HOD</span>
-            </button>
-            <button className="quick-action-btn" onClick={() => navigate('/admin/staff')}>
-              <div className="action-icon bg-icon-primary"><GraduationCap size={20} /></div>
-              <span>Register Staff</span>
-            </button>
-            <button className="quick-action-btn" onClick={() => navigate('/admin/announcements')}>
-              <div className="action-icon bg-icon-primary"><Megaphone size={20} /></div>
-              <span>Publish News</span>
-            </button>
-            <button className="quick-action-btn" onClick={() => navigate('/admin/settings')}>
-              <div className="action-icon bg-icon-primary"><Settings size={20} /></div>
-              <span>Manage Settings</span>
-            </button>
-          </div>
+          {/* Fee Structure */}
+          <button 
+            type="button"
+            className="admin-quick-btn"
+            onClick={() => navigate('/admin/fee-structure')}
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(5, 150, 105, 0.04) 0%, var(--bg-card, #ffffff) 100%)', 
+              borderLeft: '4px solid #059669',
+              '--btn-accent': '#059669'
+            }}
+          >
+            <div className="admin-quick-icon" style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', boxShadow: '0 4px 12px rgba(5, 150, 105, 0.28)' }}>
+              <Layers size={22} />
+            </div>
+            <div className="admin-quick-text">
+              <h4 className="admin-quick-title">Fee Structure</h4>
+              <p className="admin-quick-desc">Category Fees & Installments</p>
+            </div>
+            <div className="admin-quick-arrow">
+              <ChevronRight size={18} />
+            </div>
+          </button>
+
+          {/* Publish News */}
+          <button 
+            type="button"
+            className="admin-quick-btn"
+            onClick={() => navigate('/admin/announcements')}
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(217, 119, 6, 0.04) 0%, var(--bg-card, #ffffff) 100%)', 
+              borderLeft: '4px solid #d97706',
+              '--btn-accent': '#d97706'
+            }}
+          >
+            <div className="admin-quick-icon" style={{ background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', boxShadow: '0 4px 12px rgba(217, 119, 6, 0.28)' }}>
+              <Megaphone size={22} />
+            </div>
+            <div className="admin-quick-text">
+              <h4 className="admin-quick-title">Publish News</h4>
+              <p className="admin-quick-desc">Campus Broadcasts & Circulars</p>
+            </div>
+            <div className="admin-quick-arrow">
+              <ChevronRight size={18} />
+            </div>
+          </button>
+
+          {/* Manage Settings */}
+          <button 
+            type="button"
+            className="admin-quick-btn"
+            onClick={() => navigate('/admin/settings')}
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(225, 29, 72, 0.04) 0%, var(--bg-card, #ffffff) 100%)', 
+              borderLeft: '4px solid #e11d48',
+              '--btn-accent': '#e11d48'
+            }}
+          >
+            <div className="admin-quick-icon" style={{ background: 'linear-gradient(135deg, #e11d48 0%, #f43f5e 100%)', boxShadow: '0 4px 12px rgba(225, 29, 72, 0.28)' }}>
+              <Settings size={22} />
+            </div>
+            <div className="admin-quick-text">
+              <h4 className="admin-quick-title">Manage Settings</h4>
+              <p className="admin-quick-desc">Global Configuration & Security</p>
+            </div>
+            <div className="admin-quick-arrow">
+              <ChevronRight size={18} />
+            </div>
+          </button>
         </div>
       </div>
 
