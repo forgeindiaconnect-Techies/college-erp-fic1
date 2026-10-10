@@ -2240,3 +2240,97 @@ tbody tr:hover td {
   }
 }
 
+/* ==========================================================================
+   GLOBAL MOBILE RESPONSIVE MEDIA QUERIES (COMPREHENSIVE ALL-DEVICE FIX)
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* Headings & Title scaling */
+  h1 { font-size: 1.4rem !important; line-height: 1.25 !important; }
+  h2 { font-size: 1.2rem !important; line-height: 1.25 !important; }
+  h3 { font-size: 1.05rem !important; line-height: 1.25 !important; }
+
+  /* Flex Header Wrappers & Alert Banners */
+  .page-header,
+  .dashboard-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 14px 16px !important;
+  }
+
+  .page-header > div,
+  .dashboard-header > div {
+    width: 100% !important;
+  }
+
+  /* Responsive Grid Cards */
+  .kpi-grid,
+  .stats-grid,
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Cards & Containers */
+  .glass-card,
+  .stat-card,
+  .dashboard-card {
+    padding: 14px 16px !important;
+  }
+
+  /* Buttons in Header Bars */
+  .page-header button,
+  .dashboard-header button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* Data Tables */
+  .table-container {
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  th, td {
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+  }
+
+  /* Modals & Popups */
+  .modal-container,
+  .modal-content {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: 10px !important;
+    padding: 16px !important;
+    max-height: 88vh !important;
+    overflow-y: auto !important;
+  }
+
+  .form-row,
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 14px;
+  }
+
+  .main-content {
+    padding: 10px !important;
+  }
+
+  .btn-primary,
+  .btn-ghost,
+  .btn-secondary {
+    padding: 0.5rem 0.9rem !important;
+    font-size: 0.82rem !important;
+  }
+}
+
+

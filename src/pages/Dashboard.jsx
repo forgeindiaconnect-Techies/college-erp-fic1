@@ -119,7 +119,17 @@ const Dashboard = () => {
       }
       setPlacementJobs(Array.from(jobMap.values()));
 
-      setStudents(sData);
+      // Merge student records from localStorage
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const localStudents = JSON.parse(localStorage.getItem(`erp_students_${tenantId}`) || '[]');
+      const mergedStudents = [...sData];
+      localStudents.forEach(ls => {
+        if (ls && !mergedStudents.find(s => s.id === ls.id || s._id === ls._id || s.rollNo === ls.rollNo)) {
+          mergedStudents.push(ls);
+        }
+      });
+      setStudents(mergedStudents);
+
       setStaff(fData);
       setDepts(dData);
       setCourses(cData);

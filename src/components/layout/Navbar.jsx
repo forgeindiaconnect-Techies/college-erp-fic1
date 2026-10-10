@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, ChevronDown, Moon, Sun, LayoutGrid, CheckCircle, Menu, LogOut, Settings, User } from 'lucide-react';
+import { Search, Bell, ChevronDown, LayoutGrid, CheckCircle, Menu, LogOut, Settings, User } from 'lucide-react';
 import { ThemeContext } from '../../App';
 import { NotificationContext } from '../../context/NotificationContext';
 import { getDepartments } from '../../api/index';
@@ -81,21 +81,16 @@ const Navbar = ({ role = 'Admin', onMenuToggle }) => {
           </button>
         )}
         <div className="navbar-greeting" style={{ display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 600, margin: 0, color: 'var(--text-main)', marginTop: '2px' }}>
-            Welcome back, {userName}! 👋
+          <h3 className="navbar-greeting-title" style={{ fontWeight: 600, margin: 0, color: '#ffffff', marginTop: '2px' }}>
+            <span className="welcome-prefix">Welcome back, </span>{userName}! 👋
           </h3>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: '2px' }}>
+          <span className="navbar-date-subtitle" style={{ fontSize: '0.8rem', color: '#dbe8f1', fontWeight: 500, marginTop: '2px' }}>
             {userRole} Portal • {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
         </div>
       </div>
       
       <div className="navbar-actions">
-
-
-        <button className="icon-btn" onClick={toggleTheme} title="Toggle Theme">
-          {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-        </button>
         <div className="notification-wrapper" style={{ position: 'relative' }}>
           <button className="icon-btn" onClick={() => setShowNotifications(!showNotifications)}>
             <Bell size={20} />

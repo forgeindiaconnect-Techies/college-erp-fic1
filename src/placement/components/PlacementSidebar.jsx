@@ -60,8 +60,15 @@ const PlacementSidebar = ({ isOpen, onClose }) => {
     });
   }, [location.pathname]);
 
+  const handleNavClick = () => {
+    if (window.innerWidth <= 768 && onClose) {
+      onClose();
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.clear();
+    if (onClose) onClose();
     navigate('/login');
   };
 
@@ -91,7 +98,7 @@ const PlacementSidebar = ({ isOpen, onClose }) => {
             Placement Cell
           </span>
         </div>
-        <button className="sidebar-close-btn" onClick={onClose}>
+        <button className="sidebar-close-btn" onClick={onClose} aria-label="Close sidebar">
           <X size={20} />
         </button>
       </div>
@@ -135,6 +142,7 @@ const PlacementSidebar = ({ isOpen, onClose }) => {
                       to={item.path}
                       className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
                       style={{ paddingLeft: '2.8rem' }}
+                      onClick={handleNavClick}
                     >
                       {item.icon}
                       <span>{item.name}</span>

@@ -10,6 +10,9 @@ const HostelLayout = () => {
   return (
     <div className="layout-container">
       <HostelSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>
+      )}
       <div className={`main-wrapper ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <Navbar role="Hostel" onMenuToggle={() => setSidebarOpen(o => !o)} />
         <main className="main-content">

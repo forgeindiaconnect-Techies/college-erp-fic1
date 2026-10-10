@@ -125,6 +125,12 @@ const Sidebar = ({ isOpen, onClose }) => {
   const adminSession = getAdminSession();
   const displayCollegeName = adminSession?.collegeName || collegeSettings?.collegeName || 'Institution Portal';
 
+  const handleNavClick = () => {
+    if (window.innerWidth <= 768 && onClose) {
+      onClose();
+    }
+  };
+
   return (
     <>
       {isOpen && <div className="sidebar-overlay" onClick={onClose} />}
@@ -154,6 +160,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 to="/admin/dashboard" 
                 end={true}
                 className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
+                onClick={handleNavClick}
               >
                 <LayoutDashboard size={20} />
                 <span>Dashboard</span>
@@ -181,6 +188,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                         end={item.exact}
                         className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
                         style={{ paddingLeft: '2.8rem' }}
+                        onClick={handleNavClick}
                       >
                         {item.icon}
                         <span>{item.name}</span>

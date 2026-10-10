@@ -4,7 +4,7 @@ import { SettingsContext } from '../../App';
 import { 
   Building, DoorOpen, Users, UserCheck, Utensils, 
   CreditCard, AlertOctagon, UserPlus, Clock, FileText,
-  LayoutDashboard, LogOut, ChevronRight, ChevronDown, CheckCircle
+  LayoutDashboard, LogOut, ChevronRight, ChevronDown, CheckCircle, X
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -21,9 +21,16 @@ const HostelSidebar = ({ isOpen, onClose }) => {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
   };
 
+  const handleNavClick = () => {
+    if (window.innerWidth <= 768 && onClose) {
+      onClose();
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem('hostel_session');
     sessionStorage.removeItem('hostel_token');
+    if (onClose) onClose();
     navigate('/login');
   };
 
@@ -70,8 +77,8 @@ const HostelSidebar = ({ isOpen, onClose }) => {
 
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
-      {/* Brand */}
-      <div className="sidebar-header">
+      {/* Brand & Mobile Close Button */}
+      <div className="sidebar-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {collegeSettings?.collegeLogo ? (
           <img 
             src={collegeSettings.collegeLogo} 
@@ -79,10 +86,18 @@ const HostelSidebar = ({ isOpen, onClose }) => {
             style={{ height: '32px', objectFit: 'contain' }} 
           />
         ) : (
-          <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+          <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
             {displayCollegeName}
           </div>
         )}
+        <button
+          className="sidebar-close-btn"
+          onClick={onClose}
+          aria-label="Close sidebar"
+          style={{ background: 'transparent', border: 'none', color: '#ffffff', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+        >
+          <X size={22} />
+        </button>
       </div>
 
       {/* Nav links */}
@@ -92,6 +107,7 @@ const HostelSidebar = ({ isOpen, onClose }) => {
             <NavLink
               to="/hostel/dashboard"
               className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              onClick={handleNavClick}
             >
               <LayoutDashboard size={20} />
               <span>Hostel Dashboard</span>
@@ -118,6 +134,7 @@ const HostelSidebar = ({ isOpen, onClose }) => {
                       to={item.path}
                       className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
                       style={{ paddingLeft: '2.8rem' }}
+                      onClick={handleNavClick}
                     >
                       {item.icon}
                       <span>{item.name}</span>

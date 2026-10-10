@@ -189,36 +189,110 @@ export const getPaymentHistory = async (req, res) => {
       });
     }
 
-    // Look for payments in Payment collection
-    const paymentQuery = {
+    const sIds = [
+      String(admission._id),
+      admission.id,
+      admission.admissionNumber,
+      admission.admissionNo
+    ].filter(Boolean);
+
+    // 1. Fetch from Payment collection
+    const pmntRecords = await Payment.find({
       $or: [
         { admission: admission._id },
         { student: admission._id },
-        { admissionId: admission.id || admission.admissionNumber },
-        { studentId: admission.id || admission.admissionNumber }
+        { admissionId: { $in: sIds } },
+        { studentId: { $in: sIds } }
       ]
-    };
+    }).populate("collectedBy", "name email").lean();
 
-    let payments = await Payment.find(paymentQuery)
-      .populate("collectedBy", "name email")
-      .sort({ paymentDate: -1 });
+    // 2. Fetch from Fee collection
+    const feeRecords = await Fee.find({
+      $or: [
+        { studentId: { $in: sIds } },
+        { registerNo: { $in: sIds } }
+      ]
+    }).lean();
 
-    // Fallback: If no standalone Payment records yet, convert admission.paymentHistory
-    if (payments.length === 0 && admission.paymentHistory && admission.paymentHistory.length > 0) {
-      payments = admission.paymentHistory.map((p, index) => ({
-        _id: p._id || `hist-${index}`,
-        receiptNumber: p.receiptNumber || p.receiptNo || `REC-${index + 1}`,
-        amount: Number(p.amount || p.paidAmount || 0),
-        paymentMode: p.paymentMethod || p.paymentMode || "Cash",
-        transactionReference: p.transactionReference || p.transactionRef || "-",
-        paymentDate: p.paymentDate || admission.createdAt || new Date(),
+    // 3. Embedded paymentHistory
+    const embeddedRecords = Array.isArray(admission.paymentHistory) ? admission.paymentHistory : [];
+
+    const combinedPayments = [];
+    const seenReceipts = new Set();
+
+    pmntRecords.forEach(p => {
+      const receiptNo = p.receiptNumber || p.receiptNo || `RCPT-${p._id}`;
+      if (!seenReceipts.has(receiptNo)) {
+        seenReceipts.add(receiptNo);
+        combinedPayments.push({
+          _id: p._id,
+          receiptNumber: receiptNo,
+          amount: Number(p.amount || p.paidAmount || 0),
+          paymentMode: p.paymentMode || p.paymentMethod || 'Cash',
+          transactionReference: p.transactionReference || p.transactionRef || '-',
+          paymentDate: p.paymentDate || p.createdAt || new Date(),
+          collectedBy: p.collectedBy ? (typeof p.collectedBy === 'object' ? p.collectedBy : { name: "Accounts Staff" }) : { name: "Accounts Staff" }
+        });
+      }
+    });
+
+    feeRecords.forEach((f, idx) => {
+      const receiptNo = f.receiptNo || f.receiptNumber || `REC-FEE-${idx + 1}`;
+      if (!seenReceipts.has(receiptNo)) {
+        seenReceipts.add(receiptNo);
+        combinedPayments.push({
+          _id: f._id,
+          receiptNumber: receiptNo,
+          amount: Number(f.paidAmount || f.amount || 0),
+          paymentMode: f.paymentMode || f.paymentMethod || 'Cash',
+          transactionReference: f.transactionRef || f.transactionReference || '-',
+          paymentDate: f.paymentDate || f.createdAt || new Date(),
+          collectedBy: { name: f.collectedByName || "Accounts Staff" }
+        });
+      }
+    });
+
+    embeddedRecords.forEach((p, idx) => {
+      const receiptNo = p.receiptNumber || p.receiptNo || `REC-EMB-${idx + 1}`;
+      if (!seenReceipts.has(receiptNo)) {
+        seenReceipts.add(receiptNo);
+        combinedPayments.push({
+          _id: p._id || `emb-${idx}`,
+          receiptNumber: receiptNo,
+          amount: Number(p.amount || p.paidAmount || 0),
+          paymentMode: p.paymentMethod || p.paymentMode || 'Cash',
+          transactionReference: p.transactionReference || p.transactionRef || '-',
+          paymentDate: p.paymentDate || admission.createdAt || new Date(),
+          collectedBy: { name: "Accounts Staff" }
+        });
+      }
+    });
+
+    const totalPaidSum = combinedPayments.reduce((acc, curr) => acc + curr.amount, 0);
+    const actualPaidOnStudent = Number(admission.paidAmount !== undefined ? admission.paidAmount : (admission.amountPaid || 0));
+
+    if (combinedPayments.length === 0 && actualPaidOnStudent > 0) {
+      combinedPayments.push({
+        _id: `init-${admission._id}`,
+        receiptNumber: admission.receiptNumber || 'REC-INITIAL',
+        amount: actualPaidOnStudent,
+        paymentMode: admission.paymentMode || 'Bank Transfer (NEFT/RTGS)',
+        transactionReference: admission.transactionRef || '-',
+        paymentDate: admission.paymentDate || admission.createdAt || new Date(),
         collectedBy: { name: "Accounts Staff" }
-      }));
+      });
     }
+
+    combinedPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate));
+
+    const finalPaidAmount = Math.max(totalPaidSum, actualPaidOnStudent);
+    const finalFee = Number(admission.finalFee !== undefined && Number(admission.finalFee) > 0 ? admission.finalFee : (admission.totalFee || 0));
+    const remainingFee = Math.max(0, finalFee - finalPaidAmount);
+    const paymentStatus = (remainingFee === 0 && finalFee > 0) ? "Paid" : (finalPaidAmount > 0 ? "Partial" : "Pending");
 
     return res.status(200).json({
       success: true,
-      data: payments,
+      data: combinedPayments,
       admission: {
         _id: admission._id,
         id: admission.id,
@@ -228,10 +302,10 @@ export const getPaymentHistory = async (req, res) => {
         quotaName: admission.quotaName || admission.admissionQuota || "General Quota",
         normalFee: admission.normalFee ?? admission.totalFee ?? 0,
         discountAmount: admission.discountAmount ?? 0,
-        finalFee: admission.finalFee ?? admission.totalFee ?? 0,
-        paidAmount: admission.paidAmount ?? admission.amountPaid ?? 0,
-        remainingFee: admission.remainingFee ?? 0,
-        paymentStatus: admission.paymentStatus || admission.feeStatus || "Pending"
+        finalFee,
+        paidAmount: finalPaidAmount,
+        remainingFee,
+        paymentStatus
       }
     });
   } catch (error) {

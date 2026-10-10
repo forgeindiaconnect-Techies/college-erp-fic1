@@ -1,4 +1,4 @@
-﻿import React, { useContext } from 'react';
+import React, { useContext } from 'react';
 import { Outlet } from 'react-router-dom';
 import Navbar from '../../components/layout/Navbar';
 import SubAdminSidebar from './SubAdminSidebar';
@@ -12,6 +12,7 @@ const SubAdminLayout = () => {
   return (
     <div className={`layout-container ${theme}`}>
       <SubAdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <div className={`main-wrapper ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <Navbar role="Sub Admin" onMenuToggle={() => setSidebarOpen(o => !o)} />
         <main className="main-content">

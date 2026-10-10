@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import HodSidebar from './HodSidebar';
 import Navbar from '../../components/layout/Navbar';
@@ -10,6 +10,7 @@ const HodLayout = () => {
   return (
     <div className="layout-container">
       <HodSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <div className={`main-wrapper ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <Navbar role="HOD" onMenuToggle={() => setSidebarOpen(o => !o)} />
         <main className="main-content">

@@ -4,10 +4,10 @@ import {
   Building, DoorOpen, Users, UserCheck, Utensils, 
   CreditCard, AlertOctagon, UserPlus, Clock, FileText,
   Plus, Search, BedDouble, CheckCircle, AlertCircle, Phone, Download,
-  LayoutDashboard, X, RefreshCw, Filter, CheckCircle2, ShieldCheck, Mail, ArrowRight
+  LayoutDashboard, X, RefreshCw, Filter, CheckCircle2, ShieldCheck, Mail, ArrowRight, Sparkles
 } from 'lucide-react';
 import {
-  getHostelBlocks, getHostelRooms, getHostelStudents, getHostelComplaints, getHostelRequests,
+  getHostelBlocks, createHostelBlock, getHostelRooms, createHostelRoom, getHostelStudents, getHostelComplaints, getHostelRequests,
   allocateHostelRequest, updateHostelComplaint, getStudents, updateStudent
 } from '../../api/index';
 import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
@@ -223,8 +223,20 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
         { blockId: 'B2', name: 'Girls Hostel A', warden: 'Mrs. Sunita Verma', capacity: 150, occupied: 0 }
       ];
 
-      setBlocks(fetchedBlocks.length > 0 ? fetchedBlocks : defaultBlocks);
-      setRooms(fetchedRooms);
+      const tenantKeyRooms = `erp_hostel_rooms_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`;
+      const localSavedRooms = JSON.parse(localStorage.getItem(tenantKeyRooms) || '[]');
+      const combinedRoomsMap = new Map();
+      fetchedRooms.forEach(r => combinedRoomsMap.set(r.roomId, r));
+      localSavedRooms.forEach(r => combinedRoomsMap.set(r.roomId, { ...combinedRoomsMap.get(r.roomId), ...r }));
+
+      const tenantKeyBlocks = `erp_hostel_blocks_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`;
+      const localSavedBlocks = JSON.parse(localStorage.getItem(tenantKeyBlocks) || '[]');
+      const combinedBlocksMap = new Map();
+      (fetchedBlocks.length > 0 ? fetchedBlocks : defaultBlocks).forEach(b => combinedBlocksMap.set(b.name || b.blockId, b));
+      localSavedBlocks.forEach(b => combinedBlocksMap.set(b.name || b.blockId, { ...combinedBlocksMap.get(b.name || b.blockId), ...b }));
+
+      setBlocks(Array.from(combinedBlocksMap.values()));
+      setRooms(Array.from(combinedRoomsMap.values()));
       setComplaints(Array.isArray(complaintsRes?.data) ? complaintsRes.data : []);
       setLastSynced(new Date());
     } catch (error) {
@@ -476,7 +488,7 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
     }
   };
 
-  const handleAddBlock = (e) => {
+  const handleAddBlock = async (e) => {
     e.preventDefault();
     if (!blockForm.name || !blockForm.warden || !blockForm.capacity) return;
     const newBlock = {
@@ -486,14 +498,23 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
       capacity: Number(blockForm.capacity),
       occupied: 0
     };
-    const updated = [...blocks, newBlock];
-    setBlocks(updated);
-    localStorage.setItem('erp_hostel_blocks', JSON.stringify(updated));
+    try {
+      await createHostelBlock(newBlock);
+    } catch (err) {
+      console.warn('Backend save block note:', err);
+    }
+    const tenantKey = `erp_hostel_blocks_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`;
+    const localSaved = JSON.parse(localStorage.getItem(tenantKey) || '[]');
+    const updated = [...localSaved, newBlock];
+    localStorage.setItem(tenantKey, JSON.stringify(updated));
+    setBlocks(prev => [...prev, newBlock]);
     setShowAddBlockModal(false);
     setBlockForm({ name: '', warden: '', capacity: '' });
+    alert(`Hostel Block "${blockForm.name}" created successfully!`);
+    fetchHostelData(true);
   };
 
-  const handleAddRoom = (e) => {
+  const handleAddRoom = async (e) => {
     e.preventDefault();
     if (!roomForm.roomId || !roomForm.block) return;
     const newRoom = {
@@ -504,11 +525,20 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
       occupied: 0,
       status: 'Available'
     };
-    const updated = [...rooms, newRoom];
-    setRooms(updated);
-    localStorage.setItem('erp_hostel_rooms', JSON.stringify(updated));
+    try {
+      await createHostelRoom(newRoom);
+    } catch (err) {
+      console.warn('Backend save room note:', err);
+    }
+    const tenantKey = `erp_hostel_rooms_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`;
+    const localSaved = JSON.parse(localStorage.getItem(tenantKey) || '[]');
+    const updated = [...localSaved, newRoom];
+    localStorage.setItem(tenantKey, JSON.stringify(updated));
+    setRooms(prev => [...prev, newRoom]);
     setShowAddRoomModal(false);
     setRoomForm({ roomId: '', block: 'Boys Hostel A', type: '2-Sharing', capacity: '2' });
+    alert(`Room ${roomForm.roomId} created successfully in ${roomForm.block}!`);
+    fetchHostelData(true);
   };
 
   const handleAddWarden = (e) => {
@@ -670,62 +700,94 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
             >
               <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Sync Data
             </button>
-            <button 
-              type="button" 
-              onClick={() => setShowAllocateModal(true)} 
-              className="btn-primary" 
-              style={{ padding: '7px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '8px' }}
-            >
-              <Plus size={14} /> Allocate Room
-            </button>
+            {activeTab === 'Hostel Blocks' && (
+              <button type="button" onClick={() => setShowAddBlockModal(true)} className="btn-primary" style={{ padding: '7px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '8px' }}>
+                <Plus size={14} /> Add Block
+              </button>
+            )}
+            {activeTab === 'Rooms' && (
+              <button type="button" onClick={() => setShowAddRoomModal(true)} className="btn-primary" style={{ padding: '7px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '8px' }}>
+                <Plus size={14} /> Add Room
+              </button>
+            )}
+            {activeTab === 'Student Allocation' && (
+              <button type="button" onClick={() => setShowAllocateModal(true)} className="btn-primary" style={{ padding: '7px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '8px' }}>
+                <Plus size={14} /> Allocate Student
+              </button>
+            )}
+            {activeTab === 'Wardens' && (
+              <button type="button" onClick={() => setShowAddWardenModal(true)} className="btn-primary" style={{ padding: '7px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '8px' }}>
+                <Plus size={14} /> Add Warden
+              </button>
+            )}
+            {activeTab === 'Visitors' && (
+              <button type="button" onClick={() => setShowAddVisitorModal(true)} className="btn-primary" style={{ padding: '7px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '8px' }}>
+                <Plus size={14} /> New Visitor Entry
+              </button>
+            )}
+            {activeTab === 'Mess Menu' && (
+              <button type="button" onClick={() => { setEditMenuForm([...messMenu]); setShowEditMenuModal(true); }} className="btn-primary" style={{ padding: '7px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '8px' }}>
+                Edit Menu Schedule
+              </button>
+            )}
+            {activeTab === 'Dashboard' && (
+              <button 
+                type="button" 
+                onClick={() => setShowAllocateModal(true)} 
+                className="btn-primary" 
+                style={{ padding: '7px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '8px' }}
+              >
+                <Plus size={14} /> Allocate Room
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Admin / Warden Module Navigation Bar */}
-      <div className="hostel-tabs">
-        <button className={`hostel-tab ${activeTab === 'Dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('Dashboard')}>
-          <LayoutDashboard size={15} /> Overview
-        </button>
-        <button className={`hostel-tab ${activeTab === 'Hostel Blocks' ? 'active' : ''}`} onClick={() => setActiveTab('Hostel Blocks')}>
-          <Building size={15} /> Blocks ({blocks.length})
-        </button>
-        <button className={`hostel-tab ${activeTab === 'Rooms' ? 'active' : ''}`} onClick={() => setActiveTab('Rooms')}>
-          <DoorOpen size={15} /> Rooms Directory
-        </button>
-        <button className={`hostel-tab ${activeTab === 'Student Allocation' ? 'active' : ''}`} onClick={() => setActiveTab('Student Allocation')}>
-          <Users size={15} /> Residents ({allocatedStudents.length})
-        </button>
-        {!isHostelPortal && (
+      {/* Admin / Warden Module Navigation Bar (Shown when embedded, hidden when dedicated sidebar is active) */}
+      {!isHostelPortal && (
+        <div className="hostel-tabs">
+          <button className={`hostel-tab ${activeTab === 'Dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('Dashboard')}>
+            <LayoutDashboard size={15} /> Overview
+          </button>
+          <button className={`hostel-tab ${activeTab === 'Hostel Blocks' ? 'active' : ''}`} onClick={() => setActiveTab('Hostel Blocks')}>
+            <Building size={15} /> Blocks ({blocks.length})
+          </button>
+          <button className={`hostel-tab ${activeTab === 'Rooms' ? 'active' : ''}`} onClick={() => setActiveTab('Rooms')}>
+            <DoorOpen size={15} /> Rooms Directory
+          </button>
+          <button className={`hostel-tab ${activeTab === 'Student Allocation' ? 'active' : ''}`} onClick={() => setActiveTab('Student Allocation')}>
+            <Users size={15} /> Residents ({allocatedStudents.length})
+          </button>
           <button className={`hostel-tab ${activeTab === 'Hostel Requests' ? 'active' : ''}`} onClick={() => setActiveTab('Hostel Requests')}>
             <UserCheck size={15} /> Requests {pendingRequests.length > 0 && <span className="tab-badge">{pendingRequests.length}</span>}
           </button>
-        )}
-        <button className={`hostel-tab ${activeTab === 'Hostel Fees' ? 'active' : ''}`} onClick={() => setActiveTab('Hostel Fees')}>
-          <CreditCard size={15} /> Fee Realization {feeDueStudents.length > 0 && <span className="tab-badge">{feeDueStudents.length} Due</span>}
-        </button>
-        <button className={`hostel-tab ${activeTab === 'Gate Passes' ? 'active' : ''}`} onClick={() => setActiveTab('Gate Passes')}>
-          <CheckCircle size={15} /> Gate Passes {pendingPasses.length > 0 && <span className="tab-badge">{pendingPasses.length}</span>}
-        </button>
-        <button className={`hostel-tab ${activeTab === 'Attendance' ? 'active' : ''}`} onClick={() => setActiveTab('Attendance')}>
-          <Clock size={15} /> Night Roll Call
-        </button>
-        <button className={`hostel-tab ${activeTab === 'Wardens' ? 'active' : ''}`} onClick={() => setActiveTab('Wardens')}>
-          <ShieldCheck size={15} /> Wardens ({wardens.length})
-        </button>
-        <button className={`hostel-tab ${activeTab === 'Complaints' ? 'active' : ''}`} onClick={() => setActiveTab('Complaints')}>
-          <AlertOctagon size={15} /> Maintenance SLA {openComplaints.length > 0 && <span className="tab-badge">{openComplaints.length}</span>}
-        </button>
-        <button className={`hostel-tab ${activeTab === 'Mess Menu' ? 'active' : ''}`} onClick={() => setActiveTab('Mess Menu')}>
-          <Utensils size={15} /> Mess Schedule
-        </button>
-        <button className={`hostel-tab ${activeTab === 'Visitors' ? 'active' : ''}`} onClick={() => setActiveTab('Visitors')}>
-          <UserPlus size={15} /> Visitor Log
-        </button>
-        <button className={`hostel-tab ${activeTab === 'Reports' ? 'active' : ''}`} onClick={() => setActiveTab('Reports')}>
-          <FileText size={15} /> Reports
-        </button>
-      </div>
+          <button className={`hostel-tab ${activeTab === 'Hostel Fees' ? 'active' : ''}`} onClick={() => setActiveTab('Hostel Fees')}>
+            <CreditCard size={15} /> Fee Realization {feeDueStudents.length > 0 && <span className="tab-badge">{feeDueStudents.length} Due</span>}
+          </button>
+          <button className={`hostel-tab ${activeTab === 'Gate Passes' ? 'active' : ''}`} onClick={() => setActiveTab('Gate Passes')}>
+            <CheckCircle size={15} /> Gate Passes {pendingPasses.length > 0 && <span className="tab-badge">{pendingPasses.length}</span>}
+          </button>
+          <button className={`hostel-tab ${activeTab === 'Attendance' ? 'active' : ''}`} onClick={() => setActiveTab('Attendance')}>
+            <Clock size={15} /> Night Roll Call
+          </button>
+          <button className={`hostel-tab ${activeTab === 'Wardens' ? 'active' : ''}`} onClick={() => setActiveTab('Wardens')}>
+            <ShieldCheck size={15} /> Wardens ({wardens.length})
+          </button>
+          <button className={`hostel-tab ${activeTab === 'Complaints' ? 'active' : ''}`} onClick={() => setActiveTab('Complaints')}>
+            <AlertOctagon size={15} /> Maintenance SLA {openComplaints.length > 0 && <span className="tab-badge">{openComplaints.length}</span>}
+          </button>
+          <button className={`hostel-tab ${activeTab === 'Mess Menu' ? 'active' : ''}`} onClick={() => setActiveTab('Mess Menu')}>
+            <Utensils size={15} /> Mess Schedule
+          </button>
+          <button className={`hostel-tab ${activeTab === 'Visitors' ? 'active' : ''}`} onClick={() => setActiveTab('Visitors')}>
+            <UserPlus size={15} /> Visitor Log
+          </button>
+          <button className={`hostel-tab ${activeTab === 'Reports' ? 'active' : ''}`} onClick={() => setActiveTab('Reports')}>
+            <FileText size={15} /> Reports
+          </button>
+        </div>
+      )}
 
       {/* TAB 1: DASHBOARD OVERVIEW */}
       {activeTab === 'Dashboard' && (
@@ -1328,31 +1390,123 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
 
       {/* TAB 5: HOSTEL BLOCKS */}
       {activeTab === 'Hostel Blocks' && (
-        <div className="animate-fade-in">
-          <div className="flex justify-between items-center mb-6">
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* Executive Header Strip */}
+          <div style={{ background: '#ffffff', borderRadius: '16px', padding: '1.25rem 1.5rem', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h2 className="text-xl font-bold">Hostel Buildings & Blocks</h2>
-              <p className="text-muted text-sm">Overview of all physical hostel structures and supervision wardens.</p>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#1d4ed8', padding: '4px 12px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.4rem', border: '1px solid #bfdbfe' }}>
+                <Building size={13} style={{ color: '#2563eb' }} /> Residential Infrastructure Overview
+              </div>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 0.2rem 0', color: '#0f172a', letterSpacing: '-0.01em' }}>
+                Hostel Buildings & Accommodation Blocks
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
+                Manage residential capacity, assigned wardens, room allocations, and bed density across all campus hostels.
+              </p>
             </div>
-            <button className="btn-primary flex items-center gap-2" onClick={() => setShowAddBlockModal(true)}>
-              <Plus size={16}/> Add Block
+
+            <button 
+              type="button" 
+              onClick={() => setShowAddBlockModal(true)} 
+              style={{ background: '#2563eb', color: '#ffffff', border: 'none', padding: '0.55rem 1.15rem', borderRadius: '10px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)' }}
+            >
+              <Plus size={15} /> Add New Block
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Blocks Responsive Grid Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem' }}>
             {blocks.map(block => {
               const blockOccupied = allocatedStudents.filter(s => (s.hostelName === block.name || s.blockWing === block.name || s.block === block.name) && s.roomNumber && s.roomNumber !== 'Unassigned' && s.roomNumber !== 'Pending Allocation').length;
-              const occRate = (Number(block.capacity) || 0) > 0 ? Math.round((blockOccupied / Number(block.capacity)) * 100) : 0;
+              const capacity = Number(block.capacity) || 0;
+              const available = Math.max(0, capacity - blockOccupied);
+              const occRate = capacity > 0 ? Math.round((blockOccupied / capacity) * 100) : 0;
+              
+              const progressColor = occRate > 85 ? '#ef4444' : occRate > 60 ? '#f59e0b' : '#10b981';
+
               return (
-                <div key={block.blockId} className="glass-card p-6 border-t-4 border-primary">
-                  <h3 className="font-bold text-lg mb-1">{block.name}</h3>
-                  <p className="text-sm text-muted mb-4 flex items-center gap-2"><UserCheck size={14}/> Warden: {block.warden}</p>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-bold text-muted">Occupancy ({occRate}%)</span>
-                    <span className="text-xs font-bold">{blockOccupied} / {block.capacity} Beds</span>
+                <div 
+                  key={block.blockId} 
+                  style={{ 
+                    background: '#ffffff', 
+                    borderRadius: '16px', 
+                    padding: '1.35rem', 
+                    border: '1px solid #e2e8f0', 
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justify: 'space-between',
+                    gap: '1.1rem'
+                  }}
+                >
+                  <div>
+                    {/* Header: Block Name & Badge */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Building size={20} />
+                        </div>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{block.name}</h3>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Block ID: {block.blockId || 'B1'}</span>
+                        </div>
+                      </div>
+
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '4px 10px', borderRadius: '20px', background: occRate > 85 ? '#fef2f2' : occRate > 60 ? '#fffbeb' : '#ecfdf5', color: occRate > 85 ? '#dc2626' : occRate > 60 ? '#d97706' : '#047857', border: `1px solid ${occRate > 85 ? '#fca5a5' : occRate > 60 ? '#fde68a' : '#a7f3d0'}` }}>
+                        {occRate}% Occupied
+                      </span>
+                    </div>
+
+                    {/* Warden Details Pill */}
+                    <div style={{ background: '#f8fafc', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', marginBottom: '1rem' }}>
+                      <UserCheck size={16} style={{ color: '#4f46e5' }} />
+                      <span style={{ color: '#64748b', fontWeight: 500 }}>Chief Warden:</span>
+                      <strong style={{ color: '#0f172a', fontWeight: 700 }}>{block.warden || 'Unassigned'}</strong>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                        <span>Occupancy Density</span>
+                        <span>{blockOccupied} / {capacity} Beds</span>
+                      </div>
+                      <div style={{ width: '100%', height: '10px', background: '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(100, occRate)}%`, height: '100%', background: progressColor, borderRadius: '10px', transition: 'width 0.4s ease' }}></div>
+                      </div>
+                    </div>
+
+                    {/* Bed Capacity Counters */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', textAlign: 'center' }}>
+                      <div style={{ background: '#f8fafc', padding: '0.6rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Total</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{capacity}</div>
+                      </div>
+                      <div style={{ background: '#f0fdf4', padding: '0.6rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                        <div style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700, textTransform: 'uppercase' }}>Occupied</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#15803d', marginTop: '2px' }}>{blockOccupied}</div>
+                      </div>
+                      <div style={{ background: '#eff6ff', padding: '0.6rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                        <div style={{ fontSize: '0.68rem', color: '#2563eb', fontWeight: 700, textTransform: 'uppercase' }}>Available</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d4ed8', marginTop: '2px' }}>{available}</div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                    <div className="bg-primary h-2.5 rounded-full" style={{ width: `${Math.min(100, occRate)}%` }}></div>
+
+                  {/* Card Action Buttons */}
+                  <div style={{ display: 'flex', gap: '8px', paddingTop: '0.75rem', borderTop: '1px solid #f1f5f9' }}>
+                    <button 
+                      onClick={() => setShowAllocateModal(true)} 
+                      style={{ flex: 1, padding: '0.5rem 0.75rem', borderRadius: '8px', background: '#2563eb', color: '#ffffff', border: 'none', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                    >
+                      <Plus size={14} /> Allocate Bed
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('Rooms')} 
+                      style={{ flex: 1, padding: '0.5rem 0.75rem', borderRadius: '8px', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                    >
+                      <DoorOpen size={14} /> View Rooms
+                    </button>
                   </div>
                 </div>
               );
@@ -1369,9 +1523,6 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
               <Search size={16} className="text-muted"/>
               <input type="text" placeholder="Search room number..." value={search} onChange={e=>setSearch(e.target.value)}/>
             </div>
-            <button className="btn-primary flex items-center gap-2" onClick={() => setShowAddRoomModal(true)}>
-              <Plus size={16}/> Add Room
-            </button>
           </div>
 
           {rooms.length === 0 ? (
@@ -1454,49 +1605,185 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
 
       {/* TAB 8: MESS MENU */}
       {activeTab === 'Mess Menu' && (
-        <div className="animate-fade-in">
-          <div className="flex justify-between items-center mb-6">
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* Executive Mess Hero Banner */}
+          <div style={{ background: '#ffffff', borderRadius: '16px', padding: '1.25rem 1.5rem', color: '#0f172a', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h2 className="text-xl font-bold">Weekly Hostel Mess Menu</h2>
-              <p className="text-muted text-sm">Catering schedule for breakfast, lunch, and dinner.</p>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#1d4ed8', padding: '4px 12px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.5rem', border: '1px solid #bfdbfe' }}>
+                <Sparkles size={13} style={{ color: '#2563eb' }} /> Campus Dining & Nutrition Center
+              </div>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 0.2rem 0', color: '#0f172a', letterSpacing: '-0.01em' }}>
+                Weekly Hostel Mess & Catering Schedule
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', maxWidth: '650px' }}>
+                Nutritionally balanced 4-meal catering plan across all campus dining halls. Updated in real time by the Hostel Mess Committee.
+              </p>
             </div>
-            <button className="btn-primary flex items-center gap-2" onClick={() => { setEditMenuForm([...messMenu]); setShowEditMenuModal(true); }}>
-              Edit Menu Schedule
-            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <button 
+                type="button" 
+                onClick={() => { setEditMenuForm([...messMenu]); setShowEditMenuModal(true); }} 
+                style={{ background: '#2563eb', color: '#ffffff', border: 'none', padding: '0.55rem 1.1rem', borderRadius: '10px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)' }}
+              >
+                <Utensils size={15} /> Edit Menu Schedule
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Quick Meal Timings Bar */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+            <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                🌅
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Breakfast</div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>07:30 AM – 09:30 AM</div>
+              </div>
+            </div>
+
+            <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                🍲
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Lunch</div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>12:30 PM – 02:30 PM</div>
+              </div>
+            </div>
+
+            <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#ffedd5', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                ☕
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Evening Snacks</div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>05:00 PM – 06:00 PM</div>
+              </div>
+            </div>
+
+            <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#e0e7ff', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                🍽️
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Dinner</div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>07:30 PM – 09:30 PM</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 7-Day Weekly Menu Cards Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
             {messMenu.map((menu, idx) => {
-              const isToday = menu.day === new Date().toLocaleDateString('en-US', { weekday: 'long' });
+              const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+              const isToday = menu.day === todayStr;
               return (
-                <div key={idx} className={`bg-white dark:bg-gray-900 rounded-xl p-5 border ${isToday ? 'border-indigo-600 shadow-md ring-1 ring-indigo-600/20' : 'border-gray-200 dark:border-gray-800'}`}>
-                  <div className="flex justify-between items-center mb-4 border-b border-gray-100 dark:border-gray-800 pb-3">
-                    <h3 className="font-bold text-lg text-indigo-700 dark:text-indigo-400">{menu.day}</h3>
-                    {isToday && (
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">Today</span>
-                    )}
-                    {menu.day === 'Sunday' && (
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Special Feast</span>
-                    )}
+                <div 
+                  key={idx} 
+                  style={{ 
+                    background: '#ffffff', 
+                    borderRadius: '14px', 
+                    padding: '1.25rem', 
+                    border: isToday ? '2px solid #4338ca' : '1px solid #e2e8f0', 
+                    boxShadow: isToday ? '0 10px 25px -5px rgba(67, 56, 202, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)',
+                    position: 'relative'
+                  }}
+                >
+                  {/* Card Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: isToday ? '#4338ca' : '#0f172a' }}>
+                        {menu.day}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {isToday && (
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '3px 10px', borderRadius: '20px', background: '#4338ca', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          TODAY
+                        </span>
+                      )}
+                      {menu.day === 'Sunday' && (
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '3px 10px', borderRadius: '20px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>
+                          SPECIAL FEAST
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-3">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded">Breakfast (7:30 - 9:30 AM)</span>
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mt-1 pl-1">{menu.breakfast}</p>
+
+                  {/* Meal Breakdown Items */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    
+                    {/* Breakfast */}
+                    <div style={{ background: '#fefce8', border: '1px solid #fef08a', borderRadius: '10px', padding: '0.75rem 0.9rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          🥐 BREAKFAST (7:30 – 9:30 AM)
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
+                        {menu.breakfast || 'Not specified'}
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Lunch (12:30 - 2:30 PM)</span>
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mt-1 pl-1">{menu.lunch}</p>
+
+                    {/* Lunch */}
+                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '0.75rem 0.9rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          🍲 LUNCH (12:30 – 2:30 PM)
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
+                        {menu.lunch || 'Not specified'}
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">Dinner (7:30 - 9:30 PM)</span>
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mt-1 pl-1">{menu.dinner}</p>
+
+                    {/* Dinner */}
+                    <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '0.75rem 0.9rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          🍽️ DINNER (7:30 – 9:30 PM)
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
+                        {menu.dinner || 'Not specified'}
+                      </div>
                     </div>
+
+                  </div>
+
+                  {/* Card Footer Quality Note */}
+                  <div style={{ marginTop: '0.85rem', paddingTop: '0.6rem', borderTop: '1px dashed #e2e8f0', fontSize: '0.72rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Fresh & Hygienic Prep</span>
+                    <span style={{ fontWeight: 600, color: '#16a34a' }}>✓ FSSAI Standard</span>
                   </div>
                 </div>
               );
             })}
           </div>
+
+          {/* Mess Committee & Feedback Section */}
+          <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CheckCircle2 size={22} />
+              </div>
+              <div>
+                <div style={{ fontWeight: '800', fontSize: '0.92rem', color: '#0f172a' }}>Mess Quality Assurance & Dietary Feedback</div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>For food quality suggestions, dietary requests, or issues, contact the Chief Mess Warden or submit a ticket.</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button onClick={() => setActiveTab('Complaints')} style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+                Report Mess Issue
+              </button>
+            </div>
+          </div>
+
         </div>
       )}
 

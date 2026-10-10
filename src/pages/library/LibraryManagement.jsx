@@ -1943,7 +1943,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
       </div>
 
       {/* Navigation Tabs (Displayed only when not in dedicated sidebar sub-routes) */}
-      {!location.pathname.startsWith('/librarian') && (
+      {!location.pathname.startsWith('/librarian') && !location.pathname.startsWith('/library') && (
         <div className="lib-tabs-container">
           {TABS.map(tab => {
             const pendingReservationsCount = issues.filter(i => i.status === 'Pending').length;

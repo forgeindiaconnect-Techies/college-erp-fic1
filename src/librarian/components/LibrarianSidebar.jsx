@@ -62,8 +62,15 @@ const LibrarianSidebar = ({ isOpen, onClose }) => {
     });
   }, [location.pathname]);
 
+  const handleNavClick = () => {
+    if (window.innerWidth <= 768 && onClose) {
+      onClose();
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.clear();
+    if (onClose) onClose();
     navigate('/login');
   };
 
@@ -92,7 +99,7 @@ const LibrarianSidebar = ({ isOpen, onClose }) => {
             Librarian Portal
           </span>
         </div>
-        <button className="sidebar-close-btn" onClick={onClose}>
+        <button className="sidebar-close-btn" onClick={onClose} aria-label="Close sidebar">
           <X size={20} />
         </button>
       </div>
@@ -104,6 +111,7 @@ const LibrarianSidebar = ({ isOpen, onClose }) => {
             <NavLink
               to="/librarian/dashboard"
               className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              onClick={handleNavClick}
             >
               <LayoutDashboard size={20} />
               <span>Library Dashboard</span>
@@ -130,6 +138,7 @@ const LibrarianSidebar = ({ isOpen, onClose }) => {
                       to={item.path} 
                       className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
                       style={{ paddingLeft: '2.8rem' }}
+                      onClick={handleNavClick}
                     >
                       {item.icon}
                       <span>{item.name}</span>

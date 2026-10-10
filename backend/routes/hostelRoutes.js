@@ -17,10 +17,50 @@ const router = express.Router();
 // @access  Private
 router.get('/blocks', protect, collegeScope, async (req, res) => {
   try {
-    const blocks = await HostelBlock.find({});
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system')
+      ? { $or: [{ collegeId }, { tenantId: collegeId }, { collegeId: { $exists: false } }] }
+      : {};
+    const blocks = await HostelBlock.find(filter);
     res.json(blocks);
   } catch (error) {
     res.status(500).json({ message: 'Server Error fetching blocks' });
+  }
+});
+
+// @desc    Create a new hostel block
+// @route   POST /api/hostel/blocks
+// @access  Private
+router.post('/blocks', protect, collegeScope, async (req, res) => {
+  try {
+    const { blockId, name, warden, capacity } = req.body;
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId || '';
+
+    let block = await HostelBlock.findOne({
+      $or: [{ name }, { blockId }],
+      ...(collegeId ? { collegeId } : {})
+    });
+
+    if (block) {
+      if (warden) block.warden = warden;
+      if (capacity !== undefined) block.capacity = Number(capacity);
+      await block.save();
+    } else {
+      block = await HostelBlock.create({
+        blockId: blockId || `B${Date.now().toString().slice(-4)}`,
+        name,
+        warden: warden || 'Unassigned',
+        capacity: Number(capacity) || 100,
+        occupied: 0,
+        collegeId
+      });
+    }
+
+    req.app.get('io')?.emit('dataUpdated', { module: 'hostel', action: 'block_created' });
+    res.status(201).json(block);
+  } catch (error) {
+    console.error('Error creating hostel block:', error);
+    res.status(500).json({ message: error.message || 'Server Error creating block' });
   }
 });
 
@@ -29,10 +69,52 @@ router.get('/blocks', protect, collegeScope, async (req, res) => {
 // @access  Private
 router.get('/rooms', protect, collegeScope, async (req, res) => {
   try {
-    const rooms = await HostelRoom.find({});
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system')
+      ? { $or: [{ collegeId }, { tenantId: collegeId }, { collegeId: { $exists: false } }] }
+      : {};
+    const rooms = await HostelRoom.find(filter).sort({ createdAt: -1 });
     res.json(rooms);
   } catch (error) {
     res.status(500).json({ message: 'Server Error fetching rooms' });
+  }
+});
+
+// @desc    Create a new hostel room
+// @route   POST /api/hostel/rooms
+// @access  Private
+router.post('/rooms', protect, collegeScope, async (req, res) => {
+  try {
+    const { roomId, block, type, capacity } = req.body;
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId || '';
+
+    let room = await HostelRoom.findOne({
+      roomId,
+      ...(collegeId ? { collegeId } : {})
+    });
+
+    if (room) {
+      room.block = block || room.block;
+      room.type = type || room.type;
+      room.capacity = Number(capacity) || room.capacity;
+      await room.save();
+    } else {
+      room = await HostelRoom.create({
+        roomId,
+        block: block || 'Boys Hostel A',
+        type: type || '2-Sharing',
+        capacity: Number(capacity) || 2,
+        occupied: 0,
+        status: 'Available',
+        collegeId
+      });
+    }
+
+    req.app.get('io')?.emit('dataUpdated', { module: 'hostel', action: 'room_created' });
+    res.status(201).json(room);
+  } catch (error) {
+    console.error('Error creating hostel room:', error);
+    res.status(500).json({ message: error.message || 'Server Error creating room' });
   }
 });
 

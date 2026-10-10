@@ -1,18 +1,23 @@
 import React from 'react';
 import { SettingsContext } from '../../App';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Bus, MapPin, Users, Bell, Wrench, Calendar, Navigation, LogOut, ChevronRight, ChevronDown, CheckSquare, IndianRupee } from 'lucide-react';
+import { LayoutDashboard, Bus, MapPin, Users, Bell, Wrench, Calendar, Navigation, LogOut, ChevronRight, ChevronDown, CheckSquare, IndianRupee, X } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
 const DriverSidebar = ({ isOpen, onClose }) => {
   const { collegeSettings } = React.useContext(SettingsContext) || {};
   const navigate = useNavigate();
-  const session = JSON.parse(sessionStorage.getItem('driver_session') || '{}');
 
   const [expandedGroups, setExpandedGroups] = React.useState({});
 
   const toggleGroup = (groupName) => {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
+  };
+
+  const handleNavClick = () => {
+    if (window.innerWidth <= 768 && onClose) {
+      onClose();
+    }
   };
 
   const menuGroups = [
@@ -47,6 +52,7 @@ const DriverSidebar = ({ isOpen, onClose }) => {
   const handleLogout = () => {
     sessionStorage.removeItem('driver_session');
     sessionStorage.removeItem('driver_token');
+    if (onClose) onClose();
     navigate('/login');
   };
 
@@ -62,8 +68,8 @@ const DriverSidebar = ({ isOpen, onClose }) => {
 
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
-      {/* Brand */}
-      <div className="sidebar-header">
+      {/* Brand & Mobile Close Button */}
+      <div className="sidebar-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {collegeSettings?.collegeLogo ? (
           <img 
             src={collegeSettings.collegeLogo} 
@@ -71,10 +77,18 @@ const DriverSidebar = ({ isOpen, onClose }) => {
             style={{ height: '32px', objectFit: 'contain' }} 
           />
         ) : (
-          <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+          <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
             {displayCollegeName}
           </div>
         )}
+        <button
+          className="sidebar-close-btn"
+          onClick={onClose}
+          aria-label="Close sidebar"
+          style={{ background: 'transparent', border: 'none', color: '#ffffff', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+        >
+          <X size={22} />
+        </button>
       </div>
 
       {/* Nav links */}
@@ -84,6 +98,7 @@ const DriverSidebar = ({ isOpen, onClose }) => {
             <NavLink
               to="/driver/dashboard"
               className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              onClick={handleNavClick}
             >
               <LayoutDashboard size={20} />
               <span>Dashboard</span>
@@ -110,6 +125,7 @@ const DriverSidebar = ({ isOpen, onClose }) => {
                       to={item.path}
                       className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
                       style={{ paddingLeft: '2.8rem' }}
+                      onClick={handleNavClick}
                     >
                       {item.icon}
                       <span>{item.name}</span>

@@ -8,6 +8,8 @@ import bcrypt from 'bcryptjs';
 import FeeStructure from '../models/FeeStructure.js';
 import StudentFee from '../models/StudentFee.js';
 import HostelRequest from '../models/HostelRequest.js';
+import Quota from '../models/Quota.js';
+import TransportStudent from '../models/TransportStudent.js';
 import { sendNotification } from '../utils/notificationHelper.js';
 import { recordAdmissionPayment, updateAdmissionPayment, deleteAdmissionPayment } from '../controllers/admissionController.js';
 
@@ -191,6 +193,7 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
   const autoStudentName = req.body.name || [req.body.firstName, req.body.lastName].filter(Boolean).join(' ') || 'Student';
   const autoStudentEmail = (req.body.email && req.body.email.trim()) || `${autoStudentId.toLowerCase().replace(/[^a-z0-9]/g, '')}@student.college.edu`;
   const autoStudentDept = req.body.dept || req.body.department || 'General';
+  const autoStudentSem = String(req.body.sem || req.body.semester || 'Sem 1');
   const cleanBody = { ...req.body };
   delete cleanBody._id;
 
@@ -583,6 +586,27 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
       });
     }
 
+    if (isTransport || newStudent.transportRequired === 'yes') {
+      try {
+        let ts = await TransportStudent.findOne({ studentId: newStudent.id });
+        if (!ts) {
+          await TransportStudent.create({
+            studentId: newStudent.id,
+            name: newStudent.name,
+            routeId: newStudent.busRoute || '',
+            pickupPoint: newStudent.pickupPoint || 'Campus Gate',
+            feeStatus: newStudent.transportFeeStatus || 'Pending',
+            amount: newStudent.transportFee || newStudent.transportFeeAmount || 15000,
+            vehicleNumber: newStudent.vehicleNumber || newStudent.busNumber || '',
+            driverName: newStudent.driverName || '',
+            collegeId: newStudent.collegeId || collegeId
+          });
+        }
+      } catch (tsErr) {
+        console.error('Failed to sync TransportStudent during student creation:', tsErr);
+      }
+    }
+
     req.app.get('io').emit('dataUpdated', { module: 'students', action: 'created' });
     res.status(201).json(newStudent);
   } catch (err) {
@@ -753,6 +777,35 @@ router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 
 
       const collegeId = targetCollegeId || 'unassigned_college';
       const studentUser = await User.findOne({ referenceId: updatedStudent.id });
+      if (updatedStudent.transportRequired === 'yes' || req.body.transportRequired === 'yes' || req.body.busRoute || req.body.vehicleNumber) {
+        try {
+          let ts = await TransportStudent.findOne({ studentId: updatedStudent.id });
+          if (!ts) {
+            await TransportStudent.create({
+              studentId: updatedStudent.id,
+              name: updatedStudent.name,
+              routeId: updatedStudent.busRoute || req.body.busRoute || '',
+              pickupPoint: updatedStudent.pickupPoint || req.body.pickupPoint || 'Campus Gate',
+              feeStatus: updatedStudent.transportFeeStatus || 'Pending',
+              amount: updatedStudent.transportFee || updatedStudent.transportFeeAmount || 15000,
+              vehicleNumber: updatedStudent.vehicleNumber || updatedStudent.busNumber || req.body.vehicleNumber || '',
+              driverName: updatedStudent.driverName || req.body.driverName || '',
+              collegeId: updatedStudent.collegeId || collegeId
+            });
+          } else {
+            ts.name = updatedStudent.name || ts.name;
+            if (req.body.busRoute) ts.routeId = req.body.busRoute;
+            if (req.body.pickupPoint) ts.pickupPoint = req.body.pickupPoint;
+            if (req.body.vehicleNumber) ts.vehicleNumber = req.body.vehicleNumber;
+            if (req.body.driverName) ts.driverName = req.body.driverName;
+            await ts.save();
+          }
+          req.app.get('io')?.emit('dataUpdated', { module: 'transport', action: 'allocated', studentId: updatedStudent.id });
+        } catch (tsErr) {
+          console.warn('Transport sync note on student update:', tsErr);
+        }
+      }
+
       if (studentUser) {
         await sendNotification(req, {
           receiverId: studentUser._id,

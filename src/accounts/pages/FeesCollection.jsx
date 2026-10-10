@@ -369,40 +369,57 @@ const FeesCollection = () => {
   };
 
   const getFeeRate = (fType) => {
-    if (!feeStructure) return 0;
+    if (!selectedStudent && !feeStructure) return 0;
     if (fType === 'All Fees (Total Bill)') {
-      return Number(feeStructure.allFees) || 26000;
+      return Number(
+        selectedStudent?.finalFee !== undefined && Number(selectedStudent.finalFee) > 0
+          ? selectedStudent.finalFee
+          : (selectedStudent?.totalFee !== undefined && Number(selectedStudent.totalFee) > 0
+              ? selectedStudent.totalFee
+              : (feeStructure?.allFees || selectedStudent?.normalFee || 0))
+      );
     }
     const def = ALL_FEE_DEFINITIONS.find(f => f.label === fType);
     if (!def) return 0;
-    return Number(feeStructure[def.key]) || 0;
+    return Number(feeStructure?.[def.key]) || 0;
   };
 
   const getFeePaid = (fType) => {
+    if (!selectedStudent) return 0;
+    const paymentsSum = studentPayments.reduce((acc, curr) => acc + (Number(curr.paidAmount || curr.amount) || 0), 0);
+    const studentPropPaid = Number(
+      selectedStudent.paidAmount !== undefined
+        ? selectedStudent.paidAmount
+        : (selectedStudent.amountPaid !== undefined ? selectedStudent.amountPaid : (selectedStudent.paid || 0))
+    );
+    const totalPaidSum = Math.max(paymentsSum, studentPropPaid);
+
     if (fType === 'All Fees (Total Bill)') {
-      return studentPayments.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
+      return totalPaidSum;
     }
-    return studentPayments.filter(f => f.feeType === fType).reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
+    const specificPaid = studentPayments.filter(f => f.feeType === fType).reduce((acc, curr) => acc + (Number(curr.paidAmount || curr.amount) || 0), 0);
+    return specificPaid;
   };
 
   const getFeePending = (fType) => {
-    if (!feeStructure) return 0;
+    if (!selectedStudent) return 0;
+    if (fType === 'All Fees (Total Bill)') {
+      const rate = getFeeRate('All Fees (Total Bill)');
+      const paid = getFeePaid('All Fees (Total Bill)');
+      return Math.max(0, rate - paid);
+    }
     const rate = getFeeRate(fType);
+    const def = ALL_FEE_DEFINITIONS.find(f => f.label === fType);
+    const discounted = def ? getDiscountedAmount(def.key, rate, studentScholarship) : rate;
     const paid = getFeePaid(fType);
-    const discounted = fType === 'All Fees (Total Bill)' 
-      ? Math.max(0, rate - (studentScholarship ? (studentScholarship.amount === '100%' ? (Number(feeStructure.tuitionFee) || 0) : 0) : 0))
-      : getDiscountedAmount(ALL_FEE_DEFINITIONS.find(f => f.label === fType)?.key || '', rate, studentScholarship);
     return Math.max(0, discounted - paid);
   };
 
   const getSuggestedFeeAmount = (fType) => {
-    if (!feeStructure) return 0;
+    if (!selectedStudent) return 0;
     const pending = getFeePending(fType);
     if (pending > 0) return pending;
-    // If pending balance is 0, show the standard fee amount so the user sees the rate
-    const rate = getFeeRate(fType);
-    const def = ALL_FEE_DEFINITIONS.find(f => f.label === fType);
-    return def ? getDiscountedAmount(def.key, rate, studentScholarship) : rate;
+    return getFeeRate(fType);
   };
 
   // New Student Modal States
@@ -750,18 +767,39 @@ const FeesCollection = () => {
         ...serverStructure
       };
 
-      // Add hostel & transport if student opted in
+      // Add hostel & transport if student opted in, otherwise 0
       if (s.hostelFeeAmount || s.hostel === 'Yes' || s.hostelRequired === 'yes' || s.dormFacility) {
-        mergedStructure.hostelFee = Number(s.hostelFeeAmount) || mergedStructure.hostelFee || 40000;
+        mergedStructure.hostelFee = Number(s.hostelFeeAmount) || (deptDefaults.hostelFee || 40000);
+      } else {
+        mergedStructure.hostelFee = 0;
       }
       if (s.transportFeeAmount || s.transport === 'Yes' || s.transportRequired === 'yes' || s.busFacility) {
-        mergedStructure.transportFee = Number(s.transportFeeAmount) || mergedStructure.transportFee || 15000;
+        mergedStructure.transportFee = Number(s.transportFeeAmount) || (deptDefaults.transportFee || 15000);
+      } else {
+        mergedStructure.transportFee = 0;
       }
 
       // Compute total sum of all itemized keys
       const itemizedKeys = ['tuitionFee', 'admissionFee', 'universityFee', 'marksheetVerification', 'specialFee', 'englishLabNssId', 'computerLab', 'stationary', 'pta', 'examFee', 'libraryFee', 'hostelFee', 'transportFee', 'otherFee'];
       const calculatedTotal = itemizedKeys.reduce((sum, k) => sum + (Number(mergedStructure[k]) || 0), 0);
-      mergedStructure.allFees = Number(s.totalFee) || calculatedTotal || 26000;
+      
+      const realAssessedFee = Number(s.finalFee !== undefined && Number(s.finalFee) > 0 ? s.finalFee : (s.totalFee !== undefined && Number(s.totalFee) > 0 ? s.totalFee : (s.normalFee || calculatedTotal || 26000)));
+      mergedStructure.allFees = realAssessedFee;
+
+      let effectivePayments = Array.isArray(payments) ? [...payments] : [];
+      const initialPaid = Number(s.paidAmount !== undefined ? s.paidAmount : (s.amountPaid !== undefined ? s.amountPaid : (s.paid || 0)));
+      const sumPaid = effectivePayments.reduce((acc, curr) => acc + (Number(curr.paidAmount || curr.amount) || 0), 0);
+      
+      if (sumPaid === 0 && initialPaid > 0) {
+        effectivePayments = [{
+          _id: `init_pay_${s.id || s._id}`,
+          feeType: 'All Fees (Total Bill)',
+          paidAmount: initialPaid,
+          amount: initialPaid,
+          paymentMode: s.paymentMode || 'Bank Transfer (NEFT/RTGS)',
+          paymentDate: s.admissionDate || s.createdAt || new Date().toISOString()
+        }];
+      }
 
       let foundScholarship = null;
       try {
@@ -774,12 +812,14 @@ const FeesCollection = () => {
       
       setStudentScholarship(foundScholarship);
       setFeeStructure(mergedStructure);
-      setStudentPayments(payments);
+      setStudentPayments(effectivePayments);
       
       // Calculate total paid across all fees
-      const totalPaidAmount = payments.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
-      const discountVal = foundScholarship ? (foundScholarship.amount === '100%' ? (Number(mergedStructure.tuitionFee) || 0) : (Number(mergedStructure.tuitionFee) || 0) * (parseFloat(foundScholarship.amount) / 100 || 0)) : 0;
-      const netTotalFee = Math.max(0, mergedStructure.allFees - discountVal);
+      const totalPaidAmount = Math.max(
+        effectivePayments.reduce((acc, curr) => acc + (Number(curr.paidAmount || curr.amount) || 0), 0),
+        Number(s.paidAmount !== undefined ? s.paidAmount : (s.amountPaid !== undefined ? s.amountPaid : 0))
+      );
+      const netTotalFee = mergedStructure.allFees;
       const netPendingTotal = Math.max(0, netTotalFee - totalPaidAmount);
 
       setFeeType('All Fees (Total Bill)');
@@ -1831,76 +1871,98 @@ const FeesCollection = () => {
     const list = [];
     const seen = new Set();
 
-    // 1. Flatten from admissions.paymentHistory
+    // 1. Process all backend Fee collection records (allPaymentsList)
+    allPaymentsList.forEach((p) => {
+      const receiptNo = p.receiptNo || p.receiptNumber || (p._id ? `REC-${String(p._id).substring(18)}` : null);
+      const studentMatch = admissions.find((st) => (st.id && st.id === p.studentId) || (st._id && String(st._id) === String(p.studentId)) || (st.admissionNumber && st.admissionNumber === p.studentId));
+      
+      const key = p._id || p.id || receiptNo || `fee-${Math.random()}`;
+      if (!seen.has(key) && (!receiptNo || !seen.has(receiptNo))) {
+        if (receiptNo) seen.add(receiptNo);
+        seen.add(key);
+        list.push({
+          _id: key,
+          admissionId: studentMatch?._id || studentMatch?.id || p.studentId,
+          studentName: p.studentName || studentMatch?.studentName || studentMatch?.name || "Student",
+          admissionNumber: studentMatch?.admissionNumber || studentMatch?.admissionNo || studentMatch?.id || p.studentId || "—",
+          course: studentMatch?.course?.name || studentMatch?.course?.courseName || studentMatch?.course || p.department || "General",
+          courseName: p.department || studentMatch?.course?.name || studentMatch?.course?.courseName || studentMatch?.course || "General",
+          totalFee: Number(studentMatch?.finalFee || studentMatch?.totalFee || p.totalFees || p.amount || 0),
+          paidAmount: Number(studentMatch?.paidAmount || p.paidAmount || p.amount || 0),
+          remainingFee: Number(studentMatch?.remainingFee ?? 0),
+          paymentStatus: studentMatch?.paymentStatus || "Paid",
+          amount: Number(p.paidAmount || p.amount || 0),
+          paymentMethod: p.paymentMode || p.paymentMethod || "Bank Transfer (NEFT/RTGS)",
+          receiptNumber: receiptNo || "—",
+          paymentDate: p.paymentDate || p.createdAt || new Date(),
+        });
+      }
+    });
+
+    // 2. Flatten from admissions.paymentHistory
     admissions.forEach((admission) => {
-      const totalFee = Number(admission.totalFee || 0);
-      const paidAmount = Number(admission.paidAmount || 0);
+      const totalFee = Number(admission.finalFee !== undefined && Number(admission.finalFee) > 0 ? admission.finalFee : (admission.totalFee || 0));
+      const paidAmount = Number(admission.paidAmount !== undefined ? admission.paidAmount : (admission.amountPaid || 0));
       const remainingFee = Number(
         admission.remainingFee !== undefined
           ? admission.remainingFee
           : Math.max(0, totalFee - paidAmount)
       );
-      const paymentStatus = admission.paymentStatus || getPaymentStatus(totalFee, paidAmount);
+      const paymentStatus = admission.paymentStatus || (remainingFee === 0 && totalFee > 0 ? "Paid" : paidAmount > 0 ? "Partial" : "Pending");
 
       (admission.paymentHistory || []).forEach((payment, idx) => {
-        const key = payment._id || payment.id || `${admission._id || admission.id}-${idx}`;
-        if (!seen.has(key)) {
+        const receiptNo = payment.receiptNumber || payment.receiptNo || `REC-HIST-${admission.id || admission._id}-${idx}`;
+        const key = payment._id || payment.id || receiptNo;
+        if (!seen.has(key) && !seen.has(receiptNo)) {
           seen.add(key);
+          seen.add(receiptNo);
           list.push({
             ...payment,
             _id: key,
             admissionId: admission._id || admission.id,
             studentName: admission.studentName || admission.name || "Student",
             admissionNumber: admission.admissionNumber || admission.admissionNo || admission.id || "—",
-            course:
-              admission.course?._id ||
-              admission.course?.id ||
-              admission.course?.name ||
-              admission.course?.courseName ||
-              admission.course ||
-              "General",
-            courseName:
-              admission.course?.name ||
-              admission.course?.courseName ||
-              admission.course ||
-              admission.dept ||
-              admission.department ||
-              "General",
+            course: admission.course?.name || admission.course?.courseName || admission.course || admission.dept || admission.department || "General",
+            courseName: admission.course?.name || admission.course?.courseName || admission.course || admission.dept || admission.department || "General",
             totalFee,
             paidAmount,
             remainingFee,
             paymentStatus,
             amount: Number(payment.amount || payment.paidAmount || 0),
             paymentMethod: payment.paymentMethod || payment.paymentMode || "Cash",
-            receiptNumber: payment.receiptNumber || payment.receiptNo || `REC-${idx + 1}`,
-            paymentDate: payment.paymentDate || new Date(),
+            receiptNumber: receiptNo,
+            paymentDate: payment.paymentDate || admission.createdAt || new Date(),
           });
         }
       });
-    });
 
-    // 2. Also combine backend recorded Fee collection records
-    allPaymentsList.forEach((p) => {
-      const key = p._id || p.id || (p.receiptNo ? `rec-${p.receiptNo}` : `fee-${Math.random()}`);
-      if (!seen.has(key)) {
-        seen.add(key);
-        const s = admissions.find((st) => (st.id && st.id === p.studentId) || (st._id && st._id === p.studentId));
-        list.push({
-          _id: key,
-          admissionId: s?._id || s?.id || p.studentId,
-          studentName: p.studentName || s?.studentName || s?.name || "Student",
-          admissionNumber: s?.admissionNumber || s?.admissionNo || s?.id || p.studentId || "—",
-          course: s?.course?._id || s?.course?.id || p.department || "General",
-          courseName: p.department || s?.course?.name || s?.course?.courseName || s?.course || "General",
-          totalFee: Number(s?.totalFee || p.totalFees || p.amount || 0),
-          paidAmount: Number(s?.paidAmount || p.paidAmount || p.amount || 0),
-          remainingFee: Number(s?.remainingFee ?? 0),
-          paymentStatus: s?.paymentStatus || "Paid",
-          amount: Number(p.paidAmount || p.amount || 0),
-          paymentMethod: p.paymentMode || p.paymentMethod || "Cash",
-          receiptNumber: p.receiptNo || "—",
-          paymentDate: p.paymentDate || p.createdAt || new Date(),
-        });
+      // 3. Fallback: If student has paidAmount > 0 but sum of recorded receipt items is less, generate payment entry for difference
+      const studentMatchKey = String(admission.id || admission._id || admission.admissionNumber);
+      const recordedForStudent = list.filter(item => String(item.admissionId) === studentMatchKey || String(item.admissionNumber) === studentMatchKey);
+      const recordedSum = recordedForStudent.reduce((acc, curr) => acc + curr.amount, 0);
+
+      if (paidAmount > recordedSum) {
+        const diffAmount = paidAmount - recordedSum;
+        const initialReceiptNo = admission.receiptNumber || admission.receiptNo || `REC-REG-${admission.id || admission._id}`;
+        if (!seen.has(initialReceiptNo)) {
+          seen.add(initialReceiptNo);
+          list.push({
+            _id: `rec_initial_${admission._id || admission.id}`,
+            admissionId: admission._id || admission.id,
+            studentName: admission.studentName || admission.name || "Student",
+            admissionNumber: admission.admissionNumber || admission.admissionNo || admission.id || "—",
+            course: admission.course?.name || admission.course?.courseName || admission.course || admission.dept || admission.department || "General",
+            courseName: admission.course?.name || admission.course?.courseName || admission.course || admission.dept || admission.department || "General",
+            totalFee,
+            paidAmount,
+            remainingFee,
+            paymentStatus,
+            amount: diffAmount,
+            paymentMethod: admission.paymentMode || "Bank Transfer (NEFT/RTGS)",
+            receiptNumber: initialReceiptNo,
+            paymentDate: admission.paymentDate || admission.admissionDate || admission.createdAt || new Date(),
+          });
+        }
       }
     });
 
@@ -2478,21 +2540,11 @@ const FeesCollection = () => {
               {feeStructure && (() => {
                 const validFees = ALL_FEE_DEFINITIONS.filter(fee => fee.key !== 'allFees' && (Number(feeStructure[fee.key]) || 0) > 0);
 
-                let grossFee = 0;
-                let totalDiscount = 0;
-                let totalPaid = 0;
-                
-                validFees.forEach(fee => {
-                  const baseTotal = Number(feeStructure[fee.key]) || 0;
-                  const netTotal = getDiscountedAmount(fee.key, baseTotal, studentScholarship);
-                  const paid = studentPayments.filter(f => f.feeType === fee.label).reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
-                  grossFee += baseTotal;
-                  totalDiscount += (baseTotal - netTotal);
-                  totalPaid += paid;
-                });
-
-                const netFee = grossFee - totalDiscount;
+                const netFee = getFeeRate('All Fees (Total Bill)');
+                const totalPaid = getFeePaid('All Fees (Total Bill)');
                 const pendingFee = Math.max(0, netFee - totalPaid);
+
+                let unallocatedPaid = totalPaid;
 
                 return (
                   <div className="glass-card" style={{ padding:'22px' }}>
@@ -2539,7 +2591,16 @@ const FeesCollection = () => {
                             const baseTotal = Number(feeStructure[fee.key]) || 0;
                             const total = getDiscountedAmount(fee.key, baseTotal, studentScholarship);
                             const discountAmount = baseTotal - total;
-                            const paid = studentPayments.filter(f => f.feeType === fee.label).reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
+                            
+                            const specificPaid = studentPayments.filter(f => f.feeType === fee.label).reduce((acc, curr) => acc + (Number(curr.paidAmount || curr.amount) || 0), 0);
+                            let paid = 0;
+                            if (specificPaid > 0) {
+                              paid = specificPaid;
+                            } else {
+                              paid = Math.min(total, unallocatedPaid);
+                              unallocatedPaid = Math.max(0, unallocatedPaid - paid);
+                            }
+
                             const pending = Math.max(0, total - paid);
                             const status = paid >= total && total > 0 ? 'Paid' : (paid > 0 ? 'Partial' : 'Pending');
                             const isSelectedFee = feeType === fee.label;

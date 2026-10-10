@@ -83,7 +83,10 @@ const UnifiedLogin = () => {
     if (queryParams.get('deactivated') === 'true') {
       setError('Your college account has been deactivated. Please contact your Super Admin.');
     }
-  }, [location.search]);
+    setEmail('');
+    setPassword('');
+    setError('');
+  }, [location.search, selectedRole]);
 
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
@@ -317,13 +320,18 @@ const UnifiedLogin = () => {
             <p>{initialRole ? `Login to your ${initialRole} account` : 'Login to your ERP account'}</p>
           </div>
 
-          <form onSubmit={handleLogin} className="unified-form">
+          <form onSubmit={handleLogin} className="unified-form" autoComplete="off">
             {!initialRole && (
               <div className="input-group" style={{ marginBottom: '1.2rem' }}>
                 <label>User Role</label>
                 <CustomSelect 
                   value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedRole(e.target.value);
+                    setEmail('');
+                    setPassword('');
+                    setError('');
+                  }}
                   options={[
                     { value: 'Super Admin', label: 'Super Admin' },
                     { value: 'Admin', label: 'Admin' },
@@ -350,6 +358,8 @@ const UnifiedLogin = () => {
                 <Mail size={18} className="form-icon" />
                 <input
                   type="text"
+                  name="user_email_address_input"
+                  autoComplete="off"
                   placeholder="Enter your email or username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -364,6 +374,8 @@ const UnifiedLogin = () => {
                 <Lock size={18} className="form-icon" />
                 <input
                   type={showPwd ? 'text' : 'password'}
+                  name="user_password_secret_input"
+                  autoComplete="new-password"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

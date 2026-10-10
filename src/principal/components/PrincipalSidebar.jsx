@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   X, LayoutDashboard, Building2, UserCheck, GraduationCap, Users, CalendarCheck, CalendarDays, 
   Megaphone, FileBarChart, LogOut, Briefcase, Settings, ClipboardList, ShieldAlert, LifeBuoy, 
-  ChevronRight, ChevronDown, Layers, Wallet, Library, PieChart
+  ChevronRight, ChevronDown, Layers, Wallet, Library, PieChart, CheckSquare
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -12,7 +12,17 @@ const PrincipalSidebar = ({ isOpen, onClose }) => {
   const { collegeSettings } = React.useContext(SettingsContext) || {};
   const navigate = useNavigate();
   const [userName, setUserName] = useState('Principal');
-  const [expandedGroups, setExpandedGroups] = useState({});
+  // Default all groups to expanded so users can easily see all tabs
+  const [expandedGroups, setExpandedGroups] = useState({
+    'Executive & Approvals': true,
+    'User Management': true,
+    'Academic Console': true,
+    'Finance & Accounts': true,
+    'Corporate & Placements': true,
+    'Communication Hub': true,
+    'Reports & Performance': true,
+    'Administration': false
+  });
 
   const toggleGroup = (groupName) => {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
@@ -30,13 +40,27 @@ const PrincipalSidebar = ({ isOpen, onClose }) => {
     }
   }, []);
 
+  const handleNavClick = () => {
+    if (window.innerWidth <= 768 && onClose) {
+      onClose();
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem('principal_session');
     sessionStorage.removeItem('principal_token');
+    if (onClose) onClose();
     navigate('/login');
   };
 
   const menuGroups = [
+    {
+      name: 'Executive & Approvals',
+      icon: <CheckSquare size={20} />,
+      items: [
+        { name: 'Executive Approvals', path: '/principal/approvals', icon: <CheckSquare size={20} /> }
+      ]
+    },
     {
       name: 'User Management',
       icon: <Users size={20} />,
@@ -47,7 +71,7 @@ const PrincipalSidebar = ({ isOpen, onClose }) => {
       ]
     },
     {
-      name: 'Academic',
+      name: 'Academic Console',
       icon: <Layers size={20} />,
       items: [
         { name: 'Departments', path: '/principal/departments', icon: <Building2 size={20} /> },
@@ -58,33 +82,34 @@ const PrincipalSidebar = ({ isOpen, onClose }) => {
       ]
     },
     {
-      name: 'Finance',
+      name: 'Finance & Accounts',
       icon: <Wallet size={20} />,
       items: [
         { name: 'Fees Overview', path: '/principal/fees', icon: <ClipboardList size={20} /> }
       ]
     },
     {
-      name: 'Resources',
+      name: 'Corporate & Placements',
       icon: <Library size={20} />,
       items: [
         { name: 'Placements', path: '/principal/placement', icon: <Briefcase size={20} /> }
       ]
     },
     {
-      name: 'Communication',
+      name: 'Communication Hub',
       icon: <Megaphone size={20} />,
       items: [
+        { name: 'Announcements & Notices', path: '/principal/announcements', icon: <Megaphone size={20} /> },
         { name: 'Communication Center', path: '/principal/communication', icon: <Megaphone size={20} /> },
         { name: 'Meetings & Events', path: '/principal/meetings', icon: <CalendarDays size={20} /> },
         { name: 'Staff Support Center', path: '/principal/staff-support', icon: <LifeBuoy size={20} /> }
       ]
     },
     {
-      name: 'Reports & Analytics',
+      name: 'Reports & Performance',
       icon: <PieChart size={20} />,
       items: [
-        { name: 'Reports', path: '/principal/reports', icon: <ClipboardList size={20} /> },
+        { name: 'Institutional Reports', path: '/principal/reports', icon: <ClipboardList size={20} /> },
         { name: 'Faculty Performance', path: '/principal/faculty-performance', icon: <UserCheck size={20} /> },
         { name: 'Student Welfare & Discipline', path: '/principal/student-welfare', icon: <ShieldAlert size={20} /> }
       ]
@@ -134,6 +159,7 @@ const PrincipalSidebar = ({ isOpen, onClose }) => {
               to="/principal/dashboard" 
               end={true}
               className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
+              onClick={handleNavClick}
             >
               <LayoutDashboard size={20} />
               <span>Dashboard</span>
@@ -161,6 +187,7 @@ const PrincipalSidebar = ({ isOpen, onClose }) => {
                       end={item.exact}
                       className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
                       style={{ paddingLeft: '2.8rem' }}
+                      onClick={handleNavClick}
                     >
                       {item.icon}
                       <span>{item.name}</span>

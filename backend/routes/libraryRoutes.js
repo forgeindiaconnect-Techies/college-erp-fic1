@@ -3497,21 +3497,48 @@ router.post(
       const { studentId, admissionNumber, studentName, department, academicYear, remarks } = req.body;
       const tenantFilter = getTenantFilter(req);
 
-      let clearance = await LibraryClearance.findOne({
-        $or: [
-          ...(admissionNumber ? [{ admissionNumber }] : []),
-          ...(studentId ? [{ studentId }] : []),
-          ...(studentName ? [{ studentName }] : [])
-        ]
-      });
+      const targetIdStr = String(admissionNumber || studentId || '').trim();
+      let validStudentObjectId = null;
+      let foundStudent = null;
+
+      if (studentId && mongoose.Types.ObjectId.isValid(studentId)) {
+        validStudentObjectId = studentId;
+      }
+
+      if (targetIdStr) {
+        foundStudent = await Student.findOne({
+          $or: [
+            ...(mongoose.Types.ObjectId.isValid(targetIdStr) ? [{ _id: targetIdStr }] : []),
+            { registerNo: targetIdStr },
+            { admissionNo: targetIdStr },
+            { rollNo: targetIdStr },
+            { id: targetIdStr }
+          ]
+        }).lean();
+
+        if (foundStudent) {
+          validStudentObjectId = foundStudent._id;
+        }
+      }
+
+      const orConditions = [];
+      if (admissionNumber) orConditions.push({ admissionNumber });
+      if (targetIdStr) orConditions.push({ admissionNumber: targetIdStr });
+      if (validStudentObjectId) orConditions.push({ studentId: validStudentObjectId });
+      if (studentName) orConditions.push({ studentName });
+
+      let clearance = null;
+      if (orConditions.length > 0) {
+        clearance = await LibraryClearance.findOne({ $or: orConditions });
+      }
 
       if (!clearance) {
         clearance = new LibraryClearance({
-          studentId: studentId || undefined,
-          admissionNumber: admissionNumber || 'N/A',
-          studentName: studentName || 'Student',
-          department: department || '',
-          academicYear: academicYear || '2026-2027',
+          studentId: validStudentObjectId || undefined,
+          admissionNumber: admissionNumber || foundStudent?.registerNo || foundStudent?.admissionNo || targetIdStr || 'N/A',
+          studentName: studentName || foundStudent?.name || foundStudent?.fullName || 'Student',
+          department: department || foundStudent?.department || foundStudent?.dept || '',
+          academicYear: academicYear || foundStudent?.academicYear || '2026-2027',
           collegeId: tenantFilter.collegeId || req.user?.collegeId || 'DEFAULT_COLLEGE'
         });
       }

@@ -20,7 +20,7 @@ import {
   Bus,
   Building,
   Briefcase,
-  Bot, ChevronRight, ChevronDown, BookOpenCheck
+  Bot, ChevronRight, ChevronDown, BookOpenCheck, X
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -43,9 +43,16 @@ const SubAdminSidebar = ({ isOpen, onClose }) => {
     }
   }, []);
 
+  const handleNavClick = () => {
+    if (window.innerWidth <= 768 && onClose) {
+      onClose();
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem('subadmin_session');
     sessionStorage.removeItem('subadmin_token');
+    if (onClose) onClose();
     navigate('/login');
   };
 
@@ -129,6 +136,9 @@ const SubAdminSidebar = ({ isOpen, onClose }) => {
             {displayCollegeName}
           </div>
         )}
+        <button className="sidebar-close-btn" onClick={onClose} aria-label="Close sidebar">
+          <X size={20} />
+        </button>
       </div>
       
       <nav className="sidebar-nav">
@@ -138,6 +148,7 @@ const SubAdminSidebar = ({ isOpen, onClose }) => {
               to="/subadmin/dashboard" 
               end={true}
               className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
+              onClick={handleNavClick}
             >
               <LayoutDashboard size={20} />
               <span>Dashboard</span>
@@ -164,6 +175,7 @@ const SubAdminSidebar = ({ isOpen, onClose }) => {
                       to={item.path} 
                       className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
                       style={{ paddingLeft: '2.8rem' }}
+                      onClick={handleNavClick}
                     >
                       {item.icon}
                       <span>{item.name}</span>

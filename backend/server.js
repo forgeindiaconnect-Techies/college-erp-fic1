@@ -58,6 +58,7 @@ import libraryRoutes from './routes/libraryRoutes.js';
 import transportRoutes from './routes/transportRoutes.js';
 import hostelRoutes from './routes/hostelRoutes.js';
 import placementRoutes from './routes/placementRoutes.js';
+import documentsRoutes from './routes/documentsRoutes.js';
 
 import settingsRoutes from './routes/settingsRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
@@ -1002,6 +1003,7 @@ app.use('/api/period-master', periodMasterRoutes);
 app.use('/api/class-monitoring', classMonitoringRoutes);
 app.use('/api/substitutions', substitutionRoutes);
 app.use('/api/class-sessions', classSessionRoutes);
+app.use('/api/documents', documentsRoutes);
 
 app.get('/', (req, res) => {
   res.send('College ERP API is running...');

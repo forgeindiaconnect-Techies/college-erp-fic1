@@ -61,14 +61,16 @@ const StudentTransport = () => {
         const transportRecord = transportRes?.data || null;
         
         const activeRouteId = transportRecord?.routeId || dbRecord?.busRoute;
-        let actualDriverName = 'Pending Allocation';
-        let actualVehicle = 'Pending';
-        if (activeRouteId) {
+        let actualDriverName = transportRecord?.driverName || dbRecord?.driverName || 'Pending Allocation';
+        let actualVehicle = transportRecord?.vehicleNumber || dbRecord?.vehicleNumber || dbRecord?.busNumber || 'Pending';
+        let actualContact = transportRecord?.driverContact || dbRecord?.driverContact || dbRecord?.driverPhone || 'Contact Transport Desk';
+
+        if (activeRouteId && (actualDriverName === 'Pending Allocation' || actualVehicle === 'Pending')) {
           const routesRes = await getTransportRoutes().catch(() => ({ data: [] }));
-          const activeRoute = routesRes.data.find(r => r.routeId === activeRouteId);
+          const activeRoute = (routesRes.data || []).find(r => r.routeId === activeRouteId || r.name === activeRouteId);
           if (activeRoute) {
-            actualDriverName = activeRoute.driver;
-            actualVehicle = activeRoute.vehicle;
+            if (actualDriverName === 'Pending Allocation') actualDriverName = activeRoute.driver || 'Pending Allocation';
+            if (actualVehicle === 'Pending') actualVehicle = activeRoute.vehicle || 'Pending';
           }
         }
 
@@ -76,12 +78,12 @@ const StudentTransport = () => {
         setStudentDetails({
           ...dbRecord,
           busRoute: activeRouteId,
-          pickupPoint: transportRecord?.pickupPoint || dbRecord?.pickupPoint,
-          transportFeeAmount: transportRecord?.amount || dbRecord?.transportFeeAmount || 15000,
+          pickupPoint: transportRecord?.pickupPoint || dbRecord?.pickupPoint || 'Campus Gate',
+          transportFeeAmount: transportRecord?.amount !== undefined ? transportRecord.amount : (dbRecord?.transportFeeAmount || 15000),
           transportFeeStatus: transportRecord?.feeStatus || dbRecord?.transportFeeStatus || 'Pending',
           driverName: actualDriverName,
           busNumber: actualVehicle,
-          driverContact: 'Contact Admin for Details'
+          driverContact: actualContact
         });
         // Fetch complaints and notifications
         const [compsRes, notifsRes] = await Promise.all([

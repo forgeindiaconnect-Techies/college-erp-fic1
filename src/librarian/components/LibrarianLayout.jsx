@@ -16,6 +16,9 @@ const LibrarianLayout = () => {
   return (
     <div className="layout-container">
       <LibrarianSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>
+      )}
       <div className={`main-wrapper ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <Navbar role="Librarian" onMenuToggle={() => setSidebarOpen(o => !o)} />
         <main className="main-content">

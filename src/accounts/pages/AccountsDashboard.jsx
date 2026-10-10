@@ -78,7 +78,7 @@ const AccountsDashboard = () => {
   useRealtimeSync(fetchAll, ['fees', 'students', 'salaries', 'expenses', 'feePlans', 'feeStructure', 'departments']);
 
   useEffect(() => {
-    const session = sessionStorage.getItem('accounts_session');
+    const session = sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || sessionStorage.getItem('superadmin_session');
     if (!session) { navigate('/accounts/login'); return; }
     try {
       const parsed = JSON.parse(session);
@@ -291,6 +291,11 @@ const AccountsDashboard = () => {
         </div>
       </div>
 
+      {/* Duty Attendance Strip (Top Bar - Uniform across Library, Admin, and Accounts portals) */}
+      <div style={{ marginTop: '1rem', marginBottom: '0.25rem' }}>
+        <EmployeeAttendanceCard />
+      </div>
+
       {/* Tab Navigation Bar */}
       <div style={{
         display: 'flex',
@@ -373,56 +378,55 @@ const AccountsDashboard = () => {
       {/* TAB CONTENT: Financial Overview */}
       {activeTab === 'finance' && (
         <>
-          {/* Employee Attendance & Centralized Daily Attendance Hub */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px', marginBottom: '1.5rem' }}>
-            <EmployeeAttendanceCard layout="card" />
-            <div className="glass-card" style={{
-              background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.04) 0%, rgba(99, 102, 241, 0.08) 100%)',
-              border: '1px solid rgba(99, 102, 241, 0.2)',
-              borderRadius: '16px',
-              padding: '1.25rem 1.5rem',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between'
-            }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4f46e5', fontWeight: '700', fontSize: '15px' }}>
-                    <CalendarCheck size={20} />
-                    <span>Centralized Daily Attendance</span>
-                  </div>
-                  <span style={{ fontSize: '11px', background: '#e0e7ff', color: '#4338ca', padding: '3px 8px', borderRadius: '12px', fontWeight: '600' }}>Live Sync</span>
-                </div>
-                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'var(--text-muted, #64748b)', lineHeight: '1.4' }}>
-                  Monitor and record daily Present / Absent / Leave status for <strong>Teaching Staff</strong>, <strong>Non-Teaching Staff</strong>, and <strong>Drivers</strong>.
-                </p>
+          {/* Centralized Daily Attendance Duty Roster Hub Callout */}
+          <div className="glass-card" style={{
+            background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.04) 0%, rgba(99, 102, 241, 0.08) 100%)',
+            border: '1px solid rgba(99, 102, 241, 0.2)',
+            borderRadius: '16px',
+            padding: '1.25rem 1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px',
+            marginBottom: '1.5rem'
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4f46e5', fontWeight: '700', fontSize: '15px', marginBottom: '6px' }}>
+                <CalendarCheck size={20} />
+                <span>Centralized Campus Attendance Duty Roster</span>
+                <span style={{ fontSize: '11px', background: '#e0e7ff', color: '#4338ca', padding: '3px 8px', borderRadius: '12px', fontWeight: '600' }}>Live Sync</span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('attendance');
-                  setSearchParams({ tab: 'attendance' });
-                }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  padding: '10px 16px',
-                  background: '#4f46e5',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '10px',
-                  fontWeight: '600',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(79, 70, 229, 0.25)',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <CalendarCheck size={16} /> Open Attendance Tab &rarr;
-              </button>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted, #64748b)', lineHeight: '1.4' }}>
+                Monitor and record daily Present / Absent / Leave status for <strong>Teaching Staff</strong>, <strong>Non-Teaching Staff</strong>, and <strong>Drivers</strong> across campus.
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('attendance');
+                setSearchParams({ tab: 'attendance' });
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                background: '#4f46e5',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '10px',
+                fontWeight: '600',
+                fontSize: '13px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(79, 70, 229, 0.25)',
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <CalendarCheck size={16} /> Open Attendance Tab &rarr;
+            </button>
           </div>
 
       {/* Metrics Row (6 Live Cards) */}

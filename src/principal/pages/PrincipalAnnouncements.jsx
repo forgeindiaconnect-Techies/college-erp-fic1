@@ -40,6 +40,12 @@ export default function PrincipalAnnouncements() {
       }
     }
     fetchAnnouncements();
+    window.addEventListener('storage', fetchAnnouncements);
+    window.addEventListener('erp_announcement_updated', fetchAnnouncements);
+    return () => {
+      window.removeEventListener('storage', fetchAnnouncements);
+      window.removeEventListener('erp_announcement_updated', fetchAnnouncements);
+    };
   }, []);
 
   const showToast = (msg, type = 'success') => {
@@ -51,7 +57,12 @@ export default function PrincipalAnnouncements() {
     setLoading(true);
     const saved = localStorage.getItem(`erp_announcements_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
     if (saved) {
-      setAnnouncements(JSON.parse(saved));
+      try {
+        const parsed = JSON.parse(saved);
+        setAnnouncements(parsed.length > 0 ? parsed : DEFAULT_ANNOUNCEMENTS);
+      } catch (e) {
+        setAnnouncements(DEFAULT_ANNOUNCEMENTS);
+      }
     } else {
       localStorage.setItem(`erp_announcements_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(DEFAULT_ANNOUNCEMENTS));
       setAnnouncements(DEFAULT_ANNOUNCEMENTS);
@@ -62,6 +73,8 @@ export default function PrincipalAnnouncements() {
   const saveAnnouncements = (newList) => {
     setAnnouncements(newList);
     localStorage.setItem(`erp_announcements_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(newList));
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new CustomEvent('erp_announcement_updated'));
   };
 
   const openAdd = () => {

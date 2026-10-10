@@ -14,7 +14,7 @@ const AccountsLayout = () => {
   return (
     <div className="layout-container">
       <AccountsSidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
-      {isSidebarOpen && window.innerWidth <= 768 && (
+      {isSidebarOpen && (
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>
       )}
       <div className={`main-wrapper ${isSidebarOpen ? 'sidebar-open' : ''}`}>

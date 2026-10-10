@@ -232,21 +232,36 @@
 }
 
 /* Mobile */
+/* Mobile Responsive Media Queries */
+.welcome-prefix {
+  display: inline;
+}
+
 @media (max-width: 768px) {
   .navbar {
-    min-height: 62px;
+    min-height: 60px;
     padding: 0 10px;
+    gap: 8px;
   }
 
   .navbar-logo {
     display: none;
   }
 
-  .navbar-greeting h3 {
-    max-width: 170px;
-    font-size: 14px !important;
+  .welcome-prefix {
+    display: none;
   }
 
+  .navbar-greeting h3,
+  .navbar-greeting-title {
+    max-width: 160px;
+    font-size: 13.5px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .navbar-date-subtitle,
   .navbar-greeting span {
     display: none;
   }
@@ -257,14 +272,33 @@
   }
 
   .navbar-actions {
-    gap: 3px;
+    gap: 4px;
   }
 
   .notification-dropdown {
     position: fixed;
-    top: 68px;
+    top: 64px;
     right: 10px;
     left: 10px;
     width: auto;
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-greeting h3,
+  .navbar-greeting-title {
+    max-width: 125px;
+    font-size: 12.5px !important;
+  }
+
+  .navbar .icon-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .profile-img {
+    width: 32px;
+    height: 32px;
   }
 }

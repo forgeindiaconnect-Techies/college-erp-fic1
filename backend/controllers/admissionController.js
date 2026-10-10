@@ -576,18 +576,18 @@ export const getFeeCollectionRecords = async (req, res) => {
       });
     });
 
-    const feeRecords = await Fee.find({ studentId: { $in: studentIds } }).sort({ createdAt: -1 }).lean();
-    const feeByStudent = new Map();
+    const feeRecords = await Fee.find({ studentId: { $in: studentIds } }).lean();
+    const feePaidByStudent = new Map();
     feeRecords.forEach(fee => {
       const key = String(fee.studentId);
-      if (!feeByStudent.has(key)) feeByStudent.set(key, fee);
+      const amt = Number(fee.paidAmount !== undefined ? fee.paidAmount : (fee.amount || 0)) || 0;
+      feePaidByStudent.set(key, (feePaidByStudent.get(key) || 0) + amt);
     });
 
     const records = rawRecords.map((doc) => {
       const item = doc.toObject();
       const normalFee = Number(item.normalFee !== undefined && item.normalFee !== null && item.normalFee !== "" ? item.normalFee : (item.totalFee || 0));
       const discountAmount = Number(item.discountAmount || item.quotaConcession || 0);
-      const feeRecord = feeByStudent.get(String(item._id)) || feeByStudent.get(String(item.id)) || feeByStudent.get(String(item.admissionNumber)) || feeByStudent.get(String(item.admissionNo));
       const schRecord = schByStudent.get(String(item._id)) || schByStudent.get(String(item.id)) || schByStudent.get(String(item.admissionNumber)) || schByStudent.get(String(item.admissionNo));
       
       const scholarshipAmount = Number(
@@ -595,11 +595,9 @@ export const getFeeCollectionRecords = async (req, res) => {
         item.scholarshipDiscount ||
         (item.scholarshipDetails?.discountAmount || 0) ||
         schRecord?.discountAmount ||
-        feeRecord?.scholarshipAmount ||
-        feeRecord?.scholarshipDiscount ||
         0
       );
-      const scholarshipName = item.scholarship || item.scholarshipName || schRecord?.scholarshipName || feeRecord?.scholarshipName || item.scholarshipDetails?.scholarshipName || (scholarshipAmount > 0 ? "Scholarship Concession" : "");
+      const scholarshipName = item.scholarship || item.scholarshipName || schRecord?.scholarshipName || item.scholarshipDetails?.scholarshipName || (scholarshipAmount > 0 ? "Scholarship Concession" : "");
       const totalDiscount = discountAmount + scholarshipAmount;
       
       const finalFee = (normalFee > 0 && totalDiscount > 0)
@@ -609,7 +607,18 @@ export const getFeeCollectionRecords = async (req, res) => {
             : Math.max(0, normalFee - totalDiscount));
             
       const totalFee = finalFee;
-      const paidAmount = Number(item.paidAmount !== undefined ? item.paidAmount : (item.amountPaid !== undefined ? item.amountPaid : (feeRecord?.paidAmount || 0)));
+
+      const feeSum = Math.max(
+        feePaidByStudent.get(String(item._id)) || 0,
+        feePaidByStudent.get(String(item.id)) || 0,
+        feePaidByStudent.get(String(item.admissionNumber)) || 0
+      );
+      const historySum = Array.isArray(item.paymentHistory) 
+        ? item.paymentHistory.reduce((acc, curr) => acc + (Number(curr.amount || curr.paidAmount) || 0), 0)
+        : 0;
+      const storedPaid = Number(item.paidAmount !== undefined ? item.paidAmount : (item.amountPaid !== undefined ? item.amountPaid : 0));
+
+      const paidAmount = Math.max(feeSum, historySum, storedPaid);
       const remainingFee = Math.max(0, finalFee - paidAmount);
       const paymentStatusCalculated =
         (remainingFee === 0 && finalFee > 0) ? "Paid" : (paidAmount > 0 ? "Partial" : "Pending");

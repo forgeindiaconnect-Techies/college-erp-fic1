@@ -1,0 +1,505 @@
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import api from '../../api';
+
+const DocumentTracker = () => {
+  const [documents, setDocuments] = useState([]);
+  const [category, setCategory] = useState('All');
+  const [status, setStatus] = useState('All');
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busyId, setBusyId] = useState('');
+  const [showRequirementForm, setShowRequirementForm] = useState(false);
+  const [newCategory, setNewCategory] = useState('Student');
+  const [people, setPeople] = useState([]);
+  const [selectedPersonId, setSelectedPersonId] = useState('');
+  const [documentType, setDocumentType] = useState('');
+  const [peopleLoading, setPeopleLoading] = useState(false);
+  const [peopleError, setPeopleError] = useState('');
+  const [savingRequirement, setSavingRequirement] = useState(false);
+  const [formMessage, setFormMessage] = useState('');
+
+  const styles = {
+    page: { padding: '24px', color: 'var(--text-primary, #1f2937)' },
+    cards: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+      gap: '16px', margin: '24px 0'
+    },
+    card: {
+      padding: '20px', border: '1px solid var(--border-color, #e5e7eb)',
+      borderRadius: '12px', background: 'var(--card-bg, #fff)'
+    },
+    control: {
+      padding: '10px', border: '1px solid #d1d5db',
+      borderRadius: '8px', minWidth: '170px', maxWidth: '100%'
+    },
+    button: {
+      padding: '8px 12px', border: '1px solid #d1d5db',
+      borderRadius: '7px', background: '#fff', cursor: 'pointer',
+      marginRight: '6px', marginBottom: '4px'
+    },
+    cell: { padding: '13px', borderTop: '1px solid #e5e7eb' }
+  };
+
+  const loadDocuments = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.get('/documents');
+      const data = response.data;
+      setDocuments(Array.isArray(data) ? data : data.documents || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to load documents. Check your login and API server.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
+
+  useEffect(() => {
+    if (!showRequirementForm) return;
+
+    let active = true;
+    const loadPeople = async () => {
+      setPeopleLoading(true);
+      setPeopleError('');
+      setSelectedPersonId('');
+      try {
+        const endpoint = newCategory === 'Student' ? '/students' : '/staff';
+        const response = await api.get(endpoint);
+        const payload = response.data;
+        const records = Array.isArray(payload)
+          ? payload
+          : payload.students || payload.staff || payload.data || [];
+
+        const mapped = records.map(person => {
+          const id = String(person.id || person.staffId || person._id || '');
+          const role = String(person.role || person.designation || '').toLowerCase();
+          return {
+            id,
+            name: person.name || person.fullName || person.staffName || 'Unnamed',
+            department: person.department || person.dept || '',
+            isHod: role.includes('hod') || role.includes('head of department')
+          };
+        }).filter(person => person.id && (
+          newCategory !== 'HOD' || person.isHod
+        ));
+
+        if (active) {
+          setPeople(mapped);
+          if (mapped.length === 0) {
+            setPeopleError(
+              newCategory === 'HOD'
+                ? 'No HOD records were found in the staff list.'
+                : 'No people were returned by the API.'
+            );
+          }
+        }
+      } catch (err) {
+        if (active) {
+          setPeople([]);
+          setPeopleError(
+            err.response?.data?.message ||
+            'Could not load people. Check the existing API and login permissions.'
+          );
+        }
+      } finally {
+        if (active) setPeopleLoading(false);
+      }
+    };
+
+    loadPeople();
+    return () => { active = false; };
+  }, [showRequirementForm, newCategory]);
+
+  const createRequirement = async (event) => {
+    event.preventDefault();
+    setFormMessage('');
+
+    const person = people.find(item => item.id === selectedPersonId);
+    if (!person || !documentType.trim()) {
+      setFormMessage('Select a person and enter a document requirement.');
+      return;
+    }
+
+    try {
+      setSavingRequirement(true);
+      await api.post('/documents/requirements', {
+        personId: person.id,
+        personName: person.name,
+        category: newCategory,
+        department: person.department,
+        documentType: documentType.trim()
+      });
+
+      setDocumentType('');
+      setSelectedPersonId('');
+      setFormMessage('Requirement created successfully.');
+      await loadDocuments();
+    } catch (err) {
+      setFormMessage(
+        err.response?.data?.message || 'Could not create the requirement.'
+      );
+    } finally {
+      setSavingRequirement(false);
+    }
+  };
+  const visibleDocuments = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return documents.filter(doc => {
+      const matchesCategory = category === 'All' || doc.category === category;
+      const matchesStatus = status === 'All' || doc.status === status;
+      const matchesSearch = !term || [
+        doc.personName, doc.personId, doc.documentType, doc.department
+      ].some(value => String(value || '').toLowerCase().includes(term));
+      return matchesCategory && matchesStatus && matchesSearch;
+    });
+  }, [documents, category, status, search]);
+
+  const counts = useMemo(() => ({
+    total: documents.length,
+    submitted: documents.filter(doc => ['Submitted', 'Verified'].includes(doc.status)).length,
+    pending: documents.filter(doc => doc.status === 'Pending Submission').length,
+    verified: documents.filter(doc => doc.status === 'Verified').length
+  }), [documents]);
+
+  const openFile = async (doc) => {
+    if (!doc.storedFileName) {
+      window.alert('No file has been uploaded for this document yet.');
+      return;
+    }
+    try {
+      setBusyId(doc._id);
+      const response = await api.get(`/documents/${doc._id}/file`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], {
+        type: doc.mimeType || response.data.type || 'application/octet-stream'
+      });
+      const url = URL.createObjectURL(blob);
+      const tab = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!tab) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = doc.originalFileName || 'document';
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      window.alert(err.response?.data?.message || 'Could not open the uploaded file.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const updateStatus = async (doc, nextStatus) => {
+    const remarks = nextStatus === 'Rejected'
+      ? window.prompt('Enter the reason for rejection:') : (doc.remarks || '');
+    if (nextStatus === 'Rejected' && remarks === null) return;
+
+    try {
+      setBusyId(doc._id);
+      await api.patch(`/documents/${doc._id}/status`, {
+        status: nextStatus,
+        remarks: remarks || ''
+      });
+      await loadDocuments();
+    } catch (err) {
+      window.alert(err.response?.data?.message || 'Could not update document status.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const uploadFile = async (doc, file) => {
+    if (!file) return;
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!allowed.includes(file.type)) {
+      window.alert('Only PDF, JPG and PNG files are allowed.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      window.alert('The file must be 10 MB or smaller.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      setBusyId(doc._id);
+      await api.post(`/documents/${doc._id}/upload`, formData);
+      await loadDocuments();
+    } catch (err) {
+      window.alert(err.response?.data?.message || 'File upload failed.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  return (
+    <div style={styles.page}>
+      <h1>Document Tracker</h1>
+      <p>Track certificate submissions for Students, Staff and HODs.</p>
+
+      <div style={{ margin: '20px 0' }}>
+        <button
+          type="button"
+          style={styles.button}
+          onClick={() => {
+            setShowRequirementForm(value => !value);
+            setFormMessage('');
+          }}
+        >
+          {showRequirementForm ? 'Cancel' : '+ Create Document Requirement'}
+        </button>
+
+        {showRequirementForm && (
+          <form
+            onSubmit={createRequirement}
+            style={{
+              marginTop: '14px',
+              padding: '18px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '12px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '12px',
+              alignItems: 'center'
+            }}
+          >
+            <select
+              aria-label="Requirement category"
+              style={styles.control}
+              value={newCategory}
+              onChange={event => {
+                setNewCategory(event.target.value);
+                setFormMessage('');
+              }}
+            >
+              <option value="Student">Student</option>
+              <option value="Staff">Staff</option>
+              <option value="HOD">HOD</option>
+            </select>
+
+            <select
+              aria-label="Select person"
+              style={styles.control}
+              value={selectedPersonId}
+              onChange={event => setSelectedPersonId(event.target.value)}
+              required
+              disabled={peopleLoading || people.length === 0}
+            >
+              <option value="">
+                {peopleLoading ? 'Loading people…' : 'Select person'}
+              </option>
+              {people.map(person => (
+                <option key={person.id} value={person.id}>
+                  {person.name} — {person.id}
+                </option>
+              ))}
+            </select>
+
+            <input
+              aria-label="Document requirement"
+              style={styles.control}
+              placeholder="Document name (e.g. ID Proof)"
+              value={documentType}
+              onChange={event => setDocumentType(event.target.value)}
+              required
+              maxLength={120}
+            />
+
+            <button
+              type="submit"
+              style={styles.button}
+              disabled={savingRequirement || peopleLoading}
+            >
+              {savingRequirement ? 'Creating…' : 'Create Requirement'}
+            </button>
+
+            {peopleError && (
+              <p role="alert" style={{ width: '100%', color: '#b45309' }}>
+                {peopleError}
+              </p>
+            )}
+            {formMessage && (
+              <p role="status" style={{ width: '100%' }}>
+                {formMessage}
+              </p>
+            )}
+          </form>
+        )}
+      </div>
+
+      <div style={styles.cards}>
+        {[
+          ['Total Required', counts.total],
+          ['Submitted', counts.submitted],
+          ['Pending Submission', counts.pending],
+          ['Verified', counts.verified]
+        ].map(([label, value]) => (
+          <div key={label} style={styles.card}>
+            <p style={{ color: '#6b7280', margin: 0 }}>{label}</p>
+            <h2>{loading ? '…' : value}</h2>
+          </div>
+        ))}
+      </div>
+
+      {error && (
+        <div role="alert" style={{
+          padding: '12px', marginBottom: '16px',
+          border: '1px solid #fca5a5', borderRadius: '8px', color: '#b91c1c'
+        }}>
+          {error}
+          <button style={styles.button} onClick={loadDocuments}>Retry</button>
+        </div>
+      )}
+
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '12px',
+        marginBottom: '20px'
+      }}>
+        <input
+          style={styles.control}
+          placeholder="Search name, ID or document"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+
+        <select aria-label="Filter by category" style={styles.control}
+          value={category} onChange={e => setCategory(e.target.value)}>
+          <option>All</option>
+          <option>Student</option>
+          <option>Staff</option>
+          <option>HOD</option>
+        </select>
+
+        <select aria-label="Filter by status" style={styles.control}
+          value={status} onChange={e => setStatus(e.target.value)}>
+          <option>All</option>
+          <option>Pending Submission</option>
+          <option>Submitted</option>
+          <option>Verified</option>
+          <option>Rejected</option>
+        </select>
+
+        <button style={styles.button} onClick={loadDocuments}>Refresh</button>
+      </div>
+
+      <div style={{
+        overflowX: 'auto', border: '1px solid #e5e7eb',
+        borderRadius: '12px'
+      }}>
+        <table style={{
+          width: '100%', borderCollapse: 'collapse', minWidth: '850px'
+        }}>
+          <thead>
+            <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
+              {['Name / ID', 'Category', 'Department', 'Document',
+                'Status', 'Action'].map(item => (
+                <th key={item} style={{ padding: '14px' }}>{item}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {!loading && visibleDocuments.map(doc => (
+              <tr key={doc._id}>
+                <td style={styles.cell}>
+                  <strong>{doc.personName}</strong>
+                  <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                    {doc.personId}
+                  </div>
+                </td>
+                <td style={styles.cell}>{doc.category}</td>
+                <td style={styles.cell}>{doc.department || '—'}</td>
+                <td style={styles.cell}>
+                  <div>{doc.documentType}</div>
+                  {doc.originalFileName && (
+                    <small>{doc.originalFileName}</small>
+                  )}
+                </td>
+                <td style={styles.cell}>
+                  <span>{doc.status}</span>
+                  {doc.remarks && (
+                    <div style={{ color: '#b91c1c', fontSize: '12px' }}>
+                      {doc.remarks}
+                    </div>
+                  )}
+                </td>
+                <td style={styles.cell}>
+                  {doc.storedFileName && (
+                    <button style={styles.button}
+                      disabled={busyId === doc._id}
+                      onClick={() => openFile(doc)}>
+                      View
+                    </button>
+                  )}
+
+                  <label style={{ ...styles.button, display: 'inline-block' }}>
+                    Upload
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                      disabled={busyId === doc._id}
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        uploadFile(doc, e.target.files?.[0]);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+
+                  {['Submitted', 'Rejected'].includes(doc.status) && (
+                    <button style={styles.button}
+                      disabled={busyId === doc._id}
+                      onClick={() => updateStatus(doc, 'Verified')}>
+                      Verify
+                    </button>
+                  )}
+
+                  {doc.status !== 'Rejected' && doc.status !== 'Verified' && (
+                    <button style={styles.button}
+                      disabled={busyId === doc._id}
+                      onClick={() => updateStatus(doc, 'Rejected')}>
+                      Reject
+                    </button>
+                  )}
+                  {busyId === doc._id && <small> Working…</small>}
+                </td>
+              </tr>
+            ))}
+
+            {!loading && visibleDocuments.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{
+                  padding: '32px', textAlign: 'center', color: '#6b7280'
+                }}>
+                  {error ? 'Documents could not be loaded.' :
+                    'No matching document requirements or submissions found.'}
+                  <div style={{ marginTop: '8px' }}>
+                    Create document requirements before expecting pending records to appear.
+                  </div>
+                </td>
+              </tr>
+            )}
+
+            {loading && (
+              <tr>
+                <td colSpan={6} style={{ padding: '32px', textAlign: 'center' }}>
+                  Loading documents…
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+export default DocumentTracker;
+

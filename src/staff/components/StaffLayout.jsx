@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import StaffSidebar from './StaffSidebar';
 import Navbar from '../../components/layout/Navbar';
@@ -10,6 +10,9 @@ const StaffLayout = () => {
   return (
     <div className="layout-container">
       <StaffSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>
+      )}
       <div className={`main-wrapper ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <Navbar role="Staff" onMenuToggle={() => setSidebarOpen(o => !o)} />
         <main className="main-content">

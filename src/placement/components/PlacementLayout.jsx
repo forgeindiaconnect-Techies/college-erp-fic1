@@ -16,6 +16,9 @@ const PlacementLayout = () => {
   return (
     <div className="layout-container">
       <PlacementSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>
+      )}
       <div className={`main-wrapper ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <Navbar role="Placement Officer" onMenuToggle={() => setSidebarOpen(o => !o)} />
         <main className="main-content">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, LogIn, LogOut, CheckCircle, AlertCircle, RefreshCw, UserCheck } from 'lucide-react';
 import { getTodayEmployeeAttendance, employeeCheckIn, employeeCheckOut } from '../../api';
-import { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
+import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
 
 const EmployeeAttendanceCard = ({ layout = 'bar' }) => {
   const [attendance, setAttendance] = useState(null);
@@ -10,7 +10,30 @@ const EmployeeAttendanceCard = ({ layout = 'bar' }) => {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const getTodayKey = () => `erp_duty_att_${new Date().toISOString().split('T')[0]}`;
+  const getCurrentUser = () => {
+    const keys = [
+      'accounts_session', 'librarian_session', 'admin_session', 'superadmin_session',
+      'subadmin_session', 'principal_session', 'hod_session', 'staff_session',
+      'student_session', 'parent_session', 'driver_session', 'hostel_session',
+      'watchman_session', 'placement_session', 'user_session'
+    ];
+    for (const k of keys) {
+      const val = sessionStorage.getItem(k);
+      if (val) {
+        try {
+          const parsed = JSON.parse(val);
+          if (parsed && (parsed._id || parsed.id || parsed.email)) return parsed;
+        } catch (e) {}
+      }
+    }
+    return null;
+  };
+
+  const getTodayKey = () => {
+    const user = getCurrentUser();
+    const userIdent = user?._id || user?.id || user?.email || 'emp';
+    return `erp_duty_att_${userIdent}_${new Date().toISOString().split('T')[0]}`;
+  };
 
   const fetchTodayAttendance = async () => {
     try {
@@ -49,6 +72,8 @@ const EmployeeAttendanceCard = ({ layout = 'bar' }) => {
   useEffect(() => {
     fetchTodayAttendance();
   }, []);
+
+  useRealtimeSync(fetchTodayAttendance, ['employee-attendance']);
 
   const handleCheckIn = async (customStatus = null) => {
     setActionLoading(true);

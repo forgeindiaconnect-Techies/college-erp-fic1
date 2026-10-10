@@ -103,6 +103,12 @@ const StaffAnnouncements = () => {
 
   useEffect(() => {
     fetchAnnouncements();
+    window.addEventListener('storage', fetchAnnouncements);
+    window.addEventListener('erp_announcement_updated', fetchAnnouncements);
+    return () => {
+      window.removeEventListener('storage', fetchAnnouncements);
+      window.removeEventListener('erp_announcement_updated', fetchAnnouncements);
+    };
   }, []);
 
   const categories = useMemo(() => {
@@ -141,11 +147,15 @@ const StaffAnnouncements = () => {
       author: 'Faculty Member'
     };
 
-    const updated = [newNotice, ...announcements];
-    setAnnouncements(updated);
-
     const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+    const saved = localStorage.getItem(`erp_announcements_${tenantId}`);
+    const existing = saved ? JSON.parse(saved) : announcements;
+    const updated = [newNotice, ...existing];
+
+    setAnnouncements(updated);
     localStorage.setItem(`erp_announcements_${tenantId}`, JSON.stringify(updated));
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new CustomEvent('erp_announcement_updated'));
 
     setCreateSuccess(true);
     setTimeout(() => {

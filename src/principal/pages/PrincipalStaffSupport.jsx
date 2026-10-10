@@ -3,7 +3,7 @@ import {
   Calendar, Monitor, UserCheck, CreditCard, 
   AlertOctagon, BrainCircuit, CheckCircle, 
   XCircle, Clock, ShieldAlert, MessageSquare, X,
-  Briefcase, Users, FileText
+  Briefcase, Users, FileText, Search, Filter, RefreshCw
 } from 'lucide-react';
 import { 
   getStaffSupportRequests, updateStaffSupportRequest,
@@ -24,6 +24,8 @@ const PrincipalStaffSupport = () => {
   const [hodRequests, setHodRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
   
   // Modal State
   const [showReplyModal, setShowReplyModal] = useState(false);
@@ -53,7 +55,23 @@ const PrincipalStaffSupport = () => {
 
   // Depending on viewMode, determine which requests to filter
   const currentRequests = viewMode === 'Staff' ? staffRequests : hodRequests;
-  const filteredRequests = activeTab === 'All' ? currentRequests : currentRequests.filter(r => r.requestType === activeTab);
+  
+  const filteredRequests = currentRequests.filter(r => {
+    const matchesTab = activeTab === 'All' ? true : (r.requestType === activeTab || (activeTab === 'Other' && !['Faculty Support', 'Student Escalations', 'Resource Requests'].includes(r.requestType)));
+    const matchesStatus = statusFilter === 'All' ? true : (r.status === statusFilter);
+    const searchLower = searchQuery.toLowerCase();
+    const nameStr = (viewMode === 'Staff' ? r.staffName : r.hodName) || '';
+    const descStr = r.description || '';
+    const reqTypeStr = r.requestType || '';
+    const deptStr = r.department || '';
+    const matchesSearch = !searchQuery || 
+      nameStr.toLowerCase().includes(searchLower) ||
+      descStr.toLowerCase().includes(searchLower) ||
+      reqTypeStr.toLowerCase().includes(searchLower) ||
+      deptStr.toLowerCase().includes(searchLower);
+      
+    return matchesTab && matchesStatus && matchesSearch;
+  });
 
   const handleUpdateStatus = async (id, newStatus) => {
     try {
@@ -97,187 +115,318 @@ const PrincipalStaffSupport = () => {
     }
   };
 
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}><span style={{ color: 'var(--text-muted)' }}>Loading Staff Requests...</span></div>;
+  if (loading) return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh', gap: '0.75rem' }}>
+      <RefreshCw className="animate-spin text-indigo-500" size={24} />
+      <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Loading Real-time Support Portal...</span>
+    </div>
+  );
 
   return (
     <div className="dashboard-container animate-fade-in" style={{ padding: '2rem', minHeight: '100vh', background: 'var(--bg-primary)' }}>
-      {/* Header Banner */}
-      <div style={{
-        background: '#3730A5',
-        borderRadius: '16px',
+      {/* Modern Clean Header (Background Banner Removed & ERP Styled) */}
+      <div className="glass-card shadow-sm mb-6" style={{
         padding: '1.5rem 2rem',
-        marginBottom: '1.5rem',
-        color: '#fff',
-        boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)',
+        borderRadius: '16px',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        position: 'relative',
-        overflow: 'hidden'
+        gap: '1.5rem',
+        flexWrap: 'wrap'
       }}>
-        {/* Decorative blur */}
-        <div style={{ position: 'absolute', top: '-50%', right: '-10%', width: '300px', height: '300px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', filter: 'blur(40px)' }} />
-        
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <UserCheck size={24} /> Support & Escalations Oversight
-          </h1>
-          <p style={{ margin: 0, opacity: 0.9, fontSize: '0.875rem', fontWeight: 500 }}>
-            Review and manage staff requests, leaves, complaints, and HOD escalations.
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div style={{
+            padding: '14px',
+            borderRadius: '14px',
+            background: 'rgba(99, 102, 241, 0.12)',
+            color: 'var(--primary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <UserCheck size={28} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0 0 4px 0', color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+              Support & Escalations Oversight
+            </h1>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: 500 }}>
+              Review and manage staff requests, leave applications, complaints, and HOD escalations in real time.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '20px', fontSize: '0.82rem', fontWeight: 600, background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
+            Real-Time ERP Synced
+          </span>
+          <button onClick={loadRequests} className="btn-secondary" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+            <RefreshCw size={14} /> Refresh
+          </button>
         </div>
       </div>
 
       {/* View Mode Switcher */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.75rem', background: 'var(--bg-secondary)', padding: '5px', borderRadius: '12px', border: '1px solid var(--border-color)', width: 'fit-content' }}>
         <button 
           onClick={() => { setViewMode('Staff'); setActiveTab('All'); }}
-          className={viewMode === 'Staff' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, background: viewMode === 'Staff' ? '#3730A5' : undefined }}
+          style={{
+            padding: '0.65rem 1.4rem',
+            borderRadius: '9px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontWeight: 700,
+            fontSize: '0.88rem',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            background: viewMode === 'Staff' ? 'var(--primary)' : 'transparent',
+            color: viewMode === 'Staff' ? '#ffffff' : 'var(--text-muted)',
+            boxShadow: viewMode === 'Staff' ? '0 4px 12px rgba(79, 70, 229, 0.25)' : 'none'
+          }}
         >
-          <Users size={18} /> Staff Requests
+          <Users size={18} /> Staff Requests ({staffRequests.length})
         </button>
         <button 
           onClick={() => { setViewMode('HOD'); setActiveTab('All'); }}
-          className={viewMode === 'HOD' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, background: viewMode === 'HOD' ? '#3730A5' : undefined }}
+          style={{
+            padding: '0.65rem 1.4rem',
+            borderRadius: '9px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontWeight: 700,
+            fontSize: '0.88rem',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            background: viewMode === 'HOD' ? 'var(--primary)' : 'transparent',
+            color: viewMode === 'HOD' ? '#ffffff' : 'var(--text-muted)',
+            boxShadow: viewMode === 'HOD' ? '0 4px 12px rgba(79, 70, 229, 0.25)' : 'none'
+          }}
         >
-          <Briefcase size={18} /> HOD Escalations
+          <Briefcase size={18} /> HOD Escalations ({hodRequests.length})
         </button>
       </div>
 
       {/* Overview Cards */}
       {viewMode === 'Staff' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2.5rem' }}>
-          <div className="glass-card hover-scale" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', borderColor: activeTab === 'All' ? '#3730A5' : 'var(--border-color)', borderWidth: activeTab === 'All' ? '2px' : '1px' }} onClick={() => setActiveTab('All')}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+          <div className="glass-card hover-scale" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', background: 'var(--bg-secondary)', borderColor: activeTab === 'All' ? 'var(--primary)' : 'var(--border-color)', borderWidth: activeTab === 'All' ? '2px' : '1px' }} onClick={() => setActiveTab('All')}>
             <div className="bg-indigo-500/10 text-indigo-500" style={{ padding: '12px', borderRadius: '12px', display: 'flex' }}>
               <Clock size={24} />
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>All Staff Requests</p>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{staffRequests.length} Total</p>
+              <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>All Staff Requests</p>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>{staffRequests.length} Total</p>
             </div>
           </div>
           {SUPPORT_CATEGORIES.map(cat => {
             const catCount = staffRequests.filter(r => r.requestType === cat.id).length;
             return (
-              <div key={cat.id} className="glass-card hover-scale" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', borderColor: activeTab === cat.id ? '#3730A5' : 'var(--border-color)', borderWidth: activeTab === cat.id ? '2px' : '1px' }} onClick={() => setActiveTab(cat.id)}>
+              <div key={cat.id} className="glass-card hover-scale" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', background: 'var(--bg-secondary)', borderColor: activeTab === cat.id ? 'var(--primary)' : 'var(--border-color)', borderWidth: activeTab === cat.id ? '2px' : '1px' }} onClick={() => setActiveTab(cat.id)}>
                 <div className={`${cat.bg} ${cat.color}`} style={{ padding: '12px', borderRadius: '12px', display: 'flex' }}>
                   <cat.icon size={24} />
                 </div>
                 <div>
-                  <p style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{cat.title}</p>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{catCount} Request{catCount !== 1 ? 's' : ''}</p>
+                  <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>{cat.title}</p>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>{catCount} Request{catCount !== 1 ? 's' : ''}</p>
                 </div>
               </div>
             )
           })}
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2.5rem' }}>
-          <div className="glass-card hover-scale" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', borderColor: activeTab === 'All' ? '#3730A5' : 'var(--border-color)', borderWidth: activeTab === 'All' ? '2px' : '1px' }} onClick={() => setActiveTab('All')}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+          <div className="glass-card hover-scale" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', background: 'var(--bg-secondary)', borderColor: activeTab === 'All' ? 'var(--primary)' : 'var(--border-color)', borderWidth: activeTab === 'All' ? '2px' : '1px' }} onClick={() => setActiveTab('All')}>
             <div className="bg-indigo-500/10 text-indigo-500" style={{ padding: '12px', borderRadius: '12px', display: 'flex' }}>
               <Clock size={24} />
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>All HOD Escalations</p>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{hodRequests.length} Total</p>
+              <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>All HOD Escalations</p>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>{hodRequests.length} Total</p>
             </div>
           </div>
-          <div className="glass-card hover-scale" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', borderColor: activeTab === 'Faculty Support' ? '#3730A5' : 'var(--border-color)', borderWidth: activeTab === 'Faculty Support' ? '2px' : '1px' }} onClick={() => setActiveTab('Faculty Support')}>
+          <div className="glass-card hover-scale" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', background: 'var(--bg-secondary)', borderColor: activeTab === 'Faculty Support' ? 'var(--primary)' : 'var(--border-color)', borderWidth: activeTab === 'Faculty Support' ? '2px' : '1px' }} onClick={() => setActiveTab('Faculty Support')}>
             <div className="bg-blue-500/10 text-blue-500" style={{ padding: '12px', borderRadius: '12px', display: 'flex' }}>
               <Users size={24} />
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>Faculty Support</p>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{hodRequests.filter(r => r.requestType === 'Faculty Support').length} Total</p>
+              <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Faculty Support</p>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>{hodRequests.filter(r => r.requestType === 'Faculty Support').length} Total</p>
             </div>
           </div>
-          <div className="glass-card hover-scale" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', borderColor: activeTab === 'Student Escalations' ? '#3730A5' : 'var(--border-color)', borderWidth: activeTab === 'Student Escalations' ? '2px' : '1px' }} onClick={() => setActiveTab('Student Escalations')}>
+          <div className="glass-card hover-scale" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', background: 'var(--bg-secondary)', borderColor: activeTab === 'Student Escalations' ? 'var(--primary)' : 'var(--border-color)', borderWidth: activeTab === 'Student Escalations' ? '2px' : '1px' }} onClick={() => setActiveTab('Student Escalations')}>
             <div className="bg-red-500/10 text-red-500" style={{ padding: '12px', borderRadius: '12px', display: 'flex' }}>
               <AlertOctagon size={24} />
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>Student Escalations</p>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{hodRequests.filter(r => r.requestType === 'Student Escalations').length} Total</p>
+              <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Student Escalations</p>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>{hodRequests.filter(r => r.requestType === 'Student Escalations').length} Total</p>
             </div>
           </div>
-          <div className="glass-card hover-scale" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', borderColor: activeTab === 'Resource Requests' ? '#3730A5' : 'var(--border-color)', borderWidth: activeTab === 'Resource Requests' ? '2px' : '1px' }} onClick={() => setActiveTab('Resource Requests')}>
+          <div className="glass-card hover-scale" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', background: 'var(--bg-secondary)', borderColor: activeTab === 'Resource Requests' ? 'var(--primary)' : 'var(--border-color)', borderWidth: activeTab === 'Resource Requests' ? '2px' : '1px' }} onClick={() => setActiveTab('Resource Requests')}>
             <div className="bg-amber-500/10 text-amber-500" style={{ padding: '12px', borderRadius: '12px', display: 'flex' }}>
               <Monitor size={24} />
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>Resource Requests</p>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{hodRequests.filter(r => r.requestType === 'Resource Requests').length} Total</p>
+              <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Resource Requests</p>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>{hodRequests.filter(r => r.requestType === 'Resource Requests').length} Total</p>
             </div>
           </div>
-          <div className="glass-card hover-scale" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', borderColor: activeTab === 'Other' ? '#3730A5' : 'var(--border-color)', borderWidth: activeTab === 'Other' ? '2px' : '1px' }} onClick={() => setActiveTab('Other')}>
+          <div className="glass-card hover-scale" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', background: 'var(--bg-secondary)', borderColor: activeTab === 'Other' ? 'var(--primary)' : 'var(--border-color)', borderWidth: activeTab === 'Other' ? '2px' : '1px' }} onClick={() => setActiveTab('Other')}>
             <div className="bg-purple-500/10 text-purple-500" style={{ padding: '12px', borderRadius: '12px', display: 'flex' }}>
               <FileText size={24} />
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>Other</p>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{hodRequests.filter(r => !['Faculty Support', 'Student Escalations', 'Resource Requests'].includes(r.requestType)).length} Total</p>
+              <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Other</p>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>{hodRequests.filter(r => !['Faculty Support', 'Student Escalations', 'Resource Requests'].includes(r.requestType)).length} Total</p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
-          <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.1rem' }}>{activeTab === 'All' ? 'All Recent Requests' : `${activeTab} Requests`}</h3>
+      {/* Main Table Card with Toolbar */}
+      <div className="glass-card" style={{ padding: '0', overflow: 'hidden', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '16px' }}>
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 700 }}>
+              {activeTab === 'All' ? 'All Recent Submissions' : `${activeTab} Requests`}
+            </h3>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Showing {filteredRequests.length} of {currentRequests.length} records
+            </p>
+          </div>
+
+          {/* Search & Filter Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: '240px' }}>
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                placeholder="Search name, type, details..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem 0.75rem 0.5rem 2.2rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-main)',
+                  fontSize: '0.85rem',
+                  outline: 'none'
+                }}
+              />
+              {searchQuery && (
+                <X size={14} onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--text-muted)' }} />
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Filter size={15} style={{ color: 'var(--text-muted)' }} />
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-main)',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="All">All Statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Resolved">Resolved</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
         </div>
         
         <div style={{ padding: '0' }}>
           {filteredRequests.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-              <ShieldAlert size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-              <p>No requests found in this category.</p>
+            <div style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)' }}>
+              <ShieldAlert size={48} style={{ margin: '0 auto 1rem', opacity: 0.4 }} />
+              <p style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>No requests match your search filter</p>
+              <p style={{ fontSize: '0.85rem' }}>Try clearing your search keyword or status filter pill.</p>
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>
-                    <th style={{ padding: '1rem', fontWeight: 600 }}>{viewMode === 'Staff' ? 'Staff Details' : 'HOD Details'}</th>
-                    <th style={{ padding: '1rem', fontWeight: 600 }}>{viewMode === 'Staff' ? 'Request Type' : 'Escalation Type'}</th>
-                    <th style={{ padding: '1rem', fontWeight: 600 }}>Description</th>
-                    <th style={{ padding: '1rem', fontWeight: 600 }}>Status</th>
-                    <th style={{ padding: '1rem', fontWeight: 600 }}>Actions</th>
+                  <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', background: 'var(--bg-primary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>{viewMode === 'Staff' ? 'Staff Details' : 'HOD Details'}</th>
+                    <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>{viewMode === 'Staff' ? 'Request Type' : 'Escalation Type'}</th>
+                    <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>Description</th>
+                    <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>Status</th>
+                    <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody style={{ fontSize: '0.88rem' }}>
                   {filteredRequests.map(r => (
-                    <tr key={r._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <tr key={r._id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.15s ease' }}>
                       <td style={{ padding: '1rem' }}>
-                        <p style={{ margin: 0, color: 'var(--text-main)', fontWeight: 600 }}>{viewMode === 'Staff' ? r.staffName : r.hodName}</p>
-                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.department}</p>
+                        <p style={{ margin: 0, color: 'var(--text-main)', fontWeight: 700 }}>{viewMode === 'Staff' ? r.staffName : r.hodName}</p>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>{r.department || 'General'}</p>
                       </td>
                       <td style={{ padding: '1rem', color: 'var(--text-main)', fontWeight: 600 }}>
-                        {r.requestType} <br/> <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.subType}</span>
+                        {r.requestType} <br/> <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 400 }}>{r.subType}</span>
                       </td>
-                      <td style={{ padding: '1rem', color: 'var(--text-main)', maxWidth: '250px' }}>
-                        <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.description}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Submitted: {new Date(r.createdAt).toLocaleDateString()}</div>
+                      <td style={{ padding: '1rem', color: 'var(--text-main)', maxWidth: '280px' }}>
+                        <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 500 }}>{r.description}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>Submitted: {new Date(r.createdAt).toLocaleDateString()}</div>
                       </td>
                       <td style={{ padding: '1rem' }}>
-                        <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, background: r.status === 'Resolved' || r.status === 'Approved' ? 'rgba(16,185,129,0.1)' : r.status === 'Rejected' ? 'rgba(239,68,68,0.1)' : r.status === 'Pending' ? 'rgba(245,158,11,0.1)' : 'rgba(59,130,246,0.1)', color: r.status === 'Resolved' || r.status === 'Approved' ? '#3730A5' : r.status === 'Rejected' ? '#ef4444' : r.status === 'Pending' ? '#f59e0b' : '#3b82f6' }}>
+                        <span style={{ 
+                          padding: '4px 10px', 
+                          borderRadius: '12px', 
+                          fontSize: '0.78rem', 
+                          fontWeight: 700, 
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          background: r.status === 'Resolved' || r.status === 'Approved' ? 'rgba(16,185,129,0.12)' : r.status === 'Rejected' ? 'rgba(239,68,68,0.12)' : r.status === 'Pending' ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.12)', 
+                          color: r.status === 'Resolved' || r.status === 'Approved' ? '#10b981' : r.status === 'Rejected' ? '#ef4444' : r.status === 'Pending' ? '#f59e0b' : '#3b82f6' 
+                        }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }}></span>
                           {r.status}
                         </span>
                       </td>
                       <td style={{ padding: '1rem' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => { setSelectedRequest(r); setShowReplyModal(true); }} style={{ padding: '6px', borderRadius: '6px', background: 'rgba(79,70,229,0.1)', color: '#4f46e5', border: 'none', cursor: 'pointer' }} title="Reply to Staff">
-                            <MessageSquare size={16} />
+                          <button 
+                            onClick={() => { setSelectedRequest(r); setShowReplyModal(true); }} 
+                            style={{ padding: '6px 10px', borderRadius: '7px', background: 'rgba(79,70,229,0.1)', color: 'var(--primary)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600 }} 
+                            title="Reply to User"
+                          >
+                            <MessageSquare size={15} /> Reply
                           </button>
                           {r.status !== 'Approved' && r.status !== 'Resolved' && (
-                            <button onClick={() => handleUpdateStatus(r._id, r.requestType === 'Leave' ? 'Approved' : 'Resolved')} style={{ padding: '6px', borderRadius: '6px', background: 'rgba(16,185,129,0.1)', color: '#3730A5', border: 'none', cursor: 'pointer' }} title="Approve/Resolve">
-                              <CheckCircle size={16} />
+                            <button 
+                              onClick={() => handleUpdateStatus(r._id, r.requestType === 'Leave' ? 'Approved' : 'Resolved')} 
+                              style={{ padding: '6px 10px', borderRadius: '7px', background: 'rgba(16,185,129,0.1)', color: '#10b981', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600 }} 
+                              title="Approve/Resolve"
+                            >
+                              <CheckCircle size={15} /> Approve
                             </button>
                           )}
                           {r.status !== 'Rejected' && (
-                            <button onClick={() => handleUpdateStatus(r._id, 'Rejected')} style={{ padding: '6px', borderRadius: '6px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', cursor: 'pointer' }} title="Reject">
-                              <XCircle size={16} />
+                            <button 
+                              onClick={() => handleUpdateStatus(r._id, 'Rejected')} 
+                              style={{ padding: '6px 10px', borderRadius: '7px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600 }} 
+                              title="Reject"
+                            >
+                              <XCircle size={15} /> Reject
                             </button>
                           )}
                         </div>
@@ -293,29 +442,29 @@ const PrincipalStaffSupport = () => {
 
       {/* Reply Modal */}
       {showReplyModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', padding: '1rem' }}>
-          <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', width: '100%', maxWidth: '450px', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', padding: '1rem' }}>
+          <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', width: '100%', maxWidth: '480px', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
             <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                <MessageSquare size={18} color="#4f46e5"/> Reply to {viewMode === 'Staff' ? selectedRequest?.staffName : selectedRequest?.hodName}
+              <h3 style={{ fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, fontSize: '1rem' }}>
+                <MessageSquare size={18} color="var(--primary)"/> Reply to {viewMode === 'Staff' ? selectedRequest?.staffName : selectedRequest?.hodName}
               </h3>
               <button onClick={() => setShowReplyModal(false)} style={{ color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}><X size={20}/></button>
             </div>
             <form onSubmit={handleSendReply} style={{ padding: '1.25rem' }}>
               <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Your Message</label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>Your Response Message</label>
                 <textarea 
                   rows="4"
                   value={replyText} 
                   onChange={e => setReplyText(e.target.value)}
-                  placeholder="Type your response here..."
-                  style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-main)', outline: 'none', resize: 'none' }}
+                  placeholder="Type your official response here..."
+                  style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-main)', outline: 'none', resize: 'none', fontSize: '0.9rem' }}
                   required
                 />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowReplyModal(false)} style={{ padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 600, color: 'var(--text-muted)', background: 'transparent', border: '1px solid var(--border-color)', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ padding: '0.5rem 1.25rem', borderRadius: '8px', background: '#4f46e5', color: 'white', fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px 0 rgba(79, 70, 229, 0.39)' }}>Send Reply</button>
+                <button type="submit" style={{ padding: '0.55rem 1.25rem', borderRadius: '8px', background: 'var(--primary)', color: 'white', fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px 0 rgba(79, 70, 229, 0.39)' }}>Send Reply</button>
               </div>
             </form>
           </div>

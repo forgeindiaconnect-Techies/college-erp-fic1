@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import DriverSidebar from './DriverSidebar';
 import Navbar from '../../components/layout/Navbar';
@@ -16,6 +16,9 @@ const DriverLayout = () => {
   return (
     <div className="layout-container">
       <DriverSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>
+      )}
       <div className={`main-wrapper ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <Navbar role="Driver" onMenuToggle={() => setSidebarOpen(o => !o)} />
         <main className="main-content">

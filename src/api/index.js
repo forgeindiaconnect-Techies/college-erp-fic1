@@ -16,7 +16,6 @@ const getBaseURL = () => {
 const api = axios.create({
   baseURL: getBaseURL(),
   headers: {
-    'Content-Type': 'application/json',
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache',
     'Expires': '0'
@@ -46,7 +45,7 @@ api.interceptors.request.use(
       } else if (path.startsWith('/parent')) {
         token = sessionStorage.getItem('parent_token');
       } else if (path.startsWith('/accounts')) {
-        token = sessionStorage.getItem('accounts_token');
+        token = sessionStorage.getItem('accounts_token') || sessionStorage.getItem('admin_token') || sessionStorage.getItem('superadmin_token');
       } else if (path.startsWith('/driver')) {
         token = sessionStorage.getItem('driver_token');
       } else if (path.startsWith('/hostel')) {
@@ -408,7 +407,9 @@ export const createTransportNotification = (data) => api.post('/transport/notifi
 
 // Hostel Management
 export const getHostelBlocks = () => api.get('/hostel/blocks');
+export const createHostelBlock = (data) => api.post('/hostel/blocks', data);
 export const getHostelRooms = () => api.get('/hostel/rooms');
+export const createHostelRoom = (data) => api.post('/hostel/rooms', data);
 export const getHostelRequests = () => api.get('/hostel/requests');
 export const createHostelRequest = (studentId) => api.post('/hostel/requests', { studentId });
 export const allocateHostelRequest = (id, data) => api.put(`/hostel/requests/${id}/allocate`, data);
@@ -763,4 +764,12 @@ export const getPlacementOfficers = () => api.get('/placement-officers');
 export const createPlacementOfficer = (data) => api.post('/placement-officers', data);
 export const updatePlacementOfficer = (id, data) => api.put(`/placement-officers/${id}`, data);
 export const deletePlacementOfficer = (id) => api.delete(`/placement-officers/${id}`);
+
+// Document Management APIs
+export const getDocuments = (params = {}) => api.get('/documents', { params });
+export const createDocumentRequirement = (data) => api.post('/documents/requirements', data);
+export const uploadDocumentFile = (id, formData) => api.post(`/documents/${id}/upload`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+export const updateDocumentStatus = (id, status, remarks = '') => api.patch(`/documents/${id}/status`, { status, remarks });
+export const getDocumentFileUrl = (id) => `/api/documents/${id}/file`;
+
 

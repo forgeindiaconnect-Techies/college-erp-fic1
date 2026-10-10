@@ -64,14 +64,23 @@ export default function PrincipalDashboard() {
       })
       .catch(err => console.error(err));
 
-    getUsers()
-      .then(res => {
-        const users = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+    Promise.all([
+      getUsers().catch(() => ({ data: [] })),
+      import('../../api/index').then(m => m.getStudents().catch(() => ({ data: [] }))),
+      import('../../api/index').then(m => m.getStaff().catch(() => ({ data: [] }))),
+      import('../../api/index').then(m => m.getDepartments().catch(() => ({ data: [] })))
+    ])
+      .then(([usersRes, studentsRes, staffRes, deptsRes]) => {
+        const users = Array.isArray(usersRes.data) ? usersRes.data : (Array.isArray(usersRes) ? usersRes : []);
+        const sList = Array.isArray(studentsRes.data) ? studentsRes.data : (Array.isArray(studentsRes) ? studentsRes : []);
+        const fList = Array.isArray(staffRes.data) ? staffRes.data : (Array.isArray(staffRes) ? staffRes : []);
+        const dList = Array.isArray(deptsRes.data) ? deptsRes.data : (Array.isArray(deptsRes) ? deptsRes : []);
+
         setAllUsers(users);
 
-        const students = users.filter(u => u.role === 'Student');
-        const staff = users.filter(u => u.role === 'Staff');
-        const hods = users.filter(u => u.role === 'HOD');
+        const students = [...users.filter(u => u.role === 'Student'), ...sList.filter(s => !users.find(u => u.referenceId === s.id || u._id === s._id))];
+        const staff = [...users.filter(u => u.role === 'Staff'), ...fList.filter(f => f.role !== 'HOD' && f.designation !== 'HOD' && !users.find(u => u._id === f._id))];
+        const hods = users.filter(u => u.role === 'HOD' || u.designation === 'HOD');
 
         // Group by department
         const grouped = {};
@@ -85,15 +94,25 @@ export default function PrincipalDashboard() {
           }
         });
 
+        dList.forEach(d => {
+          const dName = d.name || d.departmentName;
+          if (dName && !grouped[dName]) {
+            grouped[dName] = { HOD: [], Staff: [], Student: [] };
+          }
+        });
+
         setDepartmentData(grouped);
         setMetrics({
           students: students.length,
           staff: staff.length,
           hods: hods.length,
-          depts: Object.keys(grouped).length
+          depts: Math.max(Object.keys(grouped).length, dList.length)
         });
       })
-      .catch(err => console.error(err))
+      .catch(err => {
+        console.error('Failed to load institutional roster:', err);
+        setMetrics({ students: 0, staff: 0, hods: 0, depts: 0 });
+      })
       .finally(() => setLoading(false));
   }, []);
 

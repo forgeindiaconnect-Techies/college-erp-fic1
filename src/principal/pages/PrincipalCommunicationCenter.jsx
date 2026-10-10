@@ -78,6 +78,43 @@ export default function PrincipalCommunicationCenter() {
     setShowClearanceBlock(true);
   };
 
+  const syncToGlobalAnnouncements = (logItem) => {
+    try {
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const key = `erp_announcements_${tenantId}`;
+      const saved = localStorage.getItem(key);
+      let announcements = saved ? JSON.parse(saved) : [];
+
+      let targetAudience = 'All';
+      const aud = String(logItem.audience || '').toLowerCase();
+      if (aud.includes('hod')) targetAudience = 'HODs';
+      else if (aud.includes('staff') || aud.includes('faculty')) targetAudience = 'Staff';
+      else if (aud.includes('student')) targetAudience = 'Students';
+      else if (aud.includes('parent')) targetAudience = 'Parents';
+
+      const authorName = userName ? (userName.includes('Principal') ? userName : `Principal ${userName}`) : 'Principal Office';
+
+      const newAnn = {
+        id: logItem.id || `ANN${Date.now()}`,
+        title: logItem.title,
+        content: logItem.content || `${logItem.category || 'Notice'} directive from Principal Office for ${logItem.audience || 'Entire College'}.`,
+        targetAudience: targetAudience,
+        date: logItem.date || new Date().toISOString().split('T')[0],
+        author: authorName,
+        category: logItem.category || 'Broadcast'
+      };
+
+      announcements = announcements.filter(a => String(a.id) !== String(newAnn.id));
+      announcements.unshift(newAnn);
+
+      localStorage.setItem(key, JSON.stringify(announcements));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('erp_announcement_updated'));
+    } catch (e) {
+      console.error('Failed to sync to global announcements:', e);
+    }
+  };
+
   // CRUD: Edit announcement initializer
   const handleOpenEdit = (log) => {
     setEditTarget(log.id);
@@ -99,6 +136,20 @@ export default function PrincipalCommunicationCenter() {
     if (window.confirm('Delete this notice circular from the active historical archive? This will retract it from dashboard widgets.')) {
       const updated = logs.filter(l => l.id !== id);
       saveLogs(updated);
+
+      try {
+        const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+        const key = `erp_announcements_${tenantId}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+          let list = JSON.parse(saved);
+          list = list.filter(a => String(a.id) !== String(id));
+          localStorage.setItem(key, JSON.stringify(list));
+          window.dispatchEvent(new Event('storage'));
+          window.dispatchEvent(new CustomEvent('erp_announcement_updated'));
+        }
+      } catch (err) {}
+
       triggerToast('🗑️ Announcement log permanently purged from transmission registers.', 'info');
     }
   };
@@ -112,6 +163,8 @@ export default function PrincipalCommunicationCenter() {
       // Edit
       const updated = logs.map(l => l.id === editTarget ? { ...l, ...announcementForm } : l);
       saveLogs(updated);
+      const editedItem = updated.find(l => l.id === editTarget);
+      if (editedItem) syncToGlobalAnnouncements(editedItem);
       triggerToast('✓ Circular announcement updated successfully.');
       setEditTarget(null);
     } else {
@@ -120,6 +173,7 @@ export default function PrincipalCommunicationCenter() {
       const newLog = {
         id: newId,
         title: announcementForm.title,
+        content: announcementForm.content,
         category: announcementForm.category,
         department: announcementForm.department,
         audience: announcementForm.audience,
@@ -131,6 +185,7 @@ export default function PrincipalCommunicationCenter() {
         delivery: { email: 98, sms: announcementForm.channels.includes('SMS') ? 94 : 0, push: announcementForm.channels.includes('Push') ? 100 : 0 }
       };
       saveLogs([newLog, ...logs]);
+      syncToGlobalAnnouncements(newLog);
       triggerToast('🔥 Notice successfully broadcasted across targeted channels!');
     }
     
@@ -145,6 +200,7 @@ export default function PrincipalCommunicationCenter() {
     const newLog = {
       id: newId,
       title: `[Scheduled] ${scheduleForm.title}`,
+      content: scheduleForm.content,
       category: scheduleForm.category,
       department: scheduleForm.department,
       audience: scheduleForm.audience,
@@ -156,6 +212,7 @@ export default function PrincipalCommunicationCenter() {
       delivery: { email: 0, sms: 0, push: 0 }
     };
     saveLogs([newLog, ...logs]);
+    syncToGlobalAnnouncements(newLog);
     triggerToast(`⏰ Notice successfully scheduled for delivery on ${scheduleForm.date} at ${scheduleForm.time}.`);
     setIsScheduleOpen(false);
     setScheduleForm({ title: '', content: '', category: 'Academic Updates', department: 'All', audience: 'Students', date: '', time: '', channels: ['Email'] });
@@ -168,6 +225,7 @@ export default function PrincipalCommunicationCenter() {
     const newLog = {
       id: newId,
       title: `🚨 EMERGENCY: ${emergencyForm.title}`,
+      content: emergencyForm.content,
       category: 'Emergency Alerts',
       department: 'All',
       audience: 'Entire College',
@@ -179,6 +237,7 @@ export default function PrincipalCommunicationCenter() {
       delivery: { email: 99, sms: 98, push: 100 }
     };
     saveLogs([newLog, ...logs]);
+    syncToGlobalAnnouncements(newLog);
     triggerToast('🚨 CRITICAL WARNING BROADCAST DISPATCHED VIA EMAIL, SMS & PUSH DIRECTLY!', 'warning');
     setIsEmergencyOpen(false);
     setEmergencyForm({ title: '', content: '', channels: ['Email', 'SMS', 'Push'] });
@@ -195,6 +254,7 @@ export default function PrincipalCommunicationCenter() {
     const newLog = {
       id: newId,
       title: uploadForm.title,
+      content: `Official Signed PDF Circular: ${uploadForm.title}. Attached document: ${uploadForm.fileName}`,
       category: 'Circulars',
       department: uploadForm.department,
       audience: uploadForm.audience === 'All' ? 'Entire College' : uploadForm.audience,
@@ -206,18 +266,38 @@ export default function PrincipalCommunicationCenter() {
       delivery: { email: 100, sms: 0, push: 0 }
     };
     saveLogs([newLog, ...logs]);
+    syncToGlobalAnnouncements(newLog);
     triggerToast('✓ Signed PDF circular appended and uploaded to student/staff dashboards.');
     setIsUploadOpen(false);
     setUploadForm({ title: '', category: 'Circulars', department: 'All', audience: 'All', priority: 'High', fileName: '', fileLoaded: false });
   };
 
+  const fileInputRef = React.useRef(null);
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadForm(prev => ({
+        ...prev,
+        fileName: file.name,
+        fileLoaded: true,
+        title: prev.title || file.name.replace(/\.[^/.]+$/, "")
+      }));
+      triggerToast(`📎 Document attached: ${file.name}`);
+    }
+  };
+
   const triggerMockFileUpload = () => {
-    setUploadForm(prev => ({
-      ...prev,
-      fileName: `Circular_Ref_${String(Date.now()).slice(-5)}_Sign_Approved.pdf`,
-      fileLoaded: true
-    }));
-    triggerToast('📎 Circular signed document attached successfully.');
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    } else {
+      setUploadForm(prev => ({
+        ...prev,
+        fileName: `Circular_Ref_${String(Date.now()).slice(-5)}_Sign_Approved.pdf`,
+        fileLoaded: true
+      }));
+      triggerToast('📎 Circular signed document attached successfully.');
+    }
   };
 
   const handleOpenDetails = (log) => {
@@ -1020,6 +1100,13 @@ export default function PrincipalCommunicationCenter() {
               {/* Drag and Drop pdf upload segment */}
               <div style={{ marginTop: '1rem' }}>
                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.4rem', color: 'var(--text-muted)' }}>Attach Signed PDF Document *</label>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileSelect} 
+                  accept=".pdf,application/pdf,image/*,.doc,.docx" 
+                  style={{ display: 'none' }} 
+                />
                 <div 
                   onClick={triggerMockFileUpload}
                   style={{

@@ -111,6 +111,7 @@ import PrincipalExamsResults from './principal/pages/PrincipalExamsResults';
 import PrincipalFeesOverview from './principal/pages/PrincipalFeesOverview';
 import PrincipalPlacements from './principal/pages/PrincipalPlacements';
 import PrincipalAssignments from './principal/pages/PrincipalAssignments';
+import PrincipalAnnouncements from './principal/pages/PrincipalAnnouncements';
 
 
 
@@ -171,6 +172,7 @@ import StudentHostel from './student/pages/StudentHostel';
 import StudentPlacements from './student/pages/StudentPlacements';
 import StudentLibrary from './student/pages/StudentLibrary';
 import StudentWelfare from './student/pages/StudentWelfare';
+import StudentTransport from './student/pages/StudentTransport';
 
 // Parent Layout & Pages
 import ParentLayout from './parent/components/ParentLayout';
@@ -205,6 +207,7 @@ import Salary from './accounts/pages/Salary';
 import Receipts from './accounts/pages/Receipts';
 import AccountsReports from './accounts/pages/AccountsReports';
 import DailyAttendance from './accounts/pages/DailyAttendance';
+import DocumentTracker from './accounts/pages/DocumentTracker';
 
 // Driver Layout & Pages
 import DriverLayout from './driver/components/DriverLayout';
@@ -288,9 +291,9 @@ const ParentGuard = ({ children }) => {
 };
 
 const AccountsGuard = ({ children }) => {
-  const session = sessionStorage.getItem('accounts_session');
+  const session = sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || sessionStorage.getItem('superadmin_session');
   if (session) return children;
-  if (hasAnyOtherSession('accounts_session')) return <Navigate to="/unauthorized" replace />;
+  if (hasAnyOtherSession('accounts_session') && !sessionStorage.getItem('admin_session') && !sessionStorage.getItem('superadmin_session')) return <Navigate to="/unauthorized" replace />;
   return <Navigate to="/login" replace />;
 };
 
@@ -504,6 +507,7 @@ function App() {
               <Route path="assignments"   element={<PrincipalAssignments />} />
               <Route path="fees"          element={<PrincipalFeesOverview />} />
               <Route path="communication" element={<PrincipalCommunicationCenter />} />
+              <Route path="announcements" element={<PrincipalAnnouncements />} />
               <Route path="meetings"       element={<PrincipalMeetingsEvents />} />
               <Route path="academic-planning" element={<PrincipalAcademicPlanning />} />
               <Route path="faculty-performance" element={<PrincipalFacultyPerformance />} />
@@ -577,6 +581,7 @@ function App() {
               <Route path="placements"  element={<StudentPlacements />} />
               <Route path="library"     element={<StudentLibrary />} />
               <Route path="welfare"     element={<StudentWelfare />} />
+              <Route path="transport"   element={<StudentTransport />} />
             </Route>
 
             {/* ── PARENT ROUTES ── */}
@@ -597,6 +602,7 @@ function App() {
             <Route path="/accounts" element={<AccountsGuard><GlobalLockdown><AccountsLayout /></GlobalLockdown></AccountsGuard>}>
               <Route index element={<Navigate to="/accounts/dashboard" replace />} />
               <Route path="dashboard" element={<AccountsDashboard />} />
+              <Route path="document-tracker" element={<DocumentTracker />} />
               <Route path="fee-structure" element={<FeeStructure />} />
               <Route path="quota-management" element={<QuotaManagement />} />
               <Route path="scholarship-management" element={<ScholarshipManagement />} />

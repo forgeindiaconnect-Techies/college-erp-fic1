@@ -8,7 +8,7 @@ import {
   ClipboardList, BookOpen, AlertCircle, FileText,
   Percent, Calendar, ShieldAlert, Clock, MapPin, Play, CheckCircle2, Download, ExternalLink,
   GraduationCap, CreditCard, Sparkles, RefreshCw, ChevronRight, Award, UserCheck, Inbox,
-  Briefcase, Building
+  Briefcase, Building, Bus
 } from 'lucide-react';
 import { 
   getStudentById, getAttendanceByStudent, 
@@ -17,6 +17,7 @@ import {
   getClassAdvisorInfo, getStudentLiveClass, getAssignments, getPlacementJobs
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
+import MyDocumentChecklist from '../../components/common/MyDocumentChecklist';
 import './StudentDashboard.css';
 
 const StudentDashboard = () => {
@@ -624,6 +625,11 @@ const StudentDashboard = () => {
         </div>
       </div>
 
+      {/* ── Document Tracker & Compliance Widget for Student ── */}
+      <div style={{ marginTop: '1.5rem' }}>
+        <MyDocumentChecklist title="Student Certificate & Document Compliance" category="Student" />
+      </div>
+
       {/* ── Campus Placement & Career Drives Highlight Banner ── */}
       <div className="glass-card" style={{ padding: '20px', background: 'linear-gradient(135deg, rgba(37,99,235,0.04) 0%, rgba(22,163,74,0.04) 100%)', border: '1px solid var(--border-color, #e2e8f0)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
@@ -713,6 +719,9 @@ const StudentDashboard = () => {
           </button>
           <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={() => navigate('/student/hostel')}>
             <MapPin size={14} /> Hostel & Passes
+          </button>
+          <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={() => navigate('/student/transport')}>
+            <Bus size={14} /> Transport Tracking
           </button>
           <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={() => navigate('/student/marks')}>
             <Award size={14} /> Marks

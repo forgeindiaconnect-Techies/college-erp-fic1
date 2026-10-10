@@ -785,34 +785,46 @@ const StudentHostel = () => {
                     </div>
                     
                     {/* Status Flow Timeline */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2rem', position: 'relative', padding: '0 10px' }}>
-                      <div style={{ position: 'absolute', top: '12px', left: '20px', right: '20px', height: '2px', background: 'var(--border-color)', zIndex: 0 }}></div>
-                      
-                      {['Pending Review', 'In Progress', 'Resolved'].map((step, idx) => {
-                        const statusOrder = { 'Pending Review': 0, 'In Progress': 1, 'Resolved': 2 };
-                        const currentLevel = statusOrder[comp.status] || 0;
-                        const stepLevel = statusOrder[step];
-                        
-                        const isCompleted = stepLevel <= currentLevel;
-                        const isActive = stepLevel === currentLevel;
-                        
-                        return (
-                          <div key={idx} style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '0 10px' }}>
-                            <div style={{ 
-                              width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              background: isCompleted ? '#10b981' : 'var(--bg-primary)',
-                              border: `2px solid ${isCompleted ? '#10b981' : 'var(--border-color)'}`,
-                              color: isCompleted ? 'white' : 'var(--text-muted)',
-                              boxShadow: isActive ? '0 0 0 4px rgba(16, 185, 129, 0.2)' : 'none',
-                              transition: 'all 0.3s ease'
-                            }}>
-                              {isCompleted ? <CheckCircle2 size={16} /> : <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--border-color)' }}></div>}
-                            </div>
-                            <span style={{ fontSize: '0.75rem', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--text-main)' : 'var(--text-muted)' }}>{step}</span>
+                    {(() => {
+                      const statusOrder = {
+                        'Pending Review': 0, 'Pending': 0, 'Under Review': 0,
+                        'In Progress': 1, 'In-Progress': 1, 'Assigned': 1, 'Processing': 1,
+                        'Resolved': 2, 'Completed': 2, 'Closed': 2
+                      };
+                      const currentLevel = statusOrder[comp.status] !== undefined ? statusOrder[comp.status] : 0;
+                      const fillWidth = currentLevel === 2 ? '100%' : currentLevel === 1 ? '50%' : '0%';
+
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2rem', position: 'relative', padding: '0 10px' }}>
+                          {/* Background Track & Active Progress Fill Bar */}
+                          <div style={{ position: 'absolute', top: '12px', left: '30px', right: '30px', height: '3px', background: 'var(--border-color, #e2e8f0)', zIndex: 0 }}>
+                            <div style={{ width: fillWidth, height: '100%', background: '#10b981', transition: 'width 0.4s ease' }}></div>
                           </div>
-                        );
-                      })}
-                    </div>
+                          
+                          {['Pending Review', 'In Progress', 'Resolved'].map((step, idx) => {
+                            const stepLevel = idx;
+                            const isCompleted = stepLevel <= currentLevel;
+                            const isActive = stepLevel === currentLevel;
+                            
+                            return (
+                              <div key={idx} style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '0 10px' }}>
+                                <div style={{ 
+                                  width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  background: isCompleted ? '#10b981' : 'var(--bg-primary)',
+                                  border: `2px solid ${isCompleted ? '#10b981' : 'var(--border-color)'}`,
+                                  color: isCompleted ? 'white' : 'var(--text-muted)',
+                                  boxShadow: isActive ? '0 0 0 4px rgba(16, 185, 129, 0.2)' : 'none',
+                                  transition: 'all 0.3s ease'
+                                }}>
+                                  {isCompleted ? <CheckCircle2 size={16} /> : <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--border-color)' }}></div>}
+                                </div>
+                                <span style={{ fontSize: '0.75rem', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--text-main)' : 'var(--text-muted)' }}>{step}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>

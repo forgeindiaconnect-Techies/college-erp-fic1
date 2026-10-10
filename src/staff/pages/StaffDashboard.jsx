@@ -24,6 +24,7 @@ import {
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import LiveClassModal from '../components/LiveClassModal';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
+import MyDocumentChecklist from '../../components/common/MyDocumentChecklist';
 import './StaffDashboard.css';
 
 const DEFAULT_SESSION = {
@@ -239,12 +240,14 @@ const StaffDashboard = () => {
     };
 
     window.addEventListener('erp_placement_updated', handlePlacementUpdate);
+    window.addEventListener('erp_announcement_updated', handlePlacementUpdate);
     window.addEventListener('storage', handlePlacementUpdate);
 
     const t = setTimeout(() => setAnimate(true), 100);
     return () => {
       clearTimeout(t);
       window.removeEventListener('erp_placement_updated', handlePlacementUpdate);
+      window.removeEventListener('erp_announcement_updated', handlePlacementUpdate);
       window.removeEventListener('storage', handlePlacementUpdate);
     };
   }, [loadDashboardData, navigate]);
@@ -372,8 +375,11 @@ const StaffDashboard = () => {
   const handleLeaveSubmit = (e) => {
     e.preventDefault();
     const newLeave = {
-      id: Date.now(),
+      id: `leave_${Date.now()}`,
+      staffId: staffSession.id || 'STF001',
+      name: staffName,
       staffName,
+      role: 'Staff',
       email: staffSession.email,
       dept: staffDept,
       type: leaveForm.type,
@@ -383,10 +389,14 @@ const StaffDashboard = () => {
       status: 'Pending',
       createdAt: new Date().toISOString()
     };
-    const updatedLeaves = [...leaves, newLeave];
-    setLeaves(updatedLeaves);
     const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+    const saved = localStorage.getItem(`erp_leave_requests_${tenantId}`);
+    const existing = saved ? JSON.parse(saved) : leaves;
+    const updatedLeaves = [newLeave, ...existing];
+    setLeaves(updatedLeaves);
     localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(updatedLeaves));
+    window.dispatchEvent(new Event('storage'));
+
     setLeaveSuccess(true);
     setTimeout(() => {
       setLeaveModalOpen(false);
@@ -434,23 +444,23 @@ const StaffDashboard = () => {
 
       {/* Exam Duty Invigilation Alert Banner */}
       {myInvigilationDuties.length > 0 && (
-        <div style={{ background: 'linear-gradient(135deg, #0f766e, #0d9488)', color: 'white', padding: '1.1rem 1.5rem', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '1.25rem', boxShadow: '0 4px 15px rgba(13,148,136, 0.25)' }}>
-          <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.65rem', borderRadius: '12px' }}>
-            <ShieldAlert size={26} color="white" />
+        <div style={{ background: '#ffffff', color: '#0f172a', padding: '1.1rem 1.5rem', borderRadius: '12px', border: '1px solid #cbd5e1', borderLeft: '4px solid #0d9488', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+          <div style={{ background: '#f0fdf4', padding: '0.65rem', borderRadius: '12px', color: '#0d9488' }}>
+            <ShieldAlert size={26} />
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>Exam Duty Assigned: {myInvigilationDuties.length} Scheduled Slot{myInvigilationDuties.length > 1 ? 's' : ''}</h2>
-              <span style={{ background: 'rgba(255,255,255,0.25)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 800 }}>ACTIVE ROSTER</span>
+          <div style={{ flex: '1 1 200px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Exam Duty Assigned: {myInvigilationDuties.length} Scheduled Slot{myInvigilationDuties.length > 1 ? 's' : ''}</h2>
+              <span style={{ background: '#dcfce7', color: '#166534', border: '1px solid #86efac', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 800 }}>ACTIVE ROSTER</span>
             </div>
-            <p style={{ margin: '0.2rem 0 0 0', opacity: 0.95, fontSize: '0.84rem' }}>
-              Upcoming: <strong>{myInvigilationDuties[0].name}</strong> ({myInvigilationDuties[0].subject}) • Venue: <strong>{myInvigilationDuties[0].room || myInvigilationDuties[0].hallName || 'Main Hall'}</strong> • Slot: <strong>{myInvigilationDuties[0].date} ({myInvigilationDuties[0].time})</strong>
+            <p style={{ margin: '0.2rem 0 0 0', color: '#475569', fontSize: '0.84rem' }}>
+              Upcoming: <strong style={{ color: '#0f172a' }}>{myInvigilationDuties[0].name}</strong> ({myInvigilationDuties[0].subject}) • Venue: <strong style={{ color: '#0f172a' }}>{myInvigilationDuties[0].room || myInvigilationDuties[0].hallName || 'Main Hall'}</strong> • Slot: <strong style={{ color: '#0f172a' }}>{myInvigilationDuties[0].date} ({myInvigilationDuties[0].time})</strong>
             </p>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.6rem' }}>
             <button 
               onClick={() => navigate('/staff/exams')}
-              style={{ background: '#ffffff', color: '#0f766e', border: 'none', padding: '8px 18px', borderRadius: '8px', fontWeight: 800, fontSize: '0.84rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{ background: '#0d9488', color: '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '8px', fontWeight: 800, fontSize: '0.84rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 4px rgba(13,148,136,0.2)' }}
             >
               Exam Duty Center →
             </button>
@@ -460,18 +470,18 @@ const StaffDashboard = () => {
 
       {/* Class Advisor Alert Banner if designated */}
       {advisingClass && (
-        <div style={{ background: 'linear-gradient(135deg, #1e40af, #3b82f6)', color: 'white', padding: '1.1rem 1.5rem', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '1.25rem', boxShadow: '0 4px 15px rgba(37,99,235, 0.2)' }}>
-          <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.65rem', borderRadius: '12px' }}>
-            <GraduationCap size={26} color="white" />
+        <div style={{ background: '#ffffff', color: '#0f172a', padding: '1.1rem 1.5rem', borderRadius: '12px', border: '1px solid #cbd5e1', borderLeft: '4px solid #2563eb', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+          <div style={{ background: '#eff6ff', padding: '0.65rem', borderRadius: '12px', color: '#2563eb' }}>
+            <GraduationCap size={26} />
           </div>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>Class Advisor: {advisingClass.department}</h2>
-            <p style={{ margin: '0.15rem 0 0 0', opacity: 0.9, fontSize: '0.84rem' }}>{advisingClass.semester} • Section {advisingClass.section} • Oversight of academic attendance and performance</p>
+          <div style={{ flex: '1 1 200px' }}>
+            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Class Advisor: {advisingClass.department}</h2>
+            <p style={{ margin: '0.15rem 0 0 0', color: '#475569', fontSize: '0.84rem' }}>{advisingClass.semester} • Section {advisingClass.section} • Oversight of academic attendance and performance</p>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.6rem' }}>
             <button 
               onClick={() => navigate('/staff/attendance')}
-              style={{ background: '#ffffff', color: '#1e40af', border: 'none', padding: '7px 16px', borderRadius: '8px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}
+              style={{ background: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '8px', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', boxShadow: '0 2px 4px rgba(37,99,235,0.2)' }}
             >
               Class Attendance →
             </button>
@@ -588,6 +598,11 @@ const StaffDashboard = () => {
             <span style={{ color: '#10B981', fontWeight: 700 }}>Drives →</span>
           </div>
         </div>
+      </div>
+
+      {/* ── Document Tracker & Compliance Widget for Staff ── */}
+      <div style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+        <MyDocumentChecklist title="Faculty & Staff Compliance Records" category="Staff" />
       </div>
 
       {/* Campus Recruitment & Placement Drives Showcase */}

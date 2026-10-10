@@ -28,6 +28,7 @@ import {
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
+import MyDocumentChecklist from '../../components/common/MyDocumentChecklist';
 import './HodDashboard.css';
 import CollegeInfoCard from '../../components/common/CollegeInfoCard';
 
@@ -270,6 +271,7 @@ const HodDashboard = () => {
     window.addEventListener('erp_marks_updated', handleMarksRefresh);
     window.addEventListener('erp_marks_submitted', handleMarksRefresh);
     window.addEventListener('erp_placement_updated', handleMarksRefresh);
+    window.addEventListener('erp_announcement_updated', handleMarksRefresh);
     window.addEventListener('storage', handleMarksRefresh);
 
     const timer = setTimeout(() => setAnimate(true), 100);
@@ -278,6 +280,7 @@ const HodDashboard = () => {
       window.removeEventListener('erp_marks_updated', handleMarksRefresh);
       window.removeEventListener('erp_marks_submitted', handleMarksRefresh);
       window.removeEventListener('erp_placement_updated', handleMarksRefresh);
+      window.removeEventListener('erp_announcement_updated', handleMarksRefresh);
       window.removeEventListener('storage', handleMarksRefresh);
     };
   }, [navigate, fetchLiveData, hodSession]);
@@ -784,6 +787,11 @@ const HodDashboard = () => {
       {/* HOD Duty Attendance Card */}
       <div style={{ marginBottom: '1.25rem' }}>
         <EmployeeAttendanceCard />
+      </div>
+
+      {/* HOD Document Compliance Checklist Widget */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <MyDocumentChecklist title="HOD & Department Head Compliance Records" category="HOD" />
       </div>
 
       {/* Operational Summary Strip with Real-time Badges */}

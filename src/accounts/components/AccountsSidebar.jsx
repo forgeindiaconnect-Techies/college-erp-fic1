@@ -3,7 +3,7 @@ import { SettingsContext } from '../../App';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, CreditCard, AlertCircle, Banknote,
-  Receipt, FileText, LogOut, ChevronRight, ChevronDown,
+  Receipt, FileText, FileCheck, LogOut, ChevronRight, ChevronDown,
   History, PieChart, Award, X, Wallet, FileBarChart,
   UserPlus, Layers, ShieldCheck, CalendarCheck
 } from 'lucide-react';
@@ -11,7 +11,7 @@ import '../../components/layout/Sidebar.css';
 
 const getAccountsSession = () => {
   try {
-    return JSON.parse(sessionStorage.getItem('accounts_session') || '{}') || {
+    return JSON.parse(sessionStorage.getItem('accounts_session') || sessionStorage.getItem('admin_session') || sessionStorage.getItem('superadmin_session') || '{}') || {
       name: 'Finance Admin',
       role: 'Accounts Dept.',
       email: 'finance@college.edu',
@@ -47,9 +47,16 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
   };
 
+  const handleNavClick = () => {
+    if (window.innerWidth <= 768 && onClose) {
+      onClose();
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem('accounts_session');
     sessionStorage.removeItem('accounts_token');
+    if (onClose) onClose();
     navigate('/login');
   };
 
@@ -83,10 +90,22 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
       icon: <Banknote size={20} />,
       items: [
         { name: 'Daily Attendance', path: '/accounts/daily-attendance', icon: <CalendarCheck size={20} /> },
+        { name: 'Monthly Record', path: '/accounts/daily-attendance?tab=monthly', icon: <FileBarChart size={20} /> },
         { name: 'Salary Management', path: '/accounts/salary', icon: <Banknote size={20} /> },
         { name: 'Expense Tracking', path: '/accounts/expenses', icon: <PieChart size={20} /> },
         { name: 'Receipt Generation', path: '/accounts/receipts', icon: <Receipt size={20} /> },
         { name: 'Scholarships', path: '/accounts/scholarships', icon: <Award size={20} /> }
+      ]
+    },
+    {
+      name: 'Document Management',
+      icon: <FileCheck size={20} />,
+      items: [
+        {
+          name: 'Document Tracker',
+          path: '/accounts/document-tracker',
+          icon: <FileCheck size={20} />
+        }
       ]
     },
     {
@@ -114,7 +133,7 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
             Accounts Portal
           </span>
         </div>
-        <button className="sidebar-close-btn" onClick={onClose}>
+        <button className="sidebar-close-btn" onClick={onClose} aria-label="Close sidebar">
           <X size={20} />
         </button>
       </div>
@@ -126,42 +145,49 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
               to="/accounts/dashboard" 
               end={true}
               className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
+              onClick={handleNavClick}
             >
               <LayoutDashboard size={20} />
               <span>Dashboard</span>
             </NavLink>
           </li>
 
-          {menuGroups.map((group, idx) => (
-            <li key={idx} style={{ marginBottom: '0.5rem' }}>
-              <div 
-                className="nav-group-header" 
-                onClick={() => toggleGroup(group.name)}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {group.icon}
-                  <span>{group.name}</span>
+          {menuGroups.map((group, idx) => {
+            const hasActiveItem = group.items.some(item => isItemActive(item.path));
+            const isExpanded = expandedGroups[group.name] !== undefined ? expandedGroups[group.name] : hasActiveItem;
+
+            return (
+              <li key={idx} style={{ marginBottom: '0.5rem' }}>
+                <div 
+                  className={`nav-group-header ${hasActiveItem ? 'active' : ''}`}
+                  onClick={() => toggleGroup(group.name)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {group.icon}
+                    <span>{group.name}</span>
+                  </div>
+                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </div>
-                {expandedGroups[group.name] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              </div>
-              
-              <ul className={`nav-group-items ${expandedGroups[group.name] ? 'expanded' : 'collapsed'}`}>
-                {group.items.map((item, i) => (
-                  <li key={i}>
-                    <NavLink 
-                      to={item.path} 
-                      end={item.exact}
-                      className={() => isItemActive(item.path) ? "nav-link active" : "nav-link"}
-                      style={{ paddingLeft: '2.8rem' }}
-                    >
-                      {item.icon}
-                      <span>{item.name}</span>
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
+                
+                <ul className={`nav-group-items ${isExpanded ? 'expanded' : 'collapsed'}`}>
+                  {group.items.map((item, i) => (
+                    <li key={i}>
+                      <NavLink 
+                        to={item.path} 
+                        end={item.exact}
+                        className={() => isItemActive(item.path) ? "nav-link active" : "nav-link"}
+                        onClick={handleNavClick}
+                        style={{ paddingLeft: '2.8rem' }}
+                      >
+                        {item.icon}
+                        <span>{item.name}</span>
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            );
+          })}
         </ul>
       </nav>
       

@@ -128,9 +128,16 @@ const ParentSidebar = ({ isOpen, onClose }) => {
     }
   ];
 
+  const handleNavClick = () => {
+    if (window.innerWidth <= 768 && onClose) {
+      onClose();
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem('parent_session');
     sessionStorage.removeItem('parent_token');
+    if (onClose) onClose();
     navigate('/login');
   };
 
@@ -181,6 +188,7 @@ const ParentSidebar = ({ isOpen, onClose }) => {
               to="/parent/dashboard"
               end={true}
               className={() => isItemActive('/parent/dashboard') ? 'nav-link active' : 'nav-link'}
+              onClick={handleNavClick}
             >
               <LayoutDashboard size={20} />
               <span>Dashboard</span>
@@ -207,6 +215,7 @@ const ParentSidebar = ({ isOpen, onClose }) => {
                       to={item.path}
                       className={() => isItemActive(item.path) ? 'nav-link active' : 'nav-link'}
                       style={{ paddingLeft: '2.8rem' }}
+                      onClick={handleNavClick}
                     >
                       {item.icon}
                       <span>{item.name}</span>

@@ -3,7 +3,7 @@ import { SettingsContext } from '../../App';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, CalendarCheck, BookOpenCheck,
-  ClipboardList, Calendar, LogOut, ChevronRight, ChevronDown, FileText, Megaphone, GraduationCap, IndianRupee, Briefcase, Library, LifeBuoy
+  ClipboardList, Calendar, LogOut, ChevronRight, ChevronDown, FileText, Megaphone, GraduationCap, IndianRupee, Briefcase, Library, LifeBuoy, X
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -26,6 +26,12 @@ const StaffSidebar = ({ isOpen, onClose }) => {
 
   const toggleGroup = (groupName) => {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
+  };
+
+  const handleNavClick = () => {
+    if (window.innerWidth <= 768 && onClose) {
+      onClose();
+    }
   };
 
   const menuGroups = [
@@ -76,6 +82,7 @@ const StaffSidebar = ({ isOpen, onClose }) => {
   const handleLogout = () => {
     sessionStorage.removeItem('staff_session');
     sessionStorage.removeItem('staff_token');
+    if (onClose) onClose();
     navigate('/login');
   };
 
@@ -83,8 +90,8 @@ const StaffSidebar = ({ isOpen, onClose }) => {
 
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
-      {/* Brand */}
-      <div className="sidebar-header">
+      {/* Brand & Mobile Close Button */}
+      <div className="sidebar-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {collegeSettings?.collegeLogo ? (
           <img 
             src={collegeSettings.collegeLogo} 
@@ -92,10 +99,18 @@ const StaffSidebar = ({ isOpen, onClose }) => {
             style={{ height: '32px', objectFit: 'contain' }} 
           />
         ) : (
-          <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+          <div style={{ fontWeight: 'bold', fontSize: '1.05rem', color: 'var(--sidebar-text-active, #fff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
             {displayCollegeName}
           </div>
         )}
+        <button
+          className="sidebar-close-btn"
+          onClick={onClose}
+          aria-label="Close sidebar"
+          style={{ background: 'transparent', border: 'none', color: '#ffffff', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+        >
+          <X size={22} />
+        </button>
       </div>
 
       {/* Nav links */}
@@ -105,6 +120,7 @@ const StaffSidebar = ({ isOpen, onClose }) => {
             <NavLink
               to="/staff/dashboard"
               className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              onClick={handleNavClick}
             >
               <LayoutDashboard size={20} />
               <span>Dashboard</span>
@@ -131,6 +147,7 @@ const StaffSidebar = ({ isOpen, onClose }) => {
                       to={item.path}
                       className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
                       style={{ paddingLeft: '2.8rem' }}
+                      onClick={handleNavClick}
                     >
                       {item.icon}
                       <span>{item.name}</span>

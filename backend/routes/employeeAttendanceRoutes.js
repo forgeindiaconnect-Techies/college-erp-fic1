@@ -317,7 +317,6 @@ router.post(
         return {
           updateOne: {
             filter: {
-              collegeId,
               employeeId: record.employeeId,
               date: attendanceDate
             },
@@ -580,11 +579,127 @@ router.get('/admin/reports', protect, authorize('Admin', 'Principal', 'Sub Admin
     }
 
     // 4. Fetch Users, EmployeeAttendance, and TransportDriverAttendance
-    const [users, attendanceRecords, driverAttendanceRecords] = await Promise.all([
-      User.find(userFilter).lean(),
-      EmployeeAttendance.find(filter).populate('employeeId', 'name email department designation referenceId role category').lean(),
-      queryDateStr ? TransportDriverAttendance.find({ date: queryDateStr, ...collegeScopeFilter }).lean().catch(() => []) : []
+    const users = await User.find(userFilter).lean();
+    const userIds = users.map(u => u._id);
+    const attQuery = {
+      date: filter.date,
+      $or: [
+        filter,
+        { employeeId: { $in: userIds } }
+      ]
+    };
+
+    // Calculate Month bounds for the requested date (e.g. 2026-10-01 to 2026-10-31)
+    const refDate = queryDateStr ? new Date(`${queryDateStr}T12:00:00Z`) : new Date();
+    const yearNum = refDate.getUTCFullYear();
+    const monthNum = refDate.getUTCMonth() + 1; // 1-12
+    const totalDaysInMonth = new Date(yearNum, monthNum, 0).getDate(); // 30 or 31 days
+    const monthStart = new Date(Date.UTC(yearNum, monthNum - 1, 1, 0, 0, 0));
+    const monthEnd = new Date(Date.UTC(yearNum, monthNum, 0, 23, 59, 59, 999));
+    const monthPrefix = `${yearNum}-${String(monthNum).padStart(2, '0')}`;
+
+    const baseTenantFilter = {
+      $or: [
+        { tenantId: { $in: tenantValues } },
+        { collegeId: { $in: tenantValues } }
+      ]
+    };
+
+    const [attendanceRecords, driverAttendanceRecords, monthlyRecords, driverMonthlyRecords] = await Promise.all([
+      EmployeeAttendance.find(attQuery).populate('employeeId', 'name email department designation referenceId role category').lean(),
+      queryDateStr ? TransportDriverAttendance.find({ date: queryDateStr, ...collegeScopeFilter }).lean().catch(() => []) : [],
+      EmployeeAttendance.find({
+        date: { $gte: monthStart, $lte: monthEnd },
+        $or: [baseTenantFilter, { employeeId: { $in: userIds } }]
+      }).populate('employeeId', 'name email department designation referenceId role category').lean().catch(() => []),
+      TransportDriverAttendance.find({
+        date: { $regex: `^${monthPrefix}` },
+        ...collegeScopeFilter
+      }).lean().catch(() => [])
     ]);
+
+    // Build map of monthly attendance counts per employee with multi-key indexing
+    const monthlyStatsMap = new Map();
+
+    const addToMonthlyStats = (key, status, checkIn, dateStr) => {
+      if (!key) return;
+      const k = String(key).trim();
+      if (!monthlyStatsMap.has(k)) {
+        monthlyStatsMap.set(k, {
+          present: 0,
+          absent: 0,
+          late: 0,
+          leave: 0,
+          lop: 0,
+          totalMarked: 0,
+          datesTracked: new Set()
+        });
+      }
+      const st = monthlyStatsMap.get(k);
+      const dateKey = String(dateStr || '').split('T')[0];
+      if (dateKey && st.datesTracked.has(dateKey)) {
+        return; // already counted for this date
+      }
+      if (dateKey) st.datesTracked.add(dateKey);
+
+      st.totalMarked += 1;
+      const s = String(status || '').toLowerCase();
+      if (s === 'present' || s === 'late' || s === 'half day' || checkIn) {
+        st.present += 1;
+      }
+      if (s === 'absent') st.absent += 1;
+      if (s === 'late') st.late += 1;
+      if (s === 'leave' || s === 'on leave') st.leave += 1;
+      if (s === 'lop') st.lop += 1;
+    };
+
+    monthlyRecords.forEach(r => {
+      const emp = r.employeeId || {};
+      const empId = emp._id ? emp._id.toString() : (r.employeeId ? r.employeeId.toString() : null);
+      const email = emp.email ? String(emp.email).toLowerCase() : null;
+      const refId = emp.referenceId ? String(emp.referenceId).toUpperCase() : null;
+      const name = emp.name ? String(emp.name).toLowerCase() : null;
+      const dStr = r.date ? new Date(r.date).toISOString().split('T')[0] : '';
+
+      [empId, email, refId, name].filter(Boolean).forEach(k => {
+        addToMonthlyStats(k, r.status, r.checkIn, dStr);
+      });
+    });
+
+    driverMonthlyRecords.forEach(dr => {
+      const drvId = dr.driverId ? String(dr.driverId).toUpperCase() : null;
+      const drvName = dr.driverName ? String(dr.driverName).toLowerCase() : null;
+      const dStr = dr.date ? String(dr.date).split('T')[0] : '';
+
+      [drvId, drvName].filter(Boolean).forEach(k => {
+        addToMonthlyStats(k, dr.status, dr.checkInTime, dStr);
+      });
+    });
+
+    const getMonthlyAttendancePayload = (userOrEmp) => {
+      let m = null;
+      if (userOrEmp) {
+        const id = userOrEmp._id ? userOrEmp._id.toString() : (typeof userOrEmp === 'string' ? userOrEmp : '');
+        const email = userOrEmp.email ? String(userOrEmp.email).toLowerCase() : '';
+        const refId = userOrEmp.referenceId ? String(userOrEmp.referenceId).toUpperCase() : '';
+        const name = userOrEmp.name ? String(userOrEmp.name).toLowerCase() : '';
+
+        m = monthlyStatsMap.get(id) || monthlyStatsMap.get(email) || monthlyStatsMap.get(refId) || monthlyStatsMap.get(name);
+      }
+      m = m || { present: 0, absent: 0, late: 0, leave: 0, lop: 0, totalMarked: 0 };
+      const presentCount = m.present;
+      return {
+        presentDays: presentCount,
+        absentDays: m.absent,
+        leaveDays: m.leave,
+        lateDays: m.late,
+        lopDays: m.lop,
+        totalMarkedDays: m.totalMarked,
+        totalDaysInMonth: 30,
+        percentage: Number(((presentCount / 30) * 100).toFixed(1)),
+        monthName: refDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      };
+    };
     
     const attendanceMap = new Map();
     const handledAttendanceIds = new Set();
@@ -622,12 +737,14 @@ router.get('/admin/reports', protect, authorize('Admin', 'Principal', 'Sub Admin
         : null;
 
       const { category: employeeCategory, designation: employeeDesignation } = getEmployeeClassification(user);
+      const monthlyAttendance = getMonthlyAttendancePayload(user);
 
       if (record) {
         return {
           ...record,
           category: employeeCategory,
           role: user.role,
+          monthlyAttendance,
           employeeId: {
             _id: user._id,
             name: user.name,
@@ -658,7 +775,8 @@ router.get('/admin/reports', protect, authorize('Admin', 'Principal', 'Sub Admin
           checkIn: driverRecord.checkInTime ? new Date(`${queryDateStr || new Date().toISOString().split('T')[0]}T${driverRecord.checkInTime}`) : null,
           checkOut: driverRecord.checkOutTime ? new Date(`${queryDateStr || new Date().toISOString().split('T')[0]}T${driverRecord.checkOutTime}`) : null,
           status: driverRecord.status || 'Present',
-          remarks: driverRecord.remarks || ''
+          remarks: driverRecord.remarks || '',
+          monthlyAttendance
         };
       }
 
@@ -675,6 +793,7 @@ router.get('/admin/reports', protect, authorize('Admin', 'Principal', 'Sub Admin
         },
         role: user.role,
         category: employeeCategory,
+        monthlyAttendance,
         date: filter.date || new Date(),
         checkIn: null,
         checkOut: null,
@@ -688,10 +807,12 @@ router.get('/admin/reports', protect, authorize('Admin', 'Principal', 'Sub Admin
       if (recId && !handledAttendanceIds.has(recId)) {
         const empObj = typeof record.employeeId === 'object' && record.employeeId !== null ? record.employeeId : {};
         const { category: empCat, designation: empDes } = getEmployeeClassification(empObj);
+        const empId = empObj._id || record.employeeId;
         fullReports.push({
           ...record,
           category: empCat,
           role: record.role || empObj.role,
+          monthlyAttendance: getMonthlyAttendancePayload(empObj._id ? empObj : record),
           employeeId: {
             _id: empObj._id || record.employeeId || recId,
             name: empObj.name || record.name || 'Employee',
@@ -769,40 +890,88 @@ router.get('/admin/reports', protect, authorize('Admin', 'Principal', 'Sub Admin
 // Return aggregated attendance statistics per employee
 router.get('/stats', protect, authorize('Admin', 'Principal', 'Sub Admin', 'HOD', 'Accounts'), collegeScope, async (req, res) => {
   try {
-    const query = {
-      tenantId: {
-        $in: [req.collegeId, 'unassigned_college', 'mock_college_id']
-      }
-    };
+    const tenantValues = [
+      req.collegeId,
+      req.user?.tenantId,
+      req.user?.collegeId,
+      'unassigned_college',
+      'mock_college_id'
+    ].filter(Boolean);
 
     const { month } = req.query;
+    let queryDate = new Date();
+    let yearNumber = queryDate.getFullYear();
+    let monthNumber = queryDate.getMonth() + 1;
 
     if (month && /^\d{4}-\d{2}$/.test(month)) {
-      const [year, monthNumber] = month.split('-').map(Number);
-      const startDate = new Date(Date.UTC(year, monthNumber - 1, 1));
-      const endDate = new Date(Date.UTC(year, monthNumber, 1));
-
-      query.date = {
-        $gte: startDate,
-        $lt: endDate
-      };
+      const parts = month.split('-').map(Number);
+      yearNumber = parts[0];
+      monthNumber = parts[1];
     }
 
-    const records = await EmployeeAttendance.find(query);
+    const startDate = new Date(Date.UTC(yearNumber, monthNumber - 1, 1, 0, 0, 0));
+    const endDate = new Date(Date.UTC(yearNumber, monthNumber, 0, 23, 59, 59, 999));
+    const totalDaysInMonth = new Date(yearNumber, monthNumber, 0).getDate(); // 30 or 31
+
+    const userFilter = {
+      $or: [
+        { tenantId: { $in: tenantValues } },
+        { collegeId: { $in: tenantValues } }
+      ]
+    };
+    const collegeUsers = await User.find(userFilter).select('_id referenceId email name role').lean();
+    const userIds = collegeUsers.map(u => u._id);
+
+    const records = await EmployeeAttendance.find({
+      date: { $gte: startDate, $lte: endDate },
+      $or: [
+        { tenantId: { $in: tenantValues } },
+        { collegeId: { $in: tenantValues } },
+        { employeeId: { $in: userIds } }
+      ]
+    }).lean();
 
     const statsByEmployee = {};
+
+    // Initialize all users so even employees with 0 attendance have correct structure
+    collegeUsers.forEach(u => {
+      const uId = u._id.toString();
+      statsByEmployee[uId] = {
+        employeeId: uId,
+        name: u.name,
+        role: u.role,
+        total: 0,
+        present: 0,
+        presentDays: 0,
+        absent: 0,
+        absentDays: 0,
+        late: 0,
+        leave: 0,
+        leaveDays: 0,
+        lop: 0,
+        totalDaysInMonth,
+        percentage: 0
+      };
+    });
+
     records.forEach(r => {
       const empId = r.employeeId ? r.employeeId.toString() : null;
       if (!empId) return;
 
       if (!statsByEmployee[empId]) {
         statsByEmployee[empId] = {
+          employeeId: empId,
           total: 0,
           present: 0,
+          presentDays: 0,
           absent: 0,
+          absentDays: 0,
           late: 0,
           leave: 0,
-          lop: 0
+          leaveDays: 0,
+          lop: 0,
+          totalDaysInMonth,
+          percentage: 0
         };
       }
 
@@ -811,29 +980,32 @@ router.get('/stats', protect, authorize('Admin', 'Principal', 'Sub Admin', 'HOD'
 
       stat.total += 1;
 
-      if (status === 'present' || status === 'late' || r.checkIn) {
+      if (status === 'present' || status === 'late' || status === 'half day' || r.checkIn) {
         stat.present += 1;
+        stat.presentDays += 1;
       }
-      if (status === 'absent') stat.absent += 1;
+      if (status === 'absent') { stat.absent += 1; stat.absentDays += 1; }
       if (status === 'late') stat.late += 1;
-      if (status === 'leave' || status === 'on leave') stat.leave += 1;
+      if (status === 'leave' || status === 'on leave') { stat.leave += 1; stat.leaveDays += 1; }
       if (status === 'lop') stat.lop += 1;
     });
 
-    const employeeIds = Object.keys(statsByEmployee);
+    // Compute percentages
+    Object.values(statsByEmployee).forEach(st => {
+      st.totalDaysInMonth = totalDaysInMonth;
+      st.percentage = totalDaysInMonth > 0 ? Number(((st.present / totalDaysInMonth) * 100).toFixed(1)) : 0;
+    });
 
-    const users = await User.find({
-      _id: { $in: employeeIds }
-    }).select('_id referenceId email');
-
-    users.forEach(user => {
-      if (user.referenceId) {
-        statsByEmployee[user.referenceId] =
-          statsByEmployee[user._id.toString()];
-      }
-      if (user.email) {
-        statsByEmployee[user.email.toLowerCase()] =
-          statsByEmployee[user._id.toString()];
+    collegeUsers.forEach(user => {
+      const uId = user._id.toString();
+      const baseStat = statsByEmployee[uId];
+      if (baseStat) {
+        if (user.referenceId) {
+          statsByEmployee[user.referenceId] = baseStat;
+        }
+        if (user.email) {
+          statsByEmployee[user.email.toLowerCase()] = baseStat;
+        }
       }
     });
 

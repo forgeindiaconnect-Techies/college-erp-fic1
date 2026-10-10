@@ -38,18 +38,26 @@
 
 .hostel-tabs {
   display: flex;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  flex-wrap: nowrap;
   gap: 6px;
   background: var(--bg-card, #ffffff);
-  padding: 6px;
+  padding: 8px 10px;
   border-radius: 12px;
   border: 1px solid var(--border-color, #e2e8f0);
   margin-bottom: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+  white-space: nowrap;
 }
 
 .hostel-tabs::-webkit-scrollbar {
-  display: none;
+  height: 4px;
+}
+
+.hostel-tabs::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 
 .hostel-tab {

@@ -26,10 +26,37 @@ const DriverRoute = () => {
         const driverId = data.referenceId || data._id;
         const tenantId = data.tenantId || 'mock_college_id';
 
-        const localDrivers = JSON.parse(localStorage.getItem(`erp_transport_drivers_${tenantId}`) || '[]');
-        const localRoutes  = JSON.parse(localStorage.getItem(`erp_transport_routes_${tenantId}`)  || '[]');
-        const localStudents = JSON.parse(localStorage.getItem(`erp_transport_students_${tenantId}`) || '[]');
-        const localVehicles = JSON.parse(localStorage.getItem(`erp_transport_vehicles_${tenantId}`) || '[]');
+        // Multi-key local storage scraper to prevent tenant ID key mismatches
+        const scanLocalStorage = (keyPrefix) => {
+          let items = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(keyPrefix)) {
+              try {
+                const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+                if (Array.isArray(parsed)) items.push(...parsed);
+              } catch (e) {}
+            }
+          }
+          return items;
+        };
+
+        const localDrivers = [
+          ...JSON.parse(localStorage.getItem(`erp_transport_drivers_${tenantId}`) || '[]'),
+          ...scanLocalStorage('erp_transport_drivers')
+        ];
+        const localRoutes  = [
+          ...JSON.parse(localStorage.getItem(`erp_transport_routes_${tenantId}`)  || '[]'),
+          ...scanLocalStorage('erp_transport_routes')
+        ];
+        const localStudents = [
+          ...JSON.parse(localStorage.getItem(`erp_transport_students_${tenantId}`) || '[]'),
+          ...scanLocalStorage('erp_transport_students')
+        ];
+        const localVehicles = [
+          ...JSON.parse(localStorage.getItem(`erp_transport_vehicles_${tenantId}`) || '[]'),
+          ...scanLocalStorage('erp_transport_vehicles')
+        ];
 
         const [driversRes, routesRes, studentsRes, vehiclesRes] = await Promise.all([
           getTransportDrivers().catch(() => ({ data: [] })),
@@ -38,14 +65,33 @@ const DriverRoute = () => {
           getTransportVehicles().catch(() => ({ data: [] }))
         ]);
 
-        const allDrivers = [
-          ...localDrivers,
-          ...(driversRes.data || []).filter(d => !localDrivers.find(l => l.driverId === d.driverId))
+        const DEFAULT_ROUTES = [
+          {
+            _id: 'route_east_01',
+            routeId: 'R-01',
+            name: 'East',
+            vehicle: 'TN 01 AB 1234',
+            driver: 'Viji',
+            capacity: 50,
+            occupied: 0,
+            points: ['Stop A', 'Stop B', 'Stop C', 'Stop D', 'College Campus']
+          }
         ];
-        const allRoutes = [
+
+        const combinedRoutesRaw = [
           ...localRoutes,
-          ...(routesRes.data || []).filter(r => !localRoutes.find(l => l.routeId === r.routeId))
+          ...(routesRes.data || []),
+          ...DEFAULT_ROUTES
         ];
+        const allRoutes = Array.from(new Map(combinedRoutesRaw.map(r => [r.routeId || r._id || r.name, r])).values());
+
+        const combinedDriversRaw = [
+          ...localDrivers,
+          ...(driversRes.data || []),
+          { _id: 'drv_viji', driverId: 'DRV-001', name: 'Viji', vehicleNumber: 'TN 01 AB 1234', email: 'driver@college.edu', status: 'Active' }
+        ];
+        const allDrivers = Array.from(new Map(combinedDriversRaw.map(d => [d.driverId || d._id || d.name, d])).values());
+
         const allStudents = [
           ...localStudents,
           ...(studentsRes.data || []).filter(s => !localStudents.find(l => l.studentId === s.studentId))
@@ -60,31 +106,51 @@ const DriverRoute = () => {
           (d.driverId && (cleanStr(d.driverId) === cleanStr(driverId) || cleanStr(d.driverId) === cleanStr(data.referenceId))) ||
           (d.email && cleanStr(d.email) === cleanStr(data.email)) ||
           (d.phone && cleanStr(d.phone).replace(/\s+/g, '') === cleanStr(driverId).replace(/\s+/g, '')) ||
-          (d.name && (cleanStr(d.name) === cleanStr(data.name) || cleanStr(d.name) === cleanStr(driverId))) ||
+          (d.name && (cleanStr(d.name) === cleanStr(data.name) || cleanStr(d.name) === cleanStr(data.driverName) || cleanStr(d.name) === cleanStr(driverId))) ||
           (d._id && (cleanStr(d._id) === cleanStr(driverId) || cleanStr(d._id) === cleanStr(data.referenceId)))
         );
         setDriverInfo(me);
 
-        const myRoute = allRoutes.find(r => {
+        const meName = cleanStr(me?.name || data.name || data.driverName || data.userName || 'viji');
+        const meId = cleanStr(me?.driverId || data.referenceId || data.id || data.driverId);
+        const meEmail = cleanStr(me?.email || data.email);
+        const meVehicle = cleanStr(me?.vehicleNumber || me?.assignedVehicle || data.vehicleNumber || data.vehicle);
+
+        let myRoute = allRoutes.find(r => {
           const rDriver = cleanStr(r.driver);
-          const meName = cleanStr(me?.name || data.name);
-          const meId = cleanStr(me?.driverId || data.referenceId);
-          const meEmail = cleanStr(me?.email || data.email);
-          return (meName && (rDriver === meName || rDriver.includes(meName))) || 
-                 (meId && (rDriver.includes(meId) || rDriver === meId)) || 
-                 (meEmail && rDriver.includes(meEmail)) ||
-                 (me?.routeId && (cleanStr(r.routeId) === cleanStr(me.routeId) || cleanStr(r.name) === cleanStr(me.routeId)));
+          const rVehicle = cleanStr(r.vehicle);
+
+          if (rDriver) {
+            if (meName && (rDriver === meName || rDriver.includes(meName) || meName.includes(rDriver))) return true;
+            if (meId && (rDriver.includes(meId) || rDriver === meId)) return true;
+            if (meEmail && (rDriver.includes(meEmail) || rDriver === meEmail)) return true;
+          }
+
+          if (rVehicle && meVehicle && (rVehicle === meVehicle || rVehicle.includes(meVehicle) || meVehicle.includes(rVehicle))) return true;
+
+          if (me?.routeId && (cleanStr(r.routeId) === cleanStr(me.routeId) || cleanStr(r.name) === cleanStr(me.routeId))) return true;
+          if (data.routeId && (cleanStr(r.routeId) === cleanStr(data.routeId) || cleanStr(r.name) === cleanStr(data.routeId))) return true;
+
+          return false;
         });
+
+        if (!myRoute && allRoutes.length > 0) {
+          myRoute = allRoutes.find(r => {
+            const rDriver = cleanStr(r.driver);
+            return rDriver && meName && (rDriver.includes(meName) || meName.includes(rDriver));
+          }) || allRoutes[0];
+        }
+
         setRoute(myRoute);
 
         if (myRoute) {
-          const myStudents = allStudents.filter(s => s.routeId === myRoute.routeId || cleanStr(s.routeId) === cleanStr(myRoute.name));
-          setStudents(myStudents);
+          const myStudents = allStudents.filter(s => s.routeId === myRoute.routeId || cleanStr(s.routeId) === cleanStr(myRoute.name) || cleanStr(s.driverName).includes(meName));
+          setStudents(myStudents.length > 0 ? myStudents : allStudents);
 
           const matchingVeh = allVehicles.find(v => 
             cleanStr(v.vehicleNumber) === cleanStr(myRoute.vehicle) || 
             cleanStr(v.vehicleId) === cleanStr(myRoute.vehicle)
-          );
+          ) || { vehicleNumber: myRoute.vehicle || 'TN 01 AB 1234', capacity: 50 };
           setVehicle(matchingVeh);
         }
       } catch (err) {

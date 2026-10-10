@@ -12,6 +12,7 @@ import TransportDriverAttendance from '../models/TransportDriverAttendance.js';
 import TransportNotification from '../models/TransportNotification.js';
 import { protect, authorize, collegeScope } from '../middleware/authMiddleware.js';
 import User from '../models/User.js';
+import Student from '../models/Student.js';
 
 const router = express.Router();
 
@@ -426,14 +427,54 @@ router.delete('/drivers/:id', protect, collegeScope, async (req, res) => {
 // @access  Private
 router.get('/students', protect, collegeScope, async (req, res) => {
   try {
-    const students = await TransportStudent.find({})
-      .populate({
-        path: 'studentProfile',
-        populate: { path: 'user', select: 'name email phone' }
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const filter = (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system')
+      ? { $or: [{ collegeId }, { tenantId: collegeId }, { collegeId: { $exists: false } }] }
+      : {};
+
+    const transportStudents = await TransportStudent.find(filter).lean();
+    
+    // Also fetch Student documents with transportRequired or busRoute
+    const regularStudents = await Student.find({
+      ...filter,
+      $or: [
+        { transportRequired: { $in: ['yes', 'true', true] } },
+        { busRoute: { $exists: true, $ne: '' } }
+      ]
+    }).lean();
+
+    const map = new Map();
+    
+    // First index TransportStudent entries
+    transportStudents.forEach(ts => {
+      if (ts.studentId) {
+        map.set(String(ts.studentId), { ...ts });
+      }
+    });
+
+    // Merge regular Student admissions
+    regularStudents.forEach(rs => {
+      const sId = String(rs.id || rs.admissionNo || rs._id);
+      const existing = map.get(sId) || {};
+      map.set(sId, {
+        _id: rs._id,
+        studentId: sId,
+        name: rs.name || rs.studentName || [rs.firstName, rs.lastName].filter(Boolean).join(' ') || 'Student',
+        routeId: existing.routeId || rs.busRoute || rs.transportRoute || '',
+        pickupPoint: existing.pickupPoint || rs.pickupPoint || 'Campus Gate',
+        feeStatus: existing.feeStatus || rs.transportFeeStatus || (rs.paymentStatus === 'Paid' ? 'Paid' : 'Pending'),
+        amount: existing.amount !== undefined ? existing.amount : Number(rs.transportFeeAmount || rs.transportFee || 0),
+        vehicleNumber: existing.vehicleNumber || rs.vehicleNumber || rs.busNumber || '',
+        driverName: existing.driverName || rs.driverName || '',
+        driverContact: existing.driverContact || rs.driverPhone || rs.driverContact || '',
+        collegeId: rs.collegeId || rs.tenantId || collegeId
       });
-    res.json(students);
+    });
+
+    res.json(Array.from(map.values()));
   } catch (error) {
-    res.status(500).json({ message: 'Server Error fetching students' });
+    console.error('Error fetching transport students:', error);
+    res.status(500).json({ message: 'Server Error fetching transport students' });
   }
 });
 
@@ -442,19 +483,41 @@ router.get('/students', protect, collegeScope, async (req, res) => {
 // @access  Private
 router.get('/students/:id', protect, collegeScope, async (req, res) => {
   try {
+    const queryId = req.params.id;
     let student = null;
-    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
-      student = await TransportStudent.findById(req.params.id).populate({
-        path: 'studentProfile',
-        populate: { path: 'user', select: 'name email phone' }
-      });
+    if (mongoose.Types.ObjectId.isValid(queryId)) {
+      student = await TransportStudent.findById(queryId).lean();
     }
     if (!student) {
-      student = await TransportStudent.findOne({ studentId: req.params.id }).populate({
-        path: 'studentProfile',
-        populate: { path: 'user', select: 'name email phone' }
-      });
+      student = await TransportStudent.findOne({ studentId: queryId }).lean();
     }
+    
+    // Fallback to Student collection if not in TransportStudent collection
+    if (!student) {
+      let regStudent = null;
+      if (mongoose.Types.ObjectId.isValid(queryId)) {
+        regStudent = await Student.findById(queryId).lean();
+      }
+      if (!regStudent) {
+        regStudent = await Student.findOne({ $or: [{ id: queryId }, { admissionNo: queryId }] }).lean();
+      }
+      if (regStudent) {
+        student = {
+          _id: regStudent._id,
+          studentId: regStudent.id || regStudent.admissionNo || String(regStudent._id),
+          name: regStudent.name || regStudent.studentName || 'Student',
+          routeId: regStudent.busRoute || regStudent.transportRoute || '',
+          pickupPoint: regStudent.pickupPoint || 'Campus Gate',
+          feeStatus: regStudent.transportFeeStatus || (regStudent.paymentStatus === 'Paid' ? 'Paid' : 'Pending'),
+          amount: Number(regStudent.transportFeeAmount || regStudent.transportFee || 0),
+          vehicleNumber: regStudent.vehicleNumber || regStudent.busNumber || '',
+          driverName: regStudent.driverName || '',
+          driverContact: regStudent.driverContact || regStudent.driverPhone || '',
+          collegeId: regStudent.collegeId || regStudent.tenantId
+        };
+      }
+    }
+
     if (!student) {
       return res.status(404).json({ message: 'Transport student record not found' });
     }
@@ -469,7 +532,20 @@ router.get('/students/:id', protect, collegeScope, async (req, res) => {
 // @access  Private
 router.post('/students', protect, collegeScope, async (req, res) => {
   try {
-    const { studentId, name, routeId, pickupPoint, feeStatus, amount } = req.body;
+    const { studentId, name, routeId, pickupPoint, feeStatus, amount, vehicleNumber, driverName, driverContact } = req.body;
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId || '';
+
+    let route = await TransportRoute.findOne({
+      $or: [{ routeId }, { name: routeId }],
+      ...(collegeId ? { collegeId } : {})
+    });
+    if (!route) {
+      route = await TransportRoute.findOne({ $or: [{ routeId }, { name: routeId }] });
+    }
+
+    const assignedVehicle = vehicleNumber || route?.vehicle || '';
+    const assignedDriver = driverName || route?.driver || '';
+
     let student = await TransportStudent.findOne({ studentId });
     if (student) {
       student.name = name || student.name;
@@ -477,6 +553,9 @@ router.post('/students', protect, collegeScope, async (req, res) => {
       student.pickupPoint = pickupPoint || student.pickupPoint;
       if (feeStatus) student.feeStatus = feeStatus;
       if (amount !== undefined) student.amount = amount;
+      if (assignedVehicle) student.vehicleNumber = assignedVehicle;
+      if (assignedDriver) student.driverName = assignedDriver;
+      if (collegeId) student.collegeId = collegeId;
       await student.save();
     } else {
       student = await TransportStudent.create({
@@ -485,11 +564,41 @@ router.post('/students', protect, collegeScope, async (req, res) => {
         routeId,
         pickupPoint: pickupPoint || 'Campus Gate',
         feeStatus: feeStatus || 'Pending',
-        amount: amount || 0
+        amount: amount || 0,
+        vehicleNumber: assignedVehicle,
+        driverName: assignedDriver,
+        collegeId
       });
     }
+
+    // ALSO UPDATE MATCHING STUDENT DOCUMENT IN MONGODB
+    let regStudent = await Student.findOne({
+      $or: [
+        { id: studentId },
+        { admissionNo: studentId },
+        ...(mongoose.Types.ObjectId.isValid(studentId) ? [{ _id: studentId }] : [])
+      ]
+    });
+
+    if (regStudent) {
+      regStudent.transportRequired = 'yes';
+      regStudent.busRoute = routeId || route?.name || '';
+      regStudent.pickupPoint = pickupPoint || regStudent.pickupPoint || 'Campus Gate';
+      regStudent.vehicleNumber = assignedVehicle;
+      regStudent.busNumber = assignedVehicle;
+      regStudent.driverName = assignedDriver;
+      if (driverContact) regStudent.driverContact = driverContact;
+      if (amount !== undefined) regStudent.transportFeeAmount = Number(amount);
+      if (feeStatus) regStudent.transportFeeStatus = feeStatus;
+      await regStudent.save();
+    }
+
+    req.app.get('io')?.emit('dataUpdated', { module: 'transport', action: 'allocated', studentId });
+    req.app.get('io')?.emit('dataUpdated', { module: 'students', action: 'updated', studentId });
+
     res.status(201).json(student);
   } catch (error) {
+    console.error('Error allocating transport student:', error);
     res.status(500).json({ message: error.message || 'Server Error allocating student' });
   }
 });
@@ -504,6 +613,26 @@ router.put('/students/:id', protect, collegeScope, async (req, res) => {
       req.body,
       { new: true }
     );
+    
+    if (student && student.studentId) {
+      let regStudent = await Student.findOne({
+        $or: [
+          { id: student.studentId },
+          { admissionNo: student.studentId },
+          ...(mongoose.Types.ObjectId.isValid(student.studentId) ? [{ _id: student.studentId }] : [])
+        ]
+      });
+
+      if (regStudent) {
+        if (req.body.routeId) regStudent.busRoute = req.body.routeId;
+        if (req.body.pickupPoint) regStudent.pickupPoint = req.body.pickupPoint;
+        if (req.body.feeStatus) regStudent.transportFeeStatus = req.body.feeStatus;
+        if (req.body.amount !== undefined) regStudent.transportFeeAmount = Number(req.body.amount);
+        await regStudent.save();
+      }
+    }
+
+    req.app.get('io')?.emit('dataUpdated', { module: 'transport', action: 'updated', id: req.params.id });
     res.json(student);
   } catch (error) {
     res.status(500).json({ message: error.message || 'Server Error updating student' });

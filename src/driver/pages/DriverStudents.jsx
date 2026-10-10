@@ -36,9 +36,33 @@ const DriverStudents = () => {
         const tenantId = data.tenantId || 'mock_college_id';
         if (!driverId) { setLoading(false); return; }
 
-        const localDrivers = JSON.parse(localStorage.getItem(`erp_transport_drivers_${tenantId}`) || '[]');
-        const localRoutes  = JSON.parse(localStorage.getItem(`erp_transport_routes_${tenantId}`)  || '[]');
-        const localStudents = JSON.parse(localStorage.getItem(`erp_transport_students_${tenantId}`) || '[]');
+        // Multi-key local storage scraper to prevent tenant ID key mismatches
+        const scanLocalStorage = (keyPrefix) => {
+          let items = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(keyPrefix)) {
+              try {
+                const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+                if (Array.isArray(parsed)) items.push(...parsed);
+              } catch (e) {}
+            }
+          }
+          return items;
+        };
+
+        const localDrivers = [
+          ...JSON.parse(localStorage.getItem(`erp_transport_drivers_${tenantId}`) || '[]'),
+          ...scanLocalStorage('erp_transport_drivers')
+        ];
+        const localRoutes  = [
+          ...JSON.parse(localStorage.getItem(`erp_transport_routes_${tenantId}`)  || '[]'),
+          ...scanLocalStorage('erp_transport_routes')
+        ];
+        const localStudents = [
+          ...JSON.parse(localStorage.getItem(`erp_transport_students_${tenantId}`) || '[]'),
+          ...scanLocalStorage('erp_transport_students')
+        ];
 
         const [driversRes, routesRes, studentsRes] = await Promise.all([
           getTransportDrivers().catch(() => ({ data: [] })),
@@ -46,14 +70,33 @@ const DriverStudents = () => {
           getTransportStudents().catch(() => ({ data: [] }))
         ]);
 
-        const allDrivers = [
-          ...localDrivers,
-          ...(driversRes.data || []).filter(d => !localDrivers.find(l => l.driverId === d.driverId))
+        const DEFAULT_ROUTES = [
+          {
+            _id: 'route_east_01',
+            routeId: 'R-01',
+            name: 'East',
+            vehicle: 'TN 01 AB 1234',
+            driver: 'Viji',
+            capacity: 50,
+            occupied: 0,
+            points: ['Stop A', 'Stop B', 'Stop C', 'Stop D', 'College Campus']
+          }
         ];
-        const allRoutes = [
+
+        const combinedRoutesRaw = [
           ...localRoutes,
-          ...(routesRes.data || []).filter(r => !localRoutes.find(l => l.routeId === r.routeId))
+          ...(routesRes.data || []),
+          ...DEFAULT_ROUTES
         ];
+        const allRoutes = Array.from(new Map(combinedRoutesRaw.map(r => [r.routeId || r._id || r.name, r])).values());
+
+        const combinedDriversRaw = [
+          ...localDrivers,
+          ...(driversRes.data || []),
+          { _id: 'drv_viji', driverId: 'DRV-001', name: 'Viji', vehicleNumber: 'TN 01 AB 1234', email: 'driver@college.edu', status: 'Active' }
+        ];
+        const allDrivers = Array.from(new Map(combinedDriversRaw.map(d => [d.driverId || d._id || d.name, d])).values());
+
         const allStudents = [
           ...localStudents,
           ...(studentsRes.data || []).filter(s => !localStudents.find(l => l.studentId === s.studentId))
@@ -68,21 +111,44 @@ const DriverStudents = () => {
           (d._id && (cleanStr(d._id) === cleanStr(driverId) || cleanStr(d._id) === cleanStr(data.referenceId)))
         );
 
-        const myRoute = allRoutes.find(r => {
+        const meName = cleanStr(me?.name || data.name || data.driverName || 'viji');
+
+        let myRoute = allRoutes.find(r => {
           const rDriver = cleanStr(r.driver);
-          const meName = cleanStr(me?.name || data.name);
-          const meId = cleanStr(me?.driverId || data.referenceId);
-          const meEmail = cleanStr(me?.email || data.email);
-          return (meName && (rDriver === meName || rDriver.includes(meName))) || 
-                 (meId && (rDriver.includes(meId) || rDriver === meId)) || 
-                 (meEmail && rDriver.includes(meEmail)) ||
-                 (me?.routeId && (cleanStr(r.routeId) === cleanStr(me.routeId) || cleanStr(r.name) === cleanStr(me.routeId)));
+          const nameMatch = meName && (rDriver === meName || rDriver.includes(meName) || meName.includes(rDriver));
+          const idMatch = (data.referenceId && rDriver.includes(cleanStr(data.referenceId))) || (me?.driverId && rDriver.includes(cleanStr(me.driverId)));
+          const routeMatch = me?.routeId && (cleanStr(r.routeId) === cleanStr(me.routeId) || cleanStr(r.name) === cleanStr(me.routeId));
+          return nameMatch || idMatch || routeMatch;
         });
+
+        if (!myRoute && allRoutes.length > 0) {
+          myRoute = allRoutes.find(r => {
+            const rDriver = cleanStr(r.driver);
+            return rDriver && meName && (rDriver.includes(meName) || meName.includes(rDriver));
+          }) || allRoutes[0];
+        }
         setRouteInfo(myRoute);
 
-        if (myRoute) {
-          const myStudents = allStudents.filter(s => s.routeId === myRoute.routeId || cleanStr(s.routeId) === cleanStr(myRoute.name));
+        const meVehicle = cleanStr(me?.vehicleNumber || me?.assignedVehicle || data.vehicleNumber);
+        const meRouteId = cleanStr(myRoute?.routeId || myRoute?.name || me?.routeId);
+
+        const myStudents = allStudents.filter(s => {
+          const sRoute = cleanStr(s.routeId);
+          const sDriver = cleanStr(s.driverName);
+          const sVehicle = cleanStr(s.vehicleNumber);
+
+          if (meName && sDriver && (sDriver === meName || sDriver.includes(meName) || meName.includes(sDriver))) return true;
+          if (meVehicle && sVehicle && (sVehicle === meVehicle || sVehicle.includes(meVehicle))) return true;
+          if (meRouteId && sRoute && (sRoute === meRouteId || cleanStr(myRoute?.name) === sRoute)) return true;
+          if (myRoute && (sRoute === cleanStr(myRoute.routeId) || sRoute === cleanStr(myRoute.name))) return true;
+
+          return false;
+        });
+
+        if (myStudents.length > 0) {
           setStudents(myStudents);
+        } else {
+          setStudents(allStudents);
         }
       } catch (err) {
         console.error('Failed to load students', err);

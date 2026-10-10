@@ -16,6 +16,8 @@ const LeavesManagement = () => {
 
   useEffect(() => {
     fetchLeaves();
+    window.addEventListener('storage', fetchLeaves);
+    return () => window.removeEventListener('storage', fetchLeaves);
   }, []);
 
   const fetchLeaves = () => {
@@ -31,9 +33,10 @@ const LeavesManagement = () => {
   };
 
   const handleAction = (id, newStatus) => {
-    const updated = leaves.map(l => l.id === id ? { ...l, status: newStatus } : l);
+    const updated = leaves.map(l => l.id === id ? { ...l, status: newStatus, approvedBy: newStatus === 'Approved' ? 'Admin Office' : l.approvedBy } : l);
     setLeaves(updated);
     localStorage.setItem(`erp_leave_requests_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(updated));
+    window.dispatchEvent(new Event('storage'));
   };
 
   const filtered = leaves.filter(l => {
@@ -52,87 +55,141 @@ const LeavesManagement = () => {
   });
 
   return (
-    <div className="leaves-management animate-fade-in">
-      <div className="page-header">
+    <div className="leaves-management animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      
+      {/* Page Header */}
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', background: '#ffffff', padding: '20px 24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
         <div>
-          <h1>Leave Requests Console</h1>
-          <p className="text-muted">Review, approve, or reject absence requests submitted by students and faculty staff globally.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+              Institutional Leave Console
+            </h1>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', background: '#eff6ff', padding: '3px 10px', borderRadius: '20px', border: '1px solid #bfdbfe' }}>
+              Central HRMS Admin
+            </span>
+          </div>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.88rem', fontWeight: 500 }}>
+            Audit, authorize, or decline institutional absence applications submitted by students, faculty, and HODs institution-wide.
+          </p>
         </div>
-      </div>
 
-      <div className="sm-summary-row" style={{ marginTop: '1.5rem' }}>
-        <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Pending Review</span>
-          <span className="sm-summary-value text-warning-c">
-            {leaves.filter(l => (l.status || 'Pending') === 'Pending').length} Request(s)
-          </span>
-        </div>
-        <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Approved Leaves</span>
-          <span className="sm-summary-value text-success">
-            {leaves.filter(l => (l.status || 'Pending') === 'Approved').length} Request(s)
-          </span>
-        </div>
-        <div className="sm-summary-card glass-card">
-          <span className="sm-summary-label">Rejected Leaves</span>
-          <span className="sm-summary-value text-muted">
-            {leaves.filter(l => (l.status || 'Pending') === 'Rejected').length} Request(s)
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#059669', background: '#ecfdf5', padding: '6px 14px', borderRadius: '10px', border: '1px solid #a7f3d0' }}>
+            Real-Time Live Sync Active
           </span>
         </div>
       </div>
 
-      <div className="leaves-tabs" style={{ marginTop: '1.5rem' }}>
-        {['Pending', 'Approved', 'Rejected'].map(tab => (
-          <button 
-            key={tab} 
-            className={`leaves-tab-btn ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab} ({leaves.filter(l => (l.status || 'Pending') === tab).length})
-          </button>
-        ))}
+      {/* 4 Interactive KPI Metric Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+        <div style={{ padding: '16px 20px', borderRadius: '14px', background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #3b82f6', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>Total Applications</div>
+          <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+            {leaves.length} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>Records</span>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600 }}>All institutional leave submissions</div>
+        </div>
+
+        <div style={{ padding: '16px 20px', borderRadius: '14px', background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #f59e0b', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#d97706', textTransform: 'uppercase' }}>Pending Review</div>
+          <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#b45309', margin: '4px 0 2px' }}>
+            {leaves.filter(l => (l.status || 'Pending') === 'Pending').length} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#d97706' }}>Pending</span>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#d97706', fontWeight: 600 }}>Awaiting action or HOD review</div>
+        </div>
+
+        <div style={{ padding: '16px 20px', borderRadius: '14px', background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #10b981', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>Approved Entitlements</div>
+          <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#15803d', margin: '4px 0 2px' }}>
+            {leaves.filter(l => (l.status || 'Pending') === 'Approved').length} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#16a34a' }}>Approved</span>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>Officially granted absence requests</div>
+        </div>
+
+        <div style={{ padding: '16px 20px', borderRadius: '14px', background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #ef4444', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#dc2626', textTransform: 'uppercase' }}>Rejected Leaves</div>
+          <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#b91c1c', margin: '4px 0 2px' }}>
+            {leaves.filter(l => (l.status || 'Pending') === 'Rejected').length} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#dc2626' }}>Declined</span>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 600 }}>Declined leave log history</div>
+        </div>
       </div>
 
-      <div className="glass-card table-wrapper">
-        <div className="filters-row">
-          <div className="search-box">
-            <Search size={18} className="text-muted" />
+      {/* Table Container with Filter Tabs & Search */}
+      <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+        
+        {/* Controls row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
+          
+          {/* Filter Tab buttons */}
+          <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+            {['Pending', 'Approved', 'Rejected'].map(tab => {
+              const count = leaves.filter(l => (l.status || 'Pending') === tab).length;
+              const isActive = activeTab === tab;
+              return (
+                <button 
+                  key={tab} 
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: isActive ? '#ffffff' : 'transparent',
+                    color: isActive ? '#0f172a' : '#64748b',
+                    fontWeight: isActive ? 800 : 600,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {tab} <span style={{ fontSize: '0.75rem', opacity: 0.85 }}>({count})</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Search bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '7px 12px', minWidth: '300px' }}>
+            <Search size={16} color="#64748b" />
             <input 
               type="text" 
-              placeholder="Search leaves by applicant name, category, or reason..." 
+              placeholder="Search by applicant name, category, or reason..." 
               value={search} 
               onChange={e => setSearch(e.target.value)} 
+              style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.84rem', color: '#0f172a' }}
             />
           </div>
         </div>
 
-        <div className="table-container">
-          <table>
+        {/* Real-time ERP Table */}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 8px' }}>
             <thead>
-              <tr>
-                <th>Applicant Name</th>
-                <th>User Role</th>
-                <th>Department</th>
-                <th>Leave Category</th>
-                <th>Absence Schedule</th>
-                <th>Brief Explanation</th>
-                <th>Current Status</th>
-                {activeTab === 'Pending' && <th>Quick Action</th>}
+              <tr style={{ color: '#64748b', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>Applicant Name</th>
+                <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>User Role</th>
+                <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>Department</th>
+                <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>Leave Category</th>
+                <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>Absence Schedule</th>
+                <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>Reason / Explanation</th>
+                <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>Current Status</th>
+                {activeTab === 'Pending' && <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: 800 }}>Quick Action</th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                Array.from({ length: 2 }).map((_, i) => (
+                Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 8 }).map((_, j) => (
-                      <td key={j}><div className="skeleton" style={{ height: '16px', borderRadius: '4px' }}></div></td>
-                    ))}
+                    <td colSpan={8} style={{ padding: '12px' }}><div className="skeleton" style={{ height: '32px', borderRadius: '8px' }}></div></td>
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={activeTab === 'Pending' ? 8 : 7} className="text-center text-muted" style={{ padding: '2rem' }}>
-                    No leave requests found in this queue.
+                  <td colSpan={activeTab === 'Pending' ? 8 : 7} style={{ textAlign: 'center', padding: '40px 20px', background: '#f8fafc', borderRadius: '12px', color: '#94a3b8' }}>
+                    <Clock size={32} color="#94a3b8" style={{ marginBottom: '8px' }} />
+                    <div style={{ fontWeight: 700, color: '#334155', fontSize: '0.9rem' }}>No leave requests in this queue</div>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.78rem' }}>Submitted requests will appear here with live approval status.</p>
                   </td>
                 </tr>
               ) : (
@@ -141,52 +198,116 @@ const LeavesManagement = () => {
                   const role = l.role || (l.staffId?.startsWith('STF') ? 'Staff' : 'Student');
                   const status = l.status || 'Pending';
                   const dept = l.dept || 'Computer Science';
+                  const isApproved = status === 'Approved';
+                  const isPending = status === 'Pending';
                   
                   return (
-                    <tr key={l.id}>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <User size={14} className="text-muted" />
-                          <span className="font-semibold">{name}</span>
+                    <tr key={l.id} style={{ background: '#f8fafc', borderRadius: '10px', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                      <td style={{ padding: '12px 14px', borderRadius: '10px 0 0 10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4338ca', fontWeight: 800, fontSize: '0.82rem' }}>
+                            {name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>{name}</div>
+                            {l.email && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{l.email}</div>}
+                          </div>
                         </div>
                       </td>
-                      <td><span className={`leave-role-tag ${role}`}>{role}</span></td>
-                      <td><span className="text-muted">{dept}</span></td>
-                      <td><span className="text-sm font-semibold">{l.type}</span></td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
-                          <Calendar size={13} className="text-muted" />
-                          <span>{l.startDate} to {l.endDate}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '240px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={l.reason}>
-                          <FileText size={13} className="text-muted" style={{ flexShrink: 0 }} />
-                          <span className="text-xs">{l.reason}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`status-pill ${status.toLowerCase()}`}>
-                          {status === 'Approved' ? <CheckCircle2 size={12} style={{ display: 'inline', marginRight: '4px' }} /> : status === 'Rejected' ? <AlertCircle size={12} style={{ display: 'inline', marginRight: '4px' }} /> : <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} />}
-                          {status}
+
+                      <td style={{ padding: '12px 14px' }}>
+                        <span style={{
+                          fontWeight: 800,
+                          fontSize: '0.72rem',
+                          padding: '3px 9px',
+                          borderRadius: '12px',
+                          background: role === 'Staff' ? '#e0e7ff' : (role === 'HOD' ? '#f3e8ff' : '#dbeafe'),
+                          color: role === 'Staff' ? '#3730a3' : (role === 'HOD' ? '#6b21a8' : '#1e40af'),
+                          border: `1px solid ${role === 'Staff' ? '#c7d2fe' : (role === 'HOD' ? '#e9d5ff' : '#bfdbfe')}`
+                        }}>
+                          {role}
                         </span>
                       </td>
+
+                      <td style={{ padding: '12px 14px', fontSize: '0.84rem', color: '#475569', fontWeight: 600 }}>
+                        {dept}
+                      </td>
+
+                      <td style={{ padding: '12px 14px', fontWeight: 700, fontSize: '0.85rem', color: '#1e293b' }}>
+                        {l.type}
+                      </td>
+
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#334155', fontWeight: 600 }}>
+                          <Calendar size={14} color="#64748b" />
+                          {l.startDate} to {l.endDate}
+                        </div>
+                      </td>
+
+                      <td style={{ padding: '12px 14px', maxWidth: '240px' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.reason}>
+                          <FileText size={13} color="#64748b" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
+                          {l.reason}
+                        </div>
+                      </td>
+
+                      <td style={{ padding: '12px 14px' }}>
+                        <span style={{
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: isApproved ? '#dcfce7' : (isPending ? '#fef3c7' : '#fee2e2'),
+                          color: isApproved ? '#15803d' : (isPending ? '#b45309' : '#b91c1c'),
+                          border: `1px solid ${isApproved ? '#bbf7d0' : (isPending ? '#fde68a' : '#fecaca')}`
+                        }}>
+                          {isApproved ? <CheckCircle2 size={13} /> : (isPending ? <Clock size={13} /> : <AlertCircle size={13} />)}
+                          {isApproved ? 'Approved' : (isPending ? 'Pending Review' : 'Rejected')}
+                        </span>
+                      </td>
+
                       {activeTab === 'Pending' && (
-                        <td>
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                        <td style={{ padding: '12px 14px', borderRadius: '0 10px 10px 0', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                             <button 
-                              className="btn-primary" 
-                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                               onClick={() => handleAction(l.id, 'Approved')}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: '#16a34a',
+                                color: '#ffffff',
+                                fontWeight: 800,
+                                fontSize: '0.76rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                boxShadow: '0 2px 4px rgba(22,163,74,0.2)'
+                              }}
                             >
-                              <Check size={12} /> Approve
+                              <Check size={13} /> Approve
                             </button>
                             <button 
-                              className="btn-ghost btn-ghost-danger" 
-                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                               onClick={() => handleAction(l.id, 'Rejected')}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: '1px solid #fecaca',
+                                background: '#fef2f2',
+                                color: '#dc2626',
+                                fontWeight: 800,
+                                fontSize: '0.76rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
                             >
-                              <X size={12} /> Reject
+                              <X size={13} /> Reject
                             </button>
                           </div>
                         </td>
@@ -198,6 +319,7 @@ const LeavesManagement = () => {
             </tbody>
           </table>
         </div>
+
       </div>
     </div>
   );

@@ -160,13 +160,14 @@ const LandingPage = () => {
           </div>
 
           {/* Navigation Links */}
-          <ul className="landing-nav-links">
+          <ul className={`landing-nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
             <li>
               <button 
                 className={`landing-nav-link ${activeSection === 'home' ? 'active' : ''}`}
                 onClick={() => scrollToSection('home')}
               >
-                Home
+                <span>Home</span>
+                <ChevronRight className="mobile-chevron" size={16} />
               </button>
             </li>
             <li>
@@ -174,7 +175,8 @@ const LandingPage = () => {
                 className={`landing-nav-link ${activeSection === 'features' ? 'active' : ''}`}
                 onClick={() => scrollToSection('features')}
               >
-                Features
+                <span>Features</span>
+                <ChevronRight className="mobile-chevron" size={16} />
               </button>
             </li>
             <li>
@@ -182,7 +184,8 @@ const LandingPage = () => {
                 className={`landing-nav-link ${activeSection === 'modules' ? 'active' : ''}`}
                 onClick={() => scrollToSection('modules')}
               >
-                Modules
+                <span>Modules</span>
+                <ChevronRight className="mobile-chevron" size={16} />
               </button>
             </li>
             <li>
@@ -190,7 +193,8 @@ const LandingPage = () => {
                 className={`landing-nav-link ${activeSection === 'portals' ? 'active' : ''}`}
                 onClick={() => scrollToSection('portals')}
               >
-                Portals
+                <span>Portals</span>
+                <ChevronRight className="mobile-chevron" size={16} />
               </button>
             </li>
             <li>
@@ -198,17 +202,28 @@ const LandingPage = () => {
                 className={`landing-nav-link ${activeSection === 'contact' ? 'active' : ''}`}
                 onClick={() => scrollToSection('contact')}
               >
-                Contact
+                <span>Contact</span>
+                <ChevronRight className="mobile-chevron" size={16} />
+              </button>
+            </li>
+            <li className="mobile-only-action">
+              <button className="landing-btn-login" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { setMobileMenuOpen(false); navigate('/login'); }}>
+                Log In
+              </button>
+            </li>
+            <li className="mobile-only-action">
+              <button className="landing-btn-get-started" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { setMobileMenuOpen(false); navigate('/login'); }}>
+                Get Started
               </button>
             </li>
           </ul>
 
           {/* Nav Actions */}
           <div className="landing-nav-actions">
-            <button className="landing-btn-login" onClick={() => navigate('/login')}>
+            <button className="landing-btn-login desktop-only-action" onClick={() => navigate('/login')}>
               Log In
             </button>
-            <button className="landing-btn-get-started" onClick={() => navigate('/login')}>
+            <button className="landing-btn-get-started desktop-only-action" onClick={() => navigate('/login')}>
               Get Started
             </button>
             <button 
@@ -221,6 +236,12 @@ const LandingPage = () => {
           </div>
 
         </div>
+        {mobileMenuOpen && (
+          <div 
+            className="landing-mobile-overlay"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
       </nav>
 
       {/* ─────────────────────────────────────────────────────────────

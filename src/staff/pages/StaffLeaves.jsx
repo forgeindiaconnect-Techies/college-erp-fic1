@@ -63,30 +63,32 @@ const StaffLeaves = () => {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    const session = sessionStorage.getItem('staff_session');
-    let activeStaff = DEFAULT_SESSION;
-    if (session) {
-      try {
-        activeStaff = JSON.parse(session);
-        setStaffSession(activeStaff);
-      } catch (e) {}
-    }
+    const fetchLeaves = () => {
+      const session = sessionStorage.getItem('staff_session');
+      if (session) {
+        try {
+          setStaffSession(JSON.parse(session));
+        } catch (e) {}
+      }
 
-    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
-    const saved = localStorage.getItem(`erp_leave_requests_${tenantId}`);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setLeaves(parsed.length > 0 ? parsed : DEFAULT_MOCK_LEAVES);
-      } catch (e) {
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const saved = localStorage.getItem(`erp_leave_requests_${tenantId}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setLeaves(parsed.length > 0 ? parsed : DEFAULT_MOCK_LEAVES);
+        } catch (e) {
+          setLeaves(DEFAULT_MOCK_LEAVES);
+        }
+      } else {
+        localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(DEFAULT_MOCK_LEAVES));
         setLeaves(DEFAULT_MOCK_LEAVES);
       }
-    } else {
-      localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(DEFAULT_MOCK_LEAVES));
-      setLeaves(DEFAULT_MOCK_LEAVES);
-    }
+    };
 
-    setLoading(false);
+    fetchLeaves();
+    window.addEventListener('storage', fetchLeaves);
+    return () => window.removeEventListener('storage', fetchLeaves);
   }, []);
 
   const staffName = staffSession.name || 'Faculty Member';
@@ -142,7 +144,9 @@ const StaffLeaves = () => {
     const newLeave = {
       id: `leave_${Date.now()}`,
       staffId: staffSession.id || 'STF001',
+      name: staffName,
       staffName,
+      role: 'Staff',
       email: staffEmail,
       dept: staffDept,
       type: form.type,
@@ -154,10 +158,14 @@ const StaffLeaves = () => {
       createdAt: new Date().toLocaleDateString('en-CA')
     };
 
-    const updated = [newLeave, ...leaves];
-    setLeaves(updated);
     const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+    const saved = localStorage.getItem(`erp_leave_requests_${tenantId}`);
+    const existing = saved ? JSON.parse(saved) : DEFAULT_MOCK_LEAVES;
+    const updated = [newLeave, ...existing];
+    
+    setLeaves(updated);
     localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(updated));
+    window.dispatchEvent(new Event('storage'));
 
     setSuccess(true);
     setForm({ type: 'Casual Leave', startDate: '', endDate: '', reason: '' });
@@ -166,10 +174,13 @@ const StaffLeaves = () => {
 
   const handleCancelLeave = (id) => {
     if (window.confirm('Cancel this pending leave application?')) {
-      const updated = leaves.filter(l => l.id !== id);
-      setLeaves(updated);
       const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const saved = localStorage.getItem(`erp_leave_requests_${tenantId}`);
+      const existing = saved ? JSON.parse(saved) : leaves;
+      const updated = existing.filter(l => l.id !== id);
+      setLeaves(updated);
       localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
     }
   };
 
