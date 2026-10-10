@@ -23,6 +23,7 @@
     "lucide-react": "^1.16.0",
     "mongodb-memory-server": "^11.1.0",
     "mongoose": "^9.6.2",
+    "multer": "^2.4.0",
     "node-cron": "^4.2.1",
     "razorpay": "^2.9.5",
     "react": "^19.2.6",
