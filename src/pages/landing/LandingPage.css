@@ -12,13 +12,36 @@
   --erp-card-bg: #ffffff;
 }
 
+html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
 .erp-landing-root {
   min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
   background-color: #ffffff;
   color: var(--erp-text-main);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  overflow-x: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
   line-height: 1.5;
+  box-sizing: border-box;
+  position: relative;
 }
 
 .erp-container {
@@ -994,6 +1017,9 @@
   display: grid;
   grid-template-columns: 1.25fr 1fr;
   gap: 20px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .erp-feature-box,
@@ -1003,6 +1029,11 @@
   border-radius: 20px;
   padding: 22px 24px;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.02);
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .box-header {
@@ -1029,6 +1060,8 @@
   justify-content: space-between;
   gap: 6px;
   padding-top: 4px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .feature-strip-item {
@@ -1037,6 +1070,8 @@
   align-items: center;
   text-align: center;
   flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .feature-circle-icon-box {
@@ -1048,6 +1083,7 @@
   justify-content: center;
   margin-bottom: 6px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
 }
 
 .feature-strip-title {
@@ -1055,19 +1091,25 @@
   font-weight: 750;
   color: #0f172a;
   line-height: 1.15;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .feature-strip-sub {
   font-size: 0.65rem;
   color: #64748b;
   line-height: 1.15;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Right Box: 4 Glance Metrics */
 .box-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .stat-metric-card {
@@ -1079,22 +1121,32 @@
   align-items: center;
   text-align: center;
   gap: 4px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .stat-metric-icon {
   margin-bottom: 2px;
+  flex-shrink: 0;
 }
 
 .stat-metric-value {
   font-size: 1.25rem;
   font-weight: 850;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .stat-metric-label {
   font-size: 0.72rem;
   color: #64748b;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -1306,8 +1358,10 @@
 }
 
 /* ─────────────────────────────────────────────────────────────
-   7. RESPONSIVENESS (MOBILE, TABLET, DESKTOP)
+   7. RESPONSIVE DESIGN FOR TABLETS & MOBILE SCREENS
    ───────────────────────────────────────────────────────────── */
+
+/* Tablets & Medium Screens (<= 1080px) */
 @media (max-width: 1080px) {
   .erp-hero-inner-content {
     flex-direction: column;
@@ -1320,29 +1374,27 @@
 
   .erp-hero-bg-visual {
     width: 100%;
-    opacity: 0.45;
+    opacity: 0.2;
+    background-position: center bottom;
   }
 
   .erp-hero-quick-login-card {
     width: 100%;
-    max-width: 420px;
+    max-width: 100%;
   }
 
   .erp-role-cards-row-1 {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .erp-role-cards-row-2 {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .erp-split-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .box-features-strip {
-    overflow-x: auto;
-    padding-bottom: 8px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    width: 100%;
   }
 
   .erp-footer-top {
@@ -1351,6 +1403,7 @@
   }
 }
 
+/* Tablets / Small Screens (<= 860px) */
 @media (max-width: 860px) {
   .erp-nav-pill-group {
     display: none;
@@ -1358,41 +1411,351 @@
 
   .erp-mobile-toggle {
     display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .erp-hero-heading {
-    font-size: 2.2rem;
+    font-size: 2.3rem;
   }
 
   .erp-role-cards-row-1,
   .erp-role-cards-row-2 {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 
   .box-stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 }
 
-@media (max-width: 600px) {
-  .erp-hero-heading {
-    font-size: 1.85rem;
+/* Mobile Screens (<= 768px) */
+@media (max-width: 768px) {
+  .erp-header {
+    height: 64px;
+    width: 100%;
   }
 
-  .erp-hero-trust-row {
+  .erp-header-container {
+    padding: 0 16px;
+    width: 100%;
+  }
+
+  .erp-brand-subtitle {
+    display: none;
+  }
+
+  .erp-brand-title {
+    font-size: 1.15rem;
+    white-space: nowrap;
+  }
+
+  .erp-header-right-actions {
+    gap: 8px;
+  }
+
+  /* Hide search button on mobile to save space */
+  .erp-header-right-actions .erp-action-icon-btn:first-child {
+    display: none;
+  }
+
+  .erp-action-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .erp-header-login-pill-btn {
+    padding: 7px 14px;
+    font-size: 0.8rem;
+  }
+
+  .erp-hero-section {
+    padding: 30px 0 45px 0;
+    background: #ffffff;
+    width: 100%;
+  }
+
+  /* Keep clean solid background on mobile so text is 100% legible */
+  .erp-hero-bg-visual {
+    display: none;
+  }
+
+  .erp-container,
+  .erp-hero-inner-content {
+    padding: 0 16px;
+    gap: 20px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .erp-hero-copy {
     gap: 14px;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .erp-welcome-tag {
+    font-size: 0.78rem;
+    padding: 4px 14px;
+  }
+
+  .erp-hero-heading {
+    font-size: 2rem;
+    line-height: 1.2;
+  }
+
+  .erp-hero-subtext {
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  /* Clean 2x2 Trust Badges Cards */
+  .erp-hero-trust-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    width: 100%;
+    margin-top: 10px;
+    padding-top: 0;
   }
 
   .trust-item {
-    width: calc(50% - 10px);
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 12px;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .trust-icon-box {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: var(--erp-primary-blue);
+    flex-shrink: 0;
+  }
+
+  .trust-text strong {
+    font-size: 0.8rem;
+    color: #0f172a;
+  }
+
+  .trust-text span {
+    font-size: 0.7rem;
+    color: #64748b;
+  }
+
+  .erp-hero-quick-login-card {
+    padding: 20px 16px;
+    border-radius: 16px;
+    margin-top: 10px;
+    box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Key features: Clean 4-column responsive grid */
+  .box-features-strip {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 12px 6px !important;
+    padding-top: 4px;
+    width: 100% !important;
+  }
+
+  .box-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .erp-feature-box,
+  .erp-glance-box {
+    padding: 18px 16px !important;
+    border-radius: 16px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .erp-footer-top {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    width: 100%;
+  }
+
+  .erp-footer-compliance-badge {
+    max-width: 100%;
+    word-break: break-word;
+  }
+}
+
+/* Small Mobile Screens (<= 480px) */
+@media (max-width: 480px) {
+  .erp-header {
+    height: 60px;
+  }
+
+  .erp-header-container {
+    padding: 0 12px;
+  }
+
+  .erp-brand-logo-box {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  .erp-brand-title {
+    font-size: 1.05rem;
+  }
+
+  .erp-action-icon-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .erp-header-login-pill-btn {
+    padding: 6px 11px;
+    font-size: 0.75rem;
+    gap: 4px;
+  }
+
+  .erp-container,
+  .erp-hero-inner-content {
+    padding: 0 12px;
+  }
+
+  .erp-hero-heading {
+    font-size: 1.7rem;
+  }
+
+  /* CTAs side-by-side cleanly */
+  .erp-hero-ctas {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .erp-btn-primary,
+  .erp-btn-secondary {
+    flex: 1;
+    justify-content: center;
+    padding: 11px 12px;
+    font-size: 0.82rem;
+    gap: 6px;
   }
 
   .erp-role-cards-row-1,
   .erp-role-cards-row-2 {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .erp-role-card {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .box-features-strip {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 10px 4px !important;
+    width: 100% !important;
+  }
+
+  .feature-circle-icon-box {
+    width: 38px;
+    height: 38px;
+    margin-bottom: 4px;
+  }
+
+  .feature-strip-title {
+    font-size: 0.68rem;
+  }
+
+  .feature-strip-sub {
+    font-size: 0.62rem;
+  }
+
+  .box-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .stat-metric-card {
+    padding: 10px 6px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .stat-metric-value {
+    font-size: 1.15rem !important;
+  }
+
+  .stat-metric-label {
+    font-size: 0.68rem !important;
+  }
+
+  .erp-feature-box,
+  .erp-glance-box {
+    padding: 16px 12px !important;
+    width: 100% !important;
   }
 
   .erp-footer-top {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 22px;
+    width: 100%;
+  }
+
+  .erp-footer-desc {
+    max-width: 100%;
+  }
+
+  .erp-footer-bottom {
+    flex-direction: column;
+    gap: 6px;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .erp-footer-compliance-badge {
+    font-size: 0.72rem;
+    padding: 6px 10px;
+    max-width: 100%;
+    word-break: break-word;
+  }
+}
+
+/* Extra Small Screens (<= 360px) */
+@media (max-width: 360px) {
+  .box-features-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .erp-header-login-pill-btn span {
+    display: none;
+  }
+
+  .erp-header-login-pill-btn {
+    padding: 6px 10px;
+  }
+
+  .erp-hero-heading {
+    font-size: 1.5rem;
   }
 }

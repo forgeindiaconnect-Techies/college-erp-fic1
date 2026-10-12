@@ -198,6 +198,39 @@ const Sidebar = ({ isOpen, onClose }) => {
                 </ul>
               </li>
             ))}
+
+            {/* Direct Logout menu item inside the navigation list */}
+            <li style={{ marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid rgba(255, 255, 255, 0.12)' }}>
+              <button
+                onClick={handleLogout}
+                className="nav-link"
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '10px 14px',
+                  color: '#ffffff',
+                  background: 'rgba(239, 68, 68, 0.22)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '13.5px',
+                  fontWeight: 600,
+                  textAlign: 'left',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#ef4444';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.22)';
+                }}
+              >
+                <LogOut size={20} color="#fca5a5" />
+                <span style={{ color: '#ffffff' }}>Logout</span>
+              </button>
+            </li>
           </ul>
         </nav>
 
