@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { GraduationCap, Lock, Mail, Eye, EyeOff, ArrowRight, Shield, Award, Users, BookOpen, Briefcase } from 'lucide-react';
+import { GraduationCap, Lock, Mail, Eye, EyeOff, ArrowRight, ArrowLeft, Shield, Award, Users, BookOpen, Briefcase } from 'lucide-react';
 import { loginUser } from '../api/index';
 import CustomSelect from '../components/CustomSelect';
 import './Login.css';
@@ -312,6 +312,44 @@ const UnifiedLogin = () => {
 
       <div className="login-form-section">
         <div className="login-card-container">
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start', marginBottom: '1.25rem' }}>
+            <button
+              type="button"
+              onClick={() => {
+                navigate('/');
+              }}
+              className="login-back-btn"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'var(--bg-secondary, #f1f5f9)',
+                border: '1px solid var(--border-color, #e2e8f0)',
+                color: 'var(--text-main, #334155)',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '7px 14px',
+                borderRadius: '10px',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--primary, #3b82f6)';
+                e.currentTarget.style.color = '#ffffff';
+                e.currentTarget.style.borderColor = 'var(--primary, #3b82f6)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'var(--bg-secondary, #f1f5f9)';
+                e.currentTarget.style.color = 'var(--text-main, #334155)';
+                e.currentTarget.style.borderColor = 'var(--border-color, #e2e8f0)';
+              }}
+            >
+              <ArrowLeft size={16} />
+              <span>Back</span>
+            </button>
+          </div>
+
           <div className="login-card-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div style={{ padding: '16px 24px', background: '#1e293b', borderRadius: '16px', marginBottom: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
               <img src="/logo.svg" alt="ERPSYS Logo" style={{ width: '140px', height: 'auto', display: 'block' }} />
@@ -343,7 +381,8 @@ const UnifiedLogin = () => {
                     { value: 'Accounts', label: 'Accounts' },
                     { value: 'Librarian', label: 'Librarian / Library' },
                     { value: 'Placement', label: 'Placement Officer / Cell' },
-                    { value: 'Driver', label: 'Driver' }, { value: 'Hostel', label: 'Hostel' }, { value: 'Watchman', label: 'Watchman' }
+                    { value: 'Driver', label: 'Driver' },
+                    { value: 'Hostel', label: 'Hostel' }
                   ]}
                   placeholder="Select Role"
                   icon={Users}

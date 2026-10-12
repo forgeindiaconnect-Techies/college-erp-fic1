@@ -196,3 +196,73 @@
   background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; padding: 0.2rem; border-radius: 6px;
 }
 .btn-icon:hover { background: var(--bg-primary); color: var(--text-main); }
+
+/* ── Mobile & Tablet Responsiveness for Staff Dashboard ── */
+@media (max-width: 768px) {
+  .staff-dashboard {
+    gap: 1rem;
+  }
+
+  .staff-welcome-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1.15rem;
+    gap: 1rem;
+  }
+
+  .staff-welcome-text h1 {
+    font-size: 1.35rem;
+  }
+
+  .staff-welcome-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .staff-welcome-actions button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .staff-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .staff-stat-card {
+    padding: 0.85rem;
+  }
+
+  .staff-grid-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .staff-split-row {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .modal-card {
+    max-width: 95vw;
+    padding: 1.25rem;
+    border-radius: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .staff-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-btn-primary,
+  .staff-btn-ghost {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.82rem;
+  }
+}

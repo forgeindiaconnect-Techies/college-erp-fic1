@@ -339,7 +339,8 @@ const PendingFees = () => {
             type="button"
             onClick={handleRemindAll}
             disabled={filteredPending.length === 0}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 text-white font-bold rounded-lg hover:brightness-110 transition-all shadow-md text-sm"
+            style={{ background: 'linear-gradient(135deg, #dc2626, #e11d48)', color: '#ffffff' }}
+            className="flex items-center gap-2 px-4 py-2.5 font-bold rounded-lg hover:brightness-110 transition-all shadow-md text-sm"
           >
             <Mail size={16} /> Remind All ({filteredPending.length})
           </button>
@@ -606,7 +607,8 @@ const PendingFees = () => {
                         <button 
                           type="button"
                           onClick={() => openCollectModal(item)}
-                          className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:brightness-110 text-xs font-bold rounded-lg transition-all shadow-sm flex items-center gap-1.5"
+                          style={{ background: 'linear-gradient(135deg, #059669, #0d9488)', color: '#ffffff' }}
+                          className="px-3.5 py-1.5 hover:brightness-110 text-xs font-bold rounded-lg transition-all shadow-sm flex items-center gap-1.5"
                           title="Record instant payment collection"
                         >
                           <IndianRupee size={13} /> Collect

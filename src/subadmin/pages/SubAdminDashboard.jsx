@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Users, GraduationCap, CalendarCheck, Building2, Megaphone, FileBarChart } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Users, GraduationCap, CalendarCheck, Building2, Megaphone, FileBarChart, Zap } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import '../../pages/Dashboard.css';
 import CollegeInfoCard from '../../components/common/CollegeInfoCard'; // Reuse dashboard styles
 
 const SubAdminDashboard = () => {
+  const navigate = useNavigate();
   const [permissions, setPermissions] = useState([]);
   const [userName, setUserName] = useState('Sub Admin');
 
@@ -33,10 +34,9 @@ const SubAdminDashboard = () => {
   const allowedCards = moduleCards.filter(card => permissions.includes(card.module));
 
   return (
-    <div className="dashboard-container">
+    <div className="dashboard-container subadmin-dashboard">
       <CollegeInfoCard />
       <div className="dashboard-header">
-      <CollegeInfoCard />
         <div>
           <h1 className="page-title">Welcome back, {userName}</h1>
           <p className="text-muted">Here's your permitted administrative access overview.</p>
@@ -44,8 +44,55 @@ const SubAdminDashboard = () => {
       </div>
 
       {allowedCards.length > 0 ? (
-        <div className="dashboard-grid">
-      <CollegeInfoCard />
+        <>
+          <div style={{
+            background: 'var(--bg-primary, #ffffff)',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            borderRadius: '16px',
+            padding: '1.25rem 1.5rem',
+            marginBottom: '1.5rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '8px', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Zap size={16} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>
+                    Sub Admin Quick Actions
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
+                    Immediate shortcuts for your authorized administrative modules
+                  </p>
+                </div>
+              </div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
+                Quick Shortcuts
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+              {allowedCards.map((card, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => navigate(card.path)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+                >
+                  <div style={{ width: 34, height: 34, borderRadius: '8px', background: `${card.color}15`, color: card.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {React.cloneElement(card.icon, { size: 18 })}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>{card.title}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Manage {card.title.toLowerCase()}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="dashboard-grid">
           {allowedCards.map((card, idx) => (
             <Link to={card.path} key={idx} style={{ textDecoration: 'none' }}>
               <div className="stat-card glass-card hover-lift" style={{ '--accent-color': card.color }}>
@@ -60,6 +107,7 @@ const SubAdminDashboard = () => {
             </Link>
           ))}
         </div>
+      </>
       ) : (
         <div className="glass-card mt-4" style={{ padding: '2rem', textAlign: 'center' }}>
           <h3 style={{ color: 'var(--text-primary)' }}>No Modules Assigned</h3>

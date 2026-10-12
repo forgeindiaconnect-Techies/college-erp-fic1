@@ -3,9 +3,9 @@ import {
   Bus, MapPin, Users, Calendar, Navigation, Shield, AlertTriangle, 
   Clock, CheckCircle, ArrowRight, Play, Check, RotateCcw, 
   PhoneCall, ShieldAlert, Sparkles, Activity, Bell, Fuel, Gauge,
-  Compass, ChevronRight, ShieldCheck
+  Compass, ChevronRight, ShieldCheck, Zap, IndianRupee, CheckSquare, Wrench
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   getTransportDrivers, getTransportRoutes, getTransportStudents, 
   getDriverAttendance, getTransportVehicles, createTransportTrip, 
@@ -16,6 +16,7 @@ import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCa
 import './DriverDashboard.css';
 
 const DriverDashboard = () => {
+  const navigate = useNavigate();
   const [session, setSession] = useState({});
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
@@ -252,17 +253,17 @@ const DriverDashboard = () => {
   }
 
   return (
-    <div style={{ padding: '1.25rem 1.5rem', maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
+    <div className="driver-page-container">
       
       {/* ── Breadcrumb & ERP Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
+      <div className="driver-header-bar">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
             <span>Fleet Operations</span>
             <ChevronRight size={12} />
             <span style={{ color: '#0f172a' }}>Command Center</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.01em' }}>
               Driver Command Center
             </h1>
@@ -273,7 +274,7 @@ const DriverDashboard = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600, background: '#f8fafc', padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
             ⏰ {currentTime}
           </span>
@@ -284,7 +285,7 @@ const DriverDashboard = () => {
       </div>
 
       {/* ── 4 KPI Status Cards (Single Source of Truth) ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+      <div className="driver-kpi-grid">
         
         {/* Assigned Vehicle */}
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
@@ -344,8 +345,123 @@ const DriverDashboard = () => {
 
       </div>
 
-      {/* ── Main Operations Layout (2 Columns) ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.45fr 1fr', gap: '1.25rem', alignItems: 'start' }}>
+      {/* Driver Operations Quick Actions Hub */}
+      <div style={{
+        background: 'var(--bg-primary, #ffffff)',
+        border: '1px solid var(--border-color, #e2e8f0)',
+        borderRadius: '12px',
+        padding: '1.25rem 1.5rem',
+        marginBottom: '1.25rem',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '8px', background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Zap size={16} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>
+                Fleet Operations Quick Actions
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
+                Immediate shortcuts for transit dispatch, route stops, vehicle health, and student roster
+              </p>
+            </div>
+          </div>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: '12px', background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb' }}>
+            Driver Shortcuts
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+          <button 
+            type="button"
+            onClick={() => navigate('/driver/trip')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(37, 99, 235, 0.12)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Navigation size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Trip Management</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Live trip controls</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/driver/vehicle')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Bus size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Vehicle Health</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Bus specs & fuel log</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/driver/route')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <MapPin size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Route & Waypoints</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Scheduled pick-up stops</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/driver/students')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(147, 51, 234, 0.12)', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Users size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Passenger Roster</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Student boarding list</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/driver/tasks')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(239, 68, 68, 0.12)', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <CheckSquare size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Shift Tasks</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Daily duty checklist</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/driver/payroll')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(139, 92, 246, 0.12)', color: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <IndianRupee size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Duty Payroll</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Salary slips & payslips</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Main Operations Layout (Stacked on Mobile, 2 Columns on Desktop) ── */}
+      <div className="driver-two-col-grid">
         
         {/* Left Column: Shift Operations & Scheduled Stops */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>

@@ -132,3 +132,19 @@
   font-weight: 500;
   margin-top: 0.3rem;
 }
+
+@media (max-width: 480px) {
+  .rt-widgets-grid {
+    grid-template-columns: 1fr;
+  }
+  .analytics-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .ai-insights-card {
+    padding: 1rem;
+  }
+  .insight-list li {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

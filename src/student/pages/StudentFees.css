@@ -197,7 +197,13 @@
   .erp-kpi-grid { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 768px) {
-  .erp-kpi-grid { grid-template-columns: 1fr; }
+  .erp-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  .erp-kpi-grid > *:last-child:nth-child(odd) {
+    grid-column: span 2;
+  }
 }
 
 .erp-kpi-card {
@@ -441,10 +447,12 @@
 .table-responsive-erp {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .erp-ledger-table {
   width: 100%;
+  min-width: 580px;
   border-collapse: collapse;
   font-size: 0.85rem;
 }

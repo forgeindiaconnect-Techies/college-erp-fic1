@@ -1,0 +1,488 @@
+/* ══════════════════════════════════════════════════════════════════
+   STUDENT PORTAL COMPREHENSIVE MOBILE RESPONSIVE STYLESHEET
+   Fixes mobile view & touch scrolling across ALL Student Portal tabs:
+   1. Student Dashboard (/student/dashboard)
+   2. Class Timetable (/student/timetable)
+   3. Central Library Portal (/student/library)
+   4. Student Fees & Assessment Ledger (/student/fees)
+   5. Student Support & Welfare (/student/welfare)
+   6. Student Attendance & Tracking (/student/attendance)
+   7. Exam Center & Hall Tickets (/student/exams)
+   8. Semester Marks & Transcripts (/student/marks)
+   9. Coursework & Assignments (/student/assignments)
+   10. Leave Applications (/student/leaves)
+   11. Hostel & Accommodation (/student/hostel)
+   12. Transport & Bus Routes (/student/transport)
+   13. Campus Placements & Drives (/student/placements)
+   14. Student Announcements (/student/announcements)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. GLOBAL LAYOUT & UNRESTRICTED VERTICAL TOUCH SCROLLING (<= 900px) ── */
+@media (max-width: 900px) {
+  /* Prevent root lockup and guarantee vertical scroll delegation */
+  .layout-container {
+    height: 100vh !important;
+    height: 100dvh !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .main-wrapper {
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .main-content {
+    flex: 1 1 auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    padding: 0.65rem 0.65rem 5rem !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-y: contain !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Universal page wrapper resets */
+  .main-content > div,
+  .student-dashboard,
+  .student-timetable-page,
+  .student-library-page,
+  .student-fees-page,
+  .student-attendance-page,
+  .student-marks-page,
+  .student-assignments-page,
+  .student-leaves-page,
+  .dashboard-container,
+  .animate-fade-in {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Reset oversized page level paddings */
+  .student-timetable-page,
+  .student-library-page,
+  .student-fees-page,
+  .student-attendance-page,
+  .dashboard-container {
+    padding-top: 0.25rem !important;
+    padding-bottom: 2rem !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  div[class*="p-6"],
+  div[style*="padding: '1.5rem'"],
+  div[style*="padding: 1.5rem"] {
+    padding: 0.25rem 0 2rem 0 !important;
+  }
+
+  /* ── 2. PAGE HEADERS & MOBILE CONTROLS ── */
+  .page-header,
+  .page-header-student,
+  .library-header-banner,
+  .erp-finance-header-card,
+  .student-welcome-banner {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    padding: 0.85rem 1rem !important;
+    border-radius: 12px !important;
+    gap: 0.75rem !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  .page-header h1,
+  .page-header-student h1,
+  .library-header-banner h1,
+  .erp-header-title-area h1,
+  .banner-left h1,
+  h1.text-2xl {
+    font-size: 1.3rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .banner-content-left,
+  .header-left-s {
+    gap: 0.65rem !important;
+  }
+
+  .banner-icon-box,
+  .icon-s {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 9px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Controls inside headers */
+  .page-header > div:last-child,
+  .erp-header-actions,
+  .header-actions-s {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    justify-content: flex-start !important;
+  }
+
+  .page-header button,
+  .page-header select,
+  .erp-header-actions button,
+  .header-actions-s button {
+    flex: 1 1 auto !important;
+    justify-content: center !important;
+    padding: 0.5rem 0.85rem !important;
+    font-size: 0.82rem !important;
+  }
+
+  /* ── 3. 2-COLUMN COMPACT KPI GRIDS (PREVENTS 1-COLUMN GIANT STACKING) ── */
+  .student-metrics-grid,
+  .library-metrics-grid,
+  .analytics-grid,
+  .erp-kpi-grid,
+  .marks-hero-summary-grid,
+  div[style*="repeat(auto-fit, minmax(240px, 1fr))"],
+  div[style*="repeat(auto-fit, minmax(220px, 1fr))"],
+  div[style*="repeat(auto-fit, minmax(200px, 1fr))"],
+  div[style*="repeat(auto-fit, minmax(180px, 1fr))"] {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+    margin-bottom: 0.85rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Odd 5th or 3rd cards span 2 columns nicely across the bottom */
+  .student-metrics-grid > *:last-child:nth-child(odd),
+  .library-metrics-grid > *:last-child:nth-child(odd),
+  .analytics-grid > *:last-child:nth-child(odd),
+  .erp-kpi-grid > *:last-child:nth-child(odd),
+  .marks-hero-summary-grid > *:last-child:nth-child(odd),
+  div[style*="repeat(auto-fit, minmax(240px, 1fr))"] > *:last-child:nth-child(odd) {
+    grid-column: span 2 !important;
+  }
+
+  /* Compact KPI Card Internal Styling */
+  .library-kpi-card,
+  .analytics-card,
+  .erp-kpi-card,
+  .s-metric-card,
+  .hostel-kpi-card,
+  .summary-grade-card {
+    padding: 0.65rem 0.75rem !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    gap: 0.35rem !important;
+  }
+
+  .kpi-label,
+  .card-title-s,
+  .summary-label,
+  .analytics-card span,
+  .kpi-title {
+    font-size: 0.68rem !important;
+    letter-spacing: 0.02em !important;
+  }
+
+  .kpi-value,
+  .metric-value-s,
+  .analytics-card h2,
+  .summary-grade-card h2,
+  .kpi-number {
+    font-size: 1.25rem !important;
+    line-height: 1.2 !important;
+  }
+
+  .kpi-subtext,
+  .metric-sub-s {
+    font-size: 0.68rem !important;
+  }
+
+  .kpi-icon-wrap {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .kpi-icon-wrap svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  /* ── 4. SINGLE-LINE HORIZONTAL TOUCH-SWIPE TABS & FILTERS ── */
+  .erp-tabs-nav-container,
+  .erp-tabs-nav,
+  .library-tabs-container,
+  .library-tabs-list,
+  .tab-selector-bar,
+  div[style*="gap: '8px', overflowX: 'auto'"],
+  div[style*="gap: 8px, overflowX: auto"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    white-space: nowrap !important;
+    gap: 0.45rem !important;
+    padding-bottom: 4px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    scrollbar-width: none !important;
+  }
+
+  .erp-tabs-nav::-webkit-scrollbar,
+  .library-tabs-list::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .erp-tab-btn,
+  .library-tab-btn,
+  .tab-btn {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    display: inline-flex !important;
+    padding: 0.55rem 0.85rem !important;
+    font-size: 0.82rem !important;
+  }
+
+  /* ── 5. TIMETABLE MOBILE VIEW & SCROLL DELEGATION (IMAGE 1) ── */
+  /* Remove nested height trapping on mobile so vertical touch scrolls whole page */
+  .overflow-x-auto[style*="maxHeight: '72vh'"],
+  .overflow-x-auto[style*="max-height: 72vh"],
+  .timetable-scroll-wrapper,
+  .timetable-grid-scroll-s {
+    max-height: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    display: block !important;
+    border-radius: 10px !important;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  .overflow-x-auto table,
+  .timetable-table-s {
+    min-width: 820px !important;
+    border-collapse: collapse !important;
+  }
+
+  /* Compact Timing / Period Sticky Column */
+  .overflow-x-auto th[style*="position: 'sticky'"],
+  .overflow-x-auto td[style*="position: 'sticky'"],
+  .day-col-header-s,
+  .day-name-cell-s {
+    width: 110px !important;
+    min-width: 110px !important;
+    padding: 0.45rem 0.35rem !important;
+    font-size: 0.72rem !important;
+  }
+
+  /* Day slot blocks */
+  .overflow-x-auto td div[style*="padding: '0.6rem'"],
+  .timetable-slot-s {
+    padding: 0.45rem !important;
+    min-height: 60px !important;
+  }
+
+  .overflow-x-auto td h4 {
+    font-size: 0.75rem !important;
+  }
+
+  /* ── 6. UNIVERSAL TABLE HORIZONTAL TOUCH SCROLLING (IMAGES 2, 3, 5) ── */
+  .table-responsive-erp,
+  .table-container,
+  .table-container-s,
+  .table-wrapper,
+  .table-section-card-s {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    display: block !important;
+    position: relative !important;
+    box-sizing: border-box !important;
+    margin-bottom: 0.75rem !important;
+    border-radius: 10px !important;
+  }
+
+  /* Minimum readable width for tables inside scroll containers */
+  table.erp-ledger-table,
+  .library-erp-table,
+  .student-marks-page table,
+  .student-attendance-page table,
+  .table-container-s table,
+  .receipt-items-table {
+    min-width: 580px !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  table.erp-ledger-table th,
+  table.erp-ledger-table td,
+  .library-erp-table th,
+  .library-erp-table td,
+  .student-marks-page th,
+  .student-marks-page td,
+  .student-attendance-page th,
+  .student-attendance-page td,
+  .table-container-s th,
+  .table-container-s td {
+    white-space: nowrap !important;
+    padding: 0.6rem 0.85rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  /* ── 7. FEES SECTION MOBILE VIEW (IMAGE 3) ── */
+  .erp-statement-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1rem !important;
+    width: 100% !important;
+  }
+
+  .erp-card-box {
+    padding: 0.85rem 0.75rem !important;
+    border-radius: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .card-box-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.5rem !important;
+  }
+
+  .scholar-card-top {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.65rem !important;
+  }
+
+  .scholar-amount-block {
+    text-align: left !important;
+    width: 100% !important;
+  }
+
+  .scholar-meta-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .installments-timeline-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  /* ── 8. STUDENT WELFARE & SUPPORT CENTER (IMAGE 4) ── */
+  .support-cards-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+    margin-bottom: 1.25rem !important;
+    width: 100% !important;
+  }
+
+  .support-cards-grid .glass-card,
+  .glass-card {
+    padding: 0.75rem 0.85rem !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+  }
+
+  .glass-card h3 {
+    font-size: 0.95rem !important;
+  }
+
+  .glass-card p {
+    font-size: 0.75rem !important;
+    height: auto !important;
+    margin-bottom: 0.75rem !important;
+    line-height: 1.35 !important;
+  }
+
+  /* ── 9. STACK MULTI-COLUMN SECTIONS INTO 1 COLUMN ── */
+  .charts-grid-student,
+  .student-assignments-grid,
+  .leaves-layout-grid-s,
+  .form-dates-group-s {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 0.85rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ── 10. MODALS & POPUPS ON MOBILE ── */
+  .modal-overlay {
+    padding: 0.5rem !important;
+  }
+
+  .modal-content,
+  .modal-receipt-container,
+  .modal-card {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 90vh !important;
+    padding: 1rem !important;
+    border-radius: 14px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+}
+
+/* ── SMALL SCREENS (<= 480px) ── */
+@media (max-width: 480px) {
+  .main-content {
+    padding: 0.45rem 0.45rem 4.5rem !important;
+  }
+
+  .page-header h1,
+  .page-header-student h1,
+  .banner-left h1 {
+    font-size: 1.15rem !important;
+  }
+
+  .student-metrics-grid,
+  .library-metrics-grid,
+  .analytics-grid,
+  .erp-kpi-grid,
+  .support-cards-grid {
+    gap: 0.4rem !important;
+  }
+
+  .library-kpi-card,
+  .analytics-card,
+  .erp-kpi-card,
+  .s-metric-card {
+    padding: 0.55rem 0.65rem !important;
+  }
+
+  .kpi-value,
+  .metric-value-s,
+  .analytics-card h2 {
+    font-size: 1.15rem !important;
+  }
+}

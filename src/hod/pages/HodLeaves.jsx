@@ -185,7 +185,7 @@ const HodLeaves = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
           
           {/* Tab buttons */}
-          <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+          <div className="hod-pill-tabs" style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '10px', overflowX: 'auto', maxWidth: '100%', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
             {TABS.map(t => {
               const count = t === 'My Leaves' 
                 ? leaves.filter(l => l.role === 'HOD' && l.name === hod.name).length 
@@ -205,6 +205,8 @@ const HodLeaves = () => {
                     fontSize: '0.82rem',
                     cursor: 'pointer',
                     boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
                     transition: 'all 0.15s ease'
                   }}
                 >
@@ -215,7 +217,7 @@ const HodLeaves = () => {
           </div>
 
           {/* Search bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '7px 12px', minWidth: '280px' }}>
+          <div className="hod-live-search" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '7px 12px', minWidth: '280px' }}>
             <Search size={16} color="#64748b" />
             <input
               placeholder="Search applicant name, leave type, or reason..."
@@ -227,10 +229,10 @@ const HodLeaves = () => {
         </div>
 
         {/* Real-time ERP Table */}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 8px' }}>
+        <div className="table-container" style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'separate', borderSpacing: '0 8px' }}>
             <thead>
-              <tr style={{ color: '#64748b', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <tr style={{ color: '#64748b', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
                 <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>Applicant Name</th>
                 <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>User Role</th>
                 <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 800 }}>Leave Category</th>

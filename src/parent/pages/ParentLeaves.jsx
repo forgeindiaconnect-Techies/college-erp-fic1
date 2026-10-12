@@ -6,6 +6,7 @@ import {
   X, Info, ExternalLink
 } from 'lucide-react';
 import { getStudentById, getStudents } from '../../api/index';
+import './ParentDashboard.css';
 
 const formatDate = (rawDate) => {
   if (!rawDate) return 'N/A';
@@ -215,37 +216,37 @@ const ParentLeaves = () => {
   });
 
   return (
-    <div className="animate-fade-in p-6" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="parent-page-container animate-fade-in">
       {/* Top Header */}
-      <div className="glass-card" style={{ padding: '1.25rem 1.5rem', background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--border-color)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
+      <div className="parent-header-card glass-card">
+        <div className="header-title-box">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ShieldAlert size={24} />
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <ShieldAlert size={22} />
             </div>
             <div>
-              <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)' }}>
+              <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1.2 }}>
                 Leave Status & Absence Tracker
               </h1>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Track registered absence requests, medical duty clearances, and faculty approvals for <strong style={{ color: 'var(--text-main)' }}>{childDetails.name}</strong>.
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                Absence requests and faculty approvals for <strong style={{ color: 'var(--text-main)' }}>{childDetails.name}</strong>.
               </p>
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ padding: '6px 14px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.82rem', display: 'flex', gap: '8px' }}>
+        <div className="header-actions-box">
+          <div style={{ padding: '6px 12px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Ward:</span>
-            <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>{childDetails.id}</span>
+            <span style={{ fontWeight: 700, color: 'var(--text-main)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{childDetails.id}</span>
             <span style={{ color: 'var(--border-color)' }}>|</span>
-            <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{childDetails.sem}</span>
+            <span style={{ color: 'var(--primary)', fontWeight: 700, whiteSpace: 'nowrap' }}>{childDetails.sem}</span>
           </div>
 
           <button 
             onClick={handleRefresh}
             disabled={refreshing}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.5rem 0.9rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.45rem 0.85rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
           >
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
             {refreshing ? 'Syncing...' : 'Sync'}
@@ -254,94 +255,94 @@ const ParentLeaves = () => {
       </div>
 
       {/* 4 KPI Metrics Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="parent-kpi-grid">
         {/* Total Requests */}
-        <div className="glass-card" style={{ padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <FileText size={24} />
+        <div className="glass-card" style={{ padding: '1rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <FileText size={20} />
           </div>
-          <div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total Leave Applications</span>
-            <h3 style={{ margin: '2px 0 0 0', fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{totalLeaves}</h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Semester 4 Records</span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Total Applications</span>
+            <h3 style={{ margin: '1px 0', fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-main)' }}>{totalLeaves}</h3>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Semester Records</span>
           </div>
         </div>
 
         {/* Approved Leaves */}
-        <div className="glass-card" style={{ padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <CheckCircle size={24} />
+        <div className="glass-card" style={{ padding: '1rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <CheckCircle size={20} />
           </div>
-          <div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Approved & Excused</span>
-            <h3 style={{ margin: '2px 0 0 0', fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>{approvedCount}</h3>
-            <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>✓ Verified by HOD/Advisor</span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Approved & Excused</span>
+            <h3 style={{ margin: '1px 0', fontSize: '1.35rem', fontWeight: 800, color: '#10b981' }}>{approvedCount}</h3>
+            <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>✓ Verified by HOD</span>
           </div>
         </div>
 
         {/* Pending Approval */}
-        <div className="glass-card" style={{ padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: pendingCount > 0 ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)', color: pendingCount > 0 ? '#f59e0b' : '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Clock size={24} />
+        <div className="glass-card" style={{ padding: '1rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: pendingCount > 0 ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)', color: pendingCount > 0 ? '#f59e0b' : '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Clock size={20} />
           </div>
-          <div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Under Review</span>
-            <h3 style={{ margin: '2px 0 0 0', fontSize: '1.5rem', fontWeight: 800, color: pendingCount > 0 ? '#f59e0b' : 'var(--text-main)' }}>{pendingCount}</h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Department Verification</span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Under Review</span>
+            <h3 style={{ margin: '1px 0', fontSize: '1.35rem', fontWeight: 800, color: pendingCount > 0 ? '#f59e0b' : 'var(--text-main)' }}>{pendingCount}</h3>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Dept Verification</span>
           </div>
         </div>
 
         {/* Medical / OD Leaves */}
-        <div className="glass-card" style={{ padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(168, 85, 247, 0.12)', color: '#a855f7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <ShieldAlert size={24} />
+        <div className="glass-card" style={{ padding: '1rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(168, 85, 247, 0.12)', color: '#a855f7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <ShieldAlert size={20} />
           </div>
-          <div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Medical Exemption</span>
-            <h3 style={{ margin: '2px 0 0 0', fontSize: '1.5rem', fontWeight: 800, color: '#a855f7' }}>{medicalCount}</h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Doctor Certificate on File</span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Medical Exemption</span>
+            <h3 style={{ margin: '1px 0', fontSize: '1.35rem', fontWeight: 800, color: '#a855f7' }}>{medicalCount}</h3>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Certificate on File</span>
           </div>
         </div>
       </div>
 
       {/* Institutional Policy Notice */}
       <div style={{ 
-        padding: '1rem 1.25rem', 
-        borderRadius: '12px', 
-        marginBottom: '1.5rem',
+        padding: '0.85rem 1rem', 
+        borderRadius: '10px', 
+        marginBottom: '1.25rem',
         background: 'rgba(59, 130, 246, 0.08)',
         border: '1px solid rgba(59, 130, 246, 0.25)',
-        display: 'flex', alignItems: 'center', gap: '12px'
+        display: 'flex', alignItems: 'center', gap: '10px'
       }}>
-        <Info size={20} style={{ color: '#3b82f6', flexShrink: 0 }} />
-        <div style={{ fontSize: '0.86rem', color: 'var(--text-main)', lineHeight: 1.4 }}>
-          <strong>Institutional Leave Policy:</strong> All student absences must be officially approved by the Class Advisor and Head of Department. Medical absences require a registered practitioner certificate within 3 working days to maintain semester exam eligibility.
+        <Info size={18} style={{ color: '#3b82f6', flexShrink: 0 }} />
+        <div style={{ fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: 1.4 }}>
+          <strong>Institutional Policy:</strong> All student absences must be officially verified by the Class Advisor and HOD. Medical absences require medical certificate submission within 3 days.
         </div>
       </div>
 
-      {/* Leave Request History Table */}
-      <div className="glass-card" style={{ background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+      {/* Leave Request History Table & Mobile Cards */}
+      <div className="parent-table-card glass-card">
         {/* Table Header Controls */}
-        <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Calendar size={18} className="text-primary" /> Leave Application & Verification History
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Calendar size={17} className="text-primary" /> Leave History
             </h3>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Complete history of leaves submitted and their approval status.
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Submitted leaves and verification decisions.
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', width: '100%', maxWidth: '100%', justifyContent: 'space-between' }}>
             {/* Search */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '0.45rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)', minWidth: '220px' }}>
-              <Search size={15} style={{ color: 'var(--text-muted)' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary)', padding: '0.45rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', flex: '1 1 180px', minWidth: '150px' }}>
+              <Search size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
               <input 
                 type="text" 
                 placeholder="Search reason, leave type..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-main)', fontSize: '0.84rem', width: '100%' }}
+                style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-main)', fontSize: '0.82rem', width: '100%' }}
               />
               {searchQuery && (
                 <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
@@ -351,21 +352,22 @@ const ParentLeaves = () => {
             </div>
 
             {/* Status Pills */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-secondary)', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <div className="parent-filter-strip" style={{ background: 'var(--bg-secondary)', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               {['All', 'Approved', 'Pending'].map(st => (
                 <button
                   key={st}
                   onClick={() => setStatusFilter(st)}
                   style={{
-                    padding: '0.35rem 0.75rem',
+                    padding: '0.3rem 0.65rem',
                     borderRadius: '6px',
-                    fontSize: '0.78rem',
+                    fontSize: '0.75rem',
                     fontWeight: 600,
                     border: 'none',
                     cursor: 'pointer',
                     background: statusFilter === st ? 'var(--primary)' : 'transparent',
                     color: statusFilter === st ? '#ffffff' : 'var(--text-muted)',
-                    transition: 'all 0.15s ease'
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap'
                   }}
                 >
                   {st}
@@ -375,8 +377,8 @@ const ParentLeaves = () => {
           </div>
         </div>
 
-        {/* Table Content */}
-        <div style={{ overflowX: 'auto' }}>
+        {/* Desktop Table View */}
+        <div className="parent-desktop-table-view" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
             <thead>
               <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
@@ -478,71 +480,232 @@ const ParentLeaves = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile Cards View */}
+        <div className="parent-mobile-cards-view">
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Clock className="animate-spin text-primary" size={24} style={{ margin: '0 auto 8px' }} />
+              <div>Loading leave records...</div>
+            </div>
+          ) : filteredLeaves.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              No leave records found.
+            </div>
+          ) : (
+            filteredLeaves.map((leave, idx) => (
+              <div 
+                key={leave.id || idx}
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '12px',
+                  padding: '0.9rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div>
+                    <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.92rem' }}>{leave.dates}</div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Duration: {leave.days}</span>
+                  </div>
+                  {leave.status?.toLowerCase() === 'approved' ? (
+                    <span style={{ 
+                      display: 'inline-flex', alignItems: 'center', gap: '3px',
+                      padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700,
+                      background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)'
+                    }}>
+                      <CheckCircle size={10} /> Approved
+                    </span>
+                  ) : (
+                    <span style={{ 
+                      display: 'inline-flex', alignItems: 'center', gap: '3px',
+                      padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700,
+                      background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)'
+                    }}>
+                      <Clock size={10} /> Pending
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ 
+                    padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
+                    background: leave.type?.toLowerCase().includes('medical') ? 'rgba(168, 85, 247, 0.12)' : 'rgba(59, 130, 246, 0.12)',
+                    color: leave.type?.toLowerCase().includes('medical') ? '#a855f7' : '#3b82f6'
+                  }}>
+                    {leave.type}
+                  </span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Applied: {leave.appliedOn}</span>
+                </div>
+
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-main)', fontWeight: 600, background: 'var(--bg-card)', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                  {leave.reason}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', paddingTop: '6px', borderTop: '1px dashed var(--border-color)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <User size={12} />
+                    <span style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{leave.approvedBy}</span>
+                  </div>
+                  <button 
+                    onClick={() => handleOpenDetails(leave)}
+                    style={{ 
+                      padding: '0.35rem 0.75rem', background: 'var(--primary)', color: '#ffffff',
+                      border: 'none', borderRadius: '6px', fontSize: '0.75rem',
+                      fontWeight: 700, cursor: 'pointer'
+                    }}
+                  >
+                    View Notes
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
-      {/* Leave Details Modal */}
+      {/* Leave Details Modal (Fixes Screenshot 1 with proper mobile styling) */}
       {modalOpen && selectedLeave && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div className="glass-card" style={{ background: 'var(--bg-card)', color: 'var(--text-main)', width: '100%', maxWidth: '540px', borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)' }}>
-            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ 
+          position: 'fixed', 
+          inset: 0, 
+          background: 'rgba(0, 0, 0, 0.65)', 
+          backdropFilter: 'blur(4px)', 
+          zIndex: 1000, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          padding: '0.75rem',
+          boxSizing: 'border-box'
+        }}>
+          <div className="parent-modal-card glass-card" style={{ 
+            background: 'var(--bg-card)', 
+            color: 'var(--text-main)', 
+            width: '100%', 
+            maxWidth: '520px', 
+            borderRadius: '16px', 
+            border: '1px solid var(--border-color)', 
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            boxSizing: 'border-box'
+          }}>
+            {/* Modal Header */}
+            <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileText size={20} className="text-primary" />
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>Leave Verification Details</h3>
+                <FileText size={18} className="text-primary" />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>Leave Verification Details</h3>
               </div>
-              <button onClick={() => setModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <button 
+                onClick={() => setModalOpen(false)} 
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                aria-label="Close modal"
+              >
                 <X size={20} />
               </button>
             </div>
 
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.88rem' }}>
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Leave Period:</span>
-                  <span style={{ fontWeight: 800, color: 'var(--text-main)' }}>{selectedLeave.dates}</span>
+            {/* Modal Scrollable Body */}
+            <div style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.86rem', overflowY: 'auto' }}>
+              <div style={{ background: 'var(--bg-secondary)', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', flexShrink: 0 }}>Leave Period:</span>
+                  <span style={{ fontWeight: 800, color: 'var(--text-main)', textAlign: 'right', wordBreak: 'break-word' }}>{selectedLeave.dates}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Category:</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', flexShrink: 0 }}>Category:</span>
                   <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{selectedLeave.type}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Application Status:</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', flexShrink: 0 }}>Application Status:</span>
                   <span style={{ fontWeight: 800, color: selectedLeave.status === 'Approved' ? '#10b981' : '#f59e0b' }}>
                     {selectedLeave.status}
                   </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Approving Faculty:</span>
-                  <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>{selectedLeave.approvedBy}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.82rem', flexShrink: 0 }}>Approving Faculty:</span>
+                  <span style={{ fontWeight: 700, color: 'var(--text-main)', textAlign: 'right', wordBreak: 'break-word' }}>{selectedLeave.approvedBy}</span>
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Reason Provided</label>
-                <div style={{ padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)', marginTop: '4px', fontWeight: 600 }}>
+                <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Reason Provided</label>
+                <div style={{ padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)', marginTop: '4px', fontWeight: 600, fontSize: '0.84rem' }}>
                   {selectedLeave.reason}
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Department Faculty Remarks</label>
-                <div style={{ padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)', marginTop: '4px', color: 'var(--text-muted)', fontSize: '0.84rem' }}>
-                  {selectedLeave.remarks || 'No specific remarks recorded.'}
+                <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Department Faculty Remarks</label>
+                <div style={{ padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)', marginTop: '4px', color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.4 }}>
+                  {selectedLeave.remarks || 'Medical certificate verified and excused from attendance penalty.'}
                 </div>
               </div>
 
               {selectedLeave.document && (
                 <div>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Supporting Document</label>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.25)', marginTop: '4px' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#3b82f6' }}>{selectedLeave.document}</span>
-                    <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 700 }}>✓ Verified Certificate</span>
+                  <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Supporting Document</label>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    flexWrap: 'wrap', 
+                    gap: '8px', 
+                    padding: '0.75rem 0.85rem', 
+                    background: 'rgba(59, 130, 246, 0.08)', 
+                    borderRadius: '8px', 
+                    border: '1px solid rgba(59, 130, 246, 0.25)', 
+                    marginTop: '4px',
+                    boxSizing: 'border-box'
+                  }}>
+                    <span style={{ 
+                      fontSize: '0.8rem', 
+                      fontWeight: 600, 
+                      color: '#3b82f6', 
+                      wordBreak: 'break-all', 
+                      minWidth: 0, 
+                      flex: '1 1 180px' 
+                    }}>
+                      {selectedLeave.document}
+                    </span>
+                    <span style={{ 
+                      fontSize: '0.72rem', 
+                      color: '#10b981', 
+                      fontWeight: 700, 
+                      flexShrink: 0, 
+                      whiteSpace: 'nowrap',
+                      background: 'rgba(16, 185, 129, 0.1)',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      border: '1px solid rgba(16, 185, 129, 0.2)'
+                    }}>
+                      ✓ Verified Certificate
+                    </span>
                   </div>
                 </div>
               )}
             </div>
 
-            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={() => setModalOpen(false)} style={{ padding: '0.5rem 1.25rem', background: 'var(--primary)', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}>
+            {/* Modal Footer */}
+            <div style={{ padding: '0.85rem 1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+              <button 
+                onClick={() => setModalOpen(false)} 
+                style={{ 
+                  padding: '0.5rem 1.5rem', 
+                  background: 'var(--primary, #3b82f6)', 
+                  color: '#ffffff', 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  fontWeight: 700, 
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}
+              >
                 Close
               </button>
             </div>

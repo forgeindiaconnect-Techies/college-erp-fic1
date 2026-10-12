@@ -109,5 +109,92 @@
 }
 
 /* ── Helpers ── */
-.gradient-text { background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.gradient-text { background: var(--primary-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .flex { display: flex; } .items-center { align-items: center; } .gap-2 { gap: 0.5rem; }
+
+/* ── Mobile Adaptations ── */
+.rpt-table-section {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .reports-page {
+    gap: 1rem;
+  }
+  .reports-page .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  .reports-page .page-header h1 {
+    font-size: 1.3rem;
+    margin-bottom: 0.2rem;
+  }
+  .reports-page .page-header p {
+    font-size: 0.78rem;
+  }
+  .header-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.45rem;
+  }
+  .btn-export {
+    padding: 0.5rem 0.55rem;
+    font-size: 0.76rem;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+  }
+  .rpt-summary-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+  }
+  .rpt-summary-card {
+    padding: 0.65rem 0.75rem !important;
+    border-radius: 10px !important;
+  }
+  .rpt-summary-label {
+    font-size: 0.65rem !important;
+  }
+  .rpt-summary-value {
+    font-size: 1.2rem !important;
+  }
+  .rpt-summary-sub {
+    font-size: 0.65rem !important;
+  }
+  .report-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.35rem;
+  }
+  .rtab {
+    flex-shrink: 0;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-actions {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.35rem;
+  }
+  .btn-export {
+    padding: 0.45rem 0.4rem;
+    font-size: 0.72rem;
+    gap: 0.25rem;
+  }
+  .rpt-summary-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+  .rpt-summary-card {
+    padding: 0.55rem 0.65rem !important;
+  }
+  .rpt-summary-value {
+    font-size: 1.05rem !important;
+  }
+}

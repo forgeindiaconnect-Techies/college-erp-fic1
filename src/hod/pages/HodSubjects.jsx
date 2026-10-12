@@ -150,7 +150,7 @@ const HodSubjects = () => {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+    <div className="hod-subjects-page" style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
       
       {/* Top Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', borderBottom: '1px solid var(--border-color, #e2e8f0)', paddingBottom: '16px' }}>
@@ -168,7 +168,7 @@ const HodSubjects = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="hod-header-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <button 
             type="button" 
             onClick={handleExportCSV}
@@ -255,7 +255,7 @@ const HodSubjects = () => {
       </div>
 
       {/* Filter Toolbar & Search */}
-      <div style={{
+      <div className="filters-row" style={{
         background: 'var(--bg-card, #ffffff)',
         borderRadius: '14px',
         border: '1px solid var(--border-color, #e2e8f0)',
@@ -266,7 +266,7 @@ const HodSubjects = () => {
         flexWrap: 'wrap',
         gap: '12px'
       }}>
-        <div style={{
+        <div className="search-box" style={{
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
@@ -287,7 +287,7 @@ const HodSubjects = () => {
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="filter-select-wrapper" style={{ display: 'flex', gap: '10px' }}>
           <select 
             value={semFilter} 
             onChange={e => setSemFilter(e.target.value)}
@@ -300,7 +300,8 @@ const HodSubjects = () => {
               fontWeight: 600,
               color: 'var(--text-main, #0f172a)',
               outline: 'none',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              width: '100%'
             }}
           >
             <option value="All">All Semesters</option>
@@ -314,20 +315,19 @@ const HodSubjects = () => {
         background: 'var(--bg-card, #ffffff)',
         borderRadius: '14px',
         border: '1px solid var(--border-color, #e2e8f0)',
-        overflow: 'hidden',
         boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
       }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+        <div className="table-container" style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
             <thead>
-              <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
-                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Course Code</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Subject Title</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Semester</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Allocated Faculty</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Credits</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Hours / Wk</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+              <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                <th style={{ padding: '12px 16px', textAlign: 'left', whiteSpace: 'nowrap' }}>Course Code</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', whiteSpace: 'nowrap' }}>Subject Title</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>Semester</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', whiteSpace: 'nowrap' }}>Allocated Faculty</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>Credits</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>Hours / Wk</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>

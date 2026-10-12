@@ -196,7 +196,7 @@ export default function PrincipalHodManagement() {
       </div>
 
       {/* 4 ERP KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
+      <div className="principal-kpi-grid">
         {[
           { label: 'Total Department Heads', value: hodList.length, icon: <Users size={20} />, bgTint: 'rgba(99, 102, 241, 0.1)', iconColor: '#6366f1', sub: 'Assigned divisions' },
           { label: 'Active on Duty', value: hodList.filter(h => h.status === 'Active').length, icon: <CheckCircle size={20} />, bgTint: 'rgba(16, 185, 129, 0.1)', iconColor: '#10b981', sub: 'Currently present' },
@@ -232,7 +232,7 @@ export default function PrincipalHodManagement() {
       </div>
 
       {/* Main Content Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: '1.5rem', alignItems: 'flex-start' }}>
+      <div className="principal-split-grid">
         {/* Left Column: Table & Filters */}
         <div style={{ background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-color)', padding: '1.5rem', boxShadow: 'var(--shadow-card)' }}>
           {/* Controls Bar */}

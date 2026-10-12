@@ -124,8 +124,8 @@ const AdminAssignments = () => {
       </div>
 
       <div className="glass-card search-card-assignments" style={{ marginBottom: '1.5rem', borderRadius: '12px' }}>
-        <div className="table-filters-bar" style={{ borderBottom: 'none', padding: '1rem 1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <div className="search-box-attendance" style={{ flex: '1', minWidth: '300px' }}>
+        <div className="table-filters-bar" style={{ borderBottom: 'none', padding: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div className="search-box-attendance" style={{ flex: '1 1 200px', minWidth: '0' }}>
             <Search size={17} className="search-icon" />
             <input
               type="text"
@@ -134,7 +134,7 @@ const AdminAssignments = () => {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          <div className="search-box-attendance" style={{ flex: '0 1 250px' }}>
+          <div className="search-box-attendance" style={{ flex: '1 1 180px', minWidth: '0' }}>
             <Layers size={17} className="search-icon" />
             <select
               value={filterDept}

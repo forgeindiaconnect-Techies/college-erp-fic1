@@ -36,9 +36,13 @@
 .table-section-card-s { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
 .table-header-row-s { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding: 1.25rem 1.5rem; background: var(--bg-secondary); }
 .table-header-row-s h3 { font-size: 1.05rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main); }
-.table-container-s { width: 100%; overflow-x: auto; }
+.table-container-s {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 
-table { width: 100%; border-collapse: collapse; text-align: left; }
+table { width: 100%; min-width: 550px; border-collapse: collapse; text-align: left; }
 th { padding: 1rem 1.5rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); background: rgba(0,0,0,0.02); font-weight: 700; border-bottom: 1px solid var(--border-color); }
 td { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); color: var(--text-main); vertical-align: middle; }
 tr:last-child td { border-bottom: none; }
@@ -362,4 +366,61 @@ tbody tr:hover { background: rgba(0,0,0,0.01); }
   outline: none;
   color: var(--text-main);
   font-size: 0.9rem;
+}
+
+/* ── Mobile & Tablet Responsiveness for Student Attendance ── */
+@media (max-width: 768px) {
+  .student-attendance-page {
+    gap: 1rem;
+  }
+
+  .page-header-student {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .analytics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .analytics-card {
+    padding: 1rem;
+  }
+
+  .analytics-card h2 {
+    font-size: 1.4rem;
+  }
+
+  .table-header-row-s {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+
+  .search-box-attendance {
+    width: 100%;
+  }
+
+  .search-box-attendance input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .analytics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  .analytics-grid > *:last-child:nth-child(odd) {
+    grid-column: span 2;
+  }
+  .analytics-card {
+    padding: 0.65rem 0.75rem;
+  }
+  .analytics-card h2 {
+    font-size: 1.25rem;
+  }
 }

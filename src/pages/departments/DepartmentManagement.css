@@ -235,3 +235,54 @@
   color: #65788a;
 }
 
+/* ── Mobile Adaptations ── */
+@media (max-width: 768px) {
+  .dept-management .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .dept-management .page-header button {
+    width: 100%;
+    justify-content: center;
+  }
+  .dept-management .sm-summary-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dept-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .dept-management .filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dept-management .search-box {
+    width: 100%;
+    max-width: 100%;
+  }
+  .department-table-section .search-box {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .dept-management .sm-summary-row {
+    grid-template-columns: 1fr;
+  }
+  .dept-card {
+    padding: 1rem;
+  }
+  .dept-stats-row {
+    grid-template-columns: 1fr;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+  .modal-actions button {
+    width: 100%;
+  }
+}
+

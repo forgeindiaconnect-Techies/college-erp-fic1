@@ -183,16 +183,22 @@
   gap: 8px;
   margin-bottom: 16px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.erp-steps-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .erp-step-tab {
-  flex: 1;
-  min-width: 140px;
+  flex: 0 0 auto;
+  min-width: max-content;
   height: 40px;
   border: 1px solid transparent;
   border-radius: 7px;
   background: transparent;
-  padding: 0 10px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -530,13 +536,15 @@
 .erp-table-responsive {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background: #ffffff;
   margin-top: 10px;
 }
 
 .erp-table {
   width: 100%;
+  min-width: 600px;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
@@ -582,4 +590,75 @@
   background: #fef2f2;
   border: 1px solid #fecaca;
   color: #991b1b;
+}
+
+/* ── Responsive Mobile Rules ── */
+@media (max-width: 768px) {
+  .erp-workbench {
+    padding: 10px 10px 30px;
+  }
+  .erp-header-card {
+    padding: 12px 14px;
+  }
+  .erp-header-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .erp-header-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .erp-btn-header {
+    justify-content: center !important;
+    width: 100% !important;
+    padding: 0 8px !important;
+    font-size: 0.8rem !important;
+  }
+  .erp-btn-header-primary {
+    grid-column: 1 / -1 !important;
+  }
+  .erp-card-main {
+    padding: 14px 16px;
+  }
+  .erp-section-box {
+    padding: 12px 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .erp-header-title {
+    font-size: 1.1rem !important;
+  }
+  .erp-header-actions {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+  }
+  .erp-btn-header {
+    height: 32px !important;
+    font-size: 0.74rem !important;
+    padding: 0 4px !important;
+  }
+  .erp-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  .erp-kpi-card:last-child {
+    grid-column: 1 / -1 !important;
+  }
+  .erp-kpi-card {
+    padding: 10px 8px !important;
+  }
+  .erp-kpi-value {
+    font-size: 1.05rem !important;
+  }
+  .erp-wizard-footer {
+    flex-direction: column-reverse;
+  }
+  .erp-wizard-footer button {
+    width: 100%;
+    justify-content: center;
+  }
 }

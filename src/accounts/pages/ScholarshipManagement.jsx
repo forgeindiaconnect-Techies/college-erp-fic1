@@ -440,17 +440,6 @@ export default function ScholarshipManagement() {
           >
             <RefreshCw size={15}/> Live Sync
           </button>
-          <button 
-            className="sm-btn-primary"
-            onClick={() => {
-              setActiveTab("schemes");
-              setEditingId(null);
-              setForm(emptyForm);
-              window.scrollTo({ top: 180, behavior: "smooth" });
-            }}
-          >
-            <Plus size={15}/> New Scholarship Scheme
-          </button>
         </div>
       </div>
 

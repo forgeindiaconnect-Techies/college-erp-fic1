@@ -206,7 +206,7 @@ export default function PrincipalStudentsOverview() {
       </div>
 
       {/* 4 ERP KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
+      <div className="principal-kpi-grid">
         {[
           { label: 'Total Enrolled Students', value: studentList.length, icon: <GraduationCap size={20} />, bgTint: 'rgba(16, 185, 129, 0.1)', iconColor: '#10b981', sub: 'Across all departments' },
           { label: 'Overall Attendance Rate', value: `${avgAttendance}%`, icon: <TrendingUp size={20} />, bgTint: 'rgba(59, 130, 246, 0.1)', iconColor: '#3b82f6', sub: 'Institution average' },
@@ -242,12 +242,12 @@ export default function PrincipalStudentsOverview() {
       </div>
 
       {/* Main Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: '1.5rem', alignItems: 'flex-start' }}>
+      <div className="principal-split-grid">
         {/* Left Column: Student List & Controls */}
         <div style={{ background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-color)', padding: '1.5rem', boxShadow: 'var(--shadow-card)' }}>
           {/* Controls Bar & Tab Pills */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: '1.25rem' }}>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div className="approvals-filter-pills" style={{ display: 'flex', gap: 6 }}>
               {[
                 { id: 'all', label: `All Students (${studentList.length})` },
                 { id: 'top', label: 'Top Performers' },

@@ -250,3 +250,16 @@
 .parent-login-footer a:hover {
   color: #10b981;
 }
+
+/* Responsive Media Query */
+@media (max-width: 480px) {
+  .parent-login-card {
+    padding: 1.5rem 1.25rem;
+    border-radius: 18px;
+    width: 100%;
+  }
+  .parent-login-brand h1 {
+    font-size: 1.35rem;
+  }
+}
+

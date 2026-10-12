@@ -282,23 +282,45 @@
     left: 10px;
     width: auto;
     max-width: none;
+    z-index: 300;
+  }
+
+  .profile-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    max-width: calc(100vw - 20px);
+    z-index: 300;
   }
 }
 
 @media (max-width: 480px) {
   .navbar-greeting h3,
   .navbar-greeting-title {
-    max-width: 125px;
-    font-size: 12.5px !important;
+    max-width: 120px;
+    font-size: 12px !important;
   }
 
   .navbar .icon-btn {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
   }
 
   .profile-img {
     width: 32px;
     height: 32px;
+  }
+}
+
+@media (max-width: 360px) {
+  .navbar {
+    padding: 0 6px;
+    gap: 4px;
+  }
+
+  .navbar-greeting h3,
+  .navbar-greeting-title {
+    max-width: 95px;
+    font-size: 11px !important;
   }
 }

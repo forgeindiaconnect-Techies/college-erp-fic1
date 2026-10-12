@@ -304,12 +304,401 @@
   transform: translateY(-1px);
 }
 
-.erp-btn-submit.green {
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
-}
-
 .erp-btn-submit.green:hover {
   background: linear-gradient(135deg, #15803d 0%, #166534 100%);
   box-shadow: 0 6px 16px rgba(22, 163, 74, 0.35);
+}
+
+/* ── Mobile & Tablet Responsiveness for Placement Management ── */
+@media (max-width: 1024px) {
+  .placement-page {
+    padding: 16px 12px;
+  }
+
+  .placement-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .placement-page {
+    padding: 12px 8px;
+  }
+
+  .placement-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .placement-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .erp-modal-box {
+    max-width: 95vw !important;
+  }
+
+  .erp-modal-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .erp-modal-footer button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .placement-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .placement-header h1 {
+    font-size: 1.25rem;
+  }
+}
+
+/* ── Enhanced Mobile Responsiveness for Placement Management ── */
+
+/* 1. Placement KPI Grid (2x2 on Mobile) */
+.placement-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .placement-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .placement-kpi-grid > div {
+    padding: 12px 10px !important;
+    border-radius: 12px !important;
+  }
+
+  .placement-kpi-grid > div .kpi-title {
+    font-size: 0.68rem !important;
+  }
+
+  .placement-kpi-grid > div .kpi-num {
+    font-size: 1.35rem !important;
+    margin-top: 2px !important;
+  }
+
+  .placement-kpi-grid > div .kpi-footer {
+    font-size: 0.68rem !important;
+    margin-top: 2px !important;
+  }
+}
+
+/* 2. Responsive 2-Col Grids (Charts, Actions) */
+.placement-two-col-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .placement-two-col-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+}
+
+/* 3. Card Grids (Companies, Jobs, Training) */
+.placement-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .placement-card-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+}
+
+/* 4. Horizontal Scrollable Tables */
+.placement-table-wrapper {
+  width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: thin !important;
+  position: relative !important;
+}
+
+.placement-table-wrapper::-webkit-scrollbar {
+  height: 6px !important;
+}
+
+.placement-table-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+  border-radius: 4px !important;
+}
+
+.placement-table {
+  width: 100% !important;
+  min-width: 650px !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+/* 5. Stepper Round Tabs in Interviews */
+.placement-stepper-tabs {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  gap: 12px !important;
+  padding: 4px 2px 10px !important;
+}
+
+.placement-stepper-tabs::-webkit-scrollbar {
+  display: none !important;
+}
+
+.placement-stepper-tabs button {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 640px) {
+  .placement-stepper-tabs button {
+    min-width: 200px !important;
+    padding: 10px 14px !important;
+    gap: 8px !important;
+  }
+}
+
+/* 6. Reports Sub-Navigation Tabs */
+.placement-reports-subtabs {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  gap: 8px !important;
+  padding: 6px 8px 4px !important;
+  background: #f8fafc !important;
+  border-radius: 12px !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.placement-reports-subtabs::-webkit-scrollbar {
+  display: none !important;
+}
+
+.placement-reports-subtabs button {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+/* 7. Eligibility Filter Card */
+.placement-eligibility-filter-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .placement-eligibility-filter-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding: 14px !important;
+  }
+
+  .placement-eligibility-filter-card .drive-select-group {
+    width: 100% !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+
+  .placement-eligibility-filter-card .drive-select-group select {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .placement-eligibility-filter-card .badge-group {
+    display: flex !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+
+  .placement-eligibility-filter-card .badge-group span {
+    flex: 1 !important;
+    text-align: center !important;
+    font-size: 0.75rem !important;
+    padding: 6px 8px !important;
+  }
+}
+
+/* 8. Interview Control Card */
+@media (max-width: 640px) {
+  .placement-drive-select-box {
+    width: 100% !important;
+  }
+
+  .placement-drive-select-box select {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .placement-interview-header-actions {
+    width: 100% !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .placement-interview-header-actions button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .placement-interview-counters {
+    width: 100% !important;
+    display: flex !important;
+    gap: 8px !important;
+  }
+
+  .placement-interview-counters > div {
+    flex: 1 !important;
+    min-width: 0 !important;
+    padding: 8px 10px !important;
+  }
+}
+
+/* 9. Reports Filter Bar */
+.placement-reports-filter-bar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+@media (max-width: 640px) {
+  .placement-reports-filter-bar {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .placement-reports-search-box {
+    grid-column: span 2 !important;
+    width: 100% !important;
+  }
+
+  .placement-reports-filter-item {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 4px !important;
+    width: 100% !important;
+  }
+
+  .placement-reports-filter-item select {
+    width: 100% !important;
+  }
+
+  .placement-reports-clear-btn {
+    grid-column: span 2 !important;
+    width: 100% !important;
+    text-align: center !important;
+  }
+}
+
+/* 10. Nav Tabs Header Bar */
+.placement-nav-tabs-bar {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  gap: 6px !important;
+}
+
+.placement-nav-tabs-bar::-webkit-scrollbar {
+  display: none !important;
+}
+
+.placement-nav-tabs-bar button {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+/* 11. Modal Grid & Mobile Alignment Engine */
+.erp-modal-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .erp-modal-box {
+    width: 95% !important;
+    max-width: 95% !important;
+    max-height: 90vh !important;
+    margin: auto !important;
+    border-radius: 14px !important;
+  }
+  
+  .erp-modal-header {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    flex-wrap: nowrap !important;
+    padding: 12px 16px !important;
+    gap: 10px !important;
+  }
+  
+  .erp-modal-header-info {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+  
+  .erp-modal-close {
+    flex-shrink: 0 !important;
+    margin-left: auto !important;
+    margin-top: 2px !important;
+  }
+  
+  .erp-modal-2col {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  
+  .erp-modal-body {
+    padding: 14px 16px !important;
+  }
+  
+  .erp-modal-footer {
+    padding: 12px 16px !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  
+  .erp-modal-footer button {
+    width: 100% !important;
+  }
 }

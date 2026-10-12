@@ -227,3 +227,23 @@
   }
 }
 
+@media (max-width: 480px) {
+  .upgrade-container {
+    padding: 30px 14px 40px 14px;
+  }
+  .upgrade-header {
+    margin-bottom: 30px;
+  }
+  .upgrade-header h1 {
+    font-size: 26px;
+  }
+  .upgrade-header p {
+    font-size: 15px;
+  }
+  .pricing-card {
+    width: 100%;
+    max-width: 100%;
+    padding: 24px 18px;
+  }
+}
+

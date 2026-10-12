@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getFeesByStudent, getStudentById, getStudents } from '../../api/index';
 import { SettingsContext } from '../../App';
+import './ParentDashboard.css';
 
 const formatCurrency = (amount) => {
   const num = Number(amount) || 0;
@@ -281,9 +282,9 @@ const ParentFees = () => {
   });
 
   return (
-    <div className="animate-fade-in p-6" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="parent-page-container animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto' }}>
       {/* Top Header */}
-      <div className="glass-card" style={{ padding: '1.25rem 1.5rem', background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--border-color)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="parent-header-card glass-card" style={{ marginBottom: '1.5rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -300,8 +301,8 @@ const ParentFees = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ padding: '6px 14px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.82rem', display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ padding: '6px 14px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.82rem', display: 'flex', gap: '8px', alignItems: 'center', whiteSpace: 'nowrap' }}>
             <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Ward:</span>
             <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>{childDetails.id}</span>
             <span style={{ color: 'var(--border-color)' }}>|</span>
@@ -320,7 +321,7 @@ const ParentFees = () => {
       </div>
 
       {/* 4-Column Financial Metric Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="parent-kpi-grid" style={{ marginBottom: '1.5rem' }}>
         {/* Total Billed */}
         <div className="glass-card" style={{ padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -460,8 +461,8 @@ const ParentFees = () => {
           </div>
         </div>
 
-        {/* Table Content */}
-        <div style={{ overflowX: 'auto' }}>
+        {/* Desktop Table Content */}
+        <div className="parent-desktop-table-view" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
             <thead>
               <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
@@ -550,97 +551,166 @@ const ParentFees = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile Cards View */}
+        <div className="parent-mobile-cards-view" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Clock className="animate-spin text-primary" size={24} style={{ margin: '0 auto 8px' }} />
+              <div>Loading vouchers...</div>
+            </div>
+          ) : filteredHistory.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <p style={{ margin: 0, fontWeight: 600 }}>No fee records found.</p>
+            </div>
+          ) : (
+            filteredHistory.map((fee) => (
+              <div 
+                key={fee.id}
+                style={{ 
+                  background: 'var(--bg-secondary)', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '12px', 
+                  padding: '1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.82rem', color: 'var(--primary)' }}>
+                    {fee.invoiceNo}
+                  </span>
+                  <span style={{ 
+                    display: 'inline-flex', alignItems: 'center', gap: '3px',
+                    padding: '2px 8px', borderRadius: '12px', fontSize: '0.74rem', fontWeight: 700,
+                    background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)'
+                  }}>
+                    <CheckCircle size={10} /> {fee.status}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-main)' }}>{fee.title}</h4>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>{fee.semester} • {fee.date}</div>
+                  </div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {formatCurrency(fee.totalAmount)}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border-color)', paddingTop: '0.65rem', marginTop: '0.2rem' }}>
+                  <span>{fee.paymentMode}</span>
+                  <button 
+                    onClick={() => handleOpenReceipt(fee)}
+                    style={{ 
+                      display: 'inline-flex', alignItems: 'center', gap: '5px',
+                      padding: '0.35rem 0.75rem', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6',
+                      border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '6px', fontSize: '0.78rem',
+                      fontWeight: 600, cursor: 'pointer'
+                    }}
+                  >
+                    <Download size={12} /> Receipt
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Official Receipt Modal */}
       {receiptModalOpen && selectedReceipt && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div className="glass-card" style={{ background: '#ffffff', color: '#0f172a', width: '100%', maxWidth: '680px', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)' }}>
+          <div className="parent-modal-card glass-card" style={{ background: '#ffffff', color: '#0f172a', width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)' }}>
             {/* Modal Top Bar */}
-            <div style={{ padding: '1rem 1.5rem', background: '#0f172a', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '0.85rem 1.25rem', background: '#0f172a', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', position: 'sticky', top: 0, zIndex: 2 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldCheck size={20} className="text-emerald-400" />
-                <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Official Institutional Fee Receipt</span>
+                <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>Official Institutional Fee Receipt</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button onClick={handlePrintReceipt} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.35rem 0.75rem', background: '#3b82f6', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>
-                  <Printer size={13} /> Print Receipt
+                  <Printer size={13} /> Print
                 </button>
-                <button onClick={() => setReceiptModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <button onClick={() => setReceiptModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}>
                   <X size={20} />
                 </button>
               </div>
             </div>
 
             {/* Printable Receipt Body */}
-            <div style={{ padding: '2rem' }}>
+            <div style={{ padding: '1.25rem' }}>
               {/* Institution Header */}
-              <div style={{ textAlign: 'center', borderBottom: '2px solid #e2e8f0', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>
-                <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 900, color: '#0f172a' }}>
+              <div style={{ textAlign: 'center', borderBottom: '2px solid #e2e8f0', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
+                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
                   {collegeSettings?.collegeName || 'ARIGNAR ANNA COLLEGE OF ENGINEERING & TECHNOLOGY'}
                 </h2>
-                <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
                   Affiliated to Anna University • Approved by AICTE, New Delhi
                 </p>
-                <div style={{ display: 'inline-block', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '3px 12px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800, marginTop: '8px', color: '#334155', letterSpacing: '0.05em' }}>
+                <div style={{ display: 'inline-block', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '3px 10px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800, marginTop: '8px', color: '#334155', letterSpacing: '0.04em' }}>
                   OFFICIAL FEE PAYMENT RECEIPT (ACADEMIC YEAR 2026-2027)
                 </div>
               </div>
 
               {/* Receipt Metadata Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1.25rem', fontSize: '0.82rem' }}>
                 <div>
-                  <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 600 }}>STUDENT NAME</div>
+                  <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>STUDENT NAME</div>
                   <div style={{ fontWeight: 800, color: '#0f172a', marginTop: '1px' }}>{childDetails.name}</div>
                 </div>
                 <div>
-                  <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 600 }}>REGISTER NUMBER / ID</div>
+                  <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>REGISTER NUMBER / ID</div>
                   <div style={{ fontWeight: 800, color: '#0f172a', marginTop: '1px' }}>{childDetails.id}</div>
                 </div>
                 <div>
-                  <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 600 }}>PROGRAM & SEMESTER</div>
+                  <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>PROGRAM & SEMESTER</div>
                   <div style={{ fontWeight: 700, color: '#0f172a', marginTop: '1px' }}>{childDetails.dept} - {selectedReceipt.semester}</div>
                 </div>
                 <div>
-                  <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 600 }}>RECEIPT NUMBER & DATE</div>
+                  <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>RECEIPT NUMBER & DATE</div>
                   <div style={{ fontWeight: 800, color: '#3b82f6', marginTop: '1px' }}>{selectedReceipt.invoiceNo} • {selectedReceipt.date}</div>
                 </div>
               </div>
 
               {/* Itemized Table */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.5rem', fontSize: '0.88rem' }}>
-                <thead>
-                  <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1' }}>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', color: '#475569', fontWeight: 700 }}>#</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', color: '#475569', fontWeight: 700 }}>Particulars / Description</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'right', color: '#475569', fontWeight: 700 }}>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>1</td>
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a' }}>{selectedReceipt.title}</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{formatCurrency(selectedReceipt.totalAmount)}</td>
-                  </tr>
-                  <tr style={{ background: '#f8fafc', fontWeight: 800 }}>
-                    <td colSpan={2} style={{ padding: '10px 12px', textAlign: 'right', color: '#0f172a' }}>Total Amount Paid:</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', color: '#10b981', fontSize: '1rem' }}>{formatCurrency(selectedReceipt.totalAmount)}</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div style={{ overflowX: 'auto', marginBottom: '1.25rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', minWidth: '320px' }}>
+                  <thead>
+                    <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1' }}>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', color: '#475569', fontWeight: 700 }}>#</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', color: '#475569', fontWeight: 700 }}>Particulars / Description</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', color: '#475569', fontWeight: 700 }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '8px 10px', color: '#64748b' }}>1</td>
+                      <td style={{ padding: '8px 10px', fontWeight: 700, color: '#0f172a' }}>{selectedReceipt.title}</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{formatCurrency(selectedReceipt.totalAmount)}</td>
+                    </tr>
+                    <tr style={{ background: '#f8fafc', fontWeight: 800 }}>
+                      <td colSpan={2} style={{ padding: '8px 10px', textAlign: 'right', color: '#0f172a' }}>Total Amount Paid:</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', color: '#10b981', fontSize: '0.95rem' }}>{formatCurrency(selectedReceipt.totalAmount)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
 
               {/* Payment Details & Signature Footer */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '1px dashed #cbd5e1', paddingTop: '1.25rem' }}>
-                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '1px dashed #cbd5e1', paddingTop: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
                   <div><strong>Payment Mode:</strong> {selectedReceipt.paymentMode}</div>
                   <div><strong>Transaction Reference:</strong> {selectedReceipt.transactionId}</div>
                   <div style={{ color: '#10b981', fontWeight: 700, marginTop: '3px' }}>Status: Confirmed & Paid in Full</div>
                 </div>
 
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ width: '120px', borderBottom: '1px solid #94a3b8', margin: '0 auto 6px' }} />
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Accounts Officer</div>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Authorized Signatory</div>
+                  <div style={{ width: '100px', borderBottom: '1px solid #94a3b8', margin: '0 auto 4px' }} />
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>Accounts Officer</div>
+                  <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Authorized Signatory</div>
                 </div>
               </div>
             </div>

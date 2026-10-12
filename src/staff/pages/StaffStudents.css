@@ -58,3 +58,9 @@
 
 .student-skeleton-card { display: flex; flex-direction: column; align-items: center; padding: 1.5rem; }
 .col-span-full { grid-column: 1 / -1; }
+
+@media (max-width: 480px) {
+  .students-directory-grid {
+    grid-template-columns: 1fr;
+  }
+}

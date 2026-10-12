@@ -250,3 +250,16 @@
 .accounts-login-footer a:hover {
   color: #f59e0b;
 }
+
+/* Responsive Media Query */
+@media (max-width: 480px) {
+  .accounts-login-card {
+    padding: 1.5rem 1.25rem;
+    border-radius: 18px;
+    width: 100%;
+  }
+  .accounts-login-brand h1 {
+    font-size: 1.35rem;
+  }
+}
+

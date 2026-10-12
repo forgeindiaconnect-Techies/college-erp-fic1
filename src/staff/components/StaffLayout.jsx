@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import StaffSidebar from './StaffSidebar';
 import Navbar from '../../components/layout/Navbar';
 import '../../components/layout/Layout.css';
+import '../StaffResponsive.css';
 
 const StaffLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);

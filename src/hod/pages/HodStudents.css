@@ -230,3 +230,71 @@ tr:hover td { background: rgba(79,70,229,0.035); }
 }
 .btn-ghost:hover { background: var(--bg-primary); color: var(--text-main); }
 .btn-success { background: linear-gradient(135deg, #10b981, #059669); }
+
+/* Responsive Media Queries */
+@media (max-width: 1200px) {
+  .sm-summary-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .sm-summary-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .filters-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+  .search-box {
+    width: 100%;
+    min-width: 0;
+  }
+  .filter-group {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .filter-select-wrapper {
+    flex: 1;
+    min-width: 140px;
+  }
+}
+
+@media (max-width: 580px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .page-header button {
+    width: 100%;
+    justify-content: center;
+  }
+  .sm-summary-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .modal-box {
+    width: 95vw;
+    max-height: 92vh;
+  }
+  .modal-hd,
+  .modal-body,
+  .modal-ft {
+    padding: 1rem;
+  }
+  .modal-ft {
+    flex-direction: column-reverse;
+  }
+  .modal-ft button {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+}
+

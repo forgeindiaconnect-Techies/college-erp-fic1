@@ -87,8 +87,8 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1.25rem;
 }
-@media (max-width: 768px) { .student-metrics-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 480px) { .student-metrics-grid { grid-template-columns: 1fr; } }
+@media (max-width: 768px) { .student-metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; } }
+@media (max-width: 480px) { .student-metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 0.45rem; } }
 
 .s-metric-card {
   padding: 1.25rem;
@@ -199,4 +199,53 @@
   display: block;
   opacity: 1;
   visibility: visible;
+}
+
+/* ── Mobile & Tablet Responsiveness for Student Dashboard ── */
+@media (max-width: 768px) {
+  .student-welcome-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .charts-grid-student {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .chart-card-s {
+    padding: 1rem;
+  }
+
+  .announcements-card-student {
+    padding: 1rem;
+  }
+
+  .announcements-header {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .modal-content {
+    padding: 1.25rem;
+    border-radius: 16px;
+    width: 95vw;
+    max-width: 95vw;
+  }
+}
+
+@media (max-width: 480px) {
+  .student-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.45rem;
+  }
+  .student-metrics-grid > *:last-child:nth-child(odd) {
+    grid-column: span 2;
+  }
+
+  .s-metric-card {
+    padding: 0.65rem 0.75rem;
+  }
 }

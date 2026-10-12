@@ -72,3 +72,59 @@
   align-items: center; justify-content: center; opacity: 0.5;
 }
 .empty-text-s { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
+
+.timetable-page-container {
+  padding: 1.5rem;
+  padding-bottom: 6rem;
+  width: 100%;
+}
+
+.timing-period-col {
+  width: 170px;
+  min-width: 170px;
+}
+
+.timetable-scroll-wrapper {
+  max-height: 72vh;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .timetable-page-container {
+    padding: 0.5rem 0.25rem 4rem 0.25rem !important;
+  }
+
+  .timing-period-col {
+    width: 110px !important;
+    min-width: 110px !important;
+    padding: 0.45rem 0.35rem !important;
+    font-size: 0.72rem !important;
+  }
+
+  .timetable-scroll-wrapper {
+    max-height: none !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .student-timetable-page {
+    gap: 1rem;
+  }
+
+  .timetable-card-wrapper-s {
+    padding: 0.85rem;
+  }
+
+  .timetable-header-row-s {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .timetable-legend-s {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}

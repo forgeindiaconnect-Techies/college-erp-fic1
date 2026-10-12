@@ -844,3 +844,52 @@
   color: #4f46e5;
   width: fit-content;
 }
+
+/* ── Responsive Adaptations ── */
+@media (max-width: 768px) {
+  .sm-erp-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  .sm-header-actions {
+    justify-content: flex-start;
+  }
+  .sm-card {
+    padding: 1rem 1.25rem;
+  }
+  .sm-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sm-search-wrap {
+    min-width: 0;
+    width: 100%;
+  }
+  .sm-filter-group {
+    width: 100%;
+  }
+  .sm-filter-select {
+    flex: 1;
+  }
+  .sm-simulation-box {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .sm-card {
+    padding: 0.85rem;
+  }
+  .sm-page-title {
+    font-size: 1.35rem;
+  }
+  .sm-form-actions {
+    flex-direction: column-reverse;
+  }
+  .sm-btn-primary, .sm-btn-secondary {
+    width: 100%;
+    justify-content: center;
+  }
+}

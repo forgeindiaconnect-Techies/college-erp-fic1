@@ -5,6 +5,7 @@ import {
   Printer, ShieldCheck, GraduationCap, Users, Sparkles
 } from 'lucide-react';
 import { getStudents } from '../../api/index';
+import '../../pages/admin/AdminFinanceWelfareResponsive.css';
 
 const DEFAULT_SCHOLARS = [
   { id: 'SCH-101', studentId: 'HAA2026-001', studentName: 'Priya Kumar R', department: 'History and arts', semester: 'Sem 1', type: 'Sports Quota Award', amount: '25%', fixedAmount: 6500, date: '2026-05-15', status: 'Active', grantedBy: 'Director of Physical Education' },
@@ -44,6 +45,62 @@ const Scholarships = () => {
     status: 'Active',
     note: ''
   });
+
+  const handleDownloadCertificate = (cert) => {
+    if (!cert) return;
+    const certHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Scholarship Certificate - ${cert.studentName}</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 40px 20px; background: #fff; color: #0f172a; }
+    .cert-card { max-width: 620px; margin: 0 auto; border: 2px solid #6366f1; padding: 36px; border-radius: 16px; text-align: center; }
+    .header { border-bottom: 2px double #cbd5e1; padding-bottom: 16px; margin-bottom: 18px; }
+    .title { font-size: 24px; font-weight: 900; margin: 0; }
+    .sub { font-size: 13px; color: #64748b; margin-top: 4px; }
+    .badge { display: inline-block; margin-top: 10px; padding: 6px 16px; border-radius: 20px; background: #eef2ff; color: #4f46e5; font-weight: bold; font-size: 14px; }
+    .body { font-size: 15px; line-height: 1.6; color: #334155; margin: 20px 0; }
+    .student-name { font-size: 22px; font-weight: 900; color: #0f172a; margin: 8px 0; }
+    .highlight-box { margin: 16px 0; padding: 14px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; }
+    .footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 13px; color: #64748b; text-align: left; }
+  </style>
+</head>
+<body>
+  <div class="cert-card">
+    <div class="header">
+      <h1 class="title">OFFICIAL CERTIFICATE OF SCHOLARSHIP AWARD</h1>
+      <div class="sub">FINANCIAL AID & SCHOLARSHIPS BOARD</div>
+      <div class="badge">🏅 ${cert.type}</div>
+    </div>
+    <div class="body">
+      This is to formally certify that
+      <div class="student-name">${cert.studentName}</div>
+      Student ID: <strong>${cert.studentId}</strong> · Department: <strong>${cert.department || 'Academics'}</strong>
+      <div class="highlight-box">
+        has been conferred the prestigious <strong>${cert.type}</strong> with a <strong>${cert.amount} tuition fee waiver</strong> (≈ ₹${Number(cert.fixedAmount || 12000).toLocaleString('en-IN')}) for the academic term.
+      </div>
+    </div>
+    <div class="footer">
+      <div>Award ID: <strong>${cert.id}</strong><br>Date: <strong>${cert.date}</strong></div>
+      <div style="text-align: right;">
+        <div style="font-weight: 800; color: #0f172a;">Authorized Signatory</div>
+        <div>Dean of Student Welfare & Accounts</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+    const blob = new Blob([certHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Scholarship_Certificate_${(cert.studentName || 'Student').replace(/\s+/g, '_')}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem(`erp_scholarships_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
@@ -216,21 +273,46 @@ const Scholarships = () => {
           </div>
         </div>
 
-        <div className="flex gap-3 items-center flex-wrap">
+        <div className="scholarships-header-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <button 
             type="button"
             onClick={handleExportCSV}
             disabled={filteredScholars.length === 0}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-main)] font-semibold rounded-lg hover:bg-[var(--hover-bg)] transition-all shadow-sm text-sm"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 16px',
+              background: 'var(--bg-secondary, #f8fafc)',
+              border: '1px solid var(--border-color, #cbd5e1)',
+              color: 'var(--text-main, #334155)',
+              fontWeight: 600,
+              borderRadius: '8px',
+              cursor: filteredScholars.length === 0 ? 'not-allowed' : 'pointer',
+              fontSize: '0.85rem'
+            }}
           >
             <Download size={16} /> Export Register (Excel)
           </button>
           <button 
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-lg hover:brightness-110 transition-all shadow-md text-sm"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 16px',
+              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+              color: '#ffffff',
+              fontWeight: 700,
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              boxShadow: '0 2px 8px rgba(79, 70, 229, 0.35)'
+            }}
           >
-            <Plus size={16} /> + Grant Scholarship
+            <Plus size={16} /> Grant Scholarship
           </button>
         </div>
       </div>
@@ -368,7 +450,7 @@ const Scholarships = () => {
         </div>
 
         {/* Scholarships Table */}
-        <div className="overflow-x-auto">
+        <div className="scholarships-desktop-table overflow-x-auto">
           <table className="w-full text-left border-collapse" style={{ fontSize: '0.88rem' }}>
             <thead>
               <tr className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-[var(--text-muted)] text-xs uppercase tracking-wider">
@@ -484,6 +566,93 @@ const Scholarships = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Scholarships Mobile Cards */}
+        <div className="scholarships-mobile-cards">
+          {filteredScholars.length === 0 ? (
+            <div className="p-8 text-center text-[var(--text-muted)] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)]">
+              <GraduationCap size={32} className="text-[#6366f1] mx-auto mb-2" />
+              <div className="font-bold text-sm text-[var(--text-main)]">No Scholarship Records Found</div>
+              <div className="text-xs mt-1">Adjust search filters or grant a new financial aid award.</div>
+            </div>
+          ) : (
+            filteredScholars.map((s, idx) => (
+              <div
+                key={s.id || idx}
+                style={{
+                  background: 'var(--bg-card, #ffffff)',
+                  border: '1px solid var(--border-color, #e2e8f0)',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#6366f1', fontSize: '0.82rem', fontFamily: 'monospace' }}>
+                    <Award size={14} />
+                    <span>{s.id}</span>
+                  </div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: 'rgba(16,185,129,0.12)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <CheckCircle2 size={11} /> Active
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(99,102,241,0.12)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem', flexShrink: 0 }}>
+                    {(s.studentName || 'S').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.95rem' }}>{s.studentName}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      ID: <strong style={{ color: 'var(--text-main)' }}>{s.studentId}</strong> • {s.department || 'Academics'} ({s.semester || 'Sem 1'})
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary, #f8fafc)', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border-color, #f1f5f9)' }}>
+                  <div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Scheme</div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#6366f1' }}>🎓 {s.type}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Waiver Concession</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#10b981' }}>{s.amount} Off</div>
+                    {s.fixedAmount && (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        ≈ ₹{Number(s.fixedAmount).toLocaleString('en-IN')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '2px' }}>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Calendar size={12} /> {s.date || '2026-05-15'}
+                  </span>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setViewCertModal(s)}
+                      style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-main)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <FileText size={12} /> Certificate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(s.id)}
+                      style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #fecaca', background: '#fef2f2', color: '#ef4444', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Footer */}
@@ -702,13 +871,20 @@ const Scholarships = () => {
             </div>
 
             {/* Buttons */}
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={() => setViewCertModal(null)}
                 style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'none', color: '#475569', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}
               >
                 Close
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadCertificate(viewCertModal)}
+                style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#2563eb', color: '#ffffff', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Download size={15} /> Download Certificate
               </button>
               <button
                 type="button"

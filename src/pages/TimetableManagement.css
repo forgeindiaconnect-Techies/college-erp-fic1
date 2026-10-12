@@ -140,14 +140,25 @@
 .timetable-page .overflow-x-auto {
   border: 1px solid #bfcbd4;
   border-radius: 3px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 @media (max-width: 900px) {
   .timetable-page {
     overflow-x: hidden;
+    padding: 10px 8px;
   }
 
   .timetable-page table {
-    min-width: 950px;
+    min-width: 850px;
+  }
+}
+
+@media (max-width: 480px) {
+  .timetable-page table {
+    min-width: 750px;
   }
 }

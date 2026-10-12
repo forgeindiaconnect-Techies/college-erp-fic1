@@ -199,6 +199,8 @@
   background: transparent;
   border: 0;
   cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.2s ease;
 }
 
 .sidebar-overlay {
@@ -208,8 +210,11 @@
 /* Mobile sidebar */
 @media (max-width: 768px) {
   .sidebar {
-    width: 260px;
+    width: 270px;
+    max-width: 85vw;
     transform: translateX(-100%);
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.35);
+    z-index: 250;
   }
 
   .sidebar.sidebar-open {
@@ -220,13 +225,22 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .sidebar-close-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
   }
 
   .sidebar-overlay {
     position: fixed;
     inset: 0;
-    z-index: 199;
+    z-index: 240;
     display: block;
-    background: rgba(15, 23, 42, 0.55);
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
   }
 }

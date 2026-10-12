@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CreditCard, Clock, CheckCircle, Download, ExternalLink, AlertTriangle, Trash2, Shield, Calendar, Zap, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import './AdminSubscription.css';
 
 const AdminSubscription = () => {
   const navigate = useNavigate();
@@ -56,8 +57,8 @@ const AdminSubscription = () => {
   const isExpiringSoon = subscription?.status === 'Active' && daysRemaining > 0 && daysRemaining <= 7;
 
   return (
-    <div className="animate-fade-in" style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '24px', color: 'var(--text-main)' }}>My Subscription</h1>
+    <div className="animate-fade-in sub-page-container">
+      <h1 className="sub-header-title">My Subscription</h1>
       
       {/* Grace Period Warning */}
       {isGracePeriod && (
@@ -93,34 +94,10 @@ const AdminSubscription = () => {
       )}
 
       {/* Premium Subscription Card */}
-      <div 
-        className="glass-card" 
-        style={{ 
-          padding: '0', 
-          borderRadius: '24px', 
-          marginBottom: '32px',
-          overflow: 'hidden',
-          border: '1px solid var(--border-color)',
-          background: 'var(--bg-card)'
-        }}
-      >
-        <div style={{ 
-          background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
-          padding: '32px',
-          borderBottom: '1px solid var(--border-color)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '20px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <div style={{ 
-              width: '64px', height: '64px', borderRadius: '16px', 
-              background: 'var(--primary)',
-              display: 'flex', justifyContent: 'center', alignItems: 'center',
-              color: 'white', boxShadow: '0 8px 16px rgba(79, 70, 229, 0.25)'
-            }}>
+      <div className="glass-card sub-main-card">
+        <div className="sub-card-top">
+          <div className="sub-card-info-group">
+            <div className="sub-card-icon-box">
               {subscription?.planName === 'Elite' ? <Zap size={32} /> : <ShieldCheck size={32} />}
             </div>
             <div>
@@ -159,9 +136,9 @@ const AdminSubscription = () => {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', padding: '32px', gap: '24px' }}>
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div className="sub-kpi-grid">
+          <div className="sub-kpi-item">
+            <div className="sub-kpi-icon" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
               <Calendar size={20} />
             </div>
             <div>
@@ -172,8 +149,8 @@ const AdminSubscription = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div className="sub-kpi-item">
+            <div className="sub-kpi-icon" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>
               <Clock size={20} />
             </div>
             <div>
@@ -185,8 +162,8 @@ const AdminSubscription = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div className="sub-kpi-item">
+            <div className="sub-kpi-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
               <Shield size={20} />
             </div>
             <div>
@@ -211,57 +188,59 @@ const AdminSubscription = () => {
 
       {/* Payment History */}
       <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '16px', color: 'var(--text-main)' }}>Payment History</h2>
-      <div className="glass-card" style={{ borderRadius: '16px', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--border-color)' }}>
-              <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>Date</th>
-              <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>Plan</th>
-              <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>Amount</th>
-              <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>Status</th>
-              <th style={{ padding: '16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payments.length === 0 ? (
-              <tr>
-                <td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No payment history found.</td>
+      <div className="glass-card sub-table-card">
+        <div className="sub-table-container">
+          <table className="sub-table">
+            <thead>
+              <tr style={{ background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--border-color)' }}>
+                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>Date</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>Plan</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>Amount</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)' }}>Status</th>
+                <th style={{ padding: '16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)' }}>Action</th>
               </tr>
-            ) : (
-              payments.map((payment) => (
-                <tr key={payment._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '16px' }}>{new Date(payment.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                  <td style={{ padding: '16px', fontWeight: 500 }}>{payment.planName}</td>
-                  <td style={{ padding: '16px', fontWeight: 600 }}>₹{payment.amount}</td>
-                  <td style={{ padding: '16px' }}>
-                    <span style={{ 
-                      padding: '4px 12px', 
-                      borderRadius: '20px', 
-                      fontSize: '0.75rem', 
-                      fontWeight: 600, 
-                      background: payment.paymentStatus === 'Success' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', 
-                      color: payment.paymentStatus === 'Success' ? '#10b981' : '#f59e0b' 
-                    }}>
-                      {payment.paymentStatus}
-                    </span>
-                  </td>
-                  <td style={{ padding: '16px', textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                    <button title="Download Invoice" style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px' }}>
-                      <Download size={18} />
-                    </button>
-                    <button 
-                      title="Delete Record" 
-                      onClick={() => handleDeletePayment(payment._id)}
-                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
+            </thead>
+            <tbody>
+              {payments.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No payment history found.</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                payments.map((payment) => (
+                  <tr key={payment._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '16px' }}>{new Date(payment.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                    <td style={{ padding: '16px', fontWeight: 500 }}>{payment.planName}</td>
+                    <td style={{ padding: '16px', fontWeight: 600 }}>₹{payment.amount}</td>
+                    <td style={{ padding: '16px' }}>
+                      <span style={{ 
+                        padding: '4px 12px', 
+                        borderRadius: '20px', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        background: payment.paymentStatus === 'Success' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', 
+                        color: payment.paymentStatus === 'Success' ? '#10b981' : '#f59e0b' 
+                      }}>
+                        {payment.paymentStatus}
+                      </span>
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                      <button title="Download Invoice" style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px' }}>
+                        <Download size={18} />
+                      </button>
+                      <button 
+                        title="Delete Record" 
+                        onClick={() => handleDeletePayment(payment._id)}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

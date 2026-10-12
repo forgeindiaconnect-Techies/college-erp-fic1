@@ -154,3 +154,33 @@
 .select-all-btn:hover {
   color: var(--primary);
 }
+
+/* ── Mobile Adaptations ── */
+@media (max-width: 768px) {
+  .promotion-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .promotion-header .btn-promote {
+    width: 100%;
+    justify-content: center;
+  }
+  .table-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .promotion-header h1 {
+    font-size: 1.35rem;
+  }
+  .promotion-params-grid,
+  .promotion-summary-grid {
+    grid-template-columns: 1fr;
+  }
+  .promotion-params-card,
+  .promotion-summary-card {
+    padding: 1rem;
+  }
+}

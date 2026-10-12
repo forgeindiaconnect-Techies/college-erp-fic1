@@ -1361,8 +1361,8 @@ const DailyAttendance = () => {
             <table className="daily-att-table">
               <thead>
                 <tr>
-                  <th style={{ width: '40px' }}>#</th>
-                  <th>Employee Details</th>
+                  <th className="daily-att-sticky-num">#</th>
+                  <th className="daily-att-sticky-name">Employee Details</th>
                   <th>Category & Role</th>
                   <th>Department / Unit</th>
                   <th style={{ textAlign: 'center' }}>Duty Timings</th>
@@ -1383,12 +1383,12 @@ const DailyAttendance = () => {
                     { bg: '#f3e8ff', text: '#6d28d9', border: '#e9d5ff' };
 
                   return (
-                    <tr key={empId || idx} style={{ background: isModified ? '#fffbeb' : 'transparent' }}>
-                      <td style={{ fontWeight: 700, color: '#94a3b8' }}>
+                    <tr key={empId || idx} className={isModified ? 'is-modified' : ''} style={{ background: isModified ? '#fffbeb' : 'transparent' }}>
+                      <td className="daily-att-sticky-num" style={{ fontWeight: 700, color: '#94a3b8' }}>
                         {idx + 1}
                       </td>
 
-                      <td>
+                      <td className="daily-att-sticky-name">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div style={{
                             width: '36px',
@@ -1727,8 +1727,8 @@ const DailyAttendance = () => {
             <table className="daily-att-table">
               <thead>
                 <tr>
-                  <th style={{ width: '40px' }}>#</th>
-                  <th>Employee Details</th>
+                  <th className="daily-att-sticky-num">#</th>
+                  <th className="daily-att-sticky-name">Employee Details</th>
                   <th>Category & Role</th>
                   <th>Department / Unit</th>
                   <th style={{ textAlign: 'center' }}>Total Month Days</th>
@@ -1755,11 +1755,11 @@ const DailyAttendance = () => {
 
                   return (
                     <tr key={empId || idx}>
-                      <td style={{ fontWeight: 700, color: '#94a3b8' }}>
+                      <td className="daily-att-sticky-num" style={{ fontWeight: 700, color: '#94a3b8' }}>
                         {idx + 1}
                       </td>
 
-                      <td>
+                      <td className="daily-att-sticky-name">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div style={{
                             width: '36px',

@@ -176,3 +176,22 @@
   opacity: 0.7;
   cursor: not-allowed;
 }
+
+/* Responsive Media Query */
+@media (max-width: 480px) {
+  .admin-login-page {
+    padding: 12px;
+  }
+  .admin-login-card {
+    padding: 24px 16px;
+    border-radius: 12px;
+  }
+  .admin-login-title {
+    font-size: 20px;
+  }
+  .admin-demo-hint {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+

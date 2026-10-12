@@ -1,4 +1,4 @@
-﻿/* Premium Unified Login Layout CSS - Light Professional Theme */
+/* Premium Unified Login Layout CSS - Light Professional Theme */
 
 .unified-login-container {
   display: flex;
@@ -377,10 +377,42 @@
   }
   .login-form-section {
     width: 100%;
-    height: 100vh;
+    min-height: 100vh;
+    height: auto;
     border-radius: 0;
+    padding: 30px 20px;
   }
 }
+
+@media (max-width: 480px) {
+  .login-form-section {
+    padding: 24px 14px;
+  }
+  .login-card-container {
+    padding: 10px 0;
+  }
+  .login-card-header h2 {
+    font-size: 22px;
+  }
+  .login-card-header p {
+    font-size: 13px;
+  }
+  .demo-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .demo-btn {
+    padding: 8px 4px;
+  }
+  .demo-btn span {
+    font-size: 10px;
+  }
+  .input-wrapper input, .input-wrapper select {
+    padding: 12px 38px 12px 40px;
+    font-size: 14px;
+  }
+}
+
 
 
 input[type="password"]::-ms-reveal,

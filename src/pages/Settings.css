@@ -456,3 +456,49 @@
   box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
 }
 
+/* ── Mobile Adaptations ── */
+@media (max-width: 768px) {
+  .settings-page {
+    padding: 1rem 0.85rem;
+  }
+  .settings-panel {
+    padding: 1.25rem 1rem;
+  }
+  .settings-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.5rem;
+    position: static;
+  }
+  .settings-nav-btn {
+    width: auto;
+    white-space: nowrap;
+    padding: 0.65rem 0.9rem;
+    flex-shrink: 0;
+  }
+  .settings-nav-btn .nav-arrow {
+    display: none;
+  }
+  .settings-action-row {
+    flex-direction: column;
+  }
+  .settings-action-row button {
+    width: 100%;
+    justify-content: center;
+  }
+  .btn-settings-save {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-page .settings-header h1 {
+    font-size: 1.35rem;
+  }
+  .settings-toggle-card {
+    padding: 0.85rem;
+  }
+}
+

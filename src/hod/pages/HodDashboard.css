@@ -205,8 +205,81 @@
   }
 }
 
-@media (max-width: 650px) {
+@media (max-width: 768px) {
+  .hod-dashboard {
+    gap: 1rem;
+  }
+
+  .hod-welcome-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1.15rem;
+    gap: 1rem;
+  }
+
+  .hod-welcome-text h1 {
+    font-size: 1.35rem;
+  }
+
+  .hod-welcome-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .hod-welcome-actions button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
   .hod-realtime-summary {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .hod-summary-card {
+    padding: 10px 12px;
+  }
+
+  .hod-summary-card strong {
+    font-size: 18px;
+  }
+
+  .hod-stats-grid,
+  .grid-8-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .hod-stat-card {
+    padding: 0.85rem;
+  }
+
+  .hod-charts-grid,
+  .hod-lists-row-grid,
+  .hod-tables-grid {
     grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .hod-table th,
+  .hod-table td {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hod-realtime-summary,
+  .hod-stats-grid,
+  .grid-8-cards {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .hod-btn-primary,
+  .hod-btn-ghost {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.82rem;
   }
 }

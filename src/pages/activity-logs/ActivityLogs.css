@@ -66,3 +66,94 @@
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
 }
+
+.table-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.table-wrapper {
+  overflow: hidden;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Mobile Adaptations ── */
+@media (max-width: 768px) {
+  .activity-logs-page {
+    gap: 1rem;
+    padding: 0.85rem;
+  }
+  .activity-logs-page .page-header {
+    gap: 0.5rem;
+  }
+  .activity-logs-page .page-header h1 {
+    font-size: 1.25rem;
+  }
+  .activity-logs-page .page-header p {
+    font-size: 0.78rem;
+  }
+  .activity-logs-page .table-wrapper {
+    margin-top: 0.75rem !important;
+    border-radius: 12px;
+  }
+  .activity-logs-page .filters-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.75rem 0.85rem;
+    gap: 0.5rem;
+  }
+  .activity-logs-page .search-box {
+    width: 100%;
+    padding: 0.45rem 0.75rem;
+    box-sizing: border-box;
+  }
+  .activity-logs-page .filter-group {
+    width: 100%;
+    padding: 0.45rem 0.75rem;
+    box-sizing: border-box;
+  }
+  .activity-logs-page .filter-select {
+    width: 100%;
+    font-size: 0.82rem;
+  }
+  .activity-logs-page table {
+    min-width: 580px;
+    width: 100%;
+  }
+  .activity-logs-page th {
+    padding: 0.65rem 0.75rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+  }
+  .activity-logs-page td {
+    padding: 0.65rem 0.75rem;
+    font-size: 0.8rem;
+  }
+  .activity-logs-page .table-footer {
+    padding: 0.75rem;
+    font-size: 0.75rem;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .activity-logs-page {
+    padding: 0.6rem;
+    gap: 0.75rem;
+  }
+  .activity-logs-page .page-header h1 {
+    font-size: 1.15rem;
+  }
+  .activity-logs-page table {
+    min-width: 540px;
+  }
+  .activity-logs-page th,
+  .activity-logs-page td {
+    padding: 0.55rem 0.65rem;
+  }
+}

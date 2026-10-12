@@ -1,0 +1,434 @@
+/* ══════════════════════════════════════════════════════════════════
+   STAFF PORTAL COMPREHENSIVE MOBILE RESPONSIVE STYLESHEET
+   Fixes mobile view & touch scrolling across ALL 13 Staff Portal tabs:
+   1. Faculty Operations Console / Dashboard (/staff)
+   2. Class Timetable (/staff/timetable)
+   3. Exam Duty Center (/staff/exams)
+   4. Take Attendance (/staff/attendance)
+   5. Upload Marks (/staff/marks)
+   6. Coursework & Assignments (/staff/assignments)
+   7. My Class & Scholars (/staff/students)
+   8. Faculty Library & Research Roster (/staff/library)
+   9. Campus Placement & Drives (/staff/placement)
+   10. Institutional Announcements (/staff/announcements)
+   11. Leave Management (/staff/leaves)
+   12. Staff Support & Help Desk (/staff/support)
+   13. Staff & Faculty Payroll (/staff/payroll)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. GLOBAL CONTAINER & TOUCH SCROLLING RESETS (<= 900px) ── */
+@media (max-width: 900px) {
+  /* Ensure the main container scrolls vertically without being clipped or locked */
+  .layout-container {
+    height: 100vh !important;
+    height: 100dvh !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .main-wrapper {
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .main-content {
+    flex: 1 1 auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    padding: 0.75rem 0.75rem 4rem !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    box-sizing: border-box !important;
+  }
+
+  .main-content > div,
+  .staff-dashboard,
+  .erp-payroll-page,
+  .attendance-page,
+  .student-management {
+    width: 100% !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  /* ── 2. HEADER BARS & WELCOME NOTICES ── */
+  .page-header,
+  .staff-welcome-banner {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    padding: 1rem 1.15rem !important;
+    border-radius: 12px !important;
+    gap: 0.85rem !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  .page-header h1,
+  .staff-welcome-text h1 {
+    font-size: 1.35rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .page-header > div:last-child,
+  .staff-welcome-actions {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    justify-content: flex-start !important;
+  }
+
+  .page-header button,
+  .staff-welcome-actions button {
+    flex: 1 1 auto !important;
+    justify-content: center !important;
+    padding: 0.55rem 0.85rem !important;
+    font-size: 0.82rem !important;
+  }
+
+  /* ── 3. 2-COLUMN COMPACT KPI GRIDS ON MOBILE ── */
+  .staff-stats-grid,
+  .erp-kpi-strip,
+  .four-col,
+  div[style*="minmax(230px, 1fr)"],
+  div[style*="minmax(220px, 1fr)"],
+  div[style*="minmax(200px, 1fr)"],
+  div[style*="minmax(180px, 1fr)"] {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+    margin-bottom: 0.85rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Odd last card spans full width across both columns */
+  .staff-stats-grid > *:last-child:nth-child(odd),
+  .erp-kpi-strip > *:last-child:nth-child(odd),
+  .four-col > *:last-child:nth-child(odd),
+  div[style*="minmax(230px, 1fr)"] > *:last-child:nth-child(odd),
+  div[style*="minmax(220px, 1fr)"] > *:last-child:nth-child(odd),
+  div[style*="minmax(200px, 1fr)"] > *:last-child:nth-child(odd) {
+    grid-column: span 2 !important;
+  }
+
+  /* Compact KPI Card Styles */
+  .staff-stat-card,
+  .erp-kpi-card,
+  div[style*="padding: '18px 20px'"],
+  div[style*="padding: 18px 20px"],
+  div[style*="padding: '16px 20px'"] {
+    padding: 0.65rem 0.75rem !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+  }
+
+  .staff-stat-label,
+  .erp-kpi-label,
+  div[style*="textTransform: 'uppercase'"] {
+    font-size: 0.68rem !important;
+  }
+
+  .staff-stat-value,
+  .erp-kpi-value,
+  div[style*="fontSize: '1.75rem'"],
+  div[style*="fontSize: '1.65rem'"],
+  div[style*="fontSize: '1.45rem'"] {
+    font-size: 1.25rem !important;
+    line-height: 1.2 !important;
+  }
+
+  /* ── 4. STACK SPLIT CARDS & GRIDS INTO 1 COLUMN ── */
+  .staff-grid-row,
+  .staff-split-row,
+  .students-directory-grid,
+  .leaves-layout-grid,
+  .assignments-grid,
+  div[style*="minmax(340px, 1fr)"],
+  div[style*="minmax(320px, 1fr)"],
+  div[style*="minmax(300px, 1fr)"],
+  div[style*="minmax(280px, 1fr)"] {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 0.85rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Quick Actions Hub: 2 columns on mobile */
+  div[style*="minmax(160px, 1fr)"] {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+
+  /* ── 5. SINGLE-LINE HORIZONTAL TOUCH-SWIPE TABS & FILTERS ── */
+  .staff-tab-strip,
+  .staff-pill-tabs,
+  .status-pills,
+  div[style*="gap: '8px', flexWrap: 'wrap'"],
+  div[style*="gap: 8px, flexWrap: wrap"],
+  div[style*="gap: '6px', flexWrap: 'wrap'"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    white-space: nowrap !important;
+    gap: 0.45rem !important;
+    padding-bottom: 4px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    scrollbar-width: none !important;
+  }
+
+  .staff-tab-strip::-webkit-scrollbar,
+  .staff-pill-tabs::-webkit-scrollbar,
+  div[style*="gap: '8px', flexWrap: 'wrap'"]::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .staff-tab-strip button,
+  .staff-pill-tabs button,
+  div[style*="gap: '8px', flexWrap: 'wrap'"] button,
+  div[style*="gap: '6px', flexWrap: 'wrap'"] button {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    display: inline-flex !important;
+  }
+
+  /* ── 6. UNIVERSAL TABLE HORIZONTAL TOUCH SCROLLING ── */
+  .table-container,
+  .table-responsive,
+  .table-wrapper,
+  .overflow-x-auto,
+  div[style*="overflowX: 'auto'"],
+  div[style*="overflow-x: auto"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    display: block !important;
+    position: relative !important;
+    box-sizing: border-box !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  /* Force all tables inside scroll containers to maintain minimum readable width */
+  .table-container table,
+  .table-responsive table,
+  .table-wrapper table,
+  .overflow-x-auto table,
+  div[style*="overflowX: 'auto'"] table,
+  div[style*="overflow-x: auto"] table,
+  .staff-dashboard table,
+  table:not(.erp-param-matrix) {
+    min-width: 650px !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  .table-container th,
+  .table-container td,
+  .table-responsive th,
+  .table-responsive td,
+  .table-wrapper th,
+  .table-wrapper td,
+  .overflow-x-auto th,
+  .overflow-x-auto td,
+  div[style*="overflowX: 'auto'"] th,
+  div[style*="overflowX: 'auto'"] td,
+  div[style*="overflow-x: auto"] th,
+  div[style*="overflow-x: auto"] td {
+    white-space: nowrap !important;
+    padding: 8px 12px !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* ── 7. PAYROLL SECTION MOBILE OPTIMIZATIONS ── */
+  .erp-payroll-page {
+    padding: 0.75rem 0.5rem !important;
+  }
+
+  .erp-payroll-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1rem !important;
+    width: 100% !important;
+  }
+
+  /* Horizontal swipeable bar for Payroll Cycles */
+  .erp-history-panel {
+    width: 100% !important;
+    border-radius: 10px !important;
+  }
+
+  .erp-history-list {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 0.5rem !important;
+    padding: 0.5rem !important;
+    scrollbar-width: none !important;
+  }
+
+  .erp-history-list::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .erp-history-item {
+    flex: 0 0 160px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    padding: 0.55rem 0.75rem !important;
+    background: #ffffff !important;
+  }
+
+  .erp-history-item.active {
+    border-left: 3px solid #16a34a !important;
+    background: #f0fdf4 !important;
+  }
+
+  /* Payslip Sheet */
+  .erp-payslip-statement {
+    padding: 0.85rem 0.75rem !important;
+    border-radius: 12px !important;
+    width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .erp-slip-letterhead {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+
+  .erp-slip-voucher-meta {
+    text-align: left !important;
+    width: 100% !important;
+  }
+
+  /* Parameter Matrix Specification Table */
+  .erp-param-matrix-container {
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    margin-bottom: 0.85rem !important;
+    display: block !important;
+    border-radius: 6px !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  table.erp-param-matrix {
+    min-width: 560px !important;
+    width: 100% !important;
+    table-layout: auto !important;
+    border: none !important;
+  }
+
+  table.erp-param-matrix th,
+  table.erp-param-matrix td {
+    padding: 0.5rem 0.65rem !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap !important;
+  }
+
+  /* Financial Ledger Breakdown */
+  .erp-financial-grid {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+  }
+
+  .erp-ledger-col.border-right {
+    border-right: none !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+
+  table.erp-ledger-table {
+    width: 100% !important;
+  }
+
+  /* Net Salary Bar */
+  .erp-net-statement-bar {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.6rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .erp-net-figure-box {
+    width: 100% !important;
+    text-align: left !important;
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* Sign-off grid */
+  .erp-signoff-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .erp-sign-line {
+    width: 100px !important;
+  }
+
+  /* ── 8. MODAL DIALOGS ON MOBILE ── */
+  .modal-card {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    padding: 1.15rem !important;
+    border-radius: 12px !important;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+}
+
+/* ── SMALL SCREENS (<= 480px) ── */
+@media (max-width: 480px) {
+  .main-content {
+    padding: 0.5rem 0.5rem 3.5rem !important;
+  }
+
+  .page-header h1,
+  .staff-welcome-text h1 {
+    font-size: 1.2rem !important;
+  }
+
+  .staff-stats-grid,
+  .erp-kpi-strip {
+    gap: 0.45rem !important;
+  }
+
+  .staff-stat-card,
+  .erp-kpi-card {
+    padding: 0.55rem 0.65rem !important;
+  }
+
+  .staff-stat-value,
+  .erp-kpi-value {
+    font-size: 1.1rem !important;
+  }
+}

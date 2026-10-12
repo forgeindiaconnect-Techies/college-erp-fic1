@@ -201,9 +201,10 @@ const Expenses = () => {
           <button 
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-lg hover:brightness-110 transition-all shadow-md text-sm"
+            style={{ background: 'linear-gradient(135deg, #2563eb, #4f46e5)', color: '#ffffff' }}
+            className="flex items-center gap-2 px-4 py-2.5 font-bold rounded-lg hover:brightness-110 transition-all shadow-md text-sm"
           >
-            <Plus size={16} /> + Log Expense Voucher
+            <Plus size={16} /> Log Expense Voucher
           </button>
         </div>
       </div>

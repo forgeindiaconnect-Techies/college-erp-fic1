@@ -9,7 +9,8 @@ import {
   CreditCard, AlertCircle, Banknote,
   ArrowUpRight, ArrowDownRight, Activity, Users,
   PieChart as PieChartIcon, RefreshCw, Building2, Layers,
-  CalendarCheck, LayoutDashboard, ShieldCheck
+  CalendarCheck, LayoutDashboard, ShieldCheck, Zap,
+  FileSpreadsheet, FileCheck
 } from 'lucide-react';
 import { getAllFees, getSalaries, getExpenses, getStudents, getDepartments, getFeeStructures, getFeePlans } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
@@ -267,7 +268,7 @@ const AccountsDashboard = () => {
   return (
     <div className="accounts-dashboard animate-fade-in">
       {/* Welcome Banner */}
-      <div className="accounts-welcome-banner glass-card" style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-main, #1e293b)', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+      <div className="accounts-welcome-banner glass-card" style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', color: 'var(--text-main, #1e293b)', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <div className="banner-left" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Building2 size={22} color="#3b82f6" />
@@ -281,7 +282,7 @@ const AccountsDashboard = () => {
             Welcome back, {accountsSession?.name || 'Accounts Admin'}. Real-time financial management, fee collection & payroll.
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <button onClick={() => fetchAll()} style={{ background: 'var(--bg-muted, #f1f5f9)', border: '1px solid var(--border-color, #cbd5e1)', borderRadius: '8px', color: 'var(--text-main, #334155)', padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600 }}>
             <RefreshCw size={15} /> Refresh Live
           </button>
@@ -297,16 +298,10 @@ const AccountsDashboard = () => {
       </div>
 
       {/* Tab Navigation Bar */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        margin: '1.25rem 0',
-        borderBottom: '2px solid var(--border-color, #e2e8f0)',
-        paddingBottom: '2px'
-      }}>
+      <div className="accounts-tabs-strip">
         <button
           type="button"
+          className="accounts-tab-btn"
           onClick={() => {
             setActiveTab('finance');
             setSearchParams({ tab: 'finance' });
@@ -315,15 +310,17 @@ const AccountsDashboard = () => {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '10px 20px',
+            padding: '10px 18px',
             border: 'none',
             background: activeTab === 'finance' ? 'var(--primary, #3b82f6)' : 'transparent',
             color: activeTab === 'finance' ? '#ffffff' : 'var(--text-muted, #64748b)',
             fontWeight: 700,
-            fontSize: '0.92rem',
+            fontSize: '0.88rem',
             borderRadius: '10px 10px 0 0',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
             boxShadow: activeTab === 'finance' ? '0 4px 12px rgba(59, 130, 246, 0.25)' : 'none'
           }}
         >
@@ -333,6 +330,7 @@ const AccountsDashboard = () => {
 
         <button
           type="button"
+          className="accounts-tab-btn"
           onClick={() => {
             setActiveTab('attendance');
             setSearchParams({ tab: 'attendance' });
@@ -341,15 +339,17 @@ const AccountsDashboard = () => {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '10px 20px',
+            padding: '10px 18px',
             border: 'none',
             background: activeTab === 'attendance' ? 'var(--primary, #3b82f6)' : 'transparent',
             color: activeTab === 'attendance' ? '#ffffff' : 'var(--text-muted, #64748b)',
             fontWeight: 700,
-            fontSize: '0.92rem',
+            fontSize: '0.88rem',
             borderRadius: '10px 10px 0 0',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
             boxShadow: activeTab === 'attendance' ? '0 4px 12px rgba(59, 130, 246, 0.25)' : 'none'
           }}
         >
@@ -428,6 +428,121 @@ const AccountsDashboard = () => {
               <CalendarCheck size={16} /> Open Attendance Tab &rarr;
             </button>
           </div>
+
+      {/* Finance & Accounts Quick Actions Hub */}
+      <div style={{
+        background: 'var(--bg-primary, #ffffff)',
+        border: '1px solid var(--border-color, #e2e8f0)',
+        borderRadius: '16px',
+        padding: '1.25rem 1.5rem',
+        marginBottom: '1.5rem',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '8px', background: 'rgba(55, 48, 165, 0.1)', color: '#3730A5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Zap size={16} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>
+                Accounts & Finance Quick Actions
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
+                Direct shortcuts for fee counters, salary disbursements, and financial operations
+              </p>
+            </div>
+          </div>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: '12px', background: 'rgba(55, 48, 165, 0.1)', color: '#3730A5' }}>
+            Finance Shortcuts
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+          <button 
+            type="button"
+            onClick={() => navigate('/accounts/fees-collection')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <CreditCard size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Fee Collection</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Counter & receipt entry</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/accounts/pending-fees')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(239, 68, 68, 0.12)', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <AlertCircle size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Pending Dues</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Student fee defaulters</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/accounts/fee-structure')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Layers size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Fee Structure</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Tariffs & fee heads</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/accounts/salary')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Banknote size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Salary & Payroll</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Faculty disbursements</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/accounts/expenses')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(139, 92, 246, 0.12)', color: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <FileSpreadsheet size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Expense Ledger</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Operational spends</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/accounts/document-tracker')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(99, 102, 241, 0.12)', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <FileCheck size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Document Tracker</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Clearance & certificates</div>
+            </div>
+          </button>
+        </div>
+      </div>
 
       {/* Metrics Row (6 Live Cards) */}
       <div className="accounts-metrics-grid">

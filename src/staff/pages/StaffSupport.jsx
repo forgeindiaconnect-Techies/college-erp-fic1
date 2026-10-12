@@ -275,15 +275,16 @@ const StaffSupport = () => {
         </div>
 
         {/* Status Filter Pills */}
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '4px', flexWrap: 'nowrap', width: '100%' }}>
           {['All', 'Pending', 'Under Review', 'Resolved', 'Approved', 'Rejected'].map(st => (
             <button
               key={st}
               type="button"
               onClick={() => setStatusFilter(st)}
               style={{
-                padding: '5px 12px',
-                borderRadius: '6px',
+                flexShrink: 0,
+                padding: '6px 14px',
+                borderRadius: '8px',
                 border: '1px solid',
                 borderColor: statusFilter === st ? '#4f46e5' : 'var(--border-color)',
                 background: statusFilter === st ? 'rgba(79,70,229,0.12)' : 'var(--bg-primary)',
@@ -309,8 +310,8 @@ const StaffSupport = () => {
             <p style={{ fontSize: '0.84rem', margin: '4px 0 0' }}>No support requests match your active filters.</p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.84rem' }}>
+          <div className="table-container" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.84rem' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>
                   <th style={{ padding: '10px 14px', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.72rem' }}>Category & Date</th>

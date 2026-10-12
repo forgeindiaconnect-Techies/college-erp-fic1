@@ -120,7 +120,7 @@ const StudentTimetable = () => {
   const activeSec = studentSession?.section || 'A';
 
   return (
-    <div className="animate-fade-in p-6 pb-24 max-w-7xl mx-auto">
+    <div className="animate-fade-in timetable-page-container max-w-7xl mx-auto">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">
@@ -153,13 +153,13 @@ const StudentTimetable = () => {
 
       {/* WEEKLY TIMETABLE MATRIX CONTAINER */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto" style={{ maxHeight: '72vh' }}>
-          <table className="w-full border-collapse text-left" style={{ minWidth: '980px' }}>
+        <div className="overflow-x-auto timetable-scroll-wrapper">
+          <table className="w-full border-collapse text-left" style={{ minWidth: '920px' }}>
             <thead>
               <tr style={{ background: '#f8fafc', color: '#1e293b', position: 'sticky', top: 0, zIndex: 20, borderBottom: '2px solid #e2e8f0' }} className="text-xs uppercase tracking-wider">
                 <th 
-                  className="p-3.5 border-r border-gray-200 text-center font-bold" 
-                  style={{ width: '170px', minWidth: '170px', position: 'sticky', left: 0, zIndex: 30, background: '#f1f5f9', color: '#0f172a' }}
+                  className="p-3.5 border-r border-gray-200 text-center font-bold timing-period-col" 
+                  style={{ position: 'sticky', left: 0, zIndex: 30, background: '#f1f5f9', color: '#0f172a' }}
                 >
                   TIMING / PERIOD
                 </th>
@@ -192,8 +192,8 @@ const StudentTimetable = () => {
                     return (
                       <tr key={period._id || pIdx} className="bg-amber-50/70 border-b border-amber-200">
                         <td 
-                          className="p-3 border-r border-amber-200 text-center bg-amber-100/80" 
-                          style={{ width: '170px', minWidth: '170px', position: 'sticky', left: 0, zIndex: 10 }}
+                          className="p-3 border-r border-amber-200 text-center bg-amber-100/80 timing-period-col" 
+                          style={{ position: 'sticky', left: 0, zIndex: 10 }}
                         >
                           <span className="font-bold text-amber-900 text-xs block">{cleanPeriodName}</span>
                           <span className="text-[11px] text-amber-700 font-medium">{period.startTime} – {period.endTime}</span>
@@ -209,8 +209,8 @@ const StudentTimetable = () => {
                     <tr key={period._id || pIdx} className="border-b border-gray-200 hover:bg-gray-50/50 transition-colors">
                       {/* Sticky Period Header Column */}
                       <td 
-                        className="p-3 border-r border-gray-200 bg-gray-50 text-center" 
-                        style={{ width: '170px', minWidth: '170px', position: 'sticky', left: 0, zIndex: 10 }}
+                        className="p-3 border-r border-gray-200 bg-gray-50 text-center timing-period-col" 
+                        style={{ position: 'sticky', left: 0, zIndex: 10 }}
                       >
                         <span className="font-bold text-gray-800 text-xs block">{cleanPeriodName}</span>
                         <span className="text-[11px] text-gray-500 font-medium block mt-0.5">{period.startTime}</span>

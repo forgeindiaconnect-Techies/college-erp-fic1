@@ -495,7 +495,7 @@ const StaffDashboard = () => {
       </div>
 
       {/* 4 Interactive ERP KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '14px' }}>
+      <div className="staff-stats-grid staff-kpi-grid">
         <div 
           onClick={() => navigate('/staff/students')}
           style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #6366F1', padding: '18px 20px', borderRadius: '14px', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
@@ -751,7 +751,7 @@ const StaffDashboard = () => {
           </div>
 
           {/* Day Selector Pills */}
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '4px', flexWrap: 'nowrap' }}>
             {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => {
               const isToday = day === currentDayName;
               const isSelected = day === selectedDay;
@@ -760,6 +760,8 @@ const StaffDashboard = () => {
                   key={day}
                   onClick={() => setSelectedDay(day)}
                   style={{
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap',
                     padding: '6px 12px',
                     borderRadius: '8px',
                     fontSize: '0.78rem',

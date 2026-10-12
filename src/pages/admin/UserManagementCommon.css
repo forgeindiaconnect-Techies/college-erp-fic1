@@ -1,0 +1,639 @@
+/* ══════════════════════════════════════════════════════════════════
+   USER MANAGEMENT COMMON RESPONSIVE STYLES
+   Ensures complete mobile, tablet, and desktop responsiveness
+   for all User Management tabs:
+   - Accounts Officer Management
+   - Principal Management
+   - Hostel Warden Management
+   - HOD Management
+   - Staff Management
+   - Student Management
+   - Parent Management
+   - Driver Management
+   - Librarian Management
+   - Placement Officer Management
+   ══════════════════════════════════════════════════════════════════ */
+
+.management-page {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Common Header Card ── */
+.mgmt-header-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 16px;
+  padding: 1.5rem 1.75rem;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05));
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.mgmt-header-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+
+.mgmt-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.mgmt-header-title-area {
+  flex: 1 1 300px;
+}
+
+.mgmt-header-title-area h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-main, #0f172a);
+  margin: 0 0 0.25rem;
+  letter-spacing: -0.01em;
+}
+
+.mgmt-header-title-area p {
+  color: var(--text-muted, #64748b);
+  font-size: 0.85rem;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.mgmt-sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  margin-bottom: 0.4rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.mgmt-sync-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  flex-shrink: 0;
+}
+
+.mgmt-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.mgmt-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-secondary, #f8fafc);
+  color: var(--text-main, #0f172a);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.mgmt-btn-secondary:hover {
+  background: var(--bg-hover, #f1f5f9);
+}
+
+.mgmt-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  background: linear-gradient(135deg, #3730a5, #4f46e5);
+  color: #ffffff;
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(55, 48, 165, 0.25);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.mgmt-btn-primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.mgmt-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748b);
+  flex-wrap: wrap;
+}
+
+.mgmt-header-meta .meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mgmt-header-meta .meta-bullet {
+  color: var(--border-color, #cbd5e1);
+  font-weight: bold;
+}
+
+/* ── Common KPI Grid ── */
+.mgmt-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mgmt-kpi-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mgmt-kpi-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
+  box-sizing: border-box;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.mgmt-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+}
+
+.mgmt-kpi-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mgmt-kpi-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mgmt-kpi-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mgmt-kpi-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin: 0.1rem 0 0;
+  color: var(--text-main, #0f172a);
+  line-height: 1.15;
+}
+
+/* ── Common Table Card ── */
+.mgmt-table-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.04));
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mgmt-filters-row {
+  padding: 1.15rem 1.5rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  box-sizing: border-box;
+}
+
+.mgmt-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  padding: 0.5rem 0.85rem;
+  border-radius: 10px;
+  flex: 1 1 240px;
+  max-width: 400px;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.mgmt-search-box:focus-within {
+  border-color: var(--primary, #4f46e5);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.mgmt-search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--text-main, #0f172a);
+  width: 100%;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.mgmt-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mgmt-table {
+  width: 100%;
+  min-width: 650px;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.mgmt-table th {
+  padding: 0.85rem 1.25rem;
+  color: var(--text-muted, #64748b);
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--bg-secondary, #f8fafc);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  white-space: nowrap;
+}
+
+.mgmt-table td {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color, #f1f5f9);
+  vertical-align: middle;
+}
+
+/* ── Modal Common Styles ── */
+.mgmt-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  box-sizing: border-box;
+}
+
+.mgmt-modal-card {
+  background: var(--bg-card, #ffffff);
+  border-radius: 16px;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.mgmt-modal-hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-secondary, #f8fafc);
+}
+
+.mgmt-modal-hd h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-main, #0f172a);
+}
+
+.mgmt-modal-hd p {
+  margin: 3px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748b);
+}
+
+.mgmt-modal-form {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.mgmt-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.mgmt-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.mgmt-form-field label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-main, #0f172a);
+}
+
+.mgmt-form-input {
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-secondary, #f8fafc);
+  font-size: 0.85rem;
+  color: var(--text-main, #0f172a);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.mgmt-form-input:focus {
+  border-color: var(--primary, #4f46e5);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.mgmt-modal-ft {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  margin-top: 0.5rem;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RESPONSIVE MEDIA QUERIES (Mobile & Tablet)
+   ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .management-page {
+    padding: 0.85rem !important;
+    gap: 0.85rem !important;
+  }
+
+  .mgmt-header-card {
+    padding: 1rem !important;
+    border-radius: 12px !important;
+  }
+
+  .mgmt-header-top {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 0.75rem !important;
+  }
+
+  .mgmt-header-title-area {
+    flex: 1 1 100% !important;
+  }
+
+  .mgmt-header-title-area h1 {
+    font-size: 1.2rem !important;
+    margin-bottom: 0.2rem !important;
+  }
+
+  .mgmt-header-title-area p {
+    font-size: 0.78rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .mgmt-header-actions {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1.25fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .mgmt-header-actions button {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: unset !important;
+    justify-content: center !important;
+    padding: 0.55rem 0.75rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  .mgmt-header-meta {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 0.4rem 0.6rem !important;
+    margin-top: 0.65rem !important;
+    padding-top: 0.5rem !important;
+    font-size: 0.72rem !important;
+  }
+
+  .mgmt-header-meta .meta-item {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.3rem !important;
+    background: var(--bg-secondary, #f8fafc) !important;
+    padding: 0.25rem 0.55rem !important;
+    border-radius: 6px !important;
+    border: 1px solid var(--border-color, #e2e8f0) !important;
+    font-size: 0.7rem !important;
+  }
+
+  .mgmt-header-meta .meta-bullet {
+    display: none !important;
+  }
+
+  /* 2-Column sleek KPI grid on small devices */
+  .mgmt-kpi-grid,
+  .mgmt-kpi-grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+  }
+
+  .mgmt-kpi-grid > *:last-child:nth-child(odd) {
+    grid-column: span 2 !important;
+  }
+
+  .mgmt-kpi-card {
+    padding: 0.65rem 0.75rem !important;
+    gap: 0.6rem !important;
+    border-radius: 10px !important;
+  }
+
+  .mgmt-kpi-icon {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 8px !important;
+  }
+
+  .mgmt-kpi-icon svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .mgmt-kpi-label {
+    font-size: 0.65rem !important;
+  }
+
+  .mgmt-kpi-value {
+    font-size: 1.15rem !important;
+  }
+
+  .mgmt-table-card {
+    border-radius: 12px !important;
+  }
+
+  .mgmt-filters-row {
+    flex-direction: column;
+    align-items: stretch !important;
+    padding: 0.75rem 0.85rem !important;
+    gap: 0.6rem !important;
+  }
+
+  .mgmt-search-box {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 0.45rem 0.75rem !important;
+  }
+
+  .mgmt-table {
+    min-width: 600px !important;
+  }
+
+  .mgmt-table th {
+    padding: 0.65rem 0.85rem !important;
+    font-size: 0.68rem !important;
+  }
+
+  .mgmt-table td {
+    padding: 0.75rem 0.85rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  .mgmt-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .mgmt-modal-card {
+    max-width: 95vw !important;
+    width: 95vw !important;
+    border-radius: 12px !important;
+  }
+
+  .mgmt-modal-hd {
+    padding: 1rem !important;
+  }
+
+  .mgmt-modal-form {
+    padding: 1rem !important;
+  }
+
+  .mgmt-modal-ft {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+  }
+
+  .mgmt-modal-ft button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .management-page {
+    padding: 0.6rem !important;
+    gap: 0.65rem !important;
+  }
+
+  .mgmt-header-card {
+    padding: 0.75rem 0.85rem !important;
+  }
+
+  .mgmt-header-title-area h1 {
+    font-size: 1.1rem !important;
+  }
+
+  .mgmt-header-actions {
+    grid-template-columns: 1fr 1.3fr !important;
+    gap: 0.4rem !important;
+  }
+
+  .mgmt-header-actions button {
+    padding: 0.5rem 0.6rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  .mgmt-kpi-grid,
+  .mgmt-kpi-grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+
+  .mgmt-kpi-card {
+    padding: 0.55rem 0.65rem !important;
+  }
+
+  .mgmt-kpi-value {
+    font-size: 1.05rem !important;
+  }
+}

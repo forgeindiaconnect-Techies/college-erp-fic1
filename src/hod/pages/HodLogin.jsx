@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GraduationCap, Lock, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { GraduationCap, Lock, User, Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react';
 import { loginUser } from '../../api/index';
 import './HodLogin.css';
 
@@ -48,6 +48,35 @@ const HodLogin = () => {
       </div>
 
       <div className="hod-login-card">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate('/');
+            }
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            color: '#ffffff',
+            fontSize: '0.82rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            padding: '6px 12px',
+            borderRadius: '8px',
+            marginBottom: '1rem',
+            alignSelf: 'flex-start'
+          }}
+        >
+          <ArrowLeft size={16} />
+          <span>Back</span>
+        </button>
+
         {/* Brand */}
         <div className="hod-login-brand">
           <div className="hod-login-logo">

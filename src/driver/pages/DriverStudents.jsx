@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Search, MapPin, Phone, GraduationCap, Mail, ChevronRight, Check, X, Compass, CheckCircle } from 'lucide-react';
 import { getTransportStudents, getTransportDrivers, getTransportRoutes } from '../../api/index';
+import './DriverDashboard.css';
 
 const DriverStudents = () => {
   const [session, setSession] = useState({});
@@ -176,10 +177,10 @@ const DriverStudents = () => {
   });
 
   return (
-    <div style={{ padding: '1.25rem 1.5rem', maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
+    <div className="driver-page-container" style={{ maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
       
       {/* ── Breadcrumb & ERP Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
+      <div className="driver-header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
             <span>Transport Operations</span>
@@ -199,7 +200,7 @@ const DriverStudents = () => {
       </div>
 
       {/* ── Compact Transit KPI Bar ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+      <div className="driver-kpi-grid" style={{ marginBottom: '1.25rem' }}>
         <div 
           onClick={() => setSelectedFilter('ALL')}
           style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '8px', border: selectedFilter === 'ALL' ? '2px solid #2563eb' : '1px solid #e2e8f0', cursor: 'pointer' }}
@@ -238,8 +239,8 @@ const DriverStudents = () => {
       </div>
 
       {/* ── Search & Filter Controls ── */}
-      <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div style={{ position: 'relative', flex: '1 1 300px', maxWidth: '420px' }}>
+      <div className="driver-search-filter-bar" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ position: 'relative', flex: '1 1 300px', maxWidth: '420px', width: '100%' }}>
           <Search size={15} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
           <input 
             type="text" 
@@ -250,26 +251,28 @@ const DriverStudents = () => {
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem' }}>
-          <span style={{ color: '#64748b', fontWeight: 600 }}>Filter Status:</span>
-          {['ALL', 'PENDING', 'PICKED UP', 'DROPPED', 'ABSENT'].map(f => (
-            <button
-              key={f}
-              onClick={() => setSelectedFilter(f)}
-              style={{
-                padding: '0.2rem 0.55rem',
-                borderRadius: '4px',
-                border: selectedFilter === f ? '1px solid #2563eb' : '1px solid #e2e8f0',
-                background: selectedFilter === f ? '#eff6ff' : '#ffffff',
-                color: selectedFilter === f ? '#1d4ed8' : '#64748b',
-                fontWeight: 700,
-                fontSize: '0.72rem',
-                cursor: 'pointer'
-              }}
-            >
-              {f}
-            </button>
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', maxWidth: '100%', overflowX: 'auto' }}>
+          <span style={{ color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>Filter Status:</span>
+          <div className="driver-filter-pills">
+            {['ALL', 'PENDING', 'PICKED UP', 'DROPPED', 'ABSENT'].map(f => (
+              <button
+                key={f}
+                onClick={() => setSelectedFilter(f)}
+                style={{
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '4px',
+                  border: selectedFilter === f ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                  background: selectedFilter === f ? '#eff6ff' : '#ffffff',
+                  color: selectedFilter === f ? '#1d4ed8' : '#64748b',
+                  fontWeight: 700,
+                  fontSize: '0.72rem',
+                  cursor: 'pointer'
+                }}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -289,8 +292,8 @@ const DriverStudents = () => {
             <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>Try adjusting your search query or filter.</div>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+          <div className="driver-table-wrapper" style={{ overflowX: 'auto' }}>
+            <table className="driver-table" style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   <th style={{ padding: '0.65rem 1rem' }}>Student Name</th>
@@ -302,12 +305,12 @@ const DriverStudents = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredStudents.map((student) => {
+                {filteredStudents.map((student, idx) => {
                   const phone = student.studentProfile?.user?.phone || 'N/A';
                   const status = studentStatus[student.studentId] || 'PENDING';
 
                   return (
-                    <tr key={student._id || student.studentId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr key={student._id ? `${student._id}-${idx}` : `${student.studentId || 'st'}-${idx}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.65rem 1rem', fontWeight: 700, color: '#0f172a' }}>
                         {student.name}
                       </td>

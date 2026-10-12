@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import StudentSidebar from './StudentSidebar';
 import Navbar from '../../components/layout/Navbar';
 import '../../components/layout/Layout.css';
+import '../StudentResponsive.css';
 
 const StudentLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);

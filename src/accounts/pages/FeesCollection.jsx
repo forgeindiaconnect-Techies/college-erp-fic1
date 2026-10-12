@@ -5,6 +5,7 @@ import { getStudents, updateStudent, recordAdmissionPayment, updateAdmissionPaym
 import FeeReceipt from '../../components/FeeReceipt';
 import LibraryNoDueCertificateModal from '../../components/LibraryNoDueCertificateModal';
 import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
+import '../../pages/admin/AdminFinanceWelfareResponsive.css';
 
 // Step 56: Comprehensive Print Receipt with Quota and Discount Breakdown
 const printReceipt = (record, receiptNoOrPayment, feeTypeArg, semesterArg, amountArg, paymentModeArg) => {
@@ -2135,7 +2136,7 @@ const FeesCollection = () => {
         </div>
 
         {/* View Switcher Tabs */}
-        <div style={{ display: 'flex', gap: '6px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+        <div className="fees-tabs-bar" style={{ display: 'flex', gap: '6px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-color)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <button
             type="button"
             onClick={() => handleTabChange('collection')}
@@ -2151,7 +2152,9 @@ const FeesCollection = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              transition: 'all 0.15s'
+              transition: 'all 0.15s',
+              flexShrink: 0,
+              whiteSpace: 'nowrap'
             }}
           >
             <IndianRupee size={16} /> Fee Collection Desk
@@ -2171,7 +2174,9 @@ const FeesCollection = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              transition: 'all 0.15s'
+              transition: 'all 0.15s',
+              flexShrink: 0,
+              whiteSpace: 'nowrap'
             }}
           >
             <BarChart3 size={16} /> Fee Collection Report
@@ -2191,7 +2196,9 @@ const FeesCollection = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              transition: 'all 0.15s'
+              transition: 'all 0.15s',
+              flexShrink: 0,
+              whiteSpace: 'nowrap'
             }}
           >
             <ShieldCheck size={16} /> Library No-Due Desk
@@ -2321,7 +2328,7 @@ const FeesCollection = () => {
           {/* ========================================================================= */}
           {/* UNIFIED REAL-TIME ERP CASHIER BILLING WORKSPACE (2-COLUMN POS LAYOUT)      */}
           {/* ========================================================================= */}
-          <div style={{ display:'grid', gridTemplateColumns:'minmax(0, 1.25fr) minmax(0, 1fr)', gap:'22px', marginBottom: '24px' }}>
+          <div className="fees-collection-pos-grid">
 
             {/* ----------------------------------------------------------------------- */}
             {/* LEFT PANEL: STUDENT SEARCH, VERIFICATION DOSSIER & ITEMIZED DUES MATRIX */}
@@ -2838,7 +2845,7 @@ const FeesCollection = () => {
               </div>
 
               <form onSubmit={handleSubmit}>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px' }}>
+                <div className="fees-voucher-grid">
                   <div>
                     <label style={{ display:'block', fontSize:'0.82rem', fontWeight:700, color:'var(--text-main)', marginBottom:'6px' }}>Fee Type / Category</label>
                     <select 
@@ -2930,7 +2937,7 @@ const FeesCollection = () => {
                 </div>
 
                 {/* Payment Method & Date */}
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px' }}>
+                <div className="fees-voucher-grid">
                   <div>
                     <label style={{ display:'block', fontSize:'0.82rem', fontWeight:700, color:'var(--text-main)', marginBottom:'6px' }}>Payment Mode</label>
                     <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)}

@@ -465,3 +465,61 @@
   color: #2563eb;
   background: #eff6ff;
 }
+
+/* Responsive Media Queries */
+@media (max-width: 1024px) {
+  .tt-toolbar-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .hod-timetable-container {
+    padding: 1rem 0.75rem 5rem 0.75rem;
+  }
+  .tt-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .tt-primary-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .tt-tabs-group {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  .tt-filters-group {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .tt-filter-pill {
+    flex: 1;
+    min-width: 130px;
+  }
+  .tt-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 480px) {
+  .tt-title-h1 {
+    font-size: 1.2rem;
+  }
+  .tt-tracker-strip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .tt-count-pill {
+    width: 100%;
+    text-align: center;
+  }
+}
+

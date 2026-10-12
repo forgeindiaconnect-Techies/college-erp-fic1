@@ -20,3 +20,52 @@
   border-radius: 4px;
   font-size: 0.8rem;
 }
+
+/* ── Responsive Adaptations ── */
+@media (max-width: 768px) {
+  .exams-management {
+    padding: 1rem;
+  }
+  .exams-management .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .exams-management .page-header button {
+    width: 100%;
+    justify-content: center;
+  }
+  .exams-management .sm-summary-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .exams-management .filters-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+  .exams-management .search-box {
+    width: 100%;
+    min-width: 0 !important;
+  }
+  .exams-management .filter-group {
+    width: 100%;
+  }
+  .exams-management .filter-select {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .exams-management {
+    padding: 0.75rem 0.5rem;
+  }
+  .exams-management .modal-card {
+    max-height: 95vh;
+  }
+  .exams-management .modal-form .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

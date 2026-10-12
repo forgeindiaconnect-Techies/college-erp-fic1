@@ -188,10 +188,10 @@ const HodSubstitution = () => {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+    <div className="hod-substitution-page animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
       
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', borderBottom: '1px solid var(--border-color, #e2e8f0)', paddingBottom: '16px' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', borderBottom: '1px solid var(--border-color, #e2e8f0)', paddingBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(37,99,235,0.1)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <UserCheck size={24} />
@@ -206,7 +206,7 @@ const HodSubstitution = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="hod-header-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <button 
             type="button" 
             onClick={handleExportCSV}
@@ -340,19 +340,18 @@ const HodSubstitution = () => {
         background: 'var(--bg-card, #ffffff)',
         borderRadius: '14px',
         border: '1px solid var(--border-color, #e2e8f0)',
-        overflow: 'hidden',
         boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
       }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+        <div className="table-container" style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
             <thead>
-              <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
-                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Time / Period</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Subject</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Original Faculty</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Venue Room</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Substitution Status</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+              <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                <th style={{ padding: '12px 16px', textAlign: 'left', whiteSpace: 'nowrap' }}>Time / Period</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', whiteSpace: 'nowrap' }}>Subject</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', whiteSpace: 'nowrap' }}>Original Faculty</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>Venue Room</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>Substitution Status</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>

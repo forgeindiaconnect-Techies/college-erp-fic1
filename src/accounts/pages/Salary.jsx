@@ -33,6 +33,7 @@ import {
   getUsers 
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
+import '../../pages/admin/AdminFinanceWelfareResponsive.css';
 
 const numberToWords = (num) => {
   if (!num || isNaN(num) || num <= 0) return 'Zero Rupees Only';
@@ -501,10 +502,10 @@ const Salary = () => {
   };
 
   return (
-    <div style={{ padding: '1.25rem 1.5rem', maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
+    <div className="payroll-mgmt-page" style={{ padding: '1.25rem 1.5rem', maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
       
       {/* ── 1. Page Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
+      <div className="payroll-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
         <div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', color: '#2563eb', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', background: '#eff6ff', padding: '0.15rem 0.5rem', borderRadius: '4px', marginBottom: '0.3rem' }}>
             <ShieldCheck size={13} /> Central Accounts & Finance Division
@@ -517,7 +518,7 @@ const Salary = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div className="payroll-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <select 
             value={selectedMonth} 
             onChange={(e) => setSelectedMonth(e.target.value)}
@@ -559,34 +560,34 @@ const Salary = () => {
       )}
 
       {/* ── 2. KPI Metrics Strip ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Personnel Across College</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>{staffList.length} Personnel</div>
-          <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, marginTop: '0.15rem' }}>HODs, Staff, Drivers, Hostel & Accounts</div>
+      <div className="payroll-kpi-grid">
+        <div className="payroll-kpi-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+          <div className="payroll-label" style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Personnel Across College</div>
+          <div className="payroll-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>{staffList.length} Personnel</div>
+          <div className="payroll-sub" style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, marginTop: '0.15rem' }}>HODs, Staff, Drivers, Hostel & Accounts</div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Payroll Value ({selectedMonth})</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>₹{Number(totalPayroll).toLocaleString('en-IN')}</div>
-          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>{monthSalaries.length} of {staffList.length} Generated</div>
+        <div className="payroll-kpi-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+          <div className="payroll-label" style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Payroll Value ({selectedMonth})</div>
+          <div className="payroll-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>₹{Number(totalPayroll).toLocaleString('en-IN')}</div>
+          <div className="payroll-sub" style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>{monthSalaries.length} of {staffList.length} Generated</div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Disbursed Amount</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#166534', marginTop: '0.2rem' }}>₹{Number(disbursed).toLocaleString('en-IN')}</div>
-          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>● {monthSalaries.filter(s => s.status === 'Disbursed').length} Transfers Settled</div>
+        <div className="payroll-kpi-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+          <div className="payroll-label" style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Disbursed Amount</div>
+          <div className="payroll-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: '#166534', marginTop: '0.2rem' }}>₹{Number(disbursed).toLocaleString('en-IN')}</div>
+          <div className="payroll-sub" style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>● {monthSalaries.filter(s => s.status === 'Disbursed').length} Transfers Settled</div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Pending Disbursement</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: pending > 0 ? '#dc2626' : '#64748b', marginTop: '0.2rem' }}>₹{Number(pending).toLocaleString('en-IN')}</div>
-          <div style={{ fontSize: '0.72rem', color: pending > 0 ? '#dc2626' : '#64748b', fontWeight: 600, marginTop: '0.15rem' }}>{monthSalaries.filter(s => s.status === 'Pending').length} Pending Vouchers</div>
+        <div className="payroll-kpi-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+          <div className="payroll-label" style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Pending Disbursement</div>
+          <div className="payroll-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: pending > 0 ? '#dc2626' : '#64748b', marginTop: '0.2rem' }}>₹{Number(pending).toLocaleString('en-IN')}</div>
+          <div className="payroll-sub" style={{ fontSize: '0.72rem', color: pending > 0 ? '#dc2626' : '#64748b', fontWeight: 600, marginTop: '0.15rem' }}>{monthSalaries.filter(s => s.status === 'Pending').length} Pending Vouchers</div>
         </div>
       </div>
 
       {/* ── 3. Role / Personnel Category Filter Strip ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
+      <div className="payroll-filter-strip" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
         {[
           { key: 'ALL', label: 'All Personnel', icon: <Users size={13} />, count: staffList.length },
           { key: 'HOD', label: 'HODs & Heads', icon: <Building size={13} />, count: staffList.filter(s => getCategoryKey(s) === 'HOD').length },
@@ -630,9 +631,9 @@ const Salary = () => {
       </div>
 
       {/* ── 4. Filters & Search Bar ── */}
-      <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '240px' }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '360px' }}>
+      <div className="payroll-filter-bar" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div className="payroll-filter-inputs" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '240px', flexWrap: 'wrap' }}>
+          <div className="payroll-search-box" style={{ position: 'relative', width: '100%', maxWidth: '360px' }}>
             <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input 
               type="text" 
@@ -644,6 +645,7 @@ const Salary = () => {
           </div>
 
           <select 
+            className="payroll-dept-select"
             value={departmentFilter} 
             onChange={(e) => setDepartmentFilter(e.target.value)}
             style={{ padding: '0.45rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', fontSize: '0.82rem', outline: 'none' }}
@@ -662,16 +664,18 @@ const Salary = () => {
 
       {/* ── 5. Master Payroll Ledger Table ── */}
       <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table className="salary-master-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left', fontSize: '0.82rem', minWidth: '850px' }}>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                <th style={{ padding: '0.65rem 1rem', width: '22%' }}>Employee Profile</th>
-                <th style={{ padding: '0.65rem 1rem', width: '20%' }}>Designation & Dept</th>
-                <th style={{ padding: '0.65rem 1rem', width: '18%' }}>Payroll Cycle</th>
-                <th style={{ padding: '0.65rem 1rem', width: '15%' }}>Voucher Status</th>
-                <th style={{ padding: '0.65rem 1rem', width: '12%', textAlign: 'right' }}>Net Payable</th>
-                <th style={{ padding: '0.65rem 1rem', width: '13%', textAlign: 'center' }}>Action</th>
+              <tr style={{ background: '#f8fafc', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <th className="salary-sticky-profile" style={{ padding: '0.75rem 1rem', position: 'sticky', left: 0, zIndex: 10, background: '#f8fafc', minWidth: '200px', maxWidth: '240px', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', boxShadow: '3px 0 6px -2px rgba(0,0,0,0.12)', whiteSpace: 'nowrap' }}>
+                  Employee Profile
+                </th>
+                <th style={{ padding: '0.75rem 1rem', minWidth: '160px', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>Designation & Dept</th>
+                <th style={{ padding: '0.75rem 1rem', minWidth: '130px', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>Payroll Cycle</th>
+                <th style={{ padding: '0.75rem 1rem', minWidth: '130px', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>Voucher Status</th>
+                <th style={{ padding: '0.75rem 1rem', minWidth: '120px', textAlign: 'right', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>Net Payable</th>
+                <th style={{ padding: '0.75rem 1rem', minWidth: '130px', textAlign: 'center', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -692,10 +696,11 @@ const Salary = () => {
                 filteredStaff.map((staff, i) => {
                   const staffId = staff.id || staff.staffId;
                   const salaryRecord = salaries.find(s => s.staffId === staffId && s.billingMonth === selectedMonth);
+                  const isBgWhite = Boolean(salaryRecord);
 
                   return (
-                    <tr key={staff._id || i} style={{ borderBottom: '1px solid #f1f5f9', background: salaryRecord ? '#ffffff' : '#fafafa' }}>
-                      <td style={{ padding: '0.65rem 1rem' }}>
+                    <tr key={staff._id || i} style={{ borderBottom: '1px solid #f1f5f9', background: isBgWhite ? '#ffffff' : '#fafafa' }}>
+                      <td className="salary-sticky-profile" style={{ padding: '0.65rem 1rem', position: 'sticky', left: 0, zIndex: 4, background: isBgWhite ? '#ffffff' : '#fafafa', minWidth: '200px', maxWidth: '240px', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #f1f5f9', boxShadow: '3px 0 6px -2px rgba(0,0,0,0.12)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ fontWeight: 800, color: '#0f172a' }}>{staff.name || staff.staffName}</span>
                           {getCategoryBadge(staff)}

@@ -78,10 +78,41 @@ const downloadTxt = (filename, lines) => {
 
 const generateReport = (type, format) => {
   const ts = new Date().toLocaleString('en-IN');
-  const header = [`========================================`, `  ERP SYSTEM - ${type.toUpperCase()} REPORT`, `  Generated: ${ts}`, `========================================`, ''];
-  if (format === 'pdf' || format === 'excel') {
-    const ext = format === 'excel' ? '.csv' : '.txt';
-    downloadTxt(`${type}_report${ext}`, [...header, `Report Type: ${type}`, `Format: ${format.toUpperCase()}`, '', 'Data exported successfully.', '========================================']);
+  const filename = `${type}_report_${new Date().toISOString().slice(0, 10)}`;
+
+  if (format === 'excel') {
+    const escapeCsv = (val) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const lines = [];
+    lines.push([escapeCsv('COLLEGE ERP - SUB ADMIN AUDIT REPORT')]);
+    lines.push([escapeCsv(`Report: ${type.toUpperCase()}`), escapeCsv(`Generated: ${ts}`), escapeCsv('Status: Active')]);
+    lines.push([]);
+    lines.push([escapeCsv('Department'), escapeCsv('Average CGPA'), escapeCsv('Attendance (%)'), escapeCsv('Fees Collection (%)')]);
+    DEPT_PERF.forEach(d => {
+      lines.push([escapeCsv(d.dept), escapeCsv(d.cgpa), escapeCsv(`${d.attendance}%`), escapeCsv(`${d.fees}%`)]);
+    });
+    lines.push([]);
+    lines.push([escapeCsv('Top Student ID'), escapeCsv('Student Name'), escapeCsv('Department'), escapeCsv('CGPA'), escapeCsv('Attendance')]);
+    TOP_STUDENTS.forEach(s => {
+      lines.push([escapeCsv(s.id), escapeCsv(s.name), escapeCsv(s.dept), escapeCsv(s.cgpa), escapeCsv(s.att)]);
+    });
+
+    const csvContent = '\uFEFF' + lines.map(row => row.join(',')).join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } else if (format === 'pdf') {
+    window.print();
   } else {
     window.print();
   }

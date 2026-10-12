@@ -10,6 +10,7 @@ import {
   createTransportComplaint, getTransportComplaints, getTransportDrivers, 
   getTransportRoutes, getTransportVehicles 
 } from '../../api/index';
+import './DriverDashboard.css';
 
 const DriverVehicle = () => {
   const [session, setSession] = useState({});
@@ -246,10 +247,10 @@ const DriverVehicle = () => {
   }
 
   return (
-    <div style={{ padding: '1.25rem 1.5rem', maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
+    <div className="driver-page-container">
       
       {/* ── ERP Breadcrumb & Compact Header Bar ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
+      <div className="driver-header-bar">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
             <span>Fleet Management</span>
@@ -258,7 +259,7 @@ const DriverVehicle = () => {
             <ChevronRight size={12} />
             <span style={{ color: '#0f172a' }}>{vehicle?.registrationNumber || 'TN 01 AD 1234'}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.01em' }}>
               Vehicle Master: {vehicle?.registrationNumber || 'TN 01 AD 1234'}
             </h1>
@@ -269,7 +270,7 @@ const DriverVehicle = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="driver-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button 
             onClick={() => setShowIssueModal(true)}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem', backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
@@ -286,7 +287,7 @@ const DriverVehicle = () => {
       </div>
 
       {/* ── Compact Real-Time Telemetry & Metric Row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+      <div className="driver-kpi-grid">
         
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
@@ -342,8 +343,8 @@ const DriverVehicle = () => {
 
       </div>
 
-      {/* ── ERP Master Specification & Operation Grid ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+      {/* ── ERP Master Specification & Operation Grid (Stacked on Mobile) ── */}
+      <div className="driver-two-col-grid">
         
         {/* Left Column: Comprehensive Vehicle Master Data Table */}
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
@@ -354,7 +355,8 @@ const DriverVehicle = () => {
             <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>DOC-REF: VE-9842</span>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+          <div className="driver-table-wrapper">
+            <table className="driver-table" style={{ width: '100%', minWidth: '400px', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
             <tbody>
               <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                 <td style={{ padding: '0.65rem 1rem', width: '35%', color: '#64748b', fontWeight: 600, background: '#fcfdfd' }}>Registration Number</td>
@@ -392,6 +394,7 @@ const DriverVehicle = () => {
               </tr>
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Right Column: Assigned Driver & Transit Controls */}
@@ -508,65 +511,149 @@ const DriverVehicle = () => {
         )}
       </div>
 
-      {/* ── Report Issue Modal ── */}
+      {/* ── Report Issue Modal (Reference Standard Style) ── */}
       {showIssueModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: '1rem' }} onClick={() => setShowIssueModal(false)}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', width: '100%', maxWidth: '28rem', padding: '1.25rem', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', border: '1px solid #e2e8f0' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
-              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <ShieldAlert size={18} style={{ color: '#dc2626' }} /> Log Vehicle Maintenance Defect
-              </h2>
-              <button onClick={() => setShowIssueModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.2rem' }}>
+        <div 
+          style={{ 
+            position: 'fixed', 
+            inset: 0, 
+            backgroundColor: 'rgba(15, 23, 42, 0.65)', 
+            backdropFilter: 'blur(6px)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            zIndex: 9999, 
+            padding: '1rem' 
+          }} 
+          onClick={() => setShowIssueModal(false)}
+        >
+          <div 
+            style={{ 
+              backgroundColor: '#ffffff', 
+              borderRadius: '16px', 
+              width: '100%', 
+              maxWidth: '30rem', 
+              overflow: 'hidden', 
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)', 
+              border: '1px solid #e2e8f0',
+              animation: 'fadeIn 0.2s ease-out'
+            }} 
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ 
+              background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)', 
+              color: '#ffffff', 
+              padding: '1.15rem 1.25rem', 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ 
+                  width: '38px', 
+                  height: '38px', 
+                  borderRadius: '10px', 
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  backdropFilter: 'blur(4px)'
+                }}>
+                  <ShieldAlert size={20} style={{ color: '#ffffff' }} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', margin: 0, lineHeight: 1.2 }}>
+                    Log Vehicle Defect
+                  </h2>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#bfdbfe' }}>
+                    Configure defect report & maintenance schedule
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowIssueModal(false)} 
+                style={{ 
+                  background: 'rgba(255, 255, 255, 0.15)', 
+                  border: 'none', 
+                  color: '#ffffff', 
+                  cursor: 'pointer', 
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.2s'
+                }}
+                aria-label="Close modal"
+              >
                 <X size={18} />
               </button>
             </div>
             
             <form onSubmit={handleReportIssue}>
-              <div style={{ marginBottom: '0.85rem' }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Defect Category</label>
-                <select 
-                  style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', fontSize: '0.82rem', outline: 'none', color: '#0f172a' }}
-                  value={issueForm.issueType}
-                  onChange={e => setIssueForm({...issueForm, issueType: e.target.value})}
-                  required
+              <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    Defect Category <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <select 
+                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '0.85rem', outline: 'none', color: '#0f172a', fontWeight: 600 }}
+                    value={issueForm.issueType}
+                    onChange={e => setIssueForm({...issueForm, issueType: e.target.value})}
+                    required
+                  >
+                    {issueTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    Urgency Level <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <select 
+                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '0.85rem', outline: 'none', color: '#0f172a', fontWeight: 600 }}
+                    value={issueForm.priority}
+                    onChange={e => setIssueForm({...issueForm, priority: e.target.value})}
+                    required
+                  >
+                    <option value="Low">Low (Routine Observation)</option>
+                    <option value="Medium">Medium (Fix Before Next Shift)</option>
+                    <option value="High">High (Immediate Attention Required)</option>
+                    <option value="Critical">Critical (Vehicle Unsafe to Drive)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    Defect Description & Remarks <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <textarea 
+                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '0.85rem', outline: 'none', minHeight: '5.5rem', resize: 'vertical', color: '#0f172a', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                    placeholder="Provide exact details (e.g. brake vibration, air conditioning cooling drop, battery warning light)..."
+                    value={issueForm.description}
+                    onChange={e => setIssueForm({...issueForm, description: e.target.value})}
+                    required
+                  ></textarea>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{ padding: '0.9rem 1.25rem', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setShowIssueModal(false)} 
+                  style={{ padding: '0.6rem 1.2rem', backgroundColor: '#ffffff', color: '#475569', borderRadius: '8px', fontWeight: 700, border: '1px solid #cbd5e1', cursor: 'pointer', fontSize: '0.85rem' }}
                 >
-                  {issueTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '0.85rem' }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Urgency Level</label>
-                <select 
-                  style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', fontSize: '0.82rem', outline: 'none', color: '#0f172a' }}
-                  value={issueForm.priority}
-                  onChange={e => setIssueForm({...issueForm, priority: e.target.value})}
-                  required
-                >
-                  <option value="Low">Low (Routine Observation)</option>
-                  <option value="Medium">Medium (Fix Before Next Shift)</option>
-                  <option value="High">High (Immediate Attention Required)</option>
-                  <option value="Critical">Critical (Vehicle Unsafe to Drive)</option>
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Defect Description & Remarks</label>
-                <textarea 
-                  style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', fontSize: '0.82rem', outline: 'none', minHeight: '5.5rem', resize: 'none', color: '#0f172a', fontFamily: 'inherit' }}
-                  placeholder="Provide exact details (e.g. brake vibration, air conditioning cooling drop, battery warning light)..."
-                  value={issueForm.description}
-                  onChange={e => setIssueForm({...issueForm, description: e.target.value})}
-                  required
-                ></textarea>
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button type="button" onClick={() => setShowIssueModal(false)} style={{ flex: 1, padding: '0.55rem', backgroundColor: '#f1f5f9', color: '#475569', borderRadius: '6px', fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: '0.82rem' }}>
                   Cancel
                 </button>
-                <button type="submit" style={{ flex: 1, padding: '0.55rem', backgroundColor: '#dc2626', color: 'white', borderRadius: '6px', fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: '0.82rem' }}>
+                <button 
+                  type="submit" 
+                  style={{ padding: '0.6rem 1.3rem', backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '8px', fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}
+                >
                   Submit Defect Ticket
                 </button>
               </div>

@@ -41,6 +41,7 @@ import {
   getCourses
 } from "../../api/index";
 import useRealtimeSync, { emitERPDataUpdate } from "../../hooks/useRealtimeSync";
+import "../../pages/admin/AdminFinanceWelfareResponsive.css";
 
 
 const PRESET_QUOTAS = [
@@ -639,10 +640,11 @@ const QuotaManagement = () => {
   const isFiltered = searchQuery || selectedDeptFilter !== "All" || selectedCourseFilter !== "All" || selectedQuotaFilter !== "All" || selectedStatusFilter !== "All";
 
   return (
-    <div style={{ padding: "20px 24px", maxWidth: "1600px", margin: "0 auto", color: "#0f172a", fontFamily: "inherit" }}>
+    <div className="quota-mgmt-page" style={{ padding: "20px 24px", maxWidth: "1600px", margin: "0 auto", color: "#0f172a", fontFamily: "inherit" }}>
       
       {/* ── Top Header Bar ── */}
       <div
+        className="qm-header-card"
         style={{
           background: "#ffffff",
           borderRadius: "12px",
@@ -703,7 +705,7 @@ const QuotaManagement = () => {
         </div>
 
         {/* Action Controls */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <div className="qm-toolbar" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <button
             type="button"
             onClick={handleOpenAddDrawer}
@@ -773,50 +775,43 @@ const QuotaManagement = () => {
       </div>
 
       {/* ── Metric Summary Cards ── */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: "12px",
-          marginBottom: "16px"
-        }}
-      >
-        <div style={{ background: "#ffffff", borderRadius: "10px", border: "1px solid #e2e8f0", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="qm-kpi-grid">
+        <div className="qm-kpi-card">
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748b", textTransform: "uppercase" }}>Total Quotas</div>
-            <div style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a", marginTop: "2px" }}>{metrics.totalRules}</div>
+            <div className="qm-label" style={{ fontSize: "11px", fontWeight: "700", color: "#64748b", textTransform: "uppercase" }}>Total Quotas</div>
+            <div className="qm-value" style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a", marginTop: "2px" }}>{metrics.totalRules}</div>
           </div>
-          <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: "#eef2ff", color: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="qm-icon-box" style={{ width: "36px", height: "36px", borderRadius: "8px", background: "#eef2ff", color: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Layers size={18} />
           </div>
         </div>
 
-        <div style={{ background: "#ffffff", borderRadius: "10px", border: "1px solid #e2e8f0", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="qm-kpi-card">
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748b", textTransform: "uppercase" }}>Active Rules</div>
-            <div style={{ fontSize: "22px", fontWeight: "800", color: "#059669", marginTop: "2px" }}>{metrics.activeRules}</div>
+            <div className="qm-label" style={{ fontSize: "11px", fontWeight: "700", color: "#64748b", textTransform: "uppercase" }}>Active Rules</div>
+            <div className="qm-value" style={{ fontSize: "22px", fontWeight: "800", color: "#059669", marginTop: "2px" }}>{metrics.activeRules}</div>
           </div>
-          <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: "#ecfdf5", color: "#10b981", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="qm-icon-box" style={{ width: "36px", height: "36px", borderRadius: "8px", background: "#ecfdf5", color: "#10b981", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <CheckCircle2 size={18} />
           </div>
         </div>
 
-        <div style={{ background: "#ffffff", borderRadius: "10px", border: "1px solid #e2e8f0", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="qm-kpi-card">
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748b", textTransform: "uppercase" }}>Departments Covered</div>
-            <div style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a", marginTop: "2px" }}>{metrics.uniqueDepts}</div>
+            <div className="qm-label" style={{ fontSize: "11px", fontWeight: "700", color: "#64748b", textTransform: "uppercase" }}>Departments Covered</div>
+            <div className="qm-value" style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a", marginTop: "2px" }}>{metrics.uniqueDepts}</div>
           </div>
-          <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: "#eff6ff", color: "#3b82f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="qm-icon-box" style={{ width: "36px", height: "36px", borderRadius: "8px", background: "#eff6ff", color: "#3b82f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Building2 size={18} />
           </div>
         </div>
 
-        <div style={{ background: "#ffffff", borderRadius: "10px", border: "1px solid #e2e8f0", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="qm-kpi-card">
           <div>
-            <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748b", textTransform: "uppercase" }}>Avg Concession</div>
-            <div style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a", marginTop: "2px" }}>₹{metrics.avgDiscount.toLocaleString("en-IN")}</div>
+            <div className="qm-label" style={{ fontSize: "11px", fontWeight: "700", color: "#64748b", textTransform: "uppercase" }}>Avg Concession</div>
+            <div className="qm-value" style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a", marginTop: "2px" }}>₹{metrics.avgDiscount.toLocaleString("en-IN")}</div>
           </div>
-          <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: "#fff7ed", color: "#ea580c", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="qm-icon-box" style={{ width: "36px", height: "36px", borderRadius: "8px", background: "#fff7ed", color: "#ea580c", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <IndianRupee size={18} />
           </div>
         </div>
@@ -859,6 +854,7 @@ const QuotaManagement = () => {
       >
         {/* Streamlined Single Filter Toolbar */}
         <div
+          className="qm-filters-bar"
           style={{
             padding: "12px 16px",
             borderBottom: "1px solid #e2e8f0",
@@ -870,9 +866,9 @@ const QuotaManagement = () => {
             justifyContent: "space-between"
           }}
         >
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", flex: "1 1 500px" }}>
+          <div className="qm-filters-inner" style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", flex: "1 1 500px" }}>
             {/* Search Input */}
-            <div style={{ position: "relative", minWidth: "200px", flex: "1 1 200px", maxWidth: "300px" }}>
+            <div className="qm-search-box" style={{ position: "relative", minWidth: "200px", flex: "1 1 200px", maxWidth: "300px" }}>
               <Search size={14} style={{ position: "absolute", left: "10px", top: "9px", color: "#94a3b8" }} />
               <input
                 type="text"
@@ -903,6 +899,7 @@ const QuotaManagement = () => {
 
             {/* Department Filter */}
             <select
+              className="qm-filter-select"
               value={selectedDeptFilter}
               onChange={e => setSelectedDeptFilter(e.target.value)}
               style={{
@@ -926,6 +923,7 @@ const QuotaManagement = () => {
 
             {/* Course Filter */}
             <select
+              className="qm-filter-select"
               value={selectedCourseFilter}
               onChange={e => setSelectedCourseFilter(e.target.value)}
               style={{
@@ -949,6 +947,7 @@ const QuotaManagement = () => {
 
             {/* Quota Category Filter */}
             <select
+              className="qm-filter-select"
               value={selectedQuotaFilter}
               onChange={e => setSelectedQuotaFilter(e.target.value)}
               style={{
@@ -972,6 +971,7 @@ const QuotaManagement = () => {
 
             {/* Status Filter */}
             <select
+              className="qm-filter-select"
               value={selectedStatusFilter}
               onChange={e => setSelectedStatusFilter(e.target.value)}
               style={{
@@ -1022,7 +1022,7 @@ const QuotaManagement = () => {
         </div>
 
         {/* Full-Width Table */}
-        <div style={{ width: "100%", overflowX: "auto" }}>
+        <div className="qm-desktop-table" style={{ width: "100%", overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
             <thead>
               <tr style={{ background: "#ffffff", borderBottom: "1px solid #e2e8f0" }}>
@@ -1214,6 +1214,160 @@ const QuotaManagement = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards View */}
+        <div className="qm-mobile-cards">
+          {filteredQuotas.length > 0 ? (
+            filteredQuotas.map((item, index) => {
+              const isActive = item.status === "active";
+              const isPercentage = item.discountType === "percentage";
+              const discValue = Number(item.discountValue || 0);
+              const normalVal = Number(item.normalFee || 0);
+              const calculatedDiscAmt = isPercentage ? Math.round((normalVal * discValue) / 100) : discValue;
+              const computedFinal = normalVal > 0 ? Math.max(0, normalVal - calculatedDiscAmt) : Number(item.finalFee || 0);
+              const meta = getQuotaMeta(item.quotaName);
+              const IconComp = meta.icon || Award;
+              const deptDisplay = item.departmentName || (typeof item.department === "object" ? item.department?.name : item.department) || "All Departments";
+              const courseDisplay = item.courseName || (typeof item.course === "object" ? item.course?.name : item.course);
+
+              return (
+                <div
+                  key={item._id || index}
+                  style={{
+                    background: "#ffffff",
+                    borderRadius: "10px",
+                    border: "1px solid #e2e8f0",
+                    padding: "12px 14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.03)"
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <div
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "6px",
+                          background: meta.bg,
+                          color: meta.color,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          border: `1px solid ${meta.border}`
+                        }}
+                      >
+                        <IconComp size={15} />
+                      </div>
+                      <span style={{ fontWeight: "800", color: "#0f172a", fontSize: "13.5px" }}>{item.quotaName}</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleStatus(item)}
+                      style={{
+                        padding: "3px 8px",
+                        borderRadius: "12px",
+                        border: "none",
+                        fontSize: "11px",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        background: isActive ? "#dcfce7" : "#f1f5f9",
+                        color: isActive ? "#15803d" : "#64748b",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}
+                    >
+                      {isActive ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+                      {isActive ? "Active" : "Inactive"}
+                    </button>
+                  </div>
+
+                  <div style={{ fontSize: "12px", color: "#475569", display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontWeight: "600", color: "#1e293b" }}>
+                      <Building2 size={12} color="#64748b" />
+                      <span>{deptDisplay}</span>
+                    </div>
+                    {courseDisplay && (
+                      <span style={{ background: "#eef2ff", color: "#4338ca", padding: "1px 6px", borderRadius: "4px", fontSize: "11px", fontWeight: "600" }}>
+                        {courseDisplay}
+                      </span>
+                    )}
+                    <span style={{ color: "#94a3b8", fontSize: "11px" }}>• {item.academicYear}</span>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", background: "#f8fafc", padding: "8px 10px", borderRadius: "8px", border: "1px solid #f1f5f9" }}>
+                    <div>
+                      <div style={{ fontSize: "10px", color: "#64748b", textTransform: "uppercase", fontWeight: "700" }}>Baseline</div>
+                      <div style={{ fontSize: "12px", fontWeight: "700", color: "#334155" }}>₹{normalVal.toLocaleString("en-IN")}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "10px", color: "#64748b", textTransform: "uppercase", fontWeight: "700" }}>Concession</div>
+                      <div style={{ fontSize: "11.5px", fontWeight: "700", color: "#b91c1c" }}>
+                        - {isPercentage ? `${discValue}%` : `₹${discValue.toLocaleString("en-IN")}`}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "10px", color: "#64748b", textTransform: "uppercase", fontWeight: "700" }}>Net Payable</div>
+                      <div style={{ fontSize: "13px", fontWeight: "800", color: "#059669" }}>₹{computedFinal.toLocaleString("en-IN")}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", paddingTop: "2px" }}>
+                    <button
+                      type="button"
+                      onClick={() => handleEditQuota(item)}
+                      style={{
+                        padding: "5px 12px",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                        background: "#ffffff",
+                        color: "#4f46e5",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        fontSize: "12px",
+                        fontWeight: "600"
+                      }}
+                    >
+                      <Edit size={12} /> Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteQuota(item)}
+                      style={{
+                        padding: "5px 12px",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                        background: "#ffffff",
+                        color: "#ef4444",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        fontSize: "12px",
+                        fontWeight: "600"
+                      }}
+                    >
+                      <Trash2 size={12} /> Delete
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div style={{ padding: "30px 16px", textAlign: "center", color: "#64748b", background: "#ffffff", borderRadius: "10px", border: "1px dashed #cbd5e1" }}>
+              <div style={{ fontSize: "13px", fontWeight: "700", color: "#334155" }}>No Quota Rules Found</div>
+              <div style={{ fontSize: "11.5px", color: "#94a3b8", marginTop: "3px" }}>
+                {isFiltered ? "Try resetting search or filters." : "Click 'Add Quota Rule' above to create one."}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -2241,95 +2241,421 @@ tbody tr:hover td {
 }
 
 /* ==========================================================================
-   GLOBAL MOBILE RESPONSIVE MEDIA QUERIES (COMPREHENSIVE ALL-DEVICE FIX)
+   GLOBAL MULTI-DEVICE RESPONSIVE SYSTEM (MOBILE, TABLET, LAPTOP, DESKTOP)
    ========================================================================== */
+
+/* Universal Responsive Containers & Tables */
+.table-container,
+.table-responsive,
+.responsive-table,
+.sa-table-container,
+.hod-table-card,
+.data-table-container,
+.table-wrapper {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
+/* Ensure data tables inside scrollable containers keep legible columns */
+.table-container table,
+.table-responsive table,
+.responsive-table table,
+.sa-table-container table,
+.data-table-container table {
+  min-width: 580px;
+}
+
+/* Universal Chart Containers */
+.chart-container,
+.chart-wrap,
+.chart-card,
+.chart-container-s,
+.chart-container-p,
+.recharts-responsive-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Universal Tabs Bar (smooth horizontal scroll on small screens) */
+.hostel-tabs,
+.lib-tabs-container,
+.sa-tabs,
+.filter-tabs,
+.nav-tabs,
+.dashboard-tabs,
+.tabs-list {
+  display: flex !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap !important;
+  scrollbar-width: none;
+  max-width: 100% !important;
+}
+.hostel-tabs::-webkit-scrollbar,
+.lib-tabs-container::-webkit-scrollbar,
+.sa-tabs::-webkit-scrollbar,
+.filter-tabs::-webkit-scrollbar,
+.nav-tabs::-webkit-scrollbar {
+  display: none;
+}
+.hostel-tabs > *,
+.lib-tabs-container > *,
+.sa-tabs > *,
+.filter-tabs > *,
+.nav-tabs > * {
+  flex-shrink: 0 !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   1. TABLET BREAKPOINT (max-width: 1024px)
+   ───────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  /* Dashboard Card Grids: 2 columns on tablet */
+  .kpi-grid,
+  .stats-grid,
+  .dashboard-grid,
+  .sa-kpi-grid,
+  .hod-stats-grid,
+  .grid-8-cards,
+  .staff-stats-grid,
+  .student-metrics-grid,
+  .accounts-metrics-grid,
+  .lib-kpi-grid,
+  .hostel-kpi-grid,
+  .driver-kpi-grid,
+  .placement-grid,
+  .parent-metrics-grid,
+  .admin-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+  }
+
+  /* Multi-column layouts drop to 1 column on tablet */
+  .sa-analytics-grid,
+  .staff-grid-row,
+  .hod-charts-grid,
+  .hod-lists-row-grid,
+  .hod-tables-grid,
+  .accounts-analytics-grid,
+  .lib-dashboard-layout,
+  .super-admin-quick-actions-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  /* Dashboard Header & Toolbar */
+  .page-header,
+  .dashboard-header,
+  .sa-header {
+    padding: 1rem 1.25rem !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   2. MOBILE LANDSCAPE & PHABLET (max-width: 768px)
+   ───────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   /* Headings & Title scaling */
-  h1 { font-size: 1.4rem !important; line-height: 1.25 !important; }
-  h2 { font-size: 1.2rem !important; line-height: 1.25 !important; }
-  h3 { font-size: 1.05rem !important; line-height: 1.25 !important; }
+  h1, .page-title, .sa-header-title { font-size: 1.35rem !important; line-height: 1.25 !important; }
+  h2 { font-size: 1.15rem !important; line-height: 1.25 !important; }
+  h3 { font-size: 1rem !important; line-height: 1.25 !important; }
 
-  /* Flex Header Wrappers & Alert Banners */
+  /* Page & Dashboard Header Bars */
   .page-header,
-  .dashboard-header {
+  .dashboard-header,
+  .sa-header,
+  .hod-welcome-banner,
+  .staff-welcome-banner,
+  .student-welcome-banner,
+  .accounts-welcome-banner,
+  .parent-welcome-banner,
+  .driver-hero-banner,
+  .hostel-header,
+  .placement-header {
     flex-direction: column !important;
     align-items: stretch !important;
     gap: 12px !important;
-    padding: 14px 16px !important;
+    padding: 12px 14px !important;
+    border-radius: 12px !important;
   }
 
   .page-header > div,
-  .dashboard-header > div {
+  .dashboard-header > div,
+  .sa-header-title-area,
+  .banner-left {
     width: 100% !important;
   }
 
-  /* Responsive Grid Cards */
+  /* Header Actions & Button Groups */
+  .header-actions,
+  .sa-header-actions,
+  .hod-welcome-actions,
+  .staff-welcome-actions,
+  .driver-hero-pills {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .header-actions > *,
+  .sa-header-actions > *,
+  .hod-welcome-actions > *,
+  .staff-welcome-actions > * {
+    flex: 1 1 auto !important;
+  }
+
+  /* Control strip & Telemetry on Super Admin */
+  .sa-control-strip {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+  }
+
+  /* Info Cards (College profile, Duty Attendance) */
+  .college-info-card {
+    padding: 10px 12px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .college-info-card > div {
+    width: 100% !important;
+  }
+
+  .employee-attendance-card {
+    padding: 10px 12px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .employee-attendance-card > div {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+
+  .employee-attendance-card button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .sa-telemetry-items {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+  }
+
+  /* Dashboard Cards: 2 columns on mobile (landscape/regular) */
   .kpi-grid,
   .stats-grid,
-  .dashboard-grid {
-    grid-template-columns: 1fr !important;
-    gap: 12px !important;
+  .dashboard-grid,
+  .sa-kpi-grid,
+  .hod-stats-grid,
+  .grid-8-cards,
+  .staff-stats-grid,
+  .student-metrics-grid,
+  .accounts-metrics-grid,
+  .lib-kpi-grid,
+  .hostel-kpi-grid,
+  .driver-kpi-grid,
+  .placement-grid,
+  .parent-metrics-grid,
+  .admin-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .hod-realtime-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
   }
 
   /* Cards & Containers */
   .glass-card,
   .stat-card,
-  .dashboard-card {
-    padding: 14px 16px !important;
+  .dashboard-card,
+  .hod-stat-card,
+  .staff-stat-card,
+  .s-metric-card,
+  .a-metric-card,
+  .p-metric-card,
+  .driver-kpi-card,
+  .hostel-kpi-card,
+  .sa-kpi-card {
+    padding: 12px 14px !important;
+    border-radius: 12px !important;
   }
 
-  /* Buttons in Header Bars */
-  .page-header button,
-  .dashboard-header button {
+  /* Filter bars and Search toolbars */
+  .filter-bar,
+  .search-filter-container,
+  .filters-row,
+  .table-toolbar,
+  .actions-bar,
+  .controls-row {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
     width: 100% !important;
-    justify-content: center !important;
   }
 
-  /* Data Tables */
-  .table-container {
+  .filter-bar input,
+  .filter-bar select,
+  .search-filter-container input,
+  .search-filter-container select,
+  .table-toolbar input,
+  .table-toolbar select {
     width: 100% !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 
+  /* Forms & Grid layout helpers */
+  .form-row,
+  .form-grid,
+  .grid-2,
+  .grid-3,
+  .grid-4,
+  .charts-grid-student,
+  .charts-grid-parent,
+  .staff-split-row {
+    grid-template-columns: 1fr !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    width: 100% !important;
+  }
+
+  /* Data Table Typography & Cells */
   th, td {
     padding: 8px 10px !important;
     font-size: 13px !important;
   }
 
-  /* Modals & Popups */
-  .modal-container,
-  .modal-content {
-    width: 95vw !important;
-    max-width: 95vw !important;
-    margin: 10px !important;
-    padding: 16px !important;
-    max-height: 88vh !important;
-    overflow-y: auto !important;
+  /* Modals & Dialogs */
+  .modal-overlay,
+  .erp-modal-overlay {
+    padding: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 99999 !important;
   }
 
-  .form-row,
-  .grid-2,
-  .grid-3,
-  .grid-4 {
-    grid-template-columns: 1fr !important;
+  .modal-container,
+  .modal-content,
+  .modal-card {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: auto !important;
+    padding: 16px !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    border-radius: 14px !important;
+  }
+
+  .erp-modal-box {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: auto !important;
+    padding: 0 !important;
+    max-height: 90vh !important;
+    overflow: hidden !important;
+    border-radius: 14px !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
 }
 
+/* ─────────────────────────────────────────────────────────
+   3. MOBILE PORTRAIT & SMALL PHONES (max-width: 480px)
+   ───────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
   body {
-    font-size: 14px;
+    font-size: 13.5px;
   }
 
-  .main-content {
-    padding: 10px !important;
+  /* Single Column Card Grid on small screens */
+  .kpi-grid,
+  .stats-grid,
+  .dashboard-grid,
+  .sa-kpi-grid,
+  .hod-stats-grid,
+  .grid-8-cards,
+  .staff-stats-grid,
+  .student-metrics-grid,
+  .accounts-metrics-grid,
+  .lib-kpi-grid,
+  .hostel-kpi-grid,
+  .driver-kpi-grid,
+  .placement-grid,
+  .parent-metrics-grid,
+  .admin-kpi-grid,
+  .hod-realtime-summary {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
   }
 
+  /* Compact Action Buttons */
   .btn-primary,
   .btn-ghost,
-  .btn-secondary {
-    padding: 0.5rem 0.9rem !important;
+  .btn-secondary,
+  .sa-btn,
+  .hod-btn-primary,
+  .hod-btn-ghost,
+  .staff-btn-primary,
+  .staff-btn-ghost {
+    padding: 0.5rem 0.85rem !important;
     font-size: 0.82rem !important;
+    min-height: 38px !important;
+  }
+
+  /* Data Table Cells on tiny phones */
+  th, td {
+    padding: 7px 8px !important;
+    font-size: 12px !important;
+  }
+
+  /* Modals */
+  .modal-container,
+  .modal-content,
+  .modal-card,
+  .erp-modal-box {
+    width: 96vw !important;
+    max-width: 96vw !important;
+    padding: 12px 14px !important;
+  }
+
+  /* Modal Actions Footer */
+  .modal-actions {
+    flex-direction: column-reverse !important;
+    gap: 8px !important;
+  }
+
+  .modal-actions button {
+    width: 100% !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   4. EXTRA SMALL PHONES (max-width: 360px - e.g. iPhone SE, Fold)
+   ───────────────────────────────────────────────────────── */
+@media (max-width: 360px) {
+  h1, .page-title, .sa-header-title { font-size: 1.2rem !important; }
+  h2 { font-size: 1.05rem !important; }
+  h3 { font-size: 0.95rem !important; }
+
+  .glass-card,
+  .stat-card,
+  .dashboard-card {
+    padding: 10px 12px !important;
   }
 }
 

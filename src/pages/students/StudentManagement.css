@@ -522,3 +522,143 @@
   background: rgba(16, 185, 129, 0.1);
   color: #059669;
 }
+
+/* ── Mobile & Tablet Responsiveness for Student Management ── */
+@media (max-width: 1024px) {
+  .student-management .sm-summary-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .student-management {
+    gap: 1rem;
+  }
+
+  .student-management .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .student-management .page-header h1 {
+    font-size: 1.25rem;
+    margin-bottom: 0.2rem;
+  }
+
+  .student-management .page-header p {
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .student-management .page-header-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .student-management .page-header-actions button {
+    flex: 1 1 calc(50% - 0.25rem);
+    justify-content: center;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .student-management .sm-summary-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+  }
+
+  .student-management .sm-summary-card {
+    padding: 0.65rem 0.75rem !important;
+    border-radius: 10px;
+  }
+
+  .student-management .sm-summary-label {
+    font-size: 0.65rem !important;
+  }
+
+  .student-management .sm-summary-value {
+    font-size: 1.2rem !important;
+  }
+
+  .student-management .filter-card,
+  .student-management .sm-filters-card {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .student-management .filters-row,
+  .student-management .sm-filters-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+
+  .student-management .filter-group,
+  .student-management .search-box {
+    width: 100%;
+    min-width: 0;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .student-management table {
+    min-width: 600px;
+  }
+
+  .student-management th {
+    padding: 0.65rem 0.85rem;
+    font-size: 0.68rem;
+  }
+
+  .student-management td {
+    padding: 0.75rem 0.85rem;
+    font-size: 0.8rem;
+  }
+
+  .student-management .modal-card {
+    max-width: 95vw;
+    width: 95vw;
+    border-radius: 12px;
+    padding: 0;
+  }
+
+  .student-management .modal-body {
+    padding: 1rem;
+  }
+
+  .student-management .form-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .student-management .modal-ft,
+  .student-management .modal-footer {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .student-management .modal-ft button,
+  .student-management .modal-footer button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .student-management .sm-summary-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+
+  .student-management .sm-summary-card {
+    padding: 0.55rem 0.65rem !important;
+  }
+
+  .student-management .sm-summary-card h3,
+  .student-management .sm-summary-value {
+    font-size: 1.1rem !important;
+  }
+}

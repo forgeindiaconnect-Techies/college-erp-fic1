@@ -36,3 +36,22 @@
 .text-danger { color: #ef4444; }
 .text-success { color: #10b981; }
 .text-muted { color: var(--text-muted); }
+
+/* ── Mobile Adaptations ── */
+@media (max-width: 768px) {
+  .marks-management-staff .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .marks-management-staff .page-header > div:last-child {
+    width: 100%;
+    flex-direction: column;
+  }
+  .marks-management-staff .page-header > div:last-child button {
+    width: 100%;
+    justify-content: center;
+  }
+}

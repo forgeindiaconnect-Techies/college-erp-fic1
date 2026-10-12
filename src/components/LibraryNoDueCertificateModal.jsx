@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, X, Printer } from 'lucide-react';
+import { ShieldCheck, X, Printer, Download } from 'lucide-react';
 
 const LibraryNoDueCertificateModal = ({ isOpen, onClose, clearance, student }) => {
   if (!isOpen || (!clearance && !student)) return null;
@@ -41,6 +41,37 @@ const LibraryNoDueCertificateModal = ({ isOpen, onClose, clearance, student }) =
     setTimeout(() => {
       win.print();
     }, 300);
+  };
+
+  const handleDownload = () => {
+    const printContent = document.getElementById('print-no-due-certificate-modal')?.innerHTML;
+    const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Library No-Due Certificate - ${admissionNumber}</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 40px 20px; background: #fff; color: #0f172a; }
+    @media print {
+      body { padding: 0; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div style="max-width: 680px; margin: 0 auto;">
+    ${printContent}
+  </div>
+</body>
+</html>`;
+    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Library_No_Due_Certificate_${admissionNumber}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
 
   return (
@@ -134,6 +165,13 @@ const LibraryNoDueCertificateModal = ({ isOpen, onClose, clearance, student }) =
             style={{ padding: '8px 18px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
           >
             Close
+          </button>
+          <button
+            type="button"
+            onClick={handleDownload}
+            style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#3b82f6', color: '#ffffff', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Download size={15} /> Download Certificate
           </button>
           <button
             type="button"

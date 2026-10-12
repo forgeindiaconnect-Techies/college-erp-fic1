@@ -8,7 +8,8 @@ import {
 import {
   ClipboardList, AlertCircle, BookOpen, Bell,
   Percent, Calendar, ShieldAlert, Building,
-  GraduationCap, RefreshCw, UserCheck, Clock, CheckCircle2
+  GraduationCap, RefreshCw, UserCheck, Clock, CheckCircle2,
+  Zap, CalendarCheck, Award, CreditCard, Bus
 } from 'lucide-react';
 import { 
   getStudentById, getFeesByStudent, getMarksByStudent, getExams,
@@ -332,6 +333,121 @@ const ParentDashboard = () => {
         )}
       </div>
 
+      {/* Parent Portal Quick Actions Hub */}
+      <div style={{
+        background: 'var(--bg-primary, #ffffff)',
+        border: '1px solid var(--border-color, #e2e8f0)',
+        borderRadius: '16px',
+        padding: '1.25rem 1.5rem',
+        marginBottom: '1.5rem',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '8px', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Zap size={16} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>
+                Parent Quick Actions
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
+                Direct access to ward performance records, fee settlements, and campus tracking
+              </p>
+            </div>
+          </div>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
+            Ward Shortcuts
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+          <button 
+            type="button"
+            onClick={() => navigate('/parent/attendance')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <CalendarCheck size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Ward Attendance</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Daily presence log</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/parent/marks')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Award size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Grades & Marks</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Exam report cards</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/parent/fees')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <CreditCard size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Fee Payment</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Dues & online receipts</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/parent/leaves')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(239, 68, 68, 0.12)', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Clock size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Apply Leave</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Absence permission</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/parent/timetable')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(99, 102, 241, 0.12)', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Calendar size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Class Timetable</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Periods & schedule</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/parent/transport')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(139, 92, 246, 0.12)', color: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Bus size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Bus Tracking</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Campus route & stops</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
       {/* Analytics Charts Grid */}
       <div className="charts-grid-parent">
         {/* Attendance Trend Chart */}
@@ -402,7 +518,7 @@ const ParentDashboard = () => {
       </div>
 
       {/* Dynamic Exam Schedule & Notifications Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1.5rem' }}>
+      <div className="parent-dashboard-bottom-grid">
         {/* Notifications Panel */}
         <div className="glass-card p-announcements-card" style={{ marginTop: 0 }}>
           <div className="p-announcements-header">
@@ -411,15 +527,18 @@ const ParentDashboard = () => {
           </div>
           <div className="p-announcement-list">
             {notifications.length === 0 ? (
-              <p className="text-muted text-center" style={{ padding: '2rem' }}>No announcements available.</p>
+              <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <Bell size={28} style={{ opacity: 0.25, margin: '0 auto 8px' }} />
+                <p style={{ margin: 0, fontSize: '0.86rem', fontWeight: 500 }}>No announcements available.</p>
+              </div>
             ) : (
               notifications.map((n, i) => (
-                <div key={n._id || i} className="p-announcement-item" style={{ borderLeft: `4px solid ${n.type === 'Warning' ? '#ef4444' : n.type === 'Success' ? '#10b981' : '#f59e0b'}`, padding: '1rem', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '0.8rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                    <h4 className="p-ann-title" style={{ fontSize: '1rem', color: 'var(--text-main)', margin: 0 }}>{n.title}</h4>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(n.createdAt).toLocaleDateString()}</span>
+                <div key={n._id || i} className="p-announcement-item" style={{ borderLeft: `4px solid ${n.type === 'Warning' ? '#ef4444' : n.type === 'Success' ? '#10b981' : '#f59e0b'}`, padding: '0.9rem 1rem', background: 'var(--bg-secondary)', borderRadius: '10px', borderTop: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', marginBottom: '0.65rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '6px' }}>
+                    <h4 className="p-ann-title" style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>{n.title}</h4>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{new Date(n.createdAt).toLocaleDateString()}</span>
                   </div>
-                  <p className="p-ann-desc" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>{n.message}</p>
+                  <p className="p-ann-desc" style={{ fontSize: '0.84rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>{n.message}</p>
                 </div>
               ))
             )}
@@ -428,12 +547,12 @@ const ParentDashboard = () => {
 
         {/* Dynamic Exams Timetable Card */}
         <div className="glass-card p-announcements-card" style={{ marginTop: 0 }}>
-          <div className="p-announcements-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+          <div className="p-announcements-header">
+            <h3>
               <Calendar size={18} style={{ color: '#6366F1' }} /> Child's Examination Timetable
             </h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="p-notif-pill" style={{ background: 'rgba(99, 102, 241,0.1)', color: '#6366F1' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span className="p-notif-pill" style={{ background: 'rgba(99, 102, 241, 0.12)', color: '#6366F1', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
                 {childExams.length > 0 ? childExams.length : 6} SCHEDULED
               </span>
               <button 
@@ -448,36 +567,85 @@ const ParentDashboard = () => {
                   padding: '2px 6px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '2px'
+                  gap: '2px',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 View Full →
               </button>
             </div>
           </div>
-          <div className="p-announcement-list" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+          <div className="p-announcement-list" style={{ maxHeight: '340px', overflowY: 'auto' }}>
             {childExams.length === 0 ? (
-              <div style={{ padding: '1rem', textAlign: 'center' }}>
-                <p className="text-muted" style={{ fontSize: '0.85rem', margin: '0 0 8px 0' }}>
+              <div style={{ padding: '1.5rem 1rem', textAlign: 'center' }}>
+                <p className="text-muted" style={{ fontSize: '0.85rem', margin: '0 0 10px 0' }}>
                   Semester Examinations scheduled for {childDetails.dept} ({childDetails.sem}).
                 </p>
                 <button 
                   onClick={() => navigate('/parent/timetable')}
                   className="btn-primary text-xs" 
-                  style={{ padding: '5px 12px', borderRadius: '6px', cursor: 'pointer' }}
+                  style={{ padding: '6px 14px', borderRadius: '6px', cursor: 'pointer' }}
                 >
                   View Semester Timetable & Hall Ticket
                 </button>
               </div>
             ) : (
               childExams.map((ex, i) => (
-                <div key={ex._id || ex.id || i} className="p-announcement-item" style={{ borderLeft: '3px solid #6366F1', paddingLeft: '0.75rem', cursor: 'pointer' }} onClick={() => navigate('/parent/timetable')}>
-                  <span className="p-ann-date" style={{ color: '#6366F1', fontWeight: 700 }}>{ex.name} ({ex.sem || childDetails.sem || 'Sem 3'})</span>
-                  <h4 className="p-ann-title" style={{ fontSize: '0.9rem', marginTop: '2px' }}>{ex.subject}</h4>
-                  <p className="p-ann-desc" style={{ fontSize: '0.78rem', marginTop: '4px', color: 'var(--text-muted)' }}>
-                    📅 Date: <strong>{ex.date}</strong> · ⏱ Time: <strong>{ex.time}</strong> <br />
-                    📍 Venue Hall: <strong>{ex.room || ex.hall || 'Main Hall'}</strong> ({ex.maxMarks || 100} Marks)
-                  </p>
+                <div 
+                  key={ex._id || ex.id || i} 
+                  className="p-announcement-item" 
+                  style={{ 
+                    borderLeft: '4px solid #6366F1', 
+                    padding: '0.9rem 1rem', 
+                    cursor: 'pointer',
+                    background: 'var(--bg-secondary)',
+                    borderRadius: '10px',
+                    borderTop: '1px solid var(--border-color)',
+                    borderRight: '1px solid var(--border-color)',
+                    borderBottom: '1px solid var(--border-color)',
+                    transition: 'transform 0.15s ease'
+                  }} 
+                  onClick={() => navigate('/parent/timetable')}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', flexWrap: 'wrap' }}>
+                    <div>
+                      <h4 style={{ fontSize: '0.92rem', fontWeight: 800, margin: '0 0 2px', color: 'var(--text-main)' }}>
+                        {ex.subject || ex.name}
+                      </h4>
+                      <span style={{ fontSize: '0.74rem', color: '#6366F1', fontWeight: 700 }}>
+                        {ex.name && ex.name !== ex.subject ? `${ex.name} • ` : ''}{ex.sem || childDetails.sem || 'Sem 1'}
+                      </span>
+                    </div>
+                    <span style={{ 
+                      fontSize: '0.72rem', 
+                      fontWeight: 700, 
+                      padding: '2px 8px', 
+                      borderRadius: '6px', 
+                      background: 'rgba(99, 102, 241, 0.12)', 
+                      color: '#6366F1',
+                      border: '1px solid rgba(99, 102, 241, 0.25)',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {ex.maxMarks || 100} Marks
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', fontSize: '0.78rem', marginTop: '8px', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Calendar size={13} style={{ color: '#6366F1', flexShrink: 0 }} />
+                      <span><strong>{ex.date}</strong></span>
+                    </div>
+                    {ex.time && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Clock size={13} style={{ color: '#6366F1', flexShrink: 0 }} />
+                        <span>{ex.time}</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Building size={13} style={{ color: '#6366F1', flexShrink: 0 }} />
+                      <span>Hall: <strong style={{ color: 'var(--text-main)' }}>{ex.room || ex.hall || 'Main Hall'}</strong></span>
+                    </div>
+                  </div>
                 </div>
               ))
             )}

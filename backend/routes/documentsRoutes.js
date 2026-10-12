@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import Document from '../models/Document.js';
 import { protect, authorize, collegeScope } from '../middleware/authMiddleware.js';
+import { uploadToCloudinary } from '../config/cloudinary.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -201,6 +202,21 @@ router.post('/:id/upload', protect, authorize(...allowedRoles), collegeScope, (r
     document.submittedAt = new Date();
     document.verifiedBy = '';
     document.verifiedAt = null;
+
+    // Optional Cloudinary sync for persistent cloud storage
+    try {
+      const cldRes = await uploadToCloudinary(req.file.path, {
+        folder: `college_erp/documents/${document.collegeId || 'common'}`,
+        resourceType: 'auto',
+      });
+      if (cldRes?.secure_url) {
+        document.cloudinaryUrl = cldRes.secure_url;
+        document.cloudinaryPublicId = cldRes.public_id || '';
+      }
+    } catch (cldErr) {
+      console.warn('Cloudinary upload warning:', cldErr.message);
+    }
+
     await document.save();
 
     res.json({ success: true, document });

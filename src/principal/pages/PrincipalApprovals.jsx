@@ -407,7 +407,7 @@ export default function PrincipalApprovals() {
       </div>
 
       {/* STEP 2: METRICS CARDS GRID */}
-      <div className="stats-grid mb-6 animate-fade-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+      <div className="stats-grid mb-6 animate-fade-in principal-kpi-grid">
         <div className="stat-card" style={{ border: '1px solid #E3E5EC' }}>
           <div className="stat-icon-wrapper" style={{ background: '#FAEEDA', color: 'var(--warning)' }}><Clock size={20} /></div>
           <div className="stat-details">
@@ -445,14 +445,14 @@ export default function PrincipalApprovals() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div className="approvals-content-grid">
         
         {/* LEFT COLUMN: REQUESTS TABLE */}
         <div className="glass-card" style={{ padding: '1.5rem', borderRadius: '16px', minWidth: 0, overflowX: 'auto' }}>
           
           {/* SEARCH & FILTERS HEADER */}
           <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div className="approvals-filter-pills">
               {['All', 'Pending', 'Approved', 'Rejected', 'Urgent'].map((filter) => (
                 <button
                   key={filter}

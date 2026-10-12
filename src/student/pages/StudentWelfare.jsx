@@ -117,7 +117,7 @@ export default function StudentWelfare() {
       </div>
 
       {/* Support Action Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+      <div className="support-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <div className="glass-card" style={{ padding: '1.25rem', borderRadius: '12px', borderLeft: '4px solid #4f46e5' }}>
           <UserPlus size={24} color="#4f46e5" style={{ marginBottom: '0.75rem' }} />
           <h3 style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '1.1rem', margin: '0 0 4px 0' }}>Request Counseling</h3>

@@ -988,7 +988,7 @@ const HodMarks = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <div className="hod-header-actions" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button 
             onClick={handleExportCSV}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', border: '1px solid #cbd5e1', padding: '9px 14px', borderRadius: '10px', color: '#1e293b', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
@@ -1254,10 +1254,10 @@ const HodMarks = () => {
       <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         
         {/* Semester Tabs */}
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <div className="hod-tab-strip" style={{ display: 'flex', gap: '6px', overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch', paddingBottom: '4px', scrollbarWidth: 'none' }}>
           <button
             onClick={() => setSemFilter('All')}
-            style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', border: semFilter === 'All' ? '1px solid #3730A5' : '1px solid #e2e8f0', background: semFilter === 'All' ? '#3730A5' : '#f8fafc', color: semFilter === 'All' ? '#fff' : '#475569' }}
+            style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', border: semFilter === 'All' ? '1px solid #3730A5' : '1px solid #e2e8f0', background: semFilter === 'All' ? '#3730A5' : '#f8fafc', color: semFilter === 'All' ? '#fff' : '#475569', flexShrink: 0, whiteSpace: 'nowrap' }}
           >
             All Semesters
           </button>
@@ -1265,7 +1265,7 @@ const HodMarks = () => {
             <button
               key={s}
               onClick={() => setSemFilter(s)}
-              style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', border: semFilter === s ? '1px solid #3730A5' : '1px solid #e2e8f0', background: semFilter === s ? '#3730A5' : '#f8fafc', color: semFilter === s ? '#fff' : '#475569' }}
+              style={{ padding: '6px 12px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', border: semFilter === s ? '1px solid #3730A5' : '1px solid #e2e8f0', background: semFilter === s ? '#3730A5' : '#f8fafc', color: semFilter === s ? '#fff' : '#475569', flexShrink: 0, whiteSpace: 'nowrap' }}
             >
               {s}
             </button>
@@ -1273,7 +1273,7 @@ const HodMarks = () => {
         </div>
 
         {/* Status Filter & Search */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: '100%' }}>
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
@@ -1285,7 +1285,7 @@ const HodMarks = () => {
             <option value="Arrears">Arrear Watchlist</option>
           </select>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: '8px', minWidth: '220px' }}>
+          <div className="search-box" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: '8px', flex: 1, minWidth: '220px' }}>
             <Search size={15} color="#64748b" />
             <input
               type="text"
@@ -1300,7 +1300,7 @@ const HodMarks = () => {
       </div>
 
       {/* COMPREHENSIVE ACADEMIC TRANSCRIPT ROSTER TABLE */}
-      <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+      <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
         <div style={{ padding: '14px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
             Department Academic Roster: <strong style={{ color: '#2563eb' }}>{HOD_DEPT}</strong> ({semFilter === 'All' ? 'All Semesters' : semFilter})
@@ -1310,8 +1310,8 @@ const HodMarks = () => {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="table-container" style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', minWidth: '750px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ background: '#ffffff', borderBottom: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
                 <th style={{ padding: '12px 18px', width: '50px' }}>#</th>

@@ -38,6 +38,7 @@ import { io } from 'socket.io-client';
 import { getBackendURL } from '../../utils/backendUrl';
 import { getWelfareRecords, updateWelfareRecord, approveScholarship } from '../../api/index.js';
 import '../../pages/Dashboard.css';
+import '../../pages/admin/AdminFinanceWelfareResponsive.css';
 
 // Seed data representing active student discipline, complaints & welfare cases
 const initialCases = [
@@ -461,7 +462,7 @@ export default function PrincipalStudentWelfare() {
   };
 
   return (
-    <div className="main-content" style={{ padding: '2rem', minHeight: 'calc(100vh - 70px)', background: 'var(--bg-primary)' }}>
+    <div className="main-content student-welfare-page" style={{ padding: '2rem', minHeight: 'calc(100vh - 70px)', background: 'var(--bg-primary)' }}>
       
       {/* Toast popup alerts */}
       {toastMessage && (
@@ -478,7 +479,7 @@ export default function PrincipalStudentWelfare() {
       )}
 
       {/* HEADER SECTION */}
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-4 welfare-header">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <ShieldAlert style={{ color: '#3730A5' }} size={28} /> Student Welfare & Discipline Hub
@@ -501,7 +502,7 @@ export default function PrincipalStudentWelfare() {
       </div>
 
       {/* VIEW TABS SELECTOR */}
-      <div className="glass-card mb-6" style={{ padding: '0.4rem', borderRadius: '12px', display: 'inline-flex', gap: '0.5rem' }}>
+      <div className="glass-card mb-6 welfare-tabs-selector" style={{ padding: '0.4rem', borderRadius: '12px', display: 'inline-flex', gap: '0.5rem' }}>
         <button
           onClick={() => setActiveTab('disciplinary')}
           style={{
@@ -536,7 +537,7 @@ export default function PrincipalStudentWelfare() {
       </div>
 
       {/* --- DASHBOARD STATS CARDS --- */}
-      <div className="stats-grid mb-6 animate-fade-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+      <div className="stats-grid mb-6 animate-fade-in welfare-stats-grid">
         
         <div className="stat-card" style={{ border: '1px solid #E3E5EC' }}>
           <div className="stat-icon-wrapper" style={{ background: '#FCEBEB', color: 'var(--danger)' }}><AlertOctagon size={18} /></div>
@@ -587,14 +588,14 @@ export default function PrincipalStudentWelfare() {
 
       {/* --- TAB VIEW: DISCIPLINARY & WELFARE CASES --- */}
       {activeTab === 'disciplinary' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 7.5fr) minmax(0, 2.5fr)', gap: '1.5rem' }}>
+        <div className="welfare-content-grid">
           
           {/* Main Incidents Table */}
           <div className="glass-card" style={{ padding: '1.5rem', borderRadius: '16px' }}>
             
             {/* Table Filters */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-              <div className="flex gap-2">
+              <div className="flex gap-2 welfare-filter-pills">
                 {['All', 'Disciplinary', 'Anti-Ragging', 'Counseling', 'Scholarship', 'Behavior'].map(type => (
                   <button
                     key={type}
@@ -888,7 +889,7 @@ export default function PrincipalStudentWelfare() {
 
       {/* --- TAB VIEW: STUDENT WELLNESS ANALYTICS --- */}
       {activeTab === 'wellness-analytics' && (
-        <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '1.5rem' }}>
+        <div className="animate-fade-in welfare-analytics-grid">
           
           {/* Main Charts */}
           <div className="glass-card" style={{ padding: '1.5rem', borderRadius: '16px' }}>
@@ -994,7 +995,7 @@ export default function PrincipalStudentWelfare() {
 
       {/* --- TAB VIEW: ANONYMOUS COMPLAINTS INBOX --- */}
       {activeTab === 'anonymous' && (
-        <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 7fr) minmax(0, 3fr)', gap: '1.5rem' }}>
+        <div className="animate-fade-in welfare-content-grid">
           
           {/* Complaints Table */}
           <div className="glass-card" style={{ padding: '1.5rem', borderRadius: '16px' }}>

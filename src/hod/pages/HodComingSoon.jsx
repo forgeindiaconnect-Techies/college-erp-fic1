@@ -38,7 +38,14 @@ const HodComingSoon = ({ moduleName }) => {
         </div>
 
         <div className="coming-soon-actions">
-          
+          <button 
+            type="button"
+            onClick={() => navigate(-1)} 
+            className="btn-primary" 
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#3730A5', border: 'none', padding: '0.6rem 1.2rem', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+          >
+            <ArrowLeft size={16} /> Back
+          </button>
         </div>
       </div>
     </div>

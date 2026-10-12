@@ -328,7 +328,7 @@ const EmployeeAttendanceCard = ({ layout = 'bar' }) => {
 
   // ── Default Bar Style (Sleek, Compact Header Strip) ──
   return (
-    <div style={{
+    <div className="employee-attendance-card" style={{
       background: '#ffffff',
       borderRadius: '12px',
       padding: '0.65rem 1.15rem',

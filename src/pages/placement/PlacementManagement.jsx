@@ -1478,16 +1478,21 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
 
       {/* ── Enterprise Placement Navigation Tabs (Shown in Admin/Embedded views, hidden when dedicated sidebar is active) ── */}
       {!location.pathname.startsWith('/placement') && (
-        <div style={{
-          display: 'flex',
-          gap: '6px',
-          overflowX: 'auto',
-          padding: '6px 6px 0',
-          background: 'var(--bg-secondary, #f8fafc)',
-          borderRadius: '12px',
-          border: '1px solid var(--border-color, #e2e8f0)',
-          scrollbarWidth: 'none'
-        }}>
+        <div 
+          className="placement-nav-tabs-bar"
+          style={{
+            display: 'flex',
+            flexWrap: 'nowrap',
+            gap: '6px',
+            overflowX: 'auto',
+            padding: '6px 6px 0',
+            background: 'var(--bg-secondary, #f8fafc)',
+            borderRadius: '12px',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            scrollbarWidth: 'none',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
           {[
             { id: 'Dashboard', label: 'Overview', icon: <Briefcase size={16} /> },
             { id: 'Job Openings', label: 'Recruitment Drives', icon: <Briefcase size={16} />, count: jobs.length },
@@ -1520,6 +1525,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                   whiteSpace: 'nowrap',
+                  flexShrink: 0,
                   boxShadow: isActive ? '0 -2px 6px rgba(0,0,0,0.03)' : 'none'
                 }}
               >
@@ -1549,20 +1555,20 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
           {/* Placement Officer Duty Attendance Widget */}
           <EmployeeAttendanceCard />
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '14px' }}>
+          <div className="placement-kpi-grid">
           
           <div 
             onClick={() => handleTabClick('Companies')}
             style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', cursor: 'pointer', transition: 'transform 0.15s ease' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>Total Companies</span>
+              <span className="kpi-title" style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>Total Companies</span>
               <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(37,99,235,0.1)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Building size={16} />
               </div>
             </div>
-            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', marginTop: '4px' }}>{companies.length}</div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="kpi-num" style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', marginTop: '4px' }}>{companies.length}</div>
+            <div className="kpi-footer" style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Corporate Partners</span>
               <span style={{ color: '#2563eb', fontWeight: 700 }}>View →</span>
             </div>
@@ -1573,13 +1579,13 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
             style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', cursor: 'pointer', transition: 'transform 0.15s ease' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>Active Drives</span>
+              <span className="kpi-title" style={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>Active Drives</span>
               <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(22,163,74,0.1)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Briefcase size={16} />
               </div>
             </div>
-            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#15803d', marginTop: '4px' }}>{jobs.length}</div>
-            <div style={{ fontSize: '0.72rem', color: '#16a34a', marginTop: '2px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="kpi-num" style={{ fontSize: '1.65rem', fontWeight: 800, color: '#15803d', marginTop: '4px' }}>{jobs.length}</div>
+            <div className="kpi-footer" style={{ fontSize: '0.72rem', color: '#16a34a', marginTop: '2px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Recruitment Drives Open</span>
               <span style={{ color: '#16a34a', fontWeight: 700 }}>Drives →</span>
             </div>
@@ -1590,13 +1596,13 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
             style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', cursor: 'pointer', transition: 'transform 0.15s ease' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' }}>Applications</span>
+              <span className="kpi-title" style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' }}>Applications</span>
               <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(124,58,237,0.1)', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Users size={16} />
               </div>
             </div>
-            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#6d28d9', marginTop: '4px' }}>{applications.length}</div>
-            <div style={{ fontSize: '0.72rem', color: '#7c3aed', marginTop: '2px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="kpi-num" style={{ fontSize: '1.65rem', fontWeight: 800, color: '#6d28d9', marginTop: '4px' }}>{applications.length}</div>
+            <div className="kpi-footer" style={{ fontSize: '0.72rem', color: '#7c3aed', marginTop: '2px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Candidate Submissions</span>
               <span style={{ color: '#7c3aed', fontWeight: 700 }}>Review →</span>
             </div>
@@ -1607,13 +1613,13 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
             style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', cursor: 'pointer', transition: 'transform 0.15s ease' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase' }}>Students Placed</span>
+              <span className="kpi-title" style={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase' }}>Students Placed</span>
               <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(5,150,105,0.1)', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Award size={16} />
               </div>
             </div>
-            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#047857', marginTop: '4px' }}>{selections.length}</div>
-            <div style={{ fontSize: '0.72rem', color: '#047857', marginTop: '2px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="kpi-num" style={{ fontSize: '1.65rem', fontWeight: 800, color: '#047857', marginTop: '4px' }}>{selections.length}</div>
+            <div className="kpi-footer" style={{ fontSize: '0.72rem', color: '#047857', marginTop: '2px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Offers Issued</span>
               <span style={{ color: '#047857', fontWeight: 700 }}>Placed →</span>
             </div>
@@ -1624,13 +1630,13 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
             style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', cursor: 'pointer', transition: 'transform 0.15s ease' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#d97706', textTransform: 'uppercase' }}>Highest Package</span>
+              <span className="kpi-title" style={{ fontSize: '0.72rem', fontWeight: 700, color: '#d97706', textTransform: 'uppercase' }}>Highest Package</span>
               <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(217,119,6,0.1)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <TrendingUp size={16} />
               </div>
             </div>
-            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#b45309', marginTop: '4px' }}>{packageStats.highest}</div>
-            <div style={{ fontSize: '0.72rem', color: '#d97706', marginTop: '2px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="kpi-num" style={{ fontSize: '1.65rem', fontWeight: 800, color: '#b45309', marginTop: '4px' }}>{packageStats.highest}</div>
+            <div className="kpi-footer" style={{ fontSize: '0.72rem', color: '#d97706', marginTop: '2px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Top Offer</span>
               <span style={{ color: '#d97706', fontWeight: 700 }}>Reports →</span>
             </div>
@@ -1641,13 +1647,13 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
             style={{ background: 'var(--bg-card, #ffffff)', padding: '16px 18px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', cursor: 'pointer', transition: 'transform 0.15s ease' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0284c7', textTransform: 'uppercase' }}>Average CTC</span>
+              <span className="kpi-title" style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0284c7', textTransform: 'uppercase' }}>Average CTC</span>
               <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(2,132,199,0.1)', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <DollarSign size={16} />
               </div>
             </div>
-            <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0369a1', marginTop: '4px' }}>{packageStats.average}</div>
-            <div style={{ fontSize: '0.72rem', color: '#0369a1', marginTop: '2px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="kpi-num" style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0369a1', marginTop: '4px' }}>{packageStats.average}</div>
+            <div className="kpi-footer" style={{ fontSize: '0.72rem', color: '#0369a1', marginTop: '2px', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Overall Mean</span>
               <span style={{ color: '#0284c7', fontWeight: 700 }}>Stats →</span>
             </div>
@@ -1664,7 +1670,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           {/* Charts Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+          <div className="placement-two-col-grid">
             
             <div style={{ background: 'var(--bg-card, #ffffff)', padding: '20px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -1719,7 +1725,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
           </div>
 
           {/* Quick Operations & Upcoming Interviews */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+          <div className="placement-two-col-grid">
             
             <div style={{ background: 'var(--bg-card, #ffffff)', padding: '20px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -2342,13 +2348,13 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
       {activeTab === 'Eligibility Tracker' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '18px 20px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)' }}>Select Active Recruitment Drive:</label>
+          <div className="placement-eligibility-filter-card" style={{ background: 'var(--bg-card, #ffffff)', padding: '18px 20px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+            <div className="drive-select-group" style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', whiteSpace: 'nowrap' }}>Select Active Recruitment Drive:</label>
               <select 
                 value={selectedEligibleJob} 
                 onChange={e => setSelectedEligibleJob(e.target.value)}
-                style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'var(--bg-primary, #ffffff)', color: 'var(--text-main, #0f172a)', fontWeight: 700, fontSize: '0.85rem', outline: 'none' }}
+                style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'var(--bg-primary, #ffffff)', color: 'var(--text-main, #0f172a)', fontWeight: 700, fontSize: '0.85rem', outline: 'none', maxWidth: '100%' }}
               >
                 {jobs.map(j => (
                   <option key={j._id || j.jobId || j.id} value={j._id || j.jobId || j.id}>
@@ -2359,11 +2365,11 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
               </select>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, padding: '6px 12px', borderRadius: '8px', background: '#dcfce7', color: '#15803d' }}>
+            <div className="badge-group" style={{ display: 'flex', gap: '10px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, padding: '6px 12px', borderRadius: '8px', background: '#dcfce7', color: '#15803d', whiteSpace: 'nowrap' }}>
                 {liveEligible.length} Scholars Eligible
               </span>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, padding: '6px 12px', borderRadius: '8px', background: '#fee2e2', color: '#991b1b' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, padding: '6px 12px', borderRadius: '8px', background: '#fee2e2', color: '#991b1b', whiteSpace: 'nowrap' }}>
                 {liveIneligible.length} Ineligible
               </span>
             </div>
@@ -2371,21 +2377,21 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
 
           {/* Eligible Table */}
           <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', background: 'rgba(22, 163, 74, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', background: 'rgba(22, 163, 74, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#15803d' }}>
                 ✓ Eligible Candidates ({liveEligible.length})
               </h3>
               <button 
                 type="button" 
                 onClick={() => showToast(`Notified ${liveEligible.length} eligible students via email & portal!`)}
-                style={{ padding: '5px 12px', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                style={{ padding: '6px 14px', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
                 Notify Eligible Scholars
               </button>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <div className="placement-table-wrapper">
+              <table className="placement-table" style={{ width: '100%', minWidth: '660px', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.85rem' }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
                     <th style={{ padding: '12px 18px', textAlign: 'left' }}>Register No</th>
@@ -2407,7 +2413,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                       <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 700, color: '#15803d' }}>{st.arrears ?? '0'}</td>
                       <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 600, color: '#15803d' }}>{st.attendance || '100%'}</td>
                       <td style={{ padding: '12px 18px', textAlign: 'right' }}>
-                        <span style={{ padding: '4px 10px', borderRadius: '6px', background: '#dcfce7', color: '#15803d', fontWeight: 800, fontSize: '0.75rem' }}>
+                        <span style={{ padding: '4px 10px', borderRadius: '6px', background: '#dcfce7', color: '#15803d', fontWeight: 800, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
                           ✓ Qualified
                         </span>
                       </td>
@@ -2434,8 +2440,8 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                 </h3>
               </div>
 
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <div className="placement-table-wrapper">
+                <table className="placement-table" style={{ width: '100%', minWidth: '660px', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.85rem' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
                       <th style={{ padding: '12px 18px', textAlign: 'left' }}>Register No</th>
@@ -2486,7 +2492,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
               flexWrap: 'wrap', 
               gap: '16px' 
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
                 <div style={{ 
                   width: '42px', 
                   height: '42px', 
@@ -2496,11 +2502,12 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center',
-                  boxShadow: '0 3px 8px rgba(37,99,235,0.25)'
+                  boxShadow: '0 3px 8px rgba(37,99,235,0.25)',
+                  flexShrink: 0
                 }}>
                   <Briefcase size={20} />
                 </div>
-                <div>
+                <div className="placement-drive-select-box" style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Active Recruitment Drive
                   </div>
@@ -2521,7 +2528,8 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                       fontSize: '0.92rem', 
                       outline: 'none', 
                       cursor: 'pointer', 
-                      minWidth: '320px',
+                      width: '100%',
+                      maxWidth: '100%',
                       boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                     }}
                   >
@@ -2535,7 +2543,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="placement-interview-header-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                 {currentInterviewJob && currentJobApplications.length === 0 && (
                   <button
                     type="button"
@@ -2651,7 +2659,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                <div className="placement-interview-counters" style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
                   <div style={{ 
                     textAlign: 'center', 
                     background: '#f8fafc', 
@@ -2693,13 +2701,18 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               
               {/* Stepper / Round Tabs */}
-              <div style={{ 
-                display: 'flex', 
-                gap: '12px', 
-                overflowX: 'auto', 
-                padding: '4px 2px 8px',
-                scrollbarWidth: 'none'
-              }}>
+              <div 
+                className="placement-stepper-tabs"
+                style={{ 
+                  display: 'flex', 
+                  flexWrap: 'nowrap',
+                  gap: '12px', 
+                  overflowX: 'auto', 
+                  padding: '4px 2px 8px',
+                  scrollbarWidth: 'none',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
                 {currentJobRounds.map((rnd, idx) => {
                   const isSelected = selectedRoundIndex === idx;
                   const roundName = rnd.name || `Round ${idx + 1}`;
@@ -2732,6 +2745,8 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                         alignItems: 'center',
                         gap: '12px',
                         minWidth: '240px',
+                        flexShrink: 0,
+                        whiteSpace: 'nowrap',
                         boxShadow: isSelected ? '0 4px 12px rgba(37,99,235,0.1)' : 'none',
                         transition: 'all 0.15s ease',
                         textAlign: 'left'
@@ -5592,28 +5607,34 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
       {/* Schedule Training Program Modal */}
       {showTrainingModal && (
         <div className="erp-modal-overlay">
-          <div className="erp-modal-box" style={{ maxWidth: '640px', width: '100%' }}>
+          <div className="erp-modal-box" style={{ maxWidth: '640px', width: '100%', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '92vh' }}>
             
-            <div className="erp-modal-header">
-              <div className="erp-modal-header-info">
-                <div className="erp-modal-icon-badge" style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}>
+            <div className="erp-modal-header" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: '14px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', flexWrap: 'nowrap', gap: '12px', flexShrink: 0 }}>
+              <div className="erp-modal-header-info" style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                <div className="erp-modal-icon-badge" style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb', flexShrink: 0, width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <BookOpen size={20} />
                 </div>
-                <div>
-                  <h2 className="erp-modal-title">Schedule Training & Skill Program</h2>
-                  <p className="erp-modal-subtitle">Organize bootcamps, technical modules, or aptitude workshops for candidates.</p>
+                <div style={{ minWidth: 0 }}>
+                  <h2 className="erp-modal-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.3 }}>Schedule Training & Skill Program</h2>
+                  <p className="erp-modal-subtitle" style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>Organize bootcamps, technical modules, or aptitude workshops for candidates.</p>
                 </div>
               </div>
-              <button type="button" onClick={() => setShowTrainingModal(false)} className="erp-modal-close">
+              <button 
+                type="button" 
+                onClick={() => setShowTrainingModal(false)} 
+                className="erp-modal-close"
+                style={{ flexShrink: 0, marginLeft: 'auto', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+                aria-label="Close"
+              >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateTrainingProgram} className="erp-modal-form">
-              <div className="erp-modal-body">
+            <form onSubmit={handleCreateTrainingProgram} className="erp-modal-form" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
+              <div className="erp-modal-body" style={{ flex: '1 1 auto', overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box' }}>
                 <div className="erp-form-group">
                   <label className="erp-form-label">
-                    <BookOpen size={14} color="#2563eb" /> Module / Program Title <span className="req">*</span>
+                    <BookOpen size={14} color="#2563eb" /> Module / Program Title <span className="req" style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <div className="erp-input-group">
                     <div className="erp-input-icon-box">
@@ -5630,10 +5651,10 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                <div className="erp-modal-2col">
                   <div className="erp-form-group">
                     <label className="erp-form-label">
-                      <Users size={14} color="#2563eb" /> Trainer / Training Partner <span className="req">*</span>
+                      <Users size={14} color="#2563eb" /> Trainer / Training Partner <span className="req" style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <div className="erp-input-group">
                       <div className="erp-input-icon-box">
@@ -5676,10 +5697,10 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                <div className="erp-modal-2col">
                   <div className="erp-form-group">
                     <label className="erp-form-label">
-                      <Calendar size={14} color="#2563eb" /> Scheduled Date <span className="req">*</span>
+                      <Calendar size={14} color="#2563eb" /> Scheduled Date <span className="req" style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <div className="erp-input-group">
                       <div className="erp-input-icon-box">
@@ -5714,7 +5735,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
+                <div className="erp-modal-2col">
                   <div className="erp-form-group">
                     <label className="erp-form-label">
                       <Target size={14} color="#2563eb" /> Target Interview Round
@@ -5779,24 +5800,37 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
                   <label className="erp-form-label">
                     <FileText size={14} color="#2563eb" /> Syllabus / Description
                   </label>
-                  <div className="erp-input-group">
+                  <div className="erp-input-group" style={{ height: 'auto', padding: '4px 0' }}>
+                    <div className="erp-input-icon-box" style={{ alignSelf: 'flex-start', paddingTop: '8px' }}>
+                      <FileText size={16} />
+                    </div>
                     <textarea 
                       value={trainingForm.description} 
                       onChange={e => setTrainingForm({...trainingForm, description: e.target.value})} 
                       placeholder="Brief overview of curriculum topics covered..." 
                       className="erp-input-field" 
-                      style={{ height: '54px', resize: 'none' }}
+                      style={{ minHeight: '60px', height: 'auto', resize: 'vertical', padding: '6px 8px', width: '100%', border: 'none', outline: 'none' }}
+                      rows={2}
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="erp-modal-footer">
-                <button type="button" onClick={() => setShowTrainingModal(false)} className="erp-btn-cancel">
-                  Cancel
-                </button>
-                <button type="submit" className="erp-btn-submit">
+              <div className="erp-modal-footer" style={{ padding: '12px 20px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
+                <button 
+                  type="submit" 
+                  className="erp-btn-submit"
+                  style={{ width: '100%', padding: '10px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}
+                >
                   <CheckCircle size={16} /> Schedule Program
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setShowTrainingModal(false)} 
+                  className="erp-btn-cancel"
+                  style={{ width: '100%', padding: '9px 16px', background: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '8px', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
+                >
+                  Cancel
                 </button>
               </div>
             </form>

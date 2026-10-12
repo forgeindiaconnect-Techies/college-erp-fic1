@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getTransportRoutes, getTransportStudents, getTransportDrivers, getTransportVehicles } from '../../api/index';
+import './DriverDashboard.css';
 
 const DriverRoute = () => {
   const [session, setSession] = useState({});
@@ -208,10 +209,10 @@ const DriverRoute = () => {
   });
 
   return (
-    <div style={{ padding: '1.25rem 1.5rem', maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
+    <div className="driver-page-container" style={{ maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
       
       {/* ── ERP Breadcrumb & Compact Header Bar ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
+      <div className="driver-header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
             <span>Fleet Operations</span>
@@ -230,7 +231,7 @@ const DriverRoute = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="driver-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Link 
             to="/driver/trip"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem', backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.8rem', textDecoration: 'none', cursor: 'pointer' }}
@@ -247,7 +248,7 @@ const DriverRoute = () => {
       </div>
 
       {/* ── Compact Key Metric Row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+      <div className="driver-kpi-grid" style={{ marginBottom: '1.25rem' }}>
         
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
@@ -304,7 +305,7 @@ const DriverRoute = () => {
       </div>
 
       {/* ── Route Specs & Waypoints Split ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+      <div className="driver-two-col-grid-equal" style={{ marginBottom: '1.5rem' }}>
         
         {/* Left: Route Specification Sheet */}
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
@@ -353,8 +354,8 @@ const DriverRoute = () => {
             <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{pointsList.length} Total Waypoints</span>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+          <div className="driver-table-wrapper" style={{ overflowX: 'auto' }}>
+            <table className="driver-table" style={{ width: '100%', minWidth: '450px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   <th style={{ padding: '0.65rem 0.85rem', width: '45px', textAlign: 'center' }}>#</th>
@@ -455,8 +456,8 @@ const DriverRoute = () => {
             </div>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+          <div className="driver-table-wrapper" style={{ overflowX: 'auto' }}>
+            <table className="driver-table" style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   <th style={{ padding: '0.65rem 1rem' }}>Student Name</th>
@@ -467,10 +468,10 @@ const DriverRoute = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredStudents.map((student) => {
+                {filteredStudents.map((student, idx) => {
                   const phone = student.studentProfile?.user?.phone || 'N/A';
                   return (
-                    <tr key={student._id || student.studentId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr key={student._id ? `${student._id}-${idx}` : `${student.studentId || 'st'}-${idx}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.65rem 1rem', fontWeight: 700, color: '#0f172a' }}>
                         {student.name}
                       </td>

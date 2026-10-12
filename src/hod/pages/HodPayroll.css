@@ -670,6 +670,165 @@ table.erp-ledger-table tr:last-child td {
   text-align: center;
 }
 
+/* ── Responsive Enhancements ── */
+@media (max-width: 900px) {
+  .erp-payroll-page {
+    padding: 0.75rem 0.5rem !important;
+  }
+
+  .erp-payroll-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1rem !important;
+    width: 100% !important;
+  }
+
+  /* Swipeable horizontal cycle pills */
+  .erp-history-panel {
+    width: 100% !important;
+    border-radius: 10px !important;
+  }
+
+  .erp-history-list {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 0.5rem !important;
+    padding: 0.5rem !important;
+    scrollbar-width: none !important;
+  }
+
+  .erp-history-list::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .erp-history-item {
+    flex: 0 0 160px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    padding: 0.55rem 0.75rem !important;
+    background: #ffffff !important;
+  }
+
+  .erp-history-item.active {
+    border-left: 3px solid #16a34a !important;
+    background: #f0fdf4 !important;
+  }
+
+  /* Payslip Sheet */
+  .erp-payslip-statement {
+    padding: 0.85rem 0.75rem !important;
+    border-radius: 12px !important;
+    width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .erp-slip-letterhead {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+
+  .erp-slip-voucher-meta {
+    text-align: left !important;
+    width: 100% !important;
+  }
+
+  /* Parameter Matrix Specification Table */
+  .erp-param-matrix-container {
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    margin-bottom: 0.85rem !important;
+    display: block !important;
+    border-radius: 6px !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  table.erp-param-matrix {
+    min-width: 580px !important;
+    width: 100% !important;
+    table-layout: auto !important;
+    border: none !important;
+  }
+
+  table.erp-param-matrix th,
+  table.erp-param-matrix td {
+    padding: 0.5rem 0.65rem !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap !important;
+  }
+
+  /* Financial Ledger Breakdown */
+  .erp-financial-grid {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+  }
+
+  .erp-ledger-col.border-right {
+    border-right: none !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+
+  table.erp-ledger-table {
+    width: 100% !important;
+  }
+
+  /* Net Salary Bar */
+  .erp-net-statement-bar {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.6rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .erp-net-figure-box {
+    width: 100% !important;
+    text-align: left !important;
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* Sign-off grid */
+  .erp-signoff-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .erp-sign-line {
+    width: 100px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .erp-kpi-strip {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+
+  .erp-kpi-strip > *:last-child:nth-child(odd) {
+    grid-column: span 2 !important;
+  }
+
+  .erp-payroll-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .erp-header-actions {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .erp-header-actions button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}
+
 /* ── 10. Print Styles ── */
 @media print {
   body { background: #ffffff !important; }
@@ -678,3 +837,4 @@ table.erp-ledger-table tr:last-child td {
   .erp-payroll-layout { display: block !important; }
   .erp-payslip-statement { border: none !important; box-shadow: none !important; padding: 0 !important; }
 }
+

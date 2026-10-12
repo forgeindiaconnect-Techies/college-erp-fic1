@@ -37,6 +37,7 @@ import {
 } from "../../api/index";
 
 import useRealtimeSync from "../../hooks/useRealtimeSync";
+import "../../pages/admin/AdminFinanceWelfareResponsive.css";
 
 const ACADEMIC_YEARS = [
   "2026-2027",
@@ -874,10 +875,10 @@ const FeeStructure = () => {
   };
 
   return (
-    <div style={{ padding: "24px 32px", maxWidth: "1680px", margin: "0 auto", color: "#1e293b", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
+    <div className="fee-structure-page" style={{ padding: "24px 32px", maxWidth: "1680px", margin: "0 auto", color: "#1e293b", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
       
       {/* ── ERP Breadcrumb & Header ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px", marginBottom: "22px" }}>
+      <div className="fs-header-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px", marginBottom: "22px" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#64748b", fontWeight: "600", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.6px" }}>
             <span>Finance & Accounts</span>
@@ -956,7 +957,7 @@ const FeeStructure = () => {
         </div>
 
         {/* Global Toolbar */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div className="fs-toolbar" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <button
             type="button"
             onClick={handleOpenAddModal}
@@ -1030,95 +1031,44 @@ const FeeStructure = () => {
       </div>
 
       {/* ── KPI Metrics Ribbon ── */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: "16px",
-          marginBottom: "24px"
-        }}
-      >
-        <div
-          style={{
-            background: "#ffffff",
-            borderRadius: "14px",
-            border: "1px solid #e2e8f0",
-            padding: "16px 20px",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-            display: "flex",
-            alignItems: "center",
-            gap: "16px"
-          }}
-        >
-          <div style={{ width: "46px", height: "46px", borderRadius: "12px", background: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="fs-kpi-grid">
+        <div className="fs-kpi-card">
+          <div className="fs-icon-box" style={{ width: "46px", height: "46px", borderRadius: "12px", background: "#eff6ff", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Layers size={22} />
           </div>
           <div>
-            <div style={{ fontSize: "11.5px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Configured Schedules</div>
-            <div style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a" }}>{metrics.totalSchedules}</div>
+            <div className="fs-label" style={{ fontSize: "11.5px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Configured Schedules</div>
+            <div className="fs-value" style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a" }}>{metrics.totalSchedules}</div>
           </div>
         </div>
 
-        <div
-          style={{
-            background: "#ffffff",
-            borderRadius: "14px",
-            border: "1px solid #e2e8f0",
-            padding: "16px 20px",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-            display: "flex",
-            alignItems: "center",
-            gap: "16px"
-          }}
-        >
-          <div style={{ width: "46px", height: "46px", borderRadius: "12px", background: "#f0fdf4", color: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div className="fs-kpi-card">
+          <div className="fs-icon-box" style={{ width: "46px", height: "46px", borderRadius: "12px", background: "#f0fdf4", color: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Building2 size={22} />
           </div>
           <div>
-            <div style={{ fontSize: "11.5px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Active Departments</div>
-            <div style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a" }}>{metrics.uniqueDepts}</div>
+            <div className="fs-label" style={{ fontSize: "11.5px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Active Departments</div>
+            <div className="fs-value" style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a" }}>{metrics.uniqueDepts}</div>
           </div>
         </div>
 
-        <div
-          style={{
-            background: "#ffffff",
-            borderRadius: "14px",
-            border: "1px solid #e2e8f0",
-            padding: "16px 20px",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-            display: "flex",
-            alignItems: "center",
-            gap: "16px"
-          }}
-        >
-          <div style={{ width: "46px", height: "46px", borderRadius: "12px", background: "#fdf2f8", color: "#db2777", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div className="fs-kpi-card">
+          <div className="fs-icon-box" style={{ width: "46px", height: "46px", borderRadius: "12px", background: "#fdf2f8", color: "#db2777", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <GraduationCap size={22} />
           </div>
           <div>
-            <div style={{ fontSize: "11.5px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Programs Covered</div>
-            <div style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a" }}>{metrics.uniqueCourses}</div>
+            <div className="fs-label" style={{ fontSize: "11.5px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Programs Covered</div>
+            <div className="fs-value" style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a" }}>{metrics.uniqueCourses}</div>
           </div>
         </div>
 
-        <div
-          style={{
-            background: "#ffffff",
-            borderRadius: "14px",
-            border: "1px solid #e2e8f0",
-            padding: "16px 20px",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-            display: "flex",
-            alignItems: "center",
-            gap: "16px"
-          }}
-        >
-          <div style={{ width: "46px", height: "46px", borderRadius: "12px", background: "#fffbeb", color: "#d97706", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div className="fs-kpi-card">
+          <div className="fs-icon-box" style={{ width: "46px", height: "46px", borderRadius: "12px", background: "#fffbeb", color: "#d97706", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <IndianRupee size={22} />
           </div>
           <div>
-            <div style={{ fontSize: "11.5px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Average Base Tariff</div>
-            <div style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a" }}>₹{metrics.avgFee.toLocaleString("en-IN")}</div>
+            <div className="fs-label" style={{ fontSize: "11.5px", fontWeight: "700", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>Average Base Tariff</div>
+            <div className="fs-value" style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a" }}>₹{metrics.avgFee.toLocaleString("en-IN")}</div>
           </div>
         </div>
       </div>
@@ -1234,7 +1184,7 @@ const FeeStructure = () => {
             </div>
 
             {/* Live Search */}
-            <div style={{ position: "relative", minWidth: "320px" }}>
+            <div className="fs-search-container" style={{ position: "relative", minWidth: 0, width: "100%", maxWidth: "380px" }}>
               <Search
                 size={15}
                 color="#94a3b8"
@@ -1261,6 +1211,7 @@ const FeeStructure = () => {
 
           {/* Filter Bar */}
           <div
+            className="fs-filter-bar"
             style={{
               display: "flex",
               alignItems: "center",
@@ -1277,6 +1228,7 @@ const FeeStructure = () => {
 
             {/* Dept Filter */}
             <select
+              className="fs-filter-select"
               value={deptFilter}
               onChange={(e) => {
                 setDeptFilter(e.target.value);
@@ -1302,6 +1254,7 @@ const FeeStructure = () => {
 
             {/* Course Filter */}
             <select
+              className="fs-filter-select"
               value={courseFilter}
               onChange={(e) => setCourseFilter(e.target.value)}
               style={{
@@ -1312,8 +1265,7 @@ const FeeStructure = () => {
                 background: "#ffffff",
                 color: "#334155",
                 fontWeight: "600",
-                outline: "none",
-                maxWidth: "260px"
+                outline: "none"
               }}
             >
               <option value="All">All Courses</option>
@@ -1329,6 +1281,7 @@ const FeeStructure = () => {
 
             {/* Semester Filter */}
             <select
+              className="fs-filter-select"
               value={semesterFilter}
               onChange={(e) => setSemesterFilter(e.target.value)}
               style={{
@@ -1350,6 +1303,7 @@ const FeeStructure = () => {
 
             {/* Academic Year Filter */}
             <select
+              className="fs-filter-select"
               value={yearFilter}
               onChange={(e) => setYearFilter(e.target.value)}
               style={{
@@ -1403,11 +1357,12 @@ const FeeStructure = () => {
           </div>
         ) : filteredStructures.length === 0 ? (
           <div
+            className="fs-empty-state-box"
             style={{
               textAlign: "center",
-              padding: "80px 20px",
+              padding: "40px 16px",
               background: "#fafafa",
-              margin: "24px",
+              margin: "16px",
               borderRadius: "14px",
               border: "1px dashed #cbd5e1",
             }}
@@ -1439,17 +1394,19 @@ const FeeStructure = () => {
             </p>
           </div>
         ) : (
-          <div style={{ overflowX: "auto", flex: 1 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13.5px" }}>
+          <div style={{ overflowX: "auto", flex: 1, WebkitOverflowScrolling: "touch" }}>
+            <table className="fs-tariff-table" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, textAlign: "left", fontSize: "13.5px", minWidth: "900px" }}>
               <thead>
-                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Department</th>
-                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Degree Program</th>
-                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px" }}>Term / Semester</th>
-                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px", textAlign: "right" }}>Tuition Fee</th>
-                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px", textAlign: "right" }}>Institutional / Other</th>
-                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px", textAlign: "right" }}>Base Tariff</th>
-                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px", textAlign: "center" }}>Actions</th>
+                <tr style={{ background: "#f8fafc" }}>
+                  <th className="fs-sticky-dept" style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px", position: "sticky", left: 0, zIndex: 10, background: "#f8fafc", minWidth: "180px", maxWidth: "230px", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", boxShadow: "3px 0 6px -2px rgba(0,0,0,0.12)", whiteSpace: "nowrap" }}>
+                    Department
+                  </th>
+                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px", minWidth: "180px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>Degree Program</th>
+                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px", minWidth: "140px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>Term / Semester</th>
+                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px", textAlign: "right", minWidth: "120px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>Tuition Fee</th>
+                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px", textAlign: "right", minWidth: "160px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>Institutional / Other</th>
+                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px", textAlign: "right", minWidth: "120px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>Base Tariff</th>
+                  <th style={{ padding: "14px 20px", fontWeight: "700", color: "#475569", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: "0.6px", textAlign: "center", minWidth: "110px", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1486,8 +1443,8 @@ const FeeStructure = () => {
                         transition: "background 0.15s ease",
                       }}
                     >
-                      {/* Department */}
-                      <td style={{ padding: "15px 20px", fontWeight: "600", color: "#334155" }}>
+                      {/* Department (Sticky Frozen on Left) */}
+                      <td className="fs-sticky-dept" style={{ padding: "15px 20px", fontWeight: "600", color: "#334155", position: "sticky", left: 0, zIndex: 4, background: index % 2 === 1 ? "#fafcff" : "#ffffff", minWidth: "180px", maxWidth: "230px", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #f1f5f9", boxShadow: "3px 0 6px -2px rgba(0,0,0,0.12)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <Building2 size={16} color="#64748b" />
                           <span>{deptDisplay || "General / Unassigned"}</span>

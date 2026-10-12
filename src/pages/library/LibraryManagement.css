@@ -768,5 +768,65 @@
   flex-shrink: 0;
 }
 
+/* ── Mobile & Tablet Responsiveness for Library Management ── */
+@media (max-width: 1024px) {
+  .lib-dashboard-layout {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .lib-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .library-page {
+    gap: 1rem;
+  }
+
+  .lib-tabs-container {
+    padding: 0.35rem;
+    gap: 0.35rem;
+  }
+
+  .lib-tab {
+    padding: 0.6rem 0.9rem;
+    font-size: 0.82rem;
+  }
+
+  .lib-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .lib-spotlight-card,
+  .lib-analytics-card,
+  .lib-actions-card {
+    padding: 1rem;
+  }
+
+  .lib-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .lib-toolbar input,
+  .lib-toolbar select {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .lib-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .clearance-kpi-card {
+    padding: 0.85rem;
+  }
+}
+
 
 

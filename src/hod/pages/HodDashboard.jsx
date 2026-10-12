@@ -7,7 +7,7 @@ import {
   ClipboardList, Megaphone, CheckCircle, Play, CheckCircle2, UserCheck,
   IndianRupee, Search, Filter, Download, Printer, RefreshCw, ShieldCheck,
   AlertCircle, ArrowUpRight, ArrowDownRight, Wallet, Eye, X, Phone, Mail,
-  Award, Sparkles, Building2, Check, AlertOctagon
+  Award, Sparkles, Building2, Check, AlertOctagon, Zap
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -792,6 +792,121 @@ const HodDashboard = () => {
       {/* HOD Document Compliance Checklist Widget */}
       <div style={{ marginBottom: '1.25rem' }}>
         <MyDocumentChecklist title="HOD & Department Head Compliance Records" category="HOD" />
+      </div>
+
+      {/* HOD Department Quick Actions Hub */}
+      <div style={{
+        background: 'var(--bg-primary, #ffffff)',
+        border: '1px solid var(--border-color, #e2e8f0)',
+        borderRadius: '16px',
+        padding: '1.25rem 1.5rem',
+        marginBottom: '1.25rem',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '8px', background: 'rgba(55, 48, 165, 0.1)', color: '#3730A5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Zap size={16} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>
+                Department Quick Actions
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
+                Immediate shortcuts for departmental operations, approvals, and teaching schedules
+              </p>
+            </div>
+          </div>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: '12px', background: 'rgba(55, 48, 165, 0.1)', color: '#3730A5' }}>
+            HOD Shortcuts
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+          <button 
+            type="button"
+            onClick={() => navigate('/hod/attendance')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <CalendarCheck size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Live Attendance</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Roll-call & rosters</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/hod/marks')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Award size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Marks & Grading</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Faculty approvals</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/hod/faculty-allocation')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Users size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Faculty Allocation</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Workload & courses</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/hod/timetable')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(99, 102, 241, 0.12)', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Calendar size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Timetable Routine</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Periods & classrooms</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/hod/leaves')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(239, 68, 68, 0.12)', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Clock size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Staff Leave Review</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Absence requests</div>
+            </div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/hod/announcements')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(139, 92, 246, 0.12)', color: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Megaphone size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Announcements</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Circulars & broadcasts</div>
+            </div>
+          </button>
+        </div>
       </div>
 
       {/* Operational Summary Strip with Real-time Badges */}

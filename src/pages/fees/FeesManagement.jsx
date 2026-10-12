@@ -715,6 +715,55 @@ const FeesManagement = () => {
     }
   };
 
+  const handleExportFeesReport = () => {
+    const ts = new Date().toLocaleString('en-IN');
+    const escapeCsv = (val) => {
+      if (val === null || val === undefined) return '""';
+      return `"${String(val).replace(/"/g, '""')}"`;
+    };
+
+    const lines = [];
+    lines.push([escapeCsv('COLLEGE ERP - ADVANCED FEES & REVENUE REPORT')]);
+    lines.push([escapeCsv(`Generated: ${ts}`), escapeCsv('Scope: All Departments')]);
+    lines.push([]);
+    lines.push([escapeCsv('Metric'), escapeCsv('Amount (INR)')]);
+    lines.push([escapeCsv('Total Fees Collected'), escapeCsv(`₹${Number(totalCollected).toLocaleString('en-IN')}`)]);
+    lines.push([escapeCsv('Total Pending Fees'), escapeCsv(`₹${Number(totalPending).toLocaleString('en-IN')}`)]);
+    lines.push([escapeCsv('Total Fines Generated'), escapeCsv(`₹${Number(totalFine).toLocaleString('en-IN')}`)]);
+    lines.push([escapeCsv('Active Scholarship Students'), escapeCsv(totalScholarships)]);
+    lines.push([]);
+    lines.push([escapeCsv('Student ID'), escapeCsv('Student Name'), escapeCsv('Department'), escapeCsv('Semester'), escapeCsv('Gross Fee'), escapeCsv('Paid Amount'), escapeCsv('Balance Due'), escapeCsv('Fine'), escapeCsv('Status')]);
+
+    fees.forEach(f => {
+      const gross = f.semesterFee || 0;
+      const paid = f.paid || 0;
+      const fine = f.fine || 0;
+      const bal = f.pending !== undefined ? f.pending : Math.max(0, gross + fine - paid);
+      lines.push([
+        escapeCsv(f.id || f.studentId || 'N/A'),
+        escapeCsv(f.name || 'Unknown'),
+        escapeCsv(f.dept || f.department || 'N/A'),
+        escapeCsv(f.sem || f.semester || 'N/A'),
+        escapeCsv(gross),
+        escapeCsv(paid),
+        escapeCsv(bal),
+        escapeCsv(fine),
+        escapeCsv(f.status || 'Pending')
+      ]);
+    });
+
+    const csvContent = '\uFEFF' + lines.map(row => row.join(',')).join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fees_collection_report_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const TABS = ['Dashboard', 'Fee Structure', 'Student Fees', 'Pending & Fines', 'Scholarships', 'Reports'];
 
   return (
@@ -731,7 +780,7 @@ const FeesManagement = () => {
           <p className="text-muted">Centralized control for student fees, payments, scholarships, and real-time ledger accounting.</p>
         </div>
         <div className="header-actions">
-          <button className="btn-primary shadow-glow" onClick={() => alert('Export Report Triggered!')}>
+          <button className="btn-primary shadow-glow" onClick={handleExportFeesReport}>
             <Download size={16}/> Export Report
           </button>
         </div>

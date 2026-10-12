@@ -260,12 +260,14 @@ const StaffLibrary = () => {
 
       {/* CATEGORY FILTER PILLS (Only for Catalog Tab) */}
       {activeTab === 'catalog' && (
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '4px', flexWrap: 'nowrap', width: '100%' }}>
           {categories.map(cat => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
               style={{
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
                 padding: '6px 14px',
                 borderRadius: '20px',
                 fontSize: '0.78rem',
@@ -305,12 +307,14 @@ const StaffLibrary = () => {
           </div>
 
           {/* Quick Filters */}
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '4px', flexWrap: 'nowrap', width: '100%' }}>
             {['All', 'Active', 'Returned', 'Pending'].map((f) => (
               <button
                 key={f}
                 onClick={() => setReceiptFilter(f)}
                 style={{
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
                   padding: '6px 14px',
                   borderRadius: '20px',
                   fontSize: '0.78rem',
@@ -331,7 +335,8 @@ const StaffLibrary = () => {
       {/* CATALOG TABLE */}
       {activeTab === 'catalog' && (
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="table-container" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', minWidth: '680px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
                 <th style={{ padding: '14px 20px' }}>Book Title & Details</th>
@@ -422,13 +427,15 @@ const StaffLibrary = () => {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
       {/* TRANSACTIONS / BORROW RECEIPTS TAB */}
       {activeTab === 'issued' && (
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="table-container" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
                 <th style={{ padding: '14px 20px' }}>Book Title & Accession</th>
@@ -650,6 +657,7 @@ const StaffLibrary = () => {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

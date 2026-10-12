@@ -325,3 +325,103 @@
   font-size: 0.84rem;
   color: var(--text-muted);
 }
+
+/* ── Mobile Adaptations ── */
+@media (max-width: 768px) {
+  .parent-management {
+    gap: 0.85rem;
+  }
+  .parent-management .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  .parent-management .page-header h1 {
+    font-size: 1.25rem;
+    margin-bottom: 0.2rem;
+  }
+  .parent-management .page-header p {
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+  .parent-management .page-header button {
+    width: 100%;
+    justify-content: center;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.8rem;
+  }
+  .parent-management .sm-summary-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+  }
+  .parent-management .sm-summary-card {
+    padding: 0.65rem 0.75rem !important;
+    border-radius: 10px;
+  }
+  .parent-management .sm-summary-label {
+    font-size: 0.65rem !important;
+  }
+  .parent-management .sm-summary-value {
+    font-size: 1.2rem !important;
+  }
+  .parent-management .filters-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.75rem 0.85rem;
+    gap: 0.6rem;
+  }
+  .parent-management .search-box {
+    max-width: 100%;
+    width: 100%;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.8rem;
+  }
+  .parent-management table {
+    min-width: 600px;
+  }
+  .parent-management th {
+    padding: 0.65rem 0.85rem;
+    font-size: 0.68rem;
+  }
+  .parent-management td {
+    padding: 0.75rem 0.85rem;
+    font-size: 0.8rem;
+  }
+  .parent-management .modal-card {
+    max-width: 95vw;
+    width: 95vw;
+    border-radius: 12px;
+  }
+  .parent-management .modal-form {
+    padding: 1rem;
+  }
+  .parent-management .form-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  .parent-management .modal-footer {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+  }
+  .parent-management .modal-footer button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .parent-management .page-header h1 {
+    font-size: 1.15rem;
+  }
+  .parent-management .sm-summary-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+  .parent-management .sm-summary-card {
+    padding: 0.55rem 0.65rem !important;
+  }
+  .parent-management .sm-summary-value {
+    font-size: 1.1rem !important;
+  }
+}

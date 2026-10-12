@@ -28,13 +28,15 @@ import fs from 'fs';
 import path from 'path';
 
 try {
-  const genHeroPath = 'C:/Users/Forgeindiaconnect/.gemini/antigravity-ide/brain/a676ced8-bbcc-45dd-b602-ab05875a55ea/college_hero_campus_bg_1790596775073.jpg';
+  const genHeroPath = 'C:/Users/Forgeindiaconnect/.gemini/antigravity-ide/brain/d8462177-e9ee-406b-a13e-542e3c83f059/college_campus_hero_1791805827516.jpg';
   const publicDest = path.join(__dirname, '../public/campus_hero_bg.jpg');
   const publicDestPng = path.join(__dirname, '../public/campus_bg.png');
+  const publicCampusHero = path.join(__dirname, '../public/college_campus_hero.jpg');
   if (fs.existsSync(genHeroPath)) {
     fs.copyFileSync(genHeroPath, publicDest);
     fs.copyFileSync(genHeroPath, publicDestPng);
-    console.log('✅ Real daylight campus hero image synced to public/campus_bg.png and public/campus_hero_bg.jpg!');
+    fs.copyFileSync(genHeroPath, publicCampusHero);
+    console.log('✅ Exact reference modern college campus hero image synced to public!');
   }
 } catch (e) {
   console.warn('Campus image sync:', e.message);
@@ -90,6 +92,7 @@ import admissionRoutes from './routes/admissionRoutes.js';
 import quotaRoutes from './routes/quotaRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import scholarshipRoutes from './routes/scholarshipRoutes.js';
+import { verifyCloudinaryConnection } from './config/cloudinary.js';
 
 // Import Cron Jobs
 import { initCronJobs } from './cron/scheduler.js';
@@ -1005,6 +1008,29 @@ app.use('/api/substitutions', substitutionRoutes);
 app.use('/api/class-sessions', classSessionRoutes);
 app.use('/api/documents', documentsRoutes);
 
+app.get('/api/cloudinary/status', async (_req, res) => {
+  const status = await verifyCloudinaryConnection();
+  res.json(status);
+});
+
+app.get('/api/sync-hero-image', (_req, res) => {
+  try {
+    const genHeroPath = 'C:/Users/Forgeindiaconnect/.gemini/antigravity-ide/brain/d8462177-e9ee-406b-a13e-542e3c83f059/.tempmediaStorage/media_1791805800864.jpg';
+    const publicDest = path.join(__dirname, '../public/campus_hero_bg.jpg');
+    const publicDestPng = path.join(__dirname, '../public/campus_bg.png');
+    const publicCampusHero = path.join(__dirname, '../public/college_campus_hero.jpg');
+    if (fs.existsSync(genHeroPath)) {
+      fs.copyFileSync(genHeroPath, publicDest);
+      fs.copyFileSync(genHeroPath, publicDestPng);
+      fs.copyFileSync(genHeroPath, publicCampusHero);
+      return res.json({ success: true, message: 'Campus image synced successfully' });
+    }
+    return res.status(404).json({ message: 'Source image not found' });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/', (req, res) => {
   res.send('College ERP API is running...');
 });
@@ -1015,6 +1041,7 @@ const startServer = async () => {
     const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/college_erp';
     await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
     console.log('✅ Connected to MongoDB Database');
+    await verifyCloudinaryConnection();
 
     // Clean up stale legacy unique indexes on FeeStructure collection
     try {

@@ -213,7 +213,7 @@ export default function PrincipalStaffOverview() {
       </div>
 
       {/* 4 ERP KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
+      <div className="principal-kpi-grid">
         {[
           { label: 'Total Teaching Faculty', value: staffList.length, icon: <Users size={20} />, bgTint: 'rgba(59, 130, 246, 0.1)', iconColor: '#3b82f6', sub: 'Active academic staff' },
           { label: 'Active on Duty', value: staffList.filter(s => s.status === 'Active').length, icon: <CheckCircle size={20} />, bgTint: 'rgba(16, 185, 129, 0.1)', iconColor: '#10b981', sub: 'Engaged in classes' },
@@ -249,7 +249,7 @@ export default function PrincipalStaffOverview() {
       </div>
 
       {/* Main Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: '1.5rem', alignItems: 'flex-start' }}>
+      <div className="principal-split-grid">
         {/* Left Column: Roster & Filters */}
         <div style={{ background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-color)', padding: '1.5rem', boxShadow: 'var(--shadow-card)' }}>
           {/* Controls Bar */}

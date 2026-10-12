@@ -658,21 +658,10 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
   return (
     <div className="hostel-container">
       {/* ── Real-Time ERP Header Card ── */}
-      <div 
-        style={{
-          background: 'var(--bg-card, #ffffff)',
-          border: '1px solid var(--border-color, #e2e8f0)',
-          borderRadius: '16px',
-          padding: '1.5rem 1.75rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          position: 'relative',
-          overflow: 'hidden',
-          marginBottom: '20px'
-        }}
-      >
+      <div className="hostel-hero-header">
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #4f46e5, #06b6d4, #10b981)' }}></div>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
+        <div className="hostel-hero-header-content">
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontSize: '0.75rem', fontWeight: 700, padding: '0.25rem 0.65rem', borderRadius: '20px', border: '1px solid rgba(16, 185, 129, 0.2)', marginBottom: '0.5rem' }}>
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
@@ -687,7 +676,7 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div className="hostel-hero-header-actions">
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', background: 'var(--bg-secondary, #f8fafc)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Clock size={14} className="text-indigo-600" />
               <span>Synced: {lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
@@ -793,7 +782,7 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
       {activeTab === 'Dashboard' && (
         <div className="animate-fade-in">
           {/* Executive 6-KPI Tracking Strip */}
-          <div className="hostel-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '20px' }}>
+          <div className="hostel-grid">
             <div className="hostel-kpi-card" onClick={() => setActiveTab('Hostel Blocks')} style={{ cursor: 'pointer' }}>
               <div className="hostel-kpi-top">
                 <div className="hostel-kpi-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
@@ -886,7 +875,7 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
           </div>
 
           {/* Quick Operations Action Bar */}
-          <div className="glass-card" style={{ padding: '14px 20px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div className="glass-card hostel-quick-actions">
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ShieldCheck size={18} />
@@ -897,7 +886,7 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div className="hostel-quick-actions-btns">
               <button className="btn-primary" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={() => setShowAllocateModal(true)}>
                 <Plus size={15} /> Allocate Room
               </button>
@@ -932,7 +921,7 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+            <div className="hostel-blocks-grid">
               {blocks.map(block => {
                 const blockOccupied = allocatedStudents.filter(s => (s.hostelName === block.name || s.blockWing === block.name || s.block === block.name) && s.roomNumber && s.roomNumber !== 'Unassigned' && s.roomNumber !== 'Pending Allocation').length;
                 const occRate = (Number(block.capacity) || 0) > 0 ? Math.round((blockOccupied / Number(block.capacity)) * 100) : 0;
@@ -985,7 +974,7 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
           </div>
 
           {/* 2-Column Side-by-Side: Capacity Analytics & Maintenance SLA */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+          <div className="hostel-two-col-grid">
             {/* Occupancy Donut */}
             <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
@@ -1110,8 +1099,8 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
                       </td>
                     </tr>
                   ) : (
-                    gatePasses.slice(0, 3).map(pass => (
-                      <tr key={pass.id}>
+                    gatePasses.slice(0, 3).map((pass, pIdx) => (
+                      <tr key={pass.id ? `${pass.id}-${pIdx}` : (pass._id ? `${pass._id}-${pIdx}` : pIdx)}>
                         <td className="font-mono text-xs font-bold">{pass.id}</td>
                         <td className="font-medium">{pass.studentName}</td>
                         <td><span style={{ background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 700 }}>{pass.room}</span></td>
@@ -1342,8 +1331,8 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
                 </tr>
               </thead>
               <tbody>
-                {gatePasses.filter(p => (p.studentName || '').toLowerCase().includes(search.toLowerCase()) || (p.studentId || '').toLowerCase().includes(search.toLowerCase())).map(pass => (
-                  <tr key={pass.id}>
+                {gatePasses.filter(p => (p.studentName || '').toLowerCase().includes(search.toLowerCase()) || (p.studentId || '').toLowerCase().includes(search.toLowerCase())).map((pass, pIdx) => (
+                  <tr key={pass.id ? `${pass.id}-${pIdx}` : (pass._id ? `${pass._id}-${pIdx}` : pIdx)}>
                     <td>
                       <div className="font-medium">{pass.studentName}</div>
                       <div className="text-xs text-muted font-mono">{pass.studentId}</div>
@@ -1416,7 +1405,7 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
           </div>
 
           {/* Blocks Responsive Grid Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem' }}>
+          <div className="hostel-blocks-grid">
             {blocks.map(block => {
               const blockOccupied = allocatedStudents.filter(s => (s.hostelName === block.name || s.blockWing === block.name || s.block === block.name) && s.roomNumber && s.roomNumber !== 'Unassigned' && s.roomNumber !== 'Pending Allocation').length;
               const capacity = Number(block.capacity) || 0;
@@ -1633,7 +1622,7 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
           </div>
 
           {/* Quick Meal Timings Bar */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+          <div className="hostel-timings-grid">
             <div style={{ background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
                 🌅
@@ -1676,7 +1665,7 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
           </div>
 
           {/* 7-Day Weekly Menu Cards Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+          <div className="hostel-cards-grid">
             {messMenu.map((menu, idx) => {
               const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long' });
               const isToday = menu.day === todayStr;

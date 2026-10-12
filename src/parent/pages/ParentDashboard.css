@@ -126,6 +126,8 @@
 
 .chart-card-p {
   padding: 24px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .chart-card-p h3 {
@@ -135,7 +137,10 @@
 }
 
 .chart-container-p {
-  margin-top: 20px;
+  margin-top: 16px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .flex-center {
@@ -152,9 +157,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
   border-bottom: 1px solid var(--border-color);
-  padding-bottom: 16px;
+  padding-bottom: 14px;
 }
 
 .p-announcements-header h3 {
@@ -162,7 +169,8 @@
   align-items: center;
   gap: 10px;
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
+  font-weight: 800;
 }
 
 .text-primary-p {
@@ -172,16 +180,32 @@
 .p-notif-pill {
   background-color: #ef4444;
   color: white;
-  padding: 4px 10px;
+  padding: 3px 10px;
   border-radius: 20px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.parent-dashboard-bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .parent-dashboard-bottom-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
 }
 
 .p-announcement-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .p-announcement-item {
@@ -209,3 +233,168 @@
   font-size: 0.9rem;
   color: var(--text-muted);
 }
+
+/* ── Shared Parent Portal Design System & Mobile Responsiveness ── */
+.parent-page-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.25rem;
+  box-sizing: border-box;
+}
+
+.parent-header-card {
+  padding: 1.25rem 1.5rem;
+  background: var(--bg-card, #ffffff);
+  border-radius: 14px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  margin-bottom: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-sizing: border-box;
+}
+
+.parent-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.parent-table-card {
+  background: var(--bg-card, #ffffff);
+  border-radius: 14px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.parent-filter-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+  max-width: 100%;
+}
+
+.parent-filter-strip::-webkit-scrollbar {
+  height: 4px;
+}
+
+.parent-filter-strip::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+.parent-mobile-cards-view {
+  display: none;
+}
+
+.parent-desktop-table-view {
+  display: block;
+}
+
+/* ── Mobile & Tablet Responsiveness for Parent Portal ── */
+@media (max-width: 768px) {
+  .parent-page-container {
+    padding: 0.5rem 0.25rem;
+  }
+
+  .parent-dashboard {
+    gap: 0.85rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .parent-welcome-banner,
+  .parent-header-card {
+    flex-direction: column;
+    align-items: stretch !important;
+    padding: 1rem 0.85rem !important;
+    gap: 0.75rem !important;
+  }
+
+  .parent-header-card .header-title-box {
+    width: 100%;
+  }
+
+  .parent-header-card .header-actions-box {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .parent-metrics-grid,
+  .parent-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .p-metric-card {
+    padding: 0.75rem 0.65rem !important;
+    gap: 0.65rem !important;
+  }
+
+  .p-metric-card .metric-icon-p {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+  }
+
+  .metric-value-p {
+    font-size: 1.15rem !important;
+  }
+
+  .card-title-p {
+    font-size: 0.72rem !important;
+  }
+
+  .charts-grid-parent {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .chart-card-p,
+  .p-announcements-card {
+    padding: 1rem 0.75rem;
+  }
+
+  .parent-mobile-cards-view {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.85rem;
+  }
+
+  .parent-desktop-table-view {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .parent-metrics-grid,
+  .parent-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .banner-left h1,
+  .parent-header-card h1 {
+    font-size: 1.15rem !important;
+  }
+
+  .parent-modal-card {
+    width: 95% !important;
+    padding: 1rem 0.85rem !important;
+    border-radius: 14px !important;
+  }
+}
+

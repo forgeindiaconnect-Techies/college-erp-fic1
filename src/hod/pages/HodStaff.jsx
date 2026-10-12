@@ -188,7 +188,7 @@ const HodStaff = () => {
           <h1>Department Faculty</h1>
           <p className="text-muted">Manage subjects assignment and workloads for faculty in <strong>{HOD_DEPT}</strong>.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="header-actions flex items-center gap-3">
           <div className="filter-select-wrapper">
             <label htmlFor="attendance-month">Attendance Month</label>
             <input

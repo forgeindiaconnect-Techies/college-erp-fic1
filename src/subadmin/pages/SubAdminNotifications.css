@@ -116,3 +116,21 @@
   height: 18px;
   cursor: pointer;
 }
+
+/* Responsive Media Queries */
+@media (max-width: 600px) {
+  .notif-summary-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .notif-summary-row {
+    grid-template-columns: 1fr;
+  }
+  .checkbox-group {
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+}
+

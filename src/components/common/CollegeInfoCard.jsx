@@ -80,7 +80,7 @@ const CollegeInfoCard = () => {
   }
 
   return (
-    <div style={{
+    <div className="college-info-card" style={{
       background: 'var(--bg-card, #ffffff)',
       border: '1px solid var(--border-color, #e2e8f0)',
       borderRadius: '12px',

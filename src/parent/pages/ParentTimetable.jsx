@@ -11,6 +11,7 @@ import {
   getSubjects 
 } from '../../api/index';
 import { SettingsContext } from '../../App';
+import './ParentDashboard.css';
 
 const normalizeSem = (semStr) => {
   if (!semStr) return 'Semester 1';
@@ -243,43 +244,32 @@ const ParentTimetable = () => {
   const academicYear = `${currentYear}-${currentYear + 1}`;
 
   return (
-    <div className="dashboard-container animate-fade-in" style={{ padding: '1.75rem', minHeight: '100vh', background: 'var(--bg-primary)' }}>
-      {/* Clean ERP Header Card */}
-      <div className="glass-card" style={{
-        background: 'var(--bg-card, #ffffff)',
-        border: '1px solid var(--border-color, #e2e8f0)',
-        borderRadius: '12px',
-        padding: '1.2rem 1.5rem',
-        marginBottom: '1.5rem',
-        color: 'var(--text-main, #0f172a)',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '1rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <GraduationCap size={24} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-              <span style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                Academic Portal
-              </span>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', fontWeight: 600 }}>• Academic Year {academicYear}</span>
+    <div className="parent-page-container animate-fade-in">
+      {/* Top Header Card */}
+      <div className="parent-header-card glass-card">
+        <div className="header-title-box">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <GraduationCap size={22} />
             </div>
-            <h1 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, color: 'var(--text-main, #0f172a)' }}>
-              {childDetails.name}'s Semester Exam Timetable
-            </h1>
-            <p style={{ margin: '2px 0 0 0', color: 'var(--text-muted, #64748b)', fontSize: '0.84rem', fontWeight: 500 }}>
-              {childDetails.dept} • {childDetails.sem} (Section {childDetails.section}) • Roll No: <strong style={{ color: 'var(--text-main, #0f172a)', fontFamily: 'monospace' }}>{childDetails.id}</strong>
-            </p>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px', flexWrap: 'wrap' }}>
+                <span style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', padding: '2px 7px', borderRadius: '5px', fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase' }}>
+                  Academic Portal
+                </span>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted, #64748b)', fontWeight: 600 }}>• Academic Year {academicYear}</span>
+              </div>
+              <h1 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text-main, #0f172a)', lineHeight: 1.25 }}>
+                {childDetails.name}'s Semester Exam Timetable
+              </h1>
+              <p style={{ margin: '3px 0 0 0', color: 'var(--text-muted, #64748b)', fontSize: '0.8rem', fontWeight: 500, lineHeight: 1.4 }}>
+                {childDetails.dept} • {childDetails.sem} (Section {childDetails.section}) • Roll No: <strong style={{ color: 'var(--text-main, #0f172a)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{childDetails.id}</strong>
+              </p>
+            </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="header-actions-box">
           <button
             onClick={() => { setRefreshing(true); loadOriginalAcademicData(); }}
             style={{
@@ -287,17 +277,18 @@ const ParentTimetable = () => {
               border: '1px solid var(--border-color, #cbd5e1)',
               borderRadius: '8px',
               color: 'var(--text-main, #334155)',
-              padding: '8px 14px',
+              padding: '7px 12px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '6px',
-              fontSize: '0.84rem',
+              fontSize: '0.82rem',
               fontWeight: 600,
-              transition: 'background 0.15s ease'
+              flex: '1 1 auto'
             }}
           >
-            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Refresh Live Data
+            <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} /> Refresh Live Data
           </button>
 
           {rawExams.length > 0 && (
@@ -306,69 +297,71 @@ const ParentTimetable = () => {
               style={{
                 background: 'var(--primary, #2563eb)',
                 color: '#ffffff',
-                padding: '8px 16px',
+                padding: '7px 14px',
                 borderRadius: '8px',
                 fontWeight: 700,
-                fontSize: '0.84rem',
+                fontSize: '0.82rem',
                 border: 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)'
+                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+                flex: '1 1 auto'
               }}
             >
-              <ShieldCheck size={16} /> View & Print Hall Ticket
+              <ShieldCheck size={15} /> View & Print Hall Ticket
             </button>
           )}
         </div>
       </div>
 
       {/* Quick Metrics from Real Data */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
-        <div className="glass-card" style={{ padding: '1.25rem', background: 'var(--bg-secondary)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BookOpen size={24} />
+      <div className="parent-kpi-grid">
+        <div className="glass-card" style={{ padding: '0.9rem', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <BookOpen size={20} />
           </div>
-          <div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Scheduled Examinations</span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px' }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Scheduled Exams</span>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '1px' }}>
               {rawExams.length} Courses
             </div>
           </div>
         </div>
 
-        <div className="glass-card" style={{ padding: '1.25rem', background: 'var(--bg-secondary)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <MapPin size={24} />
+        <div className="glass-card" style={{ padding: '0.9rem', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(168, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <MapPin size={20} />
           </div>
-          <div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Allocated Exam Halls</span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Allocated Halls</span>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#10b981', marginTop: '1px' }}>
               {new Set(rawExams.map(e => e.room).filter(Boolean)).size || 0} Venues
             </div>
           </div>
         </div>
 
-        <div className="glass-card" style={{ padding: '1.25rem', background: 'var(--bg-secondary)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Clock size={24} />
+        <div className="glass-card" style={{ padding: '0.9rem', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Clock size={20} />
           </div>
-          <div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Enrolled Department Subjects</span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f59e0b', marginTop: '2px' }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Department Subjects</span>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f59e0b', marginTop: '1px' }}>
               {enrolledSubjects.length} Subjects
             </div>
           </div>
         </div>
 
-        <div className="glass-card" style={{ padding: '1.25rem', background: 'var(--bg-secondary)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(168, 85, 247, 0.12)', color: '#a855f7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ShieldCheck size={24} />
+        <div className="glass-card" style={{ padding: '0.9rem', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(168, 85, 247, 0.12)', color: '#a855f7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <ShieldCheck size={20} />
           </div>
-          <div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Hall Ticket Verification</span>
-            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: rawExams.length > 0 ? '#10b981' : '#a855f7', marginTop: '2px' }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Hall Ticket Status</span>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: rawExams.length > 0 ? '#10b981' : '#a855f7', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {rawExams.length > 0 ? 'Verified & Published' : 'Awaiting Schedule'}
             </div>
           </div>
@@ -377,15 +370,15 @@ const ParentTimetable = () => {
 
       {/* Filter and Search Bar (When exams exist) */}
       {rawExams.length > 0 && (
-        <div className="glass-card" style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-primary)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', flex: 1, minWidth: '240px', maxWidth: '400px' }}>
-            <Search size={16} className="text-muted" />
+        <div className="glass-card" style={{ padding: '0.85rem 1rem', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-primary)', padding: '0.45rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)', flex: '1 1 200px', width: '100%' }}>
+            <Search size={15} className="text-muted" style={{ flexShrink: 0 }} />
             <input
               type="text"
               placeholder="Search by subject, code, or exam hall..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', color: 'var(--text-main)', fontSize: '0.88rem' }}
+              style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', color: 'var(--text-main)', fontSize: '0.84rem' }}
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
@@ -394,51 +387,56 @@ const ParentTimetable = () => {
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Filter size={14} /> Filter:
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '100%', overflow: 'hidden' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              <Filter size={13} /> Filter:
             </span>
-            {['All', 'Semester', 'Internal', 'Practical'].map(type => (
-              <button
-                key={type}
-                onClick={() => setExamTypeFilter(type)}
-                style={{
-                  padding: '0.4rem 0.8rem',
-                  borderRadius: '6px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  border: '1px solid',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  background: examTypeFilter === type ? 'var(--primary)' : 'var(--bg-primary)',
-                  color: examTypeFilter === type ? '#ffffff' : 'var(--text-muted)',
-                  borderColor: examTypeFilter === type ? 'var(--primary)' : 'var(--border-color)'
-                }}
-              >
-                {type === 'All' ? 'All Exams' : `${type} Exams`}
-              </button>
-            ))}
+            <div className="parent-filter-strip">
+              {['All', 'Semester', 'Internal', 'Practical'].map(type => (
+                <button
+                  key={type}
+                  onClick={() => setExamTypeFilter(type)}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    border: '1px solid',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap',
+                    background: examTypeFilter === type ? 'var(--primary)' : 'var(--bg-primary)',
+                    color: examTypeFilter === type ? '#ffffff' : 'var(--text-muted)',
+                    borderColor: examTypeFilter === type ? 'var(--primary)' : 'var(--border-color)'
+                  }}
+                >
+                  {type === 'All' ? 'All Exams' : `${type} Exams`}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Real Examination Schedule Table */}
-      <div className="glass-card" style={{ background: 'var(--bg-secondary)', borderRadius: '14px', border: '1px solid var(--border-color)', overflow: 'hidden', marginBottom: '1.25rem' }}>
-        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* Real Examination Schedule Section */}
+      <div className="parent-table-card glass-card">
+        <div style={{ padding: '0.9rem 1.15rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CalendarIcon size={18} className="text-primary" /> Official Semester Examination Schedule
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CalendarIcon size={17} className="text-primary" /> Examination Schedule
             </h3>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Live examination entries retrieved from the examination cell database.
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+              Retrieved from the examination cell database.
             </p>
           </div>
-          <span style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '4px 10px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 700 }}>
-            {filteredExams.length} Scheduled Courses
+          <span style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '3px 8px', borderRadius: '16px', fontSize: '0.74rem', fontWeight: 700 }}>
+            {filteredExams.length} Scheduled
           </span>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
+        {/* Desktop Table View */}
+        <div className="parent-desktop-table-view" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
             <thead>
               <tr style={{ background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-color)' }}>
@@ -552,13 +550,103 @@ const ParentTimetable = () => {
                       No Examination Schedule Published Yet
                     </div>
                     <p style={{ fontSize: '0.85rem', maxWidth: '500px', margin: '6px auto 0 auto', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                      The Controller of Examinations has not yet published an exam date sheet for <strong>{childDetails.dept}</strong> ({childDetails.sem}). As soon as an internal assessment or semester exam is scheduled, it will automatically reflect here.
+                      The Controller of Examinations has not yet published an exam date sheet for <strong>{childDetails.dept}</strong> ({childDetails.sem}).
                     </p>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards View (Fixes Screenshot 2 on phone screens) */}
+        <div className="parent-mobile-cards-view">
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Clock className="animate-spin text-primary" size={24} style={{ margin: '0 auto 8px' }} />
+              <div>Loading exam schedules...</div>
+            </div>
+          ) : filteredExams.length === 0 ? (
+            <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <AlertCircle size={32} className="text-primary opacity-60" style={{ margin: '0 auto 8px' }} />
+              <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>No Examination Schedule Published</div>
+              <p style={{ fontSize: '0.8rem', margin: '4px 0 0', color: 'var(--text-muted)' }}>Check back later or refresh live data.</p>
+            </div>
+          ) : (
+            filteredExams.map((ex, idx) => (
+              <div 
+                key={ex.id || idx}
+                style={{
+                  background: 'var(--bg-primary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '12px',
+                  padding: '0.9rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}
+              >
+                {/* Header: Subject + Exam Type */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-main)', lineHeight: 1.3 }}>
+                      {ex.subject}
+                    </div>
+                    {ex.code && (
+                      <span style={{ display: 'inline-block', marginTop: '3px', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.74rem', background: 'var(--bg-secondary)', padding: '1px 6px', borderRadius: '4px', border: '1px solid var(--border-color)', color: 'var(--primary)' }}>
+                        {ex.code}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    flexShrink: 0,
+                    background: ex.examType?.toLowerCase().includes('practical') ? 'rgba(236, 72, 153, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                    color: ex.examType?.toLowerCase().includes('practical') ? '#ec4899' : '#3b82f6',
+                    border: `1px solid ${ex.examType?.toLowerCase().includes('practical') ? 'rgba(236, 72, 153, 0.2)' : 'rgba(59, 130, 246, 0.2)'}`
+                  }}>
+                    {ex.examType}
+                  </span>
+                </div>
+
+                {/* Grid info: Date, Time, Venue, Marks */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.78rem', background: 'var(--bg-secondary)', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', display: 'block' }}>Date & Day</span>
+                    <strong style={{ color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                      <CalendarIcon size={12} className="text-primary" /> {ex.date}
+                    </strong>
+                    {ex.day && <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{ex.day}</span>}
+                  </div>
+
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', display: 'block' }}>Time Slot</span>
+                    <strong style={{ color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                      <Clock size={12} className="text-muted" /> {ex.time}
+                    </strong>
+                    {ex.session && <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{ex.session}</span>}
+                  </div>
+
+                  <div style={{ marginTop: '4px' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', display: 'block' }}>Exam Venue / Hall</span>
+                    <strong style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                      <MapPin size={12} /> {ex.room}
+                    </strong>
+                  </div>
+
+                  <div style={{ marginTop: '4px' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', display: 'block' }}>Maximum Marks</span>
+                    <strong style={{ color: 'var(--text-main)', display: 'block', marginTop: '2px' }}>
+                      {ex.maxMarks} Marks (Pass: {ex.passMarks})
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -679,7 +767,7 @@ const ParentTimetable = () => {
           }}
         >
           <div 
-            className="modal-card animate-scale-up" 
+            className="modal-card animate-scale-up parent-modal-card" 
             onClick={e => e.stopPropagation()} 
             style={{ 
               background: '#ffffff', 
@@ -687,39 +775,40 @@ const ParentTimetable = () => {
               width: '100%', 
               maxWidth: '850px', 
               borderRadius: '16px', 
-              padding: '1.75rem', 
+              padding: '1.25rem', 
               boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)', 
               maxHeight: '90vh', 
-              overflowY: 'auto' 
+              overflowY: 'auto',
+              boxSizing: 'border-box'
             }}
           >
             {/* Modal Header Controls */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShieldCheck size={22} color="#2563eb" />
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                <ShieldCheck size={20} color="#2563eb" />
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                   Official Examination Hall Ticket
                 </h2>
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 <button 
                   onClick={printHallTicket}
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
                     gap: '6px', 
-                    padding: '0.5rem 1rem', 
+                    padding: '0.45rem 0.85rem', 
                     background: '#2563eb', 
                     color: '#ffffff', 
                     borderRadius: '8px', 
                     border: 'none', 
                     fontWeight: 700, 
-                    fontSize: '0.85rem',
+                    fontSize: '0.82rem',
                     cursor: 'pointer',
                     boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)'
                   }}
                 >
-                  <Printer size={16} /> Print / Save PDF
+                  <Printer size={15} /> Print / PDF
                 </button>
                 <button 
                   onClick={() => setHallTicketOpen(false)} 
@@ -727,10 +816,14 @@ const ParentTimetable = () => {
                     background: '#f1f5f9', 
                     border: 'none', 
                     borderRadius: '8px', 
-                    padding: '0.5rem', 
+                    padding: '0.45rem', 
                     cursor: 'pointer', 
-                    color: '#64748b' 
+                    color: '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
+                  aria-label="Close Hall Ticket"
                 >
                   <X size={18} />
                 </button>
@@ -738,25 +831,25 @@ const ParentTimetable = () => {
             </div>
 
             {/* PRINTABLE HALL TICKET PAPER VIEW */}
-            <div id="parent-hall-ticket-print" style={{ border: '2px solid #0f172a', borderRadius: '12px', padding: '1.75rem', background: '#ffffff', color: '#0f172a' }}>
+            <div id="parent-hall-ticket-print" style={{ border: '2px solid #0f172a', borderRadius: '12px', padding: '1rem', background: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}>
               {/* Institution Header */}
-              <div style={{ textAlign: 'center', borderBottom: '2px dashed #cbd5e1', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
+              <div style={{ textAlign: 'center', borderBottom: '2px dashed #cbd5e1', paddingBottom: '0.85rem', marginBottom: '1rem' }}>
                 {collegeSettings?.collegeLogo && (
-                  <img src={collegeSettings.collegeLogo} alt="College Logo" style={{ height: '45px', margin: '0 auto 0.4rem auto' }} />
+                  <img src={collegeSettings.collegeLogo} alt="College Logo" style={{ height: '40px', margin: '0 auto 0.3rem auto' }} />
                 )}
-                <h1 style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 2px 0' }}>
+                <h1 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 2px 0' }}>
                   {collegeSettings?.collegeName || 'CAMPUS ERP INSTITUTION OF HIGHER EDUCATION'}
                 </h1>
-                <p style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 700, margin: '0 0 4px 0' }}>
+                <p style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, margin: '0 0 4px 0' }}>
                   OFFICE OF THE CONTROLLER OF EXAMINATIONS • OFFICIAL HALL TICKET
                 </p>
-                <div style={{ display: 'inline-block', background: '#e0e7ff', color: '#3730a3', padding: '0.2rem 0.75rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 800 }}>
+                <div style={{ display: 'inline-block', background: '#e0e7ff', color: '#3730a3', padding: '0.2rem 0.65rem', borderRadius: '12px', fontSize: '0.74rem', fontWeight: 800 }}>
                   END SEMESTER EXAMINATIONS • ACADEMIC YEAR {academicYear}
                 </div>
               </div>
 
               {/* Student Info Details Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1rem 1.25rem', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '1rem', fontSize: '0.82rem' }}>
                 <div>
                   <p style={{ margin: '0.2rem 0' }}><strong>Student Name:</strong> {childDetails.name}</p>
                   <p style={{ margin: '0.2rem 0' }}><strong>Register / Roll No:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 800 }}>{childDetails.id}</span></p>

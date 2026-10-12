@@ -292,18 +292,17 @@ export default function HodFacultyAllocation() {
         background: 'var(--bg-card, #ffffff)',
         borderRadius: '14px',
         border: '1px solid var(--border-color, #e2e8f0)',
-        overflow: 'hidden',
         boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
       }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+        <div className="table-container" style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
             <thead>
-              <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
-                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Faculty Member</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Subject Title</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Semester</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Section</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+              <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                <th style={{ padding: '12px 16px', textAlign: 'left', whiteSpace: 'nowrap' }}>Faculty Member</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', whiteSpace: 'nowrap' }}>Subject Title</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>Semester</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>Section</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>

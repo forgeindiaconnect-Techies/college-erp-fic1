@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { getAllFees, getExpenses, getSalaries, getStudents } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
+import '../../pages/admin/AdminFinanceWelfareResponsive.css';
 
 const CATEGORY_COLORS = {
   'Tuition': '#2563eb',
@@ -837,13 +838,13 @@ const AccountsReports = () => {
       </div>
 
       {/* --- EXECUTIVE 4-KPI ROW (Always 4 Columns in CSS Grid) --- */}
-      <div style={{
+      <div className="reports-kpi-grid" style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
         gap: '16px'
       }}>
         {/* KPI 1: Real Revenue */}
-        <div style={{
+        <div className="reports-kpi-card" style={{
           background: 'var(--bg-card, #ffffff)',
           borderRadius: '14px',
           border: '1px solid #bfdbfe',
@@ -861,7 +862,7 @@ const AccountsReports = () => {
               <IndianRupee size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: '10px 0 6px 0' }}>
+          <div className="reports-kpi-val" style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: '10px 0 6px 0' }}>
             ₹{metrics.totalCollectedFee.toLocaleString('en-IN')}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
@@ -871,7 +872,7 @@ const AccountsReports = () => {
         </div>
 
         {/* KPI 2: Expenses & Payroll */}
-        <div style={{
+        <div className="reports-kpi-card" style={{
           background: 'var(--bg-card, #ffffff)',
           borderRadius: '14px',
           border: '1px solid #fecdd3',
@@ -889,7 +890,7 @@ const AccountsReports = () => {
               <ArrowDownRight size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: '10px 0 6px 0' }}>
+          <div className="reports-kpi-val" style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: '10px 0 6px 0' }}>
             ₹{(metrics.totalPaidExpenses + metrics.totalPaidSalaries).toLocaleString('en-IN')}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
@@ -899,7 +900,7 @@ const AccountsReports = () => {
         </div>
 
         {/* KPI 3: Operating Surplus */}
-        <div style={{
+        <div className="reports-kpi-card" style={{
           background: 'var(--bg-card, #ffffff)',
           borderRadius: '14px',
           border: '1px solid #bbf7d0',
@@ -917,7 +918,7 @@ const AccountsReports = () => {
               <Wallet size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: '10px 0 6px 0' }}>
+          <div className="reports-kpi-val" style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: '10px 0 6px 0' }}>
             ₹{metrics.netSurplus.toLocaleString('en-IN')}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
@@ -927,7 +928,7 @@ const AccountsReports = () => {
         </div>
 
         {/* KPI 4: Pending Receivables */}
-        <div style={{
+        <div className="reports-kpi-card" style={{
           background: 'var(--bg-card, #ffffff)',
           borderRadius: '14px',
           border: '1px solid #fde68a',
@@ -945,7 +946,7 @@ const AccountsReports = () => {
               <AlertCircle size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: '10px 0 6px 0' }}>
+          <div className="reports-kpi-val" style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: '10px 0 6px 0' }}>
             ₹{metrics.totalOutstandingDues.toLocaleString('en-IN')}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
@@ -956,7 +957,7 @@ const AccountsReports = () => {
       </div>
 
       {/* --- Tab Navigation --- */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--border-color, #e2e8f0)', paddingBottom: '2px' }}>
+      <div className="reports-tabs-bar" style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--border-color, #e2e8f0)', paddingBottom: '2px', overflowX: 'auto', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
         {[
           { key: 'overview', label: '📈 Monthly Trend & Cashflow' },
           { key: 'categories', label: '🏷️ Fee Head Breakdown' },
@@ -976,7 +977,9 @@ const AccountsReports = () => {
               borderBottom: activeTab === tab.key ? '3px solid #2563eb' : '3px solid transparent',
               cursor: 'pointer',
               marginBottom: '-2px',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
             }}
           >
             {tab.label}
@@ -1198,16 +1201,18 @@ const AccountsReports = () => {
             Real-time collection efficiency and pending dues grouped by academic department
           </p>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table className="reports-dept-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.84rem', minWidth: '700px' }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
-                  <th style={{ padding: '12px 16px', textAlign: 'left' }}>Department / Program</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Students</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Total Billed</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Total Realized</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Outstanding Dues</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Recovery Efficiency</th>
+                <tr style={{ background: '#f8fafc', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
+                  <th className="reports-sticky-dept" style={{ padding: '12px 16px', textAlign: 'left', position: 'sticky', left: 0, zIndex: 10, background: '#f8fafc', minWidth: '160px', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid var(--border-color, #e2e8f0)', boxShadow: '3px 0 6px -2px rgba(0,0,0,0.12)', whiteSpace: 'nowrap' }}>
+                    Department / Program
+                  </th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', minWidth: '90px', borderBottom: '1px solid var(--border-color, #e2e8f0)', whiteSpace: 'nowrap' }}>Students</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', minWidth: '120px', borderBottom: '1px solid var(--border-color, #e2e8f0)', whiteSpace: 'nowrap' }}>Total Billed</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', minWidth: '120px', borderBottom: '1px solid var(--border-color, #e2e8f0)', whiteSpace: 'nowrap' }}>Total Realized</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', minWidth: '130px', borderBottom: '1px solid var(--border-color, #e2e8f0)', whiteSpace: 'nowrap' }}>Outstanding Dues</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', minWidth: '140px', borderBottom: '1px solid var(--border-color, #e2e8f0)', whiteSpace: 'nowrap' }}>Recovery Efficiency</th>
                 </tr>
               </thead>
               <tbody>
@@ -1220,22 +1225,22 @@ const AccountsReports = () => {
                 ) : (
                   departmentBreakdown.map((dept, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '14px 16px', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>
+                      <td className="reports-sticky-dept" style={{ padding: '14px 16px', fontWeight: 700, color: 'var(--text-main, #0f172a)', position: 'sticky', left: 0, zIndex: 4, background: '#ffffff', minWidth: '160px', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #f1f5f9', boxShadow: '3px 0 6px -2px rgba(0,0,0,0.12)' }}>
                         {dept.department}
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'center', fontWeight: 600 }}>
+                      <td style={{ padding: '14px 16px', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}>
                         {dept.studentsCount}
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right', color: 'var(--text-muted, #64748b)' }}>
+                      <td style={{ padding: '14px 16px', textAlign: 'right', color: 'var(--text-muted, #64748b)', borderBottom: '1px solid #f1f5f9' }}>
                         ₹{dept.totalBilled.toLocaleString('en-IN')}
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: '#059669' }}>
+                      <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: '#059669', borderBottom: '1px solid #f1f5f9' }}>
                         ₹{dept.totalCollected.toLocaleString('en-IN')}
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: '#d97706' }}>
+                      <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: '#d97706', borderBottom: '1px solid #f1f5f9' }}>
                         ₹{dept.totalPending.toLocaleString('en-IN')}
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                      <td style={{ padding: '14px 16px', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
                         <span style={{
                           display: 'inline-block',
                           padding: '4px 10px',

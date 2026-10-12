@@ -3,7 +3,8 @@ import { getUsers, getStaffSupportRequests, getClassMonitoringDailyStatus, getPr
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import { 
   Building2, Users, GraduationCap, UserCheck, 
-  Sparkles, Search, Filter, ChevronRight, Briefcase, LifeBuoy, CheckCircle2, Clock, Play, Calendar, BookOpen, AlertCircle, Activity
+  Sparkles, Search, Filter, ChevronRight, Briefcase, LifeBuoy, CheckCircle2, Clock, Play, Calendar, BookOpen, AlertCircle, Activity,
+  Zap, FileCheck, Award, CreditCard, Megaphone
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '../../pages/Dashboard.css';
@@ -153,7 +154,7 @@ export default function PrincipalDashboard() {
   }
 
   return (
-    <div className="dashboard-container animate-fade-in" style={{ padding: '2rem', background: 'var(--bg-primary)', minHeight: '100vh' }}>
+    <div className="dashboard-container principal-dashboard animate-fade-in" style={{ background: 'var(--bg-primary)', minHeight: '100vh' }}>
       
       {/* Welcome Header */}
       <div style={{
@@ -242,6 +243,121 @@ export default function PrincipalDashboard() {
         {/* Principal Duty Attendance Card */}
         <div style={{ marginBottom: '1.25rem' }}>
           <EmployeeAttendanceCard />
+        </div>
+
+        {/* Principal Executive Quick Actions */}
+        <div style={{
+          background: 'var(--bg-primary, #ffffff)',
+          border: '1px solid var(--border-color, #e2e8f0)',
+          borderRadius: '16px',
+          padding: '1.25rem 1.5rem',
+          marginBottom: '1.25rem',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: 32, height: 32, borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Zap size={18} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                  Principal Executive Quick Actions
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
+                  Institutional oversight, pending approvals, syllabus tracking, and college announcements.
+                </p>
+              </div>
+            </div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.1)', color: '#4f46e5' }}>
+              Executive Shortcuts
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+            <button 
+              type="button"
+              onClick={() => navigate('/principal/approvals')}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+            >
+              <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <FileCheck size={18} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Approvals Hub</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Leave & proposals</div>
+              </div>
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => navigate('/principal/attendance')}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+            >
+              <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Activity size={18} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Live Attendance</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Campus-wide analytics</div>
+              </div>
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => navigate('/principal/faculty-performance')}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+            >
+              <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(147, 51, 234, 0.12)', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <GraduationCap size={18} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Faculty Radar</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Teaching & syllabus</div>
+              </div>
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => navigate('/principal/fees')}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+            >
+              <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <CreditCard size={18} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Fees & Recovery</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Institutional revenue</div>
+              </div>
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => navigate('/principal/exams')}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+            >
+              <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(239, 68, 68, 0.12)', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Award size={18} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Exams & Results</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Academic evaluation</div>
+              </div>
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => navigate('/principal/announcements')}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+            >
+              <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(6, 182, 212, 0.12)', color: '#0891b2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Megaphone size={18} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Announcements</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Official circulars</div>
+              </div>
+            </button>
+          </div>
         </div>
 
         {/* 6 Summary Cards */}

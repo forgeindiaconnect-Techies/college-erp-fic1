@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { BookOpen, AlertTriangle, ArrowLeft, Percent, GraduationCap, Award } from 'lucide-react';
 import { getStudentById, getMarksByStudent } from '../../api/index';
 import '../../student/pages/StudentMarks.css';
+import './ParentDashboard.css';
 
 const DEFAULT_PARENT_SESSION = {
   id: 'P001',
@@ -229,7 +230,8 @@ const ParentMarks = () => {
           <span className="current-sem-badge">{marksRecord.sem}</span>
         </div>
 
-        <div className="table-container-s">
+        {/* Desktop Table View */}
+        <div className="table-container-s parent-desktop-table-view">
           <table>
             <thead>
               <tr>
@@ -282,6 +284,71 @@ const ParentMarks = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards View */}
+        <div className="parent-mobile-cards-view" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          {coursesList.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              No semester marks have been published yet.
+            </div>
+          ) : (
+            coursesList.map((course, idx) => (
+              <div 
+                key={idx}
+                style={{ 
+                  background: 'var(--bg-secondary)', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '12px', 
+                  padding: '1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="register-no-badge" style={{ fontSize: '0.75rem' }}>{course.code}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        background: getCgpaColor(course.gpa) + '15',
+                        color: getCgpaColor(course.gpa),
+                        border: `1px solid ${getCgpaColor(course.gpa)}30`,
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '6px',
+                        fontWeight: 800,
+                        fontSize: '0.75rem'
+                      }}
+                    >
+                      Grade {course.grade}
+                    </span>
+                    <span className={`status-badge-cell ${course.status.toLowerCase() === 'pass' ? 'present' : 'absent'}`} style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem' }}>
+                      {course.status}
+                    </span>
+                  </div>
+                </div>
+
+                <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                  {course.name}
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', background: 'var(--bg-card)', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center', fontSize: '0.76rem' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.7rem' }}>Internal</span>
+                    <strong style={{ color: 'var(--text-main)' }}>{course.internal}/25</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.7rem' }}>Sem Exam</span>
+                    <strong style={{ color: 'var(--text-main)' }}>{course.external}/75</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.7rem' }}>GPA</span>
+                    <strong style={{ color: getCgpaColor(course.gpa) }}>{course.gpa}</strong>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

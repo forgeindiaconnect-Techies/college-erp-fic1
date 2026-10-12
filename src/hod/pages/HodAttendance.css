@@ -82,3 +82,42 @@ tr:hover td { background: rgba(79,70,229,0.04); }
 .filter-select { border: none; background: transparent; outline: none; font-size: 0.9rem; cursor: pointer; color: var(--text-main); }
 .skeleton { background: linear-gradient(90deg, var(--bg-primary) 25%, var(--border-color) 50%, var(--bg-primary) 75%); background-size: 1000px 100%; animation: shimmer 2s infinite linear; border-radius: 4px; }
 @keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+
+/* ── Mobile Adaptations ── */
+@media (max-width: 1024px) {
+  .attendance-page .four-col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .attendance-grid {
+    grid-template-columns: 1fr;
+  }
+  .col-span-2, .col-span-3 {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .attendance-page .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .form-row-compact {
+    flex-direction: column;
+  }
+  .table-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .attendance-page table {
+    min-width: 580px;
+  }
+}
+
+@media (max-width: 480px) {
+  .attendance-page .four-col {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+}

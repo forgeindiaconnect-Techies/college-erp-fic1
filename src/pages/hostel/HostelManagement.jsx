@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getUsers, createUser, deleteUser, getHostelBlocks } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
+import '../admin/UserManagementCommon.css';
 
 const EMPTY_FORM = {
   name: '',
@@ -145,52 +146,26 @@ const HostelManagement = () => {
   }, [hostelUsers, search, typeFilter]);
 
   return (
-    <div className="management-page animate-fade-in" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="management-page animate-fade-in">
       {/* ── Real-Time ERP Header Card ── */}
-      <div 
-        style={{
-          background: 'var(--bg-card, #ffffff)',
-          border: '1px solid var(--border-color, #e2e8f0)',
-          borderRadius: '16px',
-          padding: '1.5rem 1.75rem',
-          boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05))',
-          position: 'relative',
-          overflow: 'hidden'
-        }}
-      >
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #3730a5, #06b6d4, #10b981)' }}></div>
+      <div className="mgmt-header-card">
+        <div className="mgmt-header-bar" style={{ background: 'linear-gradient(90deg, #3730a5, #06b6d4, #10b981)' }}></div>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontSize: '0.75rem', fontWeight: 700, padding: '0.25rem 0.65rem', borderRadius: '20px', border: '1px solid rgba(16, 185, 129, 0.2)', marginBottom: '0.4rem' }}>
-              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981' }}></span>
+        <div className="mgmt-header-top">
+          <div className="mgmt-header-title-area">
+            <div className="mgmt-sync-badge">
+              <span className="mgmt-sync-dot"></span>
               <span>Real-Time Warden Directory Sync Active</span>
             </div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: '0 0 0.25rem' }}>
-              Hostel Warden Management
-            </h1>
-            <p style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.85rem', margin: 0 }}>
-              Provision, assign, and manage login credentials for Boys & Girls Hostel Wardens.
-            </p>
+            <h1>Hostel Warden Management</h1>
+            <p>Provision, assign, and manage login credentials for Boys & Girls Hostel Wardens.</p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="mgmt-header-actions">
             <button
               type="button"
+              className="mgmt-btn-secondary"
               onClick={() => loadHostelUsers(true)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.55rem 0.9rem',
-                borderRadius: '8px',
-                border: '1px solid var(--border-color, #e2e8f0)',
-                background: 'var(--bg-secondary, #f8fafc)',
-                color: 'var(--text-main, #0f172a)',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
             >
               <RefreshCw size={15} className={refreshing ? 'spinning' : ''} />
               <span>{refreshing ? 'Syncing...' : 'Sync Data'}</span>
@@ -198,23 +173,10 @@ const HostelManagement = () => {
 
             <button
               type="button"
+              className="mgmt-btn-primary"
               onClick={() => {
                 setShowPassword(false);
                 setShowModal(true);
-              }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                background: 'linear-gradient(135deg, #3730a5, #4f46e5)',
-                color: '#ffffff',
-                padding: '0.55rem 1.1rem',
-                borderRadius: '8px',
-                fontSize: '0.84rem',
-                fontWeight: 700,
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(55, 48, 165, 0.25)'
               }}
             >
               <Plus size={16} /> Add Hostel Warden
@@ -222,78 +184,70 @@ const HostelManagement = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color, #e2e8f0)', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)' }}>
-          <span>Campus Module: <strong>Residential & Hostels</strong></span>
-          <span>•</span>
-          <span>Access Level: <strong>Hostel Warden Portal</strong></span>
-          <span>•</span>
-          <span>Last Updated: <strong>{lastSynced.toLocaleTimeString()}</strong></span>
+        <div className="mgmt-header-meta">
+          <span className="meta-item">Campus Module: <strong>Residential & Hostels</strong></span>
+          <span className="meta-bullet">•</span>
+          <span className="meta-item">Access Level: <strong>Hostel Warden Portal</strong></span>
+          <span className="meta-bullet">•</span>
+          <span className="meta-item">Last Updated: <strong>{lastSynced.toLocaleTimeString()}</strong></span>
         </div>
       </div>
 
       {/* ── KPI Stat Cards ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-        <div style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '12px', padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(55, 48, 165, 0.1)', color: '#3730a5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="mgmt-kpi-grid-4">
+        <div className="mgmt-kpi-card">
+          <div className="mgmt-kpi-icon" style={{ background: 'rgba(55, 48, 165, 0.1)', color: '#3730a5' }}>
             <Building size={22} />
           </div>
-          <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Total Wardens</span>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0.1rem 0 0', color: 'var(--text-main, #0f172a)' }}>{totalWardens}</h3>
+          <div className="mgmt-kpi-info">
+            <span className="mgmt-kpi-label">Total Wardens</span>
+            <h3 className="mgmt-kpi-value">{totalWardens}</h3>
           </div>
         </div>
 
-        <div style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '12px', padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="mgmt-kpi-card">
+          <div className="mgmt-kpi-icon" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
             <Users size={22} />
           </div>
-          <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Boys Hostel Wardens</span>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0.1rem 0 0', color: '#3b82f6' }}>{boysWardens}</h3>
+          <div className="mgmt-kpi-info">
+            <span className="mgmt-kpi-label">Boys Wardens</span>
+            <h3 className="mgmt-kpi-value" style={{ color: '#3b82f6' }}>{boysWardens}</h3>
           </div>
         </div>
 
-        <div style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '12px', padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(236, 72, 153, 0.1)', color: '#ec4899', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="mgmt-kpi-card">
+          <div className="mgmt-kpi-icon" style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#ec4899' }}>
             <Users size={22} />
           </div>
-          <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Girls Hostel Wardens</span>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0.1rem 0 0', color: '#ec4899' }}>{girlsWardens}</h3>
+          <div className="mgmt-kpi-info">
+            <span className="mgmt-kpi-label">Girls Wardens</span>
+            <h3 className="mgmt-kpi-value" style={{ color: '#ec4899' }}>{girlsWardens}</h3>
           </div>
         </div>
 
-        <div style={{ background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '12px', padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="mgmt-kpi-card">
+          <div className="mgmt-kpi-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
             <ShieldCheck size={22} />
           </div>
-          <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Active Credentials</span>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0.1rem 0 0', color: '#10b981' }}>100% Active</h3>
+          <div className="mgmt-kpi-info">
+            <span className="mgmt-kpi-label">Active Credentials</span>
+            <h3 className="mgmt-kpi-value" style={{ color: '#10b981' }}>100% Active</h3>
           </div>
         </div>
       </div>
 
       {/* ── Table Card & Filter Controls ── */}
-      <div 
-        style={{
-          background: 'var(--bg-card, #ffffff)',
-          border: '1px solid var(--border-color, #e2e8f0)',
-          borderRadius: '16px',
-          boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.04))',
-          overflow: 'hidden'
-        }}
-      >
-        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', padding: '0.5rem 0.85rem', borderRadius: '10px' }}>
+      <div className="mgmt-table-card">
+        <div className="mgmt-filters-row">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', flex: 1 }}>
+            <div className="mgmt-search-box">
               <Search size={16} className="text-muted" />
               <input 
                 type="text" 
                 placeholder="Search warden name, email, phone..." 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-main)', width: '240px', fontSize: '0.82rem', fontFamily: 'inherit' }}
+                className="mgmt-search-input"
               />
             </div>
 
@@ -316,16 +270,16 @@ const HostelManagement = () => {
           </span>
         </div>
 
-        <div style={{ width: '100%', overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+        <div className="mgmt-table-wrapper">
+          <table className="mgmt-table">
             <thead>
-              <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', textAlign: 'left' }}>
-                <th style={{ padding: '0.85rem 1.25rem', color: 'var(--text-muted, #64748b)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Warden Profile</th>
-                <th style={{ padding: '0.85rem 1.25rem', color: 'var(--text-muted, #64748b)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Login Email / Username</th>
-                <th style={{ padding: '0.85rem 1.25rem', color: 'var(--text-muted, #64748b)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Contact Phone</th>
-                <th style={{ padding: '0.85rem 1.25rem', color: 'var(--text-muted, #64748b)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Warden Assignment</th>
-                <th style={{ padding: '0.85rem 1.25rem', color: 'var(--text-muted, #64748b)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>ERP Role</th>
-                <th style={{ padding: '0.85rem 1.25rem', color: 'var(--text-muted, #64748b)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>Actions</th>
+              <tr>
+                <th>Warden Profile</th>
+                <th>Login Email / Username</th>
+                <th>Contact Phone</th>
+                <th>Warden Assignment</th>
+                <th>ERP Role</th>
+                <th style={{ textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -442,17 +396,7 @@ const HostelManagement = () => {
       {/* ── Add Warden Modal Overlay ── */}
       {showModal && (
         <div 
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.75)',
-            backdropFilter: 'blur(4px)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '1.5rem'
-          }}
+          className="mgmt-modal-overlay"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
               setShowModal(false);
@@ -460,25 +404,14 @@ const HostelManagement = () => {
           }}
         >
           <div 
-            style={{
-              background: 'var(--bg-card, #ffffff)',
-              borderRadius: '16px',
-              maxWidth: '520px',
-              width: '100%',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
-              overflow: 'hidden'
-            }}
+            className="mgmt-modal-card"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
+            <div className="mgmt-modal-hd">
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
-                  Provision Hostel Warden
-                </h3>
-                <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
-                  Generate secure login access for Boys or Girls Hostel Wardens.
-                </p>
+                <h3>Provision Hostel Warden</h3>
+                <p>Generate secure login access for Boys or Girls Hostel Wardens.</p>
               </div>
               <button 
                 type="button" 
@@ -496,35 +429,35 @@ const HostelManagement = () => {
                   e.preventDefault();
                 }
               }}
-              style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}
+              className="mgmt-modal-form"
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>Warden Full Name</label>
+              <div className="mgmt-form-field">
+                <label>Warden Full Name</label>
                 <input
                   type="text"
                   placeholder="e.g. Dr. Ravi Kumar / Ms. Priya S"
                   value={form.name}
                   onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
                   required
-                  style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', fontSize: '0.85rem', color: 'var(--text-main)', fontFamily: 'inherit', outline: 'none' }}
+                  className="mgmt-form-input"
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>Login Email</label>
+              <div className="mgmt-form-grid">
+                <div className="mgmt-form-field">
+                  <label>Login Email</label>
                   <input
                     type="email"
                     placeholder="e.g. warden@college.edu"
                     value={form.email}
                     onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
                     required
-                    style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', fontSize: '0.85rem', color: 'var(--text-main)', fontFamily: 'inherit', outline: 'none' }}
+                    className="mgmt-form-input"
                   />
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>Password</label>
+                <div className="mgmt-form-field">
+                  <label>Password</label>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                     <input
                       type={showPassword ? 'text' : 'password'}
@@ -532,7 +465,8 @@ const HostelManagement = () => {
                       value={form.password}
                       onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
                       required
-                      style={{ width: '100%', padding: '0.65rem 2.5rem 0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', fontSize: '0.85rem', color: 'var(--text-main)', fontFamily: 'inherit', outline: 'none' }}
+                      className="mgmt-form-input"
+                      style={{ paddingRight: '2.5rem' }}
                     />
                     <button
                       type="button"
@@ -546,24 +480,24 @@ const HostelManagement = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>Contact Phone</label>
+              <div className="mgmt-form-grid">
+                <div className="mgmt-form-field">
+                  <label>Contact Phone</label>
                   <input
                     type="text"
                     placeholder="e.g. 9876543210"
                     value={form.phone}
                     onChange={(e) => setForm(prev => ({ ...prev, phone: e.target.value }))}
-                    style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', fontSize: '0.85rem', color: 'var(--text-main)', fontFamily: 'inherit', outline: 'none' }}
+                    className="mgmt-form-input"
                   />
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>Warden Assignment</label>
+                <div className="mgmt-form-field">
+                  <label>Warden Assignment</label>
                   <select
                     value={form.wardenType}
                     onChange={(e) => setForm(prev => ({ ...prev, wardenType: e.target.value }))}
-                    style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', fontSize: '0.85rem', color: 'var(--text-main)', fontFamily: 'inherit', outline: 'none' }}
+                    className="mgmt-form-input"
                   >
                     <option value="Boys Warden">Boys Warden</option>
                     <option value="Girls Warden">Girls Warden</option>
@@ -571,7 +505,7 @@ const HostelManagement = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.75rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color, #e2e8f0)' }}>
+              <div className="mgmt-modal-ft">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}

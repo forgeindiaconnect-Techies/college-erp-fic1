@@ -6,6 +6,7 @@ import {
   TrendingUp, Award, Filter, X
 } from 'lucide-react';
 import { getAttendanceByStudent, getStudentById, getStudents, getSubjects } from '../../api/index';
+import './ParentDashboard.css';
 
 const formatDate = (rawDate) => {
   if (!rawDate) return 'N/A';
@@ -295,9 +296,9 @@ const ParentAttendance = () => {
   const insight = getAttendanceInsight();
 
   return (
-    <div className="animate-fade-in p-6" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="parent-page-container animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto' }}>
       {/* Top Header */}
-      <div className="glass-card" style={{ padding: '1.25rem 1.5rem', background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--border-color)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="parent-header-card glass-card" style={{ marginBottom: '1.5rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -314,8 +315,8 @@ const ParentAttendance = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ padding: '6px 14px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.82rem', display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ padding: '6px 14px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.82rem', display: 'flex', gap: '8px', alignItems: 'center', whiteSpace: 'nowrap' }}>
             <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Ward:</span>
             <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>{childDetails.id}</span>
             <span style={{ color: 'var(--border-color)' }}>|</span>
@@ -334,7 +335,7 @@ const ParentAttendance = () => {
       </div>
 
       {/* KPI Metrics Summary Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="parent-kpi-grid" style={{ marginBottom: '1.5rem' }}>
         {/* Overall Percentage Card */}
         <div className="glass-card" style={{ padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ 
@@ -532,8 +533,8 @@ const ParentAttendance = () => {
           </div>
         </div>
 
-        {/* Table Content */}
-        <div style={{ overflowX: 'auto' }}>
+        {/* Desktop Table View */}
+        <div className="parent-desktop-table-view" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
             <thead>
               <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
@@ -632,6 +633,84 @@ const ParentAttendance = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards View */}
+        <div className="parent-mobile-cards-view" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Clock className="animate-spin text-primary" size={24} style={{ margin: '0 auto 8px' }} />
+              <div>Loading real-time logs...</div>
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <CalendarCheck size={28} style={{ opacity: 0.3, margin: '0 auto 8px' }} />
+              <p style={{ margin: 0, fontWeight: 600 }}>No attendance records found.</p>
+            </div>
+          ) : (
+            filteredLogs.map((log) => (
+              <div 
+                key={log.id}
+                style={{ 
+                  background: 'var(--bg-secondary)', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '12px', 
+                  padding: '1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.86rem', color: 'var(--text-main)' }}>
+                    <Calendar size={13} className="text-muted" />
+                    <span>{log.dateFormatted}</span>
+                  </div>
+                  {log.status === 'Present' ? (
+                    <span style={{ 
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      padding: '2px 8px', borderRadius: '12px', fontSize: '0.74rem', fontWeight: 700,
+                      background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)'
+                    }}>
+                      <CheckCircle size={11} /> Present
+                    </span>
+                  ) : log.status === 'Absent' ? (
+                    <span style={{ 
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      padding: '2px 8px', borderRadius: '12px', fontSize: '0.74rem', fontWeight: 700,
+                      background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)'
+                    }}>
+                      <ShieldAlert size={11} /> Absent
+                    </span>
+                  ) : (
+                    <span style={{ 
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      padding: '2px 8px', borderRadius: '12px', fontSize: '0.74rem', fontWeight: 700,
+                      background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)'
+                    }}>
+                      <Clock size={11} /> Leave/OD
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)' }}>{log.subject}</h4>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>{log.subjectCode}</div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem', marginTop: '0.2rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Clock size={12} />
+                    <span>{log.period}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <User size={12} />
+                    <span>{log.faculty}</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

@@ -130,10 +130,10 @@ const SuperAdminSettings = () => {
       </div>
 
       {/* Main Settings Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '20px', alignItems: 'flex-start' }}>
+      <div className="sa-settings-layout">
         {/* Left Vertical Tab Navigation */}
-        <div className="sa-card" style={{ padding: '0.75rem' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div className="sa-card sa-settings-nav-card">
+          <div className="sa-settings-nav-list">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -141,24 +141,18 @@ const SuperAdminSettings = () => {
               return (
                 <div
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px 14px',
-                    borderRadius: '10px',
-                    cursor: 'pointer',
-                    background: isActive ? 'rgba(99,102,241,0.1)' : 'transparent',
-                    color: isActive ? '#6366f1' : 'var(--text-main)',
-                    border: isActive ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
-                    transition: 'all 0.15s'
+                  onClick={(e) => {
+                    setActiveTab(tab.id);
+                    try {
+                      e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                    } catch (err) {}
                   }}
+                  className={`sa-settings-tab ${isActive ? 'active' : ''}`}
                 >
-                  <Icon size={18} color={isActive ? '#6366f1' : 'var(--text-muted)'} />
+                  <Icon size={18} className="sa-settings-tab-icon" color={isActive ? '#6366f1' : 'var(--text-muted)'} />
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{tab.label}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{tab.desc}</div>
+                    <div className="sa-settings-tab-title">{tab.label}</div>
+                    <div className="sa-settings-tab-desc">{tab.desc}</div>
                   </div>
                 </div>
               );
@@ -167,7 +161,7 @@ const SuperAdminSettings = () => {
         </div>
 
         {/* Right Settings Form Body */}
-        <div className="sa-card">
+        <div className="sa-card" style={{ minWidth: 0, width: '100%' }}>
           {/* General Tab */}
           {activeTab === 'general' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -180,7 +174,8 @@ const SuperAdminSettings = () => {
                 </p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="sa-form-grid">
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>Platform Name</label>
                   <input 
@@ -256,7 +251,7 @@ const SuperAdminSettings = () => {
                 </p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="sa-form-grid">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>Evaluation Period (Days)</label>
                   <input 
@@ -305,7 +300,7 @@ const SuperAdminSettings = () => {
                 </p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+              <div className="sa-form-grid-3">
                 <div style={{ background: 'var(--bg-primary)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981' }}>Starter Basic (₹/mo)</label>
                   <input 
@@ -424,7 +419,7 @@ const SuperAdminSettings = () => {
                 </p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="sa-form-grid">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>Session Inactivity Timeout (Minutes)</label>
                   <input 

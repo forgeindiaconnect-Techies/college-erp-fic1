@@ -1,0 +1,997 @@
+/* ══════════════════════════════════════════════════════════════════
+   ADMIN FINANCE & WELFARE RESPONSIVE MOBILE OPTIMIZATION
+   Pages covered:
+   1. Fee Structure Master (/admin/fee-structure)
+   2. Quota Management (/admin/quota-management)
+   3. Student Welfare & Discipline Hub (/admin/student-welfare)
+   4. College Payroll & Disbursement Master (/admin/payroll)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. FEE STRUCTURE MASTER ── */
+.fs-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.fs-kpi-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  padding: 16px 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .fee-structure-page {
+    padding: 0.85rem !important;
+  }
+
+  .fs-header-card {
+    padding: 1rem !important;
+    border-radius: 12px !important;
+    gap: 0.75rem !important;
+  }
+
+  .fs-toolbar {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1.4fr 1fr 1fr !important;
+    gap: 0.45rem !important;
+  }
+
+  .fs-toolbar button {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 0.55rem 0.65rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  .fs-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .fs-kpi-card {
+    padding: 0.65rem 0.75rem !important;
+    gap: 0.6rem !important;
+    border-radius: 10px !important;
+  }
+
+  .fs-kpi-card .fs-icon-box {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 8px !important;
+  }
+
+  .fs-kpi-card .fs-icon-box svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .fs-kpi-card .fs-label {
+    font-size: 0.65rem !important;
+  }
+
+  .fs-kpi-card .fs-value {
+    font-size: 1.15rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .fee-structure-page {
+    padding: 0.6rem !important;
+  }
+
+  .fs-header-card {
+    padding: 0.75rem 0.85rem !important;
+  }
+
+  .fs-header-card h1 {
+    font-size: 1.15rem !important;
+  }
+
+  .fs-toolbar {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .fs-toolbar button:first-child {
+    grid-column: span 2 !important;
+  }
+
+  .fs-kpi-grid {
+    gap: 0.5rem !important;
+  }
+
+  .fs-kpi-card {
+    padding: 0.55rem 0.65rem !important;
+  }
+
+  .fs-kpi-card .fs-value {
+    font-size: 1.05rem !important;
+  }
+
+  .fs-search-container {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .fs-filter-bar {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .fs-filter-bar > div:first-child {
+    grid-column: 1 / -1 !important;
+  }
+
+  .fs-filter-select {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .fs-empty-state-box {
+    padding: 30px 14px !important;
+    margin: 12px !important;
+  }
+}
+
+/* ── 2. QUOTA MANAGEMENT ── */
+.qm-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.qm-kpi-card {
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.qm-mobile-cards {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .quota-mgmt-page {
+    padding: 0.85rem !important;
+  }
+
+  .qm-header-card {
+    padding: 1rem !important;
+    border-radius: 12px !important;
+    gap: 0.75rem !important;
+  }
+
+  .qm-toolbar {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1.4fr 1fr auto !important;
+    gap: 0.45rem !important;
+  }
+
+  .qm-toolbar button {
+    justify-content: center !important;
+    padding: 0.55rem 0.75rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  .qm-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .qm-kpi-card {
+    padding: 0.65rem 0.75rem !important;
+    border-radius: 10px !important;
+  }
+
+  .qm-kpi-card .qm-label {
+    font-size: 0.65rem !important;
+  }
+
+  .qm-kpi-card .qm-value {
+    font-size: 1.2rem !important;
+  }
+
+  .qm-kpi-card .qm-icon-box {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+  }
+
+  .qm-kpi-card .qm-icon-box svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .qm-desktop-table {
+    display: none !important;
+  }
+
+  .qm-mobile-cards {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    padding: 12px !important;
+  }
+
+  .qm-filters-bar {
+    padding: 10px 12px !important;
+  }
+
+  .qm-filters-inner {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  .qm-search-box {
+    grid-column: 1 / -1 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .qm-filter-select {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .quota-mgmt-page {
+    padding: 0.6rem !important;
+  }
+
+  .qm-header-card {
+    padding: 0.75rem 0.85rem !important;
+  }
+
+  .qm-header-card h1 {
+    font-size: 1.15rem !important;
+  }
+
+  .qm-toolbar {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .qm-toolbar button:nth-child(3) {
+    grid-column: span 2 !important;
+  }
+
+  .qm-kpi-grid {
+    gap: 0.5rem !important;
+  }
+
+  .qm-kpi-card {
+    padding: 0.55rem 0.65rem !important;
+  }
+
+  .qm-kpi-card .qm-value {
+    font-size: 1.1rem !important;
+  }
+}
+
+/* ── 3. STUDENT WELFARE & DISCIPLINE HUB ── */
+.welfare-tabs-selector {
+  display: inline-flex;
+  gap: 0.5rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.welfare-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.welfare-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 7.5fr) minmax(0, 2.5fr);
+  gap: 1.5rem;
+}
+
+.welfare-analytics-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 1.5rem;
+}
+
+.welfare-filter-pills {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .welfare-content-grid,
+  .welfare-analytics-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  .welfare-filter-pills {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 4px;
+    width: 100%;
+  }
+
+  .welfare-filter-pills button {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .student-welfare-page {
+    padding: 0.85rem !important;
+  }
+
+  .welfare-header {
+    gap: 0.75rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .welfare-header h1 {
+    font-size: 1.25rem !important;
+  }
+
+  .welfare-header p {
+    font-size: 0.78rem !important;
+    line-height: 1.35 !important;
+  }
+
+  /* Smooth swipeable tabs strip on mobile */
+  .welfare-tabs-selector {
+    display: flex !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    white-space: nowrap !important;
+    padding: 0.35rem !important;
+    gap: 0.4rem !important;
+    margin-bottom: 1rem !important;
+    border-radius: 10px !important;
+  }
+
+  .welfare-tabs-selector button {
+    flex-shrink: 0 !important;
+    padding: 0.5rem 0.85rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  /* 2-column sleek stat cards */
+  .welfare-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .welfare-stats-grid > *:last-child:nth-child(odd) {
+    grid-column: span 2 !important;
+  }
+
+  .welfare-stats-grid .stat-card {
+    padding: 0.65rem 0.75rem !important;
+    gap: 0.6rem !important;
+    border-radius: 10px !important;
+  }
+
+  .welfare-stats-grid .stat-icon-wrapper {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 8px !important;
+  }
+
+  .welfare-stats-grid .stat-icon-wrapper svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .welfare-stats-grid .stat-details h3 {
+    font-size: 0.68rem !important;
+  }
+
+  .welfare-stats-grid .stat-details .stat-value {
+    font-size: 1.2rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .student-welfare-page {
+    padding: 0.6rem !important;
+  }
+
+  .welfare-header h1 {
+    font-size: 1.15rem !important;
+  }
+
+  .welfare-stats-grid {
+    gap: 0.5rem !important;
+  }
+
+  .welfare-stats-grid .stat-card {
+    padding: 0.55rem 0.65rem !important;
+  }
+
+  .welfare-stats-grid .stat-details .stat-value {
+    font-size: 1.1rem !important;
+  }
+}
+
+/* ── 4. COLLEGE PAYROLL & DISBURSEMENT MASTER ── */
+.payroll-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .payroll-mgmt-page {
+    padding: 0.85rem !important;
+  }
+
+  .payroll-header {
+    gap: 0.75rem !important;
+    margin-bottom: 1rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+
+  .payroll-header h1 {
+    font-size: 1.25rem !important;
+  }
+
+  .payroll-header p {
+    font-size: 0.78rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .payroll-controls {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.45rem !important;
+  }
+
+  .payroll-controls select {
+    flex: 1 1 100% !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  .payroll-controls button {
+    flex: 1 1 calc(50% - 0.25rem) !important;
+    justify-content: center !important;
+    padding: 0.5rem 0.65rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  /* 2-column sleek KPI grid */
+  .payroll-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .payroll-kpi-card {
+    padding: 0.65rem 0.75rem !important;
+    border-radius: 8px !important;
+  }
+
+  .payroll-kpi-card .payroll-label {
+    font-size: 0.65rem !important;
+  }
+
+  .payroll-kpi-card .payroll-value {
+    font-size: 1.15rem !important;
+  }
+
+  .payroll-kpi-card .payroll-sub {
+    font-size: 0.65rem !important;
+  }
+
+  /* Swipeable role categories strip */
+  .payroll-filter-strip {
+    display: flex !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex-wrap: nowrap !important;
+    gap: 0.4rem !important;
+    padding-bottom: 0.35rem !important;
+    margin-bottom: 0.75rem !important;
+    width: 100% !important;
+  }
+
+  .payroll-filter-strip button {
+    flex-shrink: 0 !important;
+    padding: 0.35rem 0.65rem !important;
+    font-size: 0.74rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .payroll-mgmt-page {
+    padding: 0.6rem !important;
+  }
+
+  .payroll-header h1 {
+    font-size: 1.15rem !important;
+  }
+
+  .payroll-kpi-grid {
+    gap: 0.5rem !important;
+  }
+
+  .payroll-kpi-card {
+    padding: 0.55rem 0.65rem !important;
+  }
+
+  .payroll-kpi-card .payroll-value {
+    font-size: 1.05rem !important;
+  }
+}
+
+/* Global ERP Payroll Component Adaptations */
+@media (max-width: 900px) {
+  .erp-payroll-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1rem !important;
+    width: 100% !important;
+  }
+
+  .erp-history-panel {
+    width: 100% !important;
+  }
+
+  .erp-history-list {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 0.5rem !important;
+    padding: 0.5rem !important;
+    scrollbar-width: none !important;
+  }
+
+  .erp-history-list::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .erp-history-item {
+    flex: 0 0 160px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    padding: 0.55rem 0.75rem !important;
+    background: #ffffff !important;
+  }
+
+  .erp-payslip-statement {
+    padding: 0.85rem 0.75rem !important;
+    border-radius: 12px !important;
+    width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .erp-param-matrix-container {
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    margin-bottom: 0.85rem !important;
+    display: block !important;
+  }
+
+  table.erp-param-matrix {
+    min-width: 580px !important;
+    width: 100% !important;
+    table-layout: auto !important;
+  }
+
+  table.erp-param-matrix th,
+  table.erp-param-matrix td {
+    padding: 0.5rem 0.65rem !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap !important;
+  }
+
+  .erp-financial-grid {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+  }
+
+  .erp-ledger-col.border-right {
+    border-right: none !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+
+  .erp-net-statement-bar {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.6rem !important;
+  }
+
+  .erp-net-figure-box {
+    width: 100% !important;
+    text-align: left !important;
+  }
+}
+
+/* ── 5. FEES COLLECTION DESK & CASHIER TERMINAL ── */
+.fees-tabs-bar {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.fees-tabs-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.fees-collection-pos-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 22px;
+  margin-bottom: 24px;
+}
+
+.fees-voucher-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 900px) {
+  .fees-collection-pos-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .fees-collection-pos-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .fees-voucher-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    margin-bottom: 10px !important;
+  }
+}
+
+/* ── 6. SCHOLARSHIPS & FINANCIAL AID REGISTER ── */
+.scholarships-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.scholarships-mobile-cards {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .scholarships-header-actions {
+    width: 100% !important;
+  }
+  .scholarships-header-actions button {
+    flex: 1 1 calc(50% - 4px) !important;
+    justify-content: center !important;
+    width: 100% !important;
+  }
+  .scholarships-desktop-table {
+    display: none !important;
+  }
+  .scholarships-mobile-cards {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    padding: 12px !important;
+  }
+}
+
+/* ── 7. DOCUMENT TRACKER & COMPLIANCE MASTER ── */
+.doc-tracker-mobile-cards {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .doc-tracker-header-actions {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  .doc-tracker-header-actions button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  .doc-tracker-cat-strip {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    white-space: nowrap !important;
+    width: 100% !important;
+    padding-bottom: 4px !important;
+    flex-wrap: nowrap !important;
+  }
+  .doc-tracker-cat-strip::-webkit-scrollbar {
+    display: none !important;
+  }
+  .doc-tracker-cat-strip button {
+    flex-shrink: 0 !important;
+  }
+  .doc-tracker-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .doc-tracker-toolbar-inputs {
+    flex-direction: column !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .doc-tracker-toolbar-inputs > div {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  .doc-tracker-toolbar-inputs select {
+    width: 100% !important;
+  }
+  .doc-tracker-desktop-table {
+    display: block !important;
+  }
+  .doc-tracker-mobile-cards {
+    display: none !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .doc-tracker-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+}
+
+/* ── STICKY FROZEN NAME COLUMNS FOR SALARY & DOCUMENT TRACKER ── */
+.salary-master-table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.salary-master-table th.salary-sticky-profile {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 10 !important;
+  background: #f8fafc !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.12) !important;
+}
+
+.salary-master-table td.salary-sticky-profile {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 4 !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.12) !important;
+}
+
+.salary-master-table tr:hover td {
+  background: #f8fafc;
+}
+
+.salary-master-table tr:hover td.salary-sticky-profile {
+  background: #f1f5f9 !important;
+}
+
+.doc-tracker-master-table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.doc-tracker-master-table th.doc-tracker-sticky-col {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 10 !important;
+  background: #f8fafc !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.12) !important;
+}
+
+.doc-tracker-master-table td.doc-tracker-sticky-col {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 4 !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.12) !important;
+}
+
+.doc-tracker-master-table tr:hover td {
+  background: #f1f5f9;
+}
+
+.doc-tracker-master-table tr:hover td.doc-tracker-sticky-col {
+  background: #e2e8f0 !important;
+}
+
+/* ── 8. FINANCIAL REPORTS & AUDIT INTELLIGENCE RESPONSIVE ── */
+.reports-dept-table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.reports-dept-table th.reports-sticky-dept {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 10 !important;
+  background: #f8fafc !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.12) !important;
+}
+
+.reports-dept-table td.reports-sticky-dept {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 4 !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.12) !important;
+}
+
+.reports-dept-table tr:hover td {
+  background: #f8fafc;
+}
+
+.reports-dept-table tr:hover td.reports-sticky-dept {
+  background: #f1f5f9 !important;
+}
+
+@media (max-width: 768px) {
+  .reports-page-container {
+    padding: 12px 10px !important;
+    gap: 14px !important;
+  }
+
+  .reports-header-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  .reports-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .reports-kpi-card {
+    padding: 12px 14px !important;
+    border-radius: 10px !important;
+  }
+
+  .reports-kpi-card .reports-kpi-val {
+    font-size: 1.25rem !important;
+    margin: 6px 0 4px 0 !important;
+  }
+
+  .reports-tabs-bar {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+
+  .reports-tabs-bar button {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    padding: 8px 14px !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* Salary Filter Bar Mobile Adaptations */
+  .payroll-filter-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding: 12px !important;
+  }
+
+  .payroll-filter-inputs {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .payroll-search-box {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .payroll-dept-select {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .reports-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  .reports-kpi-card {
+    padding: 10px 10px !important;
+  }
+
+  .reports-kpi-card .reports-kpi-val {
+    font-size: 1.1rem !important;
+  }
+}
+
+/* ── 9. FEE STRUCTURE CATALOG RESPONSIVE ── */
+.fs-tariff-table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.fs-tariff-table th.fs-sticky-dept {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 10 !important;
+  background: #f8fafc !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.12) !important;
+}
+
+.fs-tariff-table td.fs-sticky-dept {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 4 !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.12) !important;
+}
+
+.fs-tariff-table tr:hover td {
+  background: #fafcff;
+}
+
+.fs-tariff-table tr:hover td.fs-sticky-dept {
+  background: #f1f5f9 !important;
+}
+
+@media (max-width: 768px) {
+  .fs-filter-select {
+    width: 100% !important;
+  }
+
+  .fs-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+}
+

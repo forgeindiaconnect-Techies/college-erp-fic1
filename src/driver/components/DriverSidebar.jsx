@@ -34,8 +34,7 @@ const DriverSidebar = ({ isOpen, onClose }) => {
       name: 'Student Transit',
       icon: <Users size={20} />,
       items: [
-        { name: 'Student List', path: '/driver/students', icon: <Users size={20} /> },
-        { name: 'Attendance', path: '/driver/attendance', icon: <Calendar size={20} /> }
+        { name: 'Student List', path: '/driver/students', icon: <Users size={20} /> }
       ]
     },
     {

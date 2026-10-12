@@ -5,14 +5,22 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
 }
-@media (max-width: 768px) { .marks-hero-summary-grid { grid-template-columns: 1fr; } }
-
-.summary-grade-card {
-  padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem;
-  transition: all 0.3s ease;
+@media (max-width: 768px) {
+  .marks-hero-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  .marks-hero-summary-grid > *:last-child:nth-child(odd) {
+    grid-column: span 2;
+  }
+  .summary-grade-card {
+    padding: 0.75rem 0.85rem;
+    gap: 0.75rem;
+  }
+  .summary-grade-card h2 {
+    font-size: 1.35rem;
+  }
 }
-.summary-grade-card:hover { transform: translateY(-2px); border-color: #14b8a6; box-shadow: var(--shadow-sm); }
-.summary-grade-card h2 { font-size: 1.75rem; font-weight: 800; margin: 0; }
 .summary-label { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.25rem; }
 
 .icon-s {
@@ -76,6 +84,7 @@
 .student-marks-page .table-container-s {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .student-marks-page table {
@@ -153,5 +162,23 @@
 
   .marks-hero-summary-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .student-marks-page .page-header {
+    padding: 1rem;
+  }
+  .student-marks-page .page-header h1 {
+    font-size: 1.35rem;
+  }
+  .student-marks-page .table-header-row-s {
+    padding: 1rem !important;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .student-marks-page .table-header-row-s div {
+    width: 100%;
+    justify-content: space-between;
   }
 }

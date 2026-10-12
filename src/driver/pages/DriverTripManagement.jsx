@@ -10,6 +10,7 @@ import {
   getTransportTrips, createTransportTrip, updateTransportTrip, 
   getTransportRoutes, getTransportDrivers, getTransportStudents, getTransportVehicles 
 } from '../../api/index';
+import './DriverDashboard.css';
 
 const DriverTripManagement = () => {
   const [session, setSession] = useState({});
@@ -270,24 +271,24 @@ const DriverTripManagement = () => {
   }
 
   return (
-    <div style={{ padding: '1.25rem 1.5rem', maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
+    <div className="driver-page-container">
       
       {/* ── Breadcrumb & Compact Header Bar ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
+      <div className="driver-header-bar">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
             <span>Fleet Operations</span>
             <ChevronRight size={12} />
             <span style={{ color: '#0f172a' }}>Trip Operations & Live Tracking</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.01em' }}>
               Transit Trip Operations & Dispatch
             </h1>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '0.2rem 0.6rem', background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }}></span>
             GPS ACTIVE
@@ -299,7 +300,7 @@ const DriverTripManagement = () => {
       </div>
 
       {/* ── Compact Key Metric Row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+      <div className="driver-kpi-grid">
         
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
@@ -355,8 +356,8 @@ const DriverTripManagement = () => {
 
       </div>
 
-      {/* ── Two-Column Operational Dispatch Grid ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1.7fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+      {/* ── Two-Column Operational Dispatch Grid (Stacked on Mobile) ── */}
+      <div className="driver-two-col-grid">
         
         {/* Left: Real-Time Trip Controller Card */}
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
@@ -374,7 +375,7 @@ const DriverTripManagement = () => {
             {/* Pre-Trip Safety Status Pills */}
             <div style={{ marginBottom: '1rem' }}>
               <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: '#64748b', marginBottom: '0.4rem' }}>Pre-Departure Safety Verification</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.75rem' }}>
+              <div className="driver-safety-checklist" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.75rem' }}>
                 <div style={{ background: '#f8fafc', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '4px', color: '#166534', fontWeight: 600 }}>
                   <Check size={12} /> Brakes & Tyre Pressure OK
                 </div>
@@ -550,8 +551,8 @@ const DriverTripManagement = () => {
             <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>No student records mapped to route {assignedRouteName}.</div>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+          <div className="driver-table-wrapper">
+            <table className="driver-table" style={{ width: '100%', minWidth: '600px', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   <th style={{ padding: '0.65rem 1rem' }}>Student Name & ID</th>
@@ -562,12 +563,12 @@ const DriverTripManagement = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredStudents.map((student) => {
+                {filteredStudents.map((student, idx) => {
                   const phone = student.studentProfile?.user?.phone || 'N/A';
                   const status = studentStatus[student.studentId] || 'PENDING';
 
                   return (
-                    <tr key={student._id || student.studentId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr key={student._id ? `${student._id}-${idx}` : `${student.studentId || 'st'}-${idx}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.65rem 1rem' }}>
                         <div style={{ fontWeight: 700, color: '#0f172a' }}>{student.name}</div>
                         <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>ID: {student.studentId}</div>

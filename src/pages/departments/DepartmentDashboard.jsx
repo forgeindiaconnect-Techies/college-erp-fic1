@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Users, UserCheck, BookOpen, Clock, 
-  Building2, UserCircle, ArrowRight, Scan, Camera, QrCode, Cpu, CheckCircle2, XCircle, Plus, Hash, User, Award
+  Building2, UserCircle, ArrowRight, Scan, Camera, QrCode, Cpu, CheckCircle2, XCircle, Plus, Hash, User, Award,
+  Zap, CalendarCheck, Calendar, FileText
 } from 'lucide-react';
 import {
   getDepartments,
@@ -399,12 +400,128 @@ const DepartmentDashboard = () => {
       {/* Tab Content Area */}
       <div className="dd-tab-content glass-card animate-fade-in">
         {activeTab === 'overview' && (
-          <div className="tab-placeholder-panel">
-            <div className="tab-placeholder-icon">
-              <Building2 size={48} className="text-muted" opacity={0.5} />
+          <div>
+            <div style={{
+              background: 'var(--bg-primary, #ffffff)',
+              border: '1px solid var(--border-color, #e2e8f0)',
+              borderRadius: '16px',
+              padding: '1.25rem 1.5rem',
+              marginBottom: '1.5rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '8px', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Zap size={16} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>
+                      Department Quick Actions
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
+                      Fast operational shortcuts to navigate and manage {dept?.name || 'Department'} modules
+                    </p>
+                  </div>
+                </div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
+                  Module Shortcuts
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('students')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+                >
+                  <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Users size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Student Roster</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>{students.length} Enrolled students</div>
+                  </div>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('staff')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+                >
+                  <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <UserCheck size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Faculty Directory</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>{staff.length} Faculty members</div>
+                  </div>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('attendance')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+                >
+                  <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <CalendarCheck size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Daily Attendance</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Track attendance roll</div>
+                  </div>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('smart-scanner')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+                >
+                  <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(147, 51, 234, 0.12)', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Scan size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Smart Scanner</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>QR & Face recognition</div>
+                  </div>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('timetable')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+                >
+                  <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(99, 102, 241, 0.12)', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Calendar size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Timetable Hub</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Lecture schedules</div>
+                  </div>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('reports')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+                >
+                  <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(239, 68, 68, 0.12)', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FileText size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Analytics & Reports</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Department statistics</div>
+                  </div>
+                </button>
+              </div>
             </div>
-            <h2>Department Overview</h2>
-            <p className="text-muted">Welcome to the {dept?.code || 'Dept'} control center. Select a tab above to manage specific modules.</p>
+
+            <div className="tab-placeholder-panel">
+              <div className="tab-placeholder-icon">
+                <Building2 size={48} className="text-muted" opacity={0.5} />
+              </div>
+              <h2>{dept?.name || 'Department'} Operational Hub</h2>
+              <p className="text-muted">Welcome to the {dept?.code || 'Dept'} control center. Use the quick actions above or switch tabs to manage specific academic workflows.</p>
+            </div>
           </div>
         )}
 

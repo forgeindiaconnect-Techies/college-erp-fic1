@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import HodSidebar from './HodSidebar';
 import Navbar from '../../components/layout/Navbar';
 import '../../components/layout/Layout.css';
+import '../HodResponsive.css';
 
 const HodLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);

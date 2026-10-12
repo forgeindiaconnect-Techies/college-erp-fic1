@@ -354,7 +354,7 @@ const SuperAdminColleges = () => {
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="sa-table-actions-row">
             <button 
               className="sa-btn sa-btn-outline" 
               onClick={() => setShowPasswords(!showPasswords)}
@@ -373,6 +373,7 @@ const SuperAdminColleges = () => {
               />
             </div>
           </div>
+
         </div>
 
         {/* The ERP Colleges Table */}
@@ -667,7 +668,7 @@ const SuperAdminColleges = () => {
                       style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}
                     />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="sa-form-grid">
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
                         Admin Name
@@ -695,7 +696,7 @@ const SuperAdminColleges = () => {
                       />
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="sa-form-grid">
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
                         Contact Phone
@@ -723,7 +724,7 @@ const SuperAdminColleges = () => {
                       />
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', background: 'rgba(99,102,241,0.04)', padding: '10px', borderRadius: '8px', border: '1px dashed rgba(99,102,241,0.2)' }}>
+                  <div className="sa-form-grid-3" style={{ background: 'rgba(99,102,241,0.04)', padding: '10px', borderRadius: '8px', border: '1px dashed rgba(99,102,241,0.2)' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
                         Subscription Plan
@@ -803,7 +804,7 @@ const SuperAdminColleges = () => {
                 </div>
               ) : null}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+              <div className="sa-form-grid-3">
                 <div style={{ background: 'var(--bg-primary)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Subscription Plan</div>
                   <div style={{ fontWeight: 700, color: '#6366f1', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>

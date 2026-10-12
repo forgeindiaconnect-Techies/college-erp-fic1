@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Search, Filter, Plus, FileText, CheckCircle2, Clock, AlertCircle, 
   XCircle, Eye, Upload, Check, X, RefreshCw, ShieldCheck, Users, 
-  GraduationCap, Briefcase, Building, UserPlus
+  GraduationCap, Briefcase, Building, UserPlus, Download
 } from 'lucide-react';
 import api from '../../api';
+import '../../pages/admin/AdminFinanceWelfareResponsive.css';
 
 const DocumentTracker = () => {
   const [documents, setDocuments] = useState([]);
@@ -188,6 +189,35 @@ const DocumentTracker = () => {
     }
   };
 
+  const downloadFile = async (doc) => {
+    if (!doc.storedFileName) {
+      showNotification('No certificate file has been uploaded yet.', 'warning');
+      return;
+    }
+    try {
+      setBusyId(doc._id);
+      const response = await api.get(`/documents/${doc._id}/file`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], {
+        type: doc.mimeType || response.data.type || 'application/octet-stream'
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.originalFileName || `${doc.personName}_${doc.documentType}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      showNotification(`✓ Download started for ${doc.documentType}!`);
+    } catch (err) {
+      showNotification(err.response?.data?.message || 'Could not download document file.', 'error');
+    } finally {
+      setBusyId('');
+    }
+  };
+
   const updateStatus = async (doc, nextStatus) => {
     if (nextStatus === 'Rejected') {
       setRejectModalDoc(doc);
@@ -347,7 +377,7 @@ const DocumentTracker = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div className="doc-tracker-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button 
             onClick={() => { setShowRequirementModal(true); setFormMessage(''); }}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.95rem', borderRadius: '6px', border: '1px solid #166534', background: '#16a34a', color: '#ffffff', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 4px rgba(22,101,52,0.2)' }}
@@ -378,7 +408,7 @@ const DocumentTracker = () => {
       )}
 
       {/* ── 2. KPI Metrics Strip (Matching Salary.jsx style) ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+      <div className="doc-tracker-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
           <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Tracked Requirements</div>
           <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>{loading ? '…' : counts.total} Documents</div>
@@ -405,7 +435,7 @@ const DocumentTracker = () => {
       </div>
 
       {/* ── 3. Personnel Category Filter Strip (Matching Salary.jsx) ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
+      <div className="doc-tracker-cat-strip" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
         {[
           { key: 'All', label: 'All Personnel', icon: <Users size={13} />, count: counts.total },
           { key: 'Student', label: 'Students', icon: <GraduationCap size={13} />, count: documents.filter(d => d.category === 'Student').length },
@@ -427,7 +457,9 @@ const DocumentTracker = () => {
               cursor: 'pointer',
               background: category === cat.key ? '#2563eb' : '#ffffff',
               color: category === cat.key ? '#ffffff' : '#475569',
-              border: category === cat.key ? '1px solid #2563eb' : '1px solid #cbd5e1'
+              border: category === cat.key ? '1px solid #2563eb' : '1px solid #cbd5e1',
+              flexShrink: 0,
+              whiteSpace: 'nowrap'
             }}
           >
             {cat.icon}
@@ -446,23 +478,23 @@ const DocumentTracker = () => {
       </div>
 
       {/* ── 4. Search & Status Toolbar (Matching Salary.jsx) ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.85rem', flexWrap: 'wrap', background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '240px' }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '380px' }}>
+      <div className="doc-tracker-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.85rem', flexWrap: 'wrap', background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+        <div className="doc-tracker-toolbar-inputs" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '240px', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: '380px', flex: '1 1 200px' }}>
             <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input
               type="text"
               placeholder="Search by Employee/Student Name, ID, or Document..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ width: '100%', padding: '0.45rem 0.75rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', background: '#f8fafc', color: '#0f172a', outline: 'none' }}
+              style={{ width: '100%', padding: '0.45rem 0.75rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', background: '#f8fafc', color: '#0f172a', outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
 
           <select
             value={status}
             onChange={e => setStatus(e.target.value)}
-            style={{ padding: '0.45rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '0.82rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
+            style={{ padding: '0.45rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '0.82rem', fontWeight: 600, outline: 'none', cursor: 'pointer', flex: '1 1 140px' }}
           >
             <option value="All">All Statuses</option>
             <option value="Pending Submission">Pending Submission</option>
@@ -472,33 +504,33 @@ const DocumentTracker = () => {
           </select>
         </div>
 
-        <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+        <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>
           Showing <strong style={{ color: '#0f172a' }}>{visibleDocuments.length}</strong> of {documents.length} records
         </div>
       </div>
 
       {/* ── 5. Data Table (Matching Salary.jsx Table Layout) ── */}
       <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '1100px' }}>
+        <div className="doc-tracker-desktop-table" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table className="doc-tracker-master-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: '950px' }}>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', width: '16%', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+              <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
+                <th className="doc-tracker-sticky-col" style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', position: 'sticky', left: 0, zIndex: 10, background: '#f8fafc', minWidth: '190px', maxWidth: '230px', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', boxShadow: '3px 0 6px -2px rgba(0,0,0,0.12)', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                   Person Profile
                 </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', width: '10%', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', minWidth: '110px', borderBottom: '1px solid #e2e8f0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                   Category
                 </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', width: '10%', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', minWidth: '120px', borderBottom: '1px solid #e2e8f0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                   Department
                 </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', width: '22%', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', minWidth: '220px', borderBottom: '1px solid #e2e8f0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                   Required Document
                 </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', width: '28%', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', minWidth: '240px', borderBottom: '1px solid #e2e8f0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                   Audit Status
                 </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', width: '14%', textAlign: 'center', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', minWidth: '110px', textAlign: 'center', borderBottom: '1px solid #e2e8f0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                   Action
                 </th>
               </tr>
@@ -512,8 +544,8 @@ const DocumentTracker = () => {
                     key={doc._id} 
                     style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}
                   >
-                    {/* Person Profile */}
-                    <td style={{ padding: '0.85rem 1rem', verticalAlign: 'top' }}>
+                    {/* Person Profile (Sticky Constant on Left) */}
+                    <td className="doc-tracker-sticky-col" style={{ padding: '0.85rem 1rem', verticalAlign: 'top', position: 'sticky', left: 0, zIndex: 4, background: idx % 2 === 0 ? '#ffffff' : '#f8fafc', minWidth: '190px', maxWidth: '230px', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #f1f5f9', boxShadow: '3px 0 6px -2px rgba(0,0,0,0.12)' }}>
                       <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
                         {doc.personName}
                       </div>
@@ -593,9 +625,36 @@ const DocumentTracker = () => {
                               justifyContent: 'center',
                               gap: '4px'
                             }}
-                            title="View / Download Document"
+                            title="View / Preview Document"
                           >
                             <Eye size={12} /> View
+                          </button>
+                        )}
+
+                        {/* Download Certificate Button */}
+                        {doc.storedFileName && (
+                          <button
+                            type="button"
+                            disabled={isWorking}
+                            onClick={() => downloadFile(doc)}
+                            style={{
+                              width: '92px',
+                              padding: '0.35rem 0.5rem',
+                              borderRadius: '4px',
+                              border: '1px solid #bbf7d0',
+                              background: '#f0fdf4',
+                              color: '#16a34a',
+                              fontWeight: 700,
+                              fontSize: '0.76rem',
+                              cursor: isWorking ? 'wait' : 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px'
+                            }}
+                            title="Download Certificate"
+                          >
+                            <Download size={12} /> Download
                           </button>
                         )}
 
@@ -735,6 +794,224 @@ const DocumentTracker = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards View */}
+        <div className="doc-tracker-mobile-cards">
+          {!loading && visibleDocuments.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b', background: '#ffffff', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+              <FileText size={32} color="#94a3b8" style={{ margin: '0 auto 8px' }} />
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#334155' }}>No Document Records Found</div>
+              <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
+                {error ? 'Could not load records from server.' : 'No document requirements match your current filters.'}
+              </div>
+            </div>
+          )}
+
+          {!loading && visibleDocuments.map((doc) => {
+            const isWorking = busyId === doc._id;
+
+            return (
+              <div
+                key={doc._id}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                }}
+              >
+                {/* Header: Person & Category */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div>
+                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>
+                      {doc.personName}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: 'monospace', fontWeight: 600 }}>
+                      ID: {doc.personId}
+                    </div>
+                  </div>
+                  <div>
+                    {renderCategoryTag(doc.category)}
+                  </div>
+                </div>
+
+                {/* Dept & Document Type */}
+                <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Department:</span>
+                    <strong style={{ color: '#334155' }}>{doc.department || 'General'}</strong>
+                  </div>
+
+                  <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '6px' }}>
+                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>
+                      {doc.documentType}
+                    </div>
+                    {doc.originalFileName ? (
+                      <div style={{ fontSize: '0.74rem', color: '#2563eb', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', flexWrap: 'wrap' }}>
+                        <FileText size={12} style={{ flexShrink: 0 }} />
+                        <span style={{ wordBreak: 'break-all' }}>{doc.originalFileName}</span>
+                        {doc.fileSize > 0 && <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>({formatFileSize(doc.fileSize)})</span>}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic', marginTop: '2px' }}>
+                        No file attached
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Audit Status */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Audit Status:</span>
+                    <div>{renderStatusTag(doc.status)}</div>
+                  </div>
+                  {doc.verifiedBy && (
+                    <div style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600, textAlign: 'right' }}>
+                      Verified by: <strong>{doc.verifiedBy}</strong>
+                    </div>
+                  )}
+                  {doc.remarks && (
+                    <div style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 600, marginTop: '2px', background: '#fef2f2', border: '1px solid #fecaca', padding: '0.35rem 0.55rem', borderRadius: '5px' }}>
+                      Note: {doc.remarks}
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions Bar */}
+                <div style={{ display: 'grid', gridTemplateColumns: doc.storedFileName ? 'repeat(auto-fit, minmax(80px, 1fr))' : 'repeat(auto-fit, minmax(100px, 1fr))', gap: '6px', paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
+                  {doc.storedFileName && (
+                    <button
+                      type="button"
+                      disabled={isWorking}
+                      onClick={() => openFile(doc)}
+                      style={{
+                        padding: '0.45rem',
+                        borderRadius: '6px',
+                        border: '1px solid #bfdbfe',
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                        cursor: isWorking ? 'wait' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Eye size={12} /> View
+                    </button>
+                  )}
+
+                  {doc.storedFileName && (
+                    <button
+                      type="button"
+                      disabled={isWorking}
+                      onClick={() => downloadFile(doc)}
+                      style={{
+                        padding: '0.45rem',
+                        borderRadius: '6px',
+                        border: '1px solid #bbf7d0',
+                        background: '#f0fdf4',
+                        color: '#16a34a',
+                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                        cursor: isWorking ? 'wait' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px'
+                      }}
+                      title="Download Certificate"
+                    >
+                      <Download size={12} /> Download
+                    </button>
+                  )}
+
+                  <label style={{
+                    padding: '0.45rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#334155',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    cursor: isWorking ? 'wait' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px'
+                  }}>
+                    <Upload size={12} /> Upload
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.doc,.docx,.xls,.xlsx,application/pdf,image/*"
+                      disabled={isWorking}
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        uploadFile(doc, e.target.files?.[0]);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+
+                  {['Submitted', 'Rejected'].includes(doc.status) && (
+                    <button
+                      type="button"
+                      disabled={isWorking || !doc.storedFileName}
+                      onClick={() => updateStatus(doc, 'Verified')}
+                      style={{
+                        padding: '0.45rem',
+                        borderRadius: '6px',
+                        border: '1px solid #86efac',
+                        background: '#dcfce7',
+                        color: '#15803d',
+                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                        cursor: (isWorking || !doc.storedFileName) ? 'not-allowed' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Check size={12} /> Verify
+                    </button>
+                  )}
+
+                  {doc.status !== 'Rejected' && doc.status !== 'Verified' && (
+                    <button
+                      type="button"
+                      disabled={isWorking}
+                      onClick={() => updateStatus(doc, 'Rejected')}
+                      style={{
+                        padding: '0.45rem',
+                        borderRadius: '6px',
+                        border: '1px solid #fca5a5',
+                        background: '#fef2f2',
+                        color: '#b91c1c',
+                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                        cursor: isWorking ? 'wait' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <X size={12} /> Reject
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

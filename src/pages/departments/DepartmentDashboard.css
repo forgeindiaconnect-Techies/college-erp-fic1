@@ -693,3 +693,42 @@
   }
 }
 
+@media (max-width: 768px) {
+  .dept-detail-header {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .dd-header-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .dd-quick-stats {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.75rem 1rem;
+    gap: 1rem;
+  }
+
+  .dd-tab-content {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 10px !important;
+  }
+
+  .dd-tab-content table {
+    min-width: 600px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dd-title-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+}
+

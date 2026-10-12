@@ -102,7 +102,11 @@
 
 @media (max-width: 600px) {
   .library-metrics-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  .library-metrics-grid > *:last-child:nth-child(odd) {
+    grid-column: span 2;
   }
 }
 
@@ -477,10 +481,12 @@
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .library-erp-table {
   width: 100%;
+  min-width: 650px;
   border-collapse: collapse;
   text-align: left;
 }
