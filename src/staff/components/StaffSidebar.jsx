@@ -3,7 +3,7 @@ import { SettingsContext } from '../../App';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, CalendarCheck, BookOpenCheck,
-  ClipboardList, Calendar, LogOut, ChevronRight, ChevronDown, FileText, Megaphone, GraduationCap, IndianRupee, Briefcase, Library, LifeBuoy, X
+  ClipboardList, Calendar, LogOut, ChevronRight, ChevronDown, FileText, Megaphone, GraduationCap, IndianRupee, Briefcase, Library, LifeBuoy, X, Award
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -71,10 +71,11 @@ const StaffSidebar = ({ isOpen, onClose }) => {
       ]
     },
     {
-      name: 'Finance',
+      name: 'Finance & Earnings',
       icon: <IndianRupee size={20} />,
       items: [
-        { name: 'Payroll', path: '/staff/payroll', icon: <IndianRupee size={20} /> }
+        { name: 'Payroll', path: '/staff/payroll', icon: <IndianRupee size={20} /> },
+        { name: 'Business Referral', path: '/staff/referrals', icon: <Award size={20} /> }
       ]
     }
   ];

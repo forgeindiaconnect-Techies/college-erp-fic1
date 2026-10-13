@@ -780,4 +780,35 @@ export const getDocumentFileUrl = (id) => `/api/documents/${id}/file`;
 // College Management APIs
 export const deleteCollege = (id) => api.delete(`/superadmin/college/${id}`);
 
+// ── Business Referral & Incentive Management APIs ──────────────────────────
+export const submitReferral = (data) => api.post('/referrals', data);
+export const getMyReferrals = (params = {}) => api.get('/referrals/my-referrals', { params });
+export const getMyReferralStats = () => api.get('/referrals/my-stats');
+export const getAdminReferrals = (params = {}) => api.get('/referrals', { params });
+export const getReferralDetails = (id) => api.get(`/referrals/${id}`);
+export const updateReferralStatus = (id, data) => api.patch(`/referrals/${id}/status`, data);
+export const getIncentiveRules = () => api.get('/referrals/rules');
+export const createIncentiveRule = (data) => api.post('/referrals/rules', data);
+export const updateIncentiveRule = (id, data) => api.patch(`/referrals/rules/${id}`, data);
+export const getIncentives = (params = {}) => api.get('/referrals/incentives', { params });
+export const approveIncentive = (id, data) => api.patch(`/referrals/incentives/${id}/approve`, data);
+export const processIncentivePayout = (data) => api.post('/referrals/incentives/payout', data);
+export const reverseIncentive = (id, data) => api.post(`/referrals/incentives/${id}/reverse`, data);
+export const getAdminReferralOverview = (params = {}) => api.get('/referrals/admin-overview', { params });
+export const getSuperAdminReferralOverview = () => api.get('/referrals/superadmin-overview');
+export const getReferralExportCsvUrl = (collegeId) => `/api/referrals/export/csv${collegeId ? `?collegeId=${collegeId}` : ''}`;
+
+// ── Super Admin-Controlled Business Opportunity Publishing & Application APIs ─
+export const getSuperAdminOpportunities = (params = {}) => api.get('/opportunities/superadmin', { params });
+export const createOpportunity = (data) => api.post('/opportunities/superadmin', data);
+export const updateOpportunity = (id, data) => api.put(`/opportunities/superadmin/${id}`, data);
+export const updateOpportunityStatus = (id, status) => api.patch(`/opportunities/superadmin/${id}/status`, { status });
+export const getOpportunityApplications = (id, params = {}) => api.get(`/opportunities/superadmin/${id}/applications`, { params });
+export const getPublishedOpportunities = (params = {}) => api.get('/opportunities/published', { params });
+export const getPublishedOpportunityDetails = (id) => api.get(`/opportunities/published/${id}`);
+export const applyForOpportunity = (id, data) => api.post(`/opportunities/apply/${id}`, data);
+export const getMyOpportunityApplications = (params = {}) => api.get('/opportunities/my-applications', { params });
+export const updateOpportunityApplicationStatus = (appId, data) => api.patch(`/opportunities/applications/${appId}/status`, data);
+export const getOpportunityExportCsvUrl = (id) => `/api/opportunities/export/${id}`;
+
 

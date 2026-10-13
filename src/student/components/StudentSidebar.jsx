@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarCheck, BookOpenCheck,
   ClipboardList, CreditCard, Calendar, FileText,
-  Settings, LogOut, ChevronRight, ChevronDown, Megaphone, GraduationCap, Home, Briefcase, Library, ShieldAlert, X
+  Settings, LogOut, ChevronRight, ChevronDown, Megaphone, GraduationCap, Home, Briefcase, Library, ShieldAlert, X, Award
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -61,7 +61,8 @@ const StudentSidebar = ({ isOpen, onClose }) => {
       icon: <FileText size={20} />,
       items: [
         { name: 'Fee Status', path: '/student/fees', icon: <CreditCard size={20} /> },
-        { name: 'Leave Requests', path: '/student/leaves', icon: <FileText size={20} /> }
+        { name: 'Leave Requests', path: '/student/leaves', icon: <FileText size={20} /> },
+        { name: 'Business Referral', path: '/student/referrals', icon: <Award size={20} /> }
       ]
     },
     {

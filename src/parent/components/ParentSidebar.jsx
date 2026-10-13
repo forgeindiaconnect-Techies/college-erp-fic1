@@ -4,7 +4,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarCheck, BookOpenCheck,
   CreditCard, Calendar, FileText, Bell, LogOut, ChevronRight, ChevronDown,
-  X, Bus, User, GraduationCap
+  X, Bus, User, GraduationCap, Award
 } from 'lucide-react';
 import { getStudentById, getStudents } from '../../api/index';
 import '../../components/layout/Sidebar.css';
@@ -123,7 +123,8 @@ const ParentSidebar = ({ isOpen, onClose }) => {
         { name: 'Fee Status', path: '/parent/fees', icon: <CreditCard size={20} /> },
         { name: 'Leave Status', path: '/parent/leaves', icon: <FileText size={20} /> },
         { name: 'Transport & Bus', path: '/parent/transport', icon: <Bus size={20} /> },
-        { name: 'Notifications', path: '/parent/notifications', icon: <Bell size={20} /> }
+        { name: 'Notifications', path: '/parent/notifications', icon: <Bell size={20} /> },
+        { name: 'Business Referral', path: '/parent/referrals', icon: <Award size={20} /> }
       ]
     }
   ];

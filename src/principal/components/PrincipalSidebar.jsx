@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   X, LayoutDashboard, Building2, UserCheck, GraduationCap, Users, CalendarCheck, CalendarDays, 
   Megaphone, FileBarChart, LogOut, Briefcase, Settings, ClipboardList, ShieldAlert, LifeBuoy, 
-  ChevronRight, ChevronDown, Layers, Wallet, Library, PieChart, CheckSquare
+  ChevronRight, ChevronDown, Layers, Wallet, Library, PieChart, CheckSquare, Award
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -85,7 +85,8 @@ const PrincipalSidebar = ({ isOpen, onClose }) => {
       name: 'Finance & Accounts',
       icon: <Wallet size={20} />,
       items: [
-        { name: 'Fees Overview', path: '/principal/fees', icon: <ClipboardList size={20} /> }
+        { name: 'Fees Overview', path: '/principal/fees', icon: <ClipboardList size={20} /> },
+        { name: 'Business Referral', path: '/principal/referrals', icon: <Award size={20} /> }
       ]
     },
     {

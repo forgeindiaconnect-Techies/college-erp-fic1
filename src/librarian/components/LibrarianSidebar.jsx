@@ -5,7 +5,7 @@ import {
   LayoutDashboard, BookOpen, ArrowRightLeft, Clock, 
   FileText, Users, BarChart3, LogOut, ChevronRight, 
   ChevronDown, Library, PlusCircle, BookmarkCheck,
-  BookDown, CheckCircle2, ShieldCheck, X
+  BookDown, CheckCircle2, ShieldCheck, X, Award
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -36,6 +36,7 @@ const menuGroups = [
     items: [
       { name: 'Library Members', path: '/librarian/members', icon: <Users size={18} /> },
       { name: 'Reports & Analytics', path: '/librarian/reports', icon: <BarChart3 size={18} /> },
+      { name: 'Business Referral', path: '/librarian/referrals', icon: <Award size={18} /> },
     ]
   }
 ];

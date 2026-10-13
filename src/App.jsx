@@ -90,6 +90,9 @@ import SuperAdminTrials from './superadmin/pages/SuperAdminTrials';
 import SuperAdminPayments from './superadmin/pages/SuperAdminPayments';
 import SuperAdminReports from './superadmin/pages/SuperAdminReports';
 import SuperAdminSettings from './superadmin/pages/SuperAdminSettings';
+import SuperAdminReferrals from './superadmin/pages/SuperAdminReferrals';
+import AdminReferralManagement from './pages/referrals/AdminReferralManagement';
+import PersonalReferrals from './pages/referrals/PersonalReferrals';
 
 import PrincipalLayout from './principal/components/PrincipalLayout';
 import PrincipalDashboard from './principal/pages/PrincipalDashboard';
@@ -426,6 +429,7 @@ function App() {
               <Route path="subscriptions" element={<SuperAdminSubscriptions />} />
               <Route path="trials" element={<SuperAdminTrials />} />
               <Route path="payments" element={<SuperAdminPayments />} />
+              <Route path="business-referrals" element={<SuperAdminReferrals />} />
               <Route path="reports" element={<SuperAdminReports />} />
               <Route path="settings" element={<SuperAdminSettings />} />
             </Route>
@@ -489,6 +493,7 @@ function App() {
               <Route path="activity-logs" element={<ActivityLogs />} />
               <Route path="analytics"     element={<SystemAnalytics />} />
               <Route path="subscription"  element={<AdminSubscription />} />
+              <Route path="business-referrals" element={<AdminReferralManagement />} />
             </Route>
 
 
@@ -517,6 +522,7 @@ function App() {
               <Route path="placement"     element={<PrincipalPlacements />} />
               <Route path="placements"    element={<PrincipalPlacements />} />
               <Route path="settings"      element={<Settings />} />
+              <Route path="referrals"     element={<PersonalReferrals />} />
             </Route>
 
             {/* ── HOD ROUTES ── */}
@@ -542,6 +548,7 @@ function App() {
               <Route path="placements"    element={<HodPlacements />} />
               <Route path="library"       element={<HodLibrary />} />
               <Route path="settings"      element={<HodSettings />} />
+              <Route path="referrals"     element={<PersonalReferrals />} />
             </Route>
 
             {/* ── STAFF ROUTES ── */}
@@ -561,6 +568,7 @@ function App() {
               <Route path="placements" element={<StaffPlacements />} />
               <Route path="library"    element={<StaffLibrary />} />
               <Route path="support"    element={<StaffSupport />} />
+              <Route path="referrals"  element={<PersonalReferrals />} />
             </Route>
 
             {/* ── STUDENT ROUTES ── */}
@@ -582,6 +590,7 @@ function App() {
               <Route path="library"     element={<StudentLibrary />} />
               <Route path="welfare"     element={<StudentWelfare />} />
               <Route path="transport"   element={<StudentTransport />} />
+              <Route path="referrals"   element={<PersonalReferrals />} />
             </Route>
 
             {/* ── PARENT ROUTES ── */}
@@ -596,6 +605,7 @@ function App() {
               <Route path="timetable" element={<ParentTimetable />} />
               <Route path="exams" element={<ParentTimetable />} />
               <Route path="transport" element={<ParentTransport />} />
+              <Route path="referrals" element={<PersonalReferrals />} />
             </Route>
 
             {/* ── ACCOUNTS ROUTES ── */}
@@ -617,6 +627,7 @@ function App() {
               <Route path="expenses" element={<Expenses />} />
               <Route path="reports" element={<AccountsReports />} />
               <Route path="scholarships" element={<Scholarships />} />
+              <Route path="referrals" element={<PersonalReferrals />} />
             </Route>
 
             {/* ── DRIVER ROUTES ── */}
@@ -632,6 +643,7 @@ function App() {
               <Route path="payroll" element={<DriverPayroll />} />
               <Route path="notifications" element={<DriverNotifications />} />
               <Route path="attendance" element={<DriverAttendance />} />
+              <Route path="referrals"  element={<PersonalReferrals />} />
             </Route>
 
             {/* ── HOSTEL WARDEN ROUTES ── */}
@@ -650,6 +662,7 @@ function App() {
               <Route path="visitors" element={<HostelDashboard defaultTab="Visitors" />} />
               <Route path="attendance" element={<HostelDashboard defaultTab="Attendance" />} />
               <Route path="reports" element={<HostelDashboard defaultTab="Reports" />} />
+              <Route path="referrals" element={<PersonalReferrals />} />
             </Route>
 
             {/* ── LIBRARIAN ROUTES ── */}
@@ -666,6 +679,7 @@ function App() {
               <Route path="digital" element={<LibrarianDashboard defaultTab="Digital Library" />} />
               <Route path="members" element={<LibrarianDashboard defaultTab="Student Members" />} />
               <Route path="reports" element={<LibrarianDashboard defaultTab="Fines & Analytics" />} />
+              <Route path="referrals" element={<PersonalReferrals />} />
             </Route>
 
             {/* ── PLACEMENT OFFICER ROUTES ── */}
@@ -680,6 +694,7 @@ function App() {
               <Route path="interviews" element={<PlacementDashboard defaultTab="Interviews" />} />
               <Route path="selections" element={<PlacementDashboard defaultTab="Selected Students" />} />
               <Route path="reports" element={<PlacementDashboard defaultTab="Reports" />} />
+              <Route path="referrals" element={<PersonalReferrals />} />
             </Route>
           </Routes>
         </BrowserRouter>

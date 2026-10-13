@@ -94,7 +94,8 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
         { name: 'Salary Management', path: '/accounts/salary', icon: <Banknote size={20} /> },
         { name: 'Expense Tracking', path: '/accounts/expenses', icon: <PieChart size={20} /> },
         { name: 'Receipt Generation', path: '/accounts/receipts', icon: <Receipt size={20} /> },
-        { name: 'Scholarships', path: '/accounts/scholarships', icon: <Award size={20} /> }
+        { name: 'Scholarships', path: '/accounts/scholarships', icon: <Award size={20} /> },
+        { name: 'Business Referral', path: '/accounts/referrals', icon: <Award size={20} /> }
       ]
     },
     {

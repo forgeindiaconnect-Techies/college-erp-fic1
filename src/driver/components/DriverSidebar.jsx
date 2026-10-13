@@ -1,7 +1,7 @@
 import React from 'react';
 import { SettingsContext } from '../../App';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Bus, MapPin, Users, Bell, Wrench, Calendar, Navigation, LogOut, ChevronRight, ChevronDown, CheckSquare, IndianRupee, X } from 'lucide-react';
+import { LayoutDashboard, Bus, MapPin, Users, Bell, Wrench, Calendar, Navigation, LogOut, ChevronRight, ChevronDown, CheckSquare, IndianRupee, X, Award } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
 const DriverSidebar = ({ isOpen, onClose }) => {
@@ -43,7 +43,8 @@ const DriverSidebar = ({ isOpen, onClose }) => {
       items: [
         { name: 'My Tasks', path: '/driver/tasks', icon: <CheckSquare size={20} /> },
         { name: 'Payroll', path: '/driver/payroll', icon: <IndianRupee size={20} /> },
-        { name: 'Notifications', path: '/driver/notifications', icon: <Bell size={20} /> }
+        { name: 'Notifications', path: '/driver/notifications', icon: <Bell size={20} /> },
+        { name: 'Business Referral', path: '/driver/referrals', icon: <Award size={20} /> }
       ]
     }
   ];

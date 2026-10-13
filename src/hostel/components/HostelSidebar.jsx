@@ -4,7 +4,7 @@ import { SettingsContext } from '../../App';
 import { 
   Building, DoorOpen, Users, UserCheck, Utensils, 
   CreditCard, AlertOctagon, UserPlus, Clock, FileText,
-  LayoutDashboard, LogOut, ChevronRight, ChevronDown, CheckCircle, X
+  LayoutDashboard, LogOut, ChevronRight, ChevronDown, CheckCircle, X, Award
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -60,7 +60,8 @@ const HostelSidebar = ({ isOpen, onClose }) => {
         { name: 'Mess Menu', path: '/hostel/mess-menu', icon: <Utensils size={20} /> },
         { name: 'Complaints', path: '/hostel/complaints', icon: <AlertOctagon size={20} /> },
         { name: 'Hostel Fees', path: '/hostel/fees', icon: <CreditCard size={20} /> },
-        { name: 'Hostel Reports', path: '/hostel/reports', icon: <FileText size={20} /> }
+        { name: 'Hostel Reports', path: '/hostel/reports', icon: <FileText size={20} /> },
+        { name: 'Business Referral', path: '/hostel/referrals', icon: <Award size={20} /> }
       ]
     }
   ];

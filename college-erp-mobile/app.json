@@ -11,6 +11,11 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.college.erp",
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "INTERNET"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -37,6 +42,16 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "f92b61f6-42f5-406d-a19d-aaffa6d55eb8"
+      }
     }
   }
 }

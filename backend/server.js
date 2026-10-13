@@ -92,6 +92,8 @@ import admissionRoutes from './routes/admissionRoutes.js';
 import quotaRoutes from './routes/quotaRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import scholarshipRoutes from './routes/scholarshipRoutes.js';
+import referralRoutes from './routes/referralRoutes.js';
+import opportunityRoutes, { autoSeedOpportunitiesIfEmpty } from './routes/opportunityRoutes.js';
 import { verifyCloudinaryConnection } from './config/cloudinary.js';
 
 // Import Cron Jobs
@@ -1007,6 +1009,8 @@ app.use('/api/class-monitoring', classMonitoringRoutes);
 app.use('/api/substitutions', substitutionRoutes);
 app.use('/api/class-sessions', classSessionRoutes);
 app.use('/api/documents', documentsRoutes);
+app.use('/api/referrals', referralRoutes);
+app.use('/api/opportunities', opportunityRoutes);
 
 app.get('/api/cloudinary/status', async (_req, res) => {
   const status = await verifyCloudinaryConnection();
@@ -1029,6 +1033,10 @@ app.get('/api/sync-hero-image', (_req, res) => {
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
+});
+
+app.get('/api', (req, res) => {
+  res.json({ status: 'online', message: 'College ERP API is running...', timestamp: new Date().toISOString() });
 });
 
 app.get('/', (req, res) => {
@@ -1153,6 +1161,7 @@ const startServer = async () => {
 
   await seedDepartments();
   await autoSeedIfEmpty();
+  await autoSeedOpportunitiesIfEmpty();
 
   const listenOnPort = (portToTry) => {
     const srv = server.listen(portToTry, () => {

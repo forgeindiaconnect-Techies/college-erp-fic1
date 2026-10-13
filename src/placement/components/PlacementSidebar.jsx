@@ -34,6 +34,7 @@ const menuGroups = [
     icon: <BarChart3 size={20} />,
     items: [
       { name: 'Placement Analytics', path: '/placement/reports', icon: <BarChart3 size={18} /> },
+      { name: 'Business Referral', path: '/placement/referrals', icon: <Award size={18} /> },
     ]
   }
 ];

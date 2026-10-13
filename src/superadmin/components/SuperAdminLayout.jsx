@@ -13,7 +13,8 @@ import {
   ShieldAlert,
   Crown,
   X,
-  LogOut
+  LogOut,
+  Award
 } from 'lucide-react';
 
 const SuperAdminSidebar = ({ isOpen, onClose }) => {
@@ -28,6 +29,7 @@ const SuperAdminSidebar = ({ isOpen, onClose }) => {
   const navItems = [
     { name: 'Dashboard', path: '/superadmin/dashboard', icon: <LayoutDashboard size={20} /> },
     { name: 'Colleges', path: '/superadmin/colleges', icon: <Building2 size={20} /> },
+    { name: 'Business Referral', path: '/superadmin/business-referrals', icon: <Award size={20} /> },
     { name: 'Subscriptions', path: '/superadmin/subscriptions', icon: <Crown size={20} /> },
     { name: 'Trials', path: '/superadmin/trials', icon: <ShieldAlert size={20} /> },
     { name: 'Payments', path: '/superadmin/payments', icon: <CreditCard size={20} /> },

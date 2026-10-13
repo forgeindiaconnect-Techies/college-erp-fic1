@@ -4,7 +4,7 @@ import { SettingsContext } from '../../App';
 import {
   LayoutDashboard, Users, GraduationCap, CalendarCheck,
   BookOpenCheck, Calendar, BookOpen, FileText, ClipboardList, Inbox,
-  LogOut, ChevronRight, ChevronDown, Megaphone, Settings, IndianRupee, Briefcase, Library, LifeBuoy, X
+  LogOut, ChevronRight, ChevronDown, Megaphone, Settings, IndianRupee, Briefcase, Library, LifeBuoy, X, Award
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -105,6 +105,7 @@ const HodSidebar = ({ isOpen, onClose }) => {
       items: [
         { name: 'Reports', path: '/hod/reports', icon: <ClipboardList size={20} /> },
         { name: 'Payroll', path: '/hod/payroll', icon: <IndianRupee size={20} /> },
+        { name: 'Business Referral', path: '/hod/referrals', icon: <Award size={20} /> },
         { name: 'Settings', path: '/hod/settings', icon: <Settings size={20} /> }
       ]
     }
