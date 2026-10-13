@@ -159,50 +159,36 @@ const StudentPlacements = () => {
         attendance: computedAttendance
       });
 
-      // 3. Jobs / Drives
+      // 3. Jobs / Drives (strictly this tenant)
       let rawJobs = Array.isArray(jobsRes.data) ? jobsRes.data : (jobsRes.data?.jobs || []);
       try {
         const localJobMap = new Map();
         rawJobs.forEach(j => localJobMap.set(String(j._id || j.jobId || j.id), j));
         
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('erp_placement_jobs')) {
-            try {
-              const items = JSON.parse(localStorage.getItem(key) || '[]');
-              if (Array.isArray(items)) {
-                items.forEach(j => {
-                  const id = String(j._id || j.jobId || j.id);
-                  if (id && !localJobMap.has(id)) {
-                    localJobMap.set(id, j);
-                  }
-                });
-              }
-            } catch (e) {}
-          }
+        const items = JSON.parse(localStorage.getItem(`erp_placement_jobs_${tenantId}`) || '[]');
+        if (Array.isArray(items)) {
+          items.forEach(j => {
+            const id = String(j._id || j.jobId || j.id);
+            if (id && !localJobMap.has(id)) {
+              localJobMap.set(id, j);
+            }
+          });
         }
         rawJobs = Array.from(localJobMap.values());
       } catch {}
       setJobs(rawJobs);
 
-      // 4. Applications for this student
+      // 4. Applications for this student (strictly this tenant)
       let rawApps = Array.isArray(appsRes.data) ? appsRes.data : (appsRes.data?.applications || []);
       try {
         const appMap = new Map();
         rawApps.forEach(a => appMap.set(String(a._id || a.applicationId || a.id), a));
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('erp_placement_applications')) {
-            try {
-              const items = JSON.parse(localStorage.getItem(key) || '[]');
-              if (Array.isArray(items)) {
-                items.forEach(a => {
-                  const id = String(a._id || a.applicationId || a.id);
-                  if (id && !appMap.has(id)) appMap.set(id, a);
-                });
-              }
-            } catch (e) {}
-          }
+        const items = JSON.parse(localStorage.getItem(`erp_placement_applications_${tenantId}`) || '[]');
+        if (Array.isArray(items)) {
+          items.forEach(a => {
+            const id = String(a._id || a.applicationId || a.id);
+            if (id && !appMap.has(id)) appMap.set(id, a);
+          });
         }
         rawApps = Array.from(appMap.values());
       } catch {}
@@ -213,47 +199,33 @@ const StudentPlacements = () => {
       );
       setApplications(myApps);
 
-      // 5. Interviews
+      // 5. Interviews (strictly this tenant)
       let rawInt = Array.isArray(intRes.data) ? intRes.data : (intRes.data?.interviews || []);
       try {
         const intMap = new Map();
         rawInt.forEach(item => intMap.set(String(item._id || item.interviewId || item.id), item));
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('erp_placement_interviews')) {
-            try {
-              const items = JSON.parse(localStorage.getItem(key) || '[]');
-              if (Array.isArray(items)) {
-                items.forEach(item => {
-                  const id = String(item._id || item.interviewId || item.id);
-                  if (id && !intMap.has(id)) intMap.set(id, item);
-                });
-              }
-            } catch (e) {}
-          }
+        const items = JSON.parse(localStorage.getItem(`erp_placement_interviews_${tenantId}`) || '[]');
+        if (Array.isArray(items)) {
+          items.forEach(item => {
+            const id = String(item._id || item.interviewId || item.id);
+            if (id && !intMap.has(id)) intMap.set(id, item);
+          });
         }
         rawInt = Array.from(intMap.values());
       } catch {}
       setInterviews(rawInt);
 
-      // 6. Selections / Offers
+      // 6. Selections / Offers (strictly this tenant)
       let rawSel = Array.isArray(selRes.data) ? selRes.data : (selRes.data?.selections || []);
       try {
         const selMap = new Map();
         rawSel.forEach(s => selMap.set(String(s._id || s.selectionId || s.id), s));
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('erp_placement_selections')) {
-            try {
-              const items = JSON.parse(localStorage.getItem(key) || '[]');
-              if (Array.isArray(items)) {
-                items.forEach(s => {
-                  const id = String(s._id || s.selectionId || s.id);
-                  if (id && !selMap.has(id)) selMap.set(id, s);
-                });
-              }
-            } catch (e) {}
-          }
+        const items = JSON.parse(localStorage.getItem(`erp_placement_selections_${tenantId}`) || '[]');
+        if (Array.isArray(items)) {
+          items.forEach(s => {
+            const id = String(s._id || s.selectionId || s.id);
+            if (id && !selMap.has(id)) selMap.set(id, s);
+          });
         }
         rawSel = Array.from(selMap.values());
       } catch {}

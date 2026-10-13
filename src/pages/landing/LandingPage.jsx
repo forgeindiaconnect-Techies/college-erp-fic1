@@ -37,7 +37,10 @@ import {
   Building2,
   ChevronRight,
   Play,
-  Award
+  Award,
+  Mail,
+  MapPin,
+  Clock
 } from 'lucide-react';
 import './LandingPage.css';
 
@@ -297,6 +300,7 @@ const LandingPage = () => {
   const [showLoginDropdown, setShowLoginDropdown] = useState(false);
   const [quickLoginRole, setQuickLoginRole] = useState('Select Role');
   const [showRoleSelector, setShowRoleSelector] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
 
   const notifRef = useRef(null);
   const loginRef = useRef(null);
@@ -406,7 +410,11 @@ const LandingPage = () => {
             <button
               type="button"
               className={`erp-nav-pill-btn ${activeNav === 'contact' ? 'active-pill' : ''}`}
-              onClick={() => scrollToSection('contact')}
+              onClick={() => {
+                setActiveNav('contact');
+                setShowContactModal(true);
+                scrollToSection('contact');
+              }}
             >
               <Phone size={15} />
               <span>Contact</span>
@@ -535,7 +543,10 @@ const LandingPage = () => {
               <button onClick={() => scrollToSection('about')}>About</button>
               <button onClick={() => scrollToSection('features')}>Features</button>
               <button onClick={() => scrollToSection('modules')}>Modules</button>
-              <button onClick={() => scrollToSection('contact')}>Contact</button>
+              <button onClick={() => {
+                setShowContactModal(true);
+                scrollToSection('contact');
+              }}>Contact</button>
             </div>
             <div className="mobile-drawer-actions">
               <button className="mobile-login-btn" onClick={() => { setMobileMenuOpen(false); navigate('/login'); }}>
@@ -588,7 +599,7 @@ const LandingPage = () => {
               <button
                 type="button"
                 className="erp-btn-primary"
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/register')}
               >
                 <span>Get Started</span>
                 <ArrowRight size={16} />
@@ -697,7 +708,7 @@ const LandingPage = () => {
             {/* Mint Green Card: "New to College ERP? Get Started →" */}
             <div 
               className="quick-login-register-box"
-              onClick={() => navigate('/login?role=Student')}
+              onClick={() => navigate('/register')}
             >
               <div className="register-box-icon">
                 <UserPlus size={18} />
@@ -919,9 +930,79 @@ const LandingPage = () => {
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
-         5. PROFESSIONAL FOOTER (Matching Theme & Guidelines)
+         5. CAMPUS SUPPORT & CONTACT DETAILS SECTION
          ───────────────────────────────────────────────────────────── */}
-      <footer className="erp-footer" id="contact">
+      <section className="erp-contact-section" id="contact">
+        <div className="erp-container">
+          <div className="erp-section-header">
+            <span className="erp-section-badge">
+              <Phone size={14} /> Get In Touch
+            </span>
+            <h2 className="erp-section-title">Institutional Support &amp; Contact Desk</h2>
+            <p className="erp-section-subtitle">
+              Reach our 24/7 dedicated ERP administration helpline, technical support team, or visit our central campus office.
+            </p>
+          </div>
+
+          <div className="erp-contact-cards-grid">
+            {/* Phone Support Card */}
+            <div className="erp-contact-card">
+              <div className="contact-card-icon-box phone">
+                <Phone size={24} />
+              </div>
+              <h3 className="contact-card-title">Helpline &amp; Support</h3>
+              <p className="contact-card-desc">Instant phone assistance for administrative, faculty, and student portals.</p>
+              <div className="contact-card-links">
+                <a href="tel:18001234567" className="contact-link-highlight">1800-123-4567 (Toll-Free)</a>
+                <a href="tel:+919876543210" className="contact-link-sub">+91 98765 43210 (Direct Support)</a>
+              </div>
+            </div>
+
+            {/* Email Support Card */}
+            <div className="erp-contact-card">
+              <div className="contact-card-icon-box email">
+                <Mail size={24} />
+              </div>
+              <h3 className="contact-card-title">Official Email</h3>
+              <p className="contact-card-desc">Write to our technical and tenant deployment specialists for fast resolution.</p>
+              <div className="contact-card-links">
+                <a href="mailto:support@collegeerp.com" className="contact-link-highlight">support@collegeerp.com</a>
+                <a href="mailto:contact@collegeerp.edu" className="contact-link-sub">contact@collegeerp.edu</a>
+              </div>
+            </div>
+
+            {/* Campus Address Card */}
+            <div className="erp-contact-card">
+              <div className="contact-card-icon-box location">
+                <MapPin size={24} />
+              </div>
+              <h3 className="contact-card-title">Campus Headquarters</h3>
+              <p className="contact-card-desc">Central Administrative Wing, College ERP Knowledge Park.</p>
+              <div className="contact-card-links">
+                <span className="contact-address-text">Block C, Tech Corridor, Bangalore, Karnataka - 560001</span>
+              </div>
+            </div>
+
+            {/* Working Hours Card */}
+            <div className="erp-contact-card">
+              <div className="contact-card-icon-box hours">
+                <Clock size={24} />
+              </div>
+              <h3 className="contact-card-title">Operating Hours</h3>
+              <p className="contact-card-desc">Helpdesk and technical onboarding schedules.</p>
+              <div className="contact-card-links">
+                <span className="contact-hours-bold">Mon – Sat: 8:30 AM – 6:30 PM</span>
+                <span className="contact-hours-badge">24/7 Cloud Monitoring Active</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────────────────────────────────────────────────
+         6. PROFESSIONAL FOOTER (Matching Theme & Guidelines)
+         ───────────────────────────────────────────────────────────── */}
+      <footer className="erp-footer" id="footer">
         <div className="erp-container">
 
           <div className="erp-footer-top">
@@ -954,7 +1035,10 @@ const LandingPage = () => {
                 <li><button onClick={() => scrollToSection('about')}>About Campus</button></li>
                 <li><button onClick={() => scrollToSection('features')}>Features</button></li>
                 <li><button onClick={() => scrollToSection('modules')}>Dashboard Portals</button></li>
-                <li><button onClick={() => scrollToSection('contact')}>Support &amp; Contact</button></li>
+                <li><button onClick={() => {
+                  setShowContactModal(true);
+                  scrollToSection('contact');
+                }}>Support &amp; Contact</button></li>
               </ul>
             </div>
 
@@ -1046,6 +1130,104 @@ const LandingPage = () => {
                   <p>No portals matching "{searchQuery}".</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+         7. INTERACTIVE CONTACT DETAILS MODAL POPUP
+         ───────────────────────────────────────────────────────────── */}
+      {showContactModal && (
+        <div className="erp-modal-overlay animate-fade-in" onClick={() => setShowContactModal(false)}>
+          <div className="erp-contact-modal" onClick={e => e.stopPropagation()}>
+            <div className="contact-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="contact-modal-icon-badge">
+                  <Phone size={20} color="#2563eb" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+                    Contact &amp; Support Directory
+                  </h3>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Direct channels for admissions, technical assistance &amp; management
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="search-modal-close"
+                onClick={() => setShowContactModal(false)}
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="contact-modal-body">
+              {/* Phone item */}
+              <div className="contact-modal-item">
+                <div className="modal-item-icon-box phone">
+                  <Phone size={20} />
+                </div>
+                <div className="modal-item-info">
+                  <strong>Toll-Free Helpline &amp; Mobile Desk</strong>
+                  <p>
+                    <a href="tel:18001234567">1800-123-4567</a> (Toll-Free) &bull;{' '}
+                    <a href="tel:+919876543210">+91 98765 43210</a> (Direct Support)
+                  </p>
+                </div>
+              </div>
+
+              {/* Email item */}
+              <div className="contact-modal-item">
+                <div className="modal-item-icon-box email">
+                  <Mail size={20} />
+                </div>
+                <div className="modal-item-info">
+                  <strong>Official Email Support</strong>
+                  <p>
+                    <a href="mailto:support@collegeerp.com">support@collegeerp.com</a> &bull;{' '}
+                    <a href="mailto:contact@collegeerp.edu">contact@collegeerp.edu</a>
+                  </p>
+                </div>
+              </div>
+
+              {/* Address item */}
+              <div className="contact-modal-item">
+                <div className="modal-item-icon-box location">
+                  <MapPin size={20} />
+                </div>
+                <div className="modal-item-info">
+                  <strong>Campus Headquarters &amp; Operations Office</strong>
+                  <p>Central Administrative Wing, Block C, Tech Corridor, Bangalore, Karnataka - 560001</p>
+                </div>
+              </div>
+
+              {/* Hours item */}
+              <div className="contact-modal-item">
+                <div className="modal-item-icon-box hours">
+                  <Clock size={20} />
+                </div>
+                <div className="modal-item-info">
+                  <strong>Operating &amp; Support Hours</strong>
+                  <p>Monday to Saturday: 8:30 AM &ndash; 6:30 PM IST (Cloud Infrastructure 24/7)</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="contact-modal-footer">
+              <a href="tel:18001234567" className="contact-modal-call-btn">
+                <Phone size={15} /> Call Toll-Free Now
+              </a>
+              <button
+                type="button"
+                className="contact-modal-close-btn"
+                onClick={() => setShowContactModal(false)}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

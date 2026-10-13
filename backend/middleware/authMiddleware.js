@@ -70,11 +70,17 @@ export const protect = async (req, res, next) => {
               { _id: (typeof tenantId === 'string' && tenantId.length === 24) ? tenantId : null }
             ]
           });
-          if (college && (college.isActive === false || college.subscriptionStatus === 'Deactivated')) {
+          if (college && (college.isActive === false || college.subscriptionStatus === 'Deactivated' || college.subscriptionStatus === 'Suspended' || college.subscriptionStatus === 'Pending Approval')) {
+            const isPending = college.subscriptionStatus === 'Pending Approval';
+            const isSuspended = college.subscriptionStatus === 'Suspended';
             return res.status(403).json({
               success: false,
               isDeactivated: true,
-              message: 'College is deactivated. Please contact Super Admin.'
+              message: isPending
+                ? 'Your college registration and subscription are currently pending Super Admin approval.'
+                : isSuspended
+                ? 'Your college subscription has been suspended by Super Admin. Please contact support.'
+                : 'College is deactivated. Please contact Super Admin.'
             });
           }
         }

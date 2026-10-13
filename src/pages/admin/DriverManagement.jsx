@@ -43,29 +43,13 @@ const DriverManagement = () => {
   const [vehicles, setVehicles] = useState([]);
   const [routes, setRoutes] = useState([]);
 
-  const getCachedDrivers = () => {
+  const getCachedDrivers = (tenant) => {
     try {
-      const allCached = [];
-      const seen = new Set();
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith('erp_transport_drivers')) {
-          try {
-            const parsed = JSON.parse(localStorage.getItem(k));
-            if (Array.isArray(parsed)) {
-              parsed.forEach(item => {
-                if (!item) return;
-                const id = item.driverId || item.email || item._id;
-                if (id && !seen.has(id)) {
-                  seen.add(id);
-                  allCached.push(item);
-                }
-              });
-            }
-          } catch (e) {}
-        }
-      }
-      return allCached;
+      const activeTenant = tenant || sessionStorage.getItem('tenantId') || (JSON.parse(sessionStorage.getItem('admin_session') || '{}').tenantId) || 'mock_college_id';
+      const raw = localStorage.getItem(`erp_transport_drivers_${activeTenant}`);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
       return [];
     }
@@ -74,6 +58,7 @@ const DriverManagement = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
+      const activeTenant = sessionStorage.getItem('tenantId') || (JSON.parse(sessionStorage.getItem('admin_session') || '{}').tenantId) || 'mock_college_id';
       const [drRes, vehRes, routeRes] = await Promise.all([
         getTransportDrivers().catch(() => ({ data: [] })),
         getTransportVehicles().catch(() => ({ data: [] })),
@@ -81,9 +66,9 @@ const DriverManagement = () => {
       ]);
 
       const backendDrivers = (Array.isArray(drRes?.data) ? drRes.data : (Array.isArray(drRes) ? drRes : [])).filter(Boolean);
-      const cachedDrivers = getCachedDrivers();
+      const cachedDrivers = getCachedDrivers(activeTenant);
 
-      // Merge backend and local cache
+      // Merge backend and local cache strictly for this tenant
       const mergedMap = new Map();
 
       // 1. Seed cached drivers
@@ -101,38 +86,8 @@ const DriverManagement = () => {
       });
 
       const finalDrivers = Array.from(mergedMap.values());
-
-      // Ensure Viji is preserved alongside other drivers
-      const hasViji = finalDrivers.some(d => 
-        (d?.name || '').toLowerCase().includes('viji') || 
-        (d?.email || '').toLowerCase().includes('viji')
-      );
-
-      if (!hasViji) {
-        let maxIdNum = 0;
-        finalDrivers.forEach(d => {
-          const m = String(d?.driverId || '').match(/\d+/);
-          if (m) {
-            const num = parseInt(m[0], 10);
-            if (num > maxIdNum) maxIdNum = num;
-          }
-        });
-        const vijiId = `DRV-${String(Math.max(maxIdNum + 1, 3)).padStart(4, '0')}`;
-        finalDrivers.push({
-          _id: 'drv_viji_0003',
-          driverId: vijiId,
-          name: 'Viji',
-          email: 'viji.driver@college.edu',
-          phone: '9845123456',
-          license: 'TN-38-20200005678',
-          experience: '4 Years',
-          status: 'Active'
-        });
-      }
-
       setDrivers(finalDrivers);
 
-      const activeTenant = sessionStorage.getItem('tenantId') || localStorage.getItem('tenantId') || 'mock_college_id';
       if (finalDrivers.length > 0) {
         localStorage.setItem(`erp_transport_drivers_${activeTenant}`, JSON.stringify(finalDrivers));
       }
@@ -141,7 +96,8 @@ const DriverManagement = () => {
       setRoutes(Array.isArray(routeRes.data) ? routeRes.data : []);
     } catch (err) {
       console.error('Failed to fetch data:', err);
-      const cached = getCachedDrivers();
+      const activeTenant = sessionStorage.getItem('tenantId') || (JSON.parse(sessionStorage.getItem('admin_session') || '{}').tenantId) || 'mock_college_id';
+      const cached = getCachedDrivers(activeTenant);
       setDrivers(cached);
     } finally {
       setLoading(false);

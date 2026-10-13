@@ -19,7 +19,9 @@ import {
   ShieldCheck,
   UserCheck,
   Globe,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Clock,
+  Trash2
 } from 'lucide-react';
 import api from '../../api';
 import ConfirmModal from '../../components/common/ConfirmModal';
@@ -108,17 +110,53 @@ const SuperAdminColleges = () => {
 
   const metrics = useMemo(() => {
     const total = colleges.length;
-    const active = colleges.filter(c => (c.subscriptionStatus || 'Active') === 'Active').length;
-    const trials = colleges.filter(c => c.subscriptionPlan === 'Trial' || c.subscriptionStatus === 'Trial').length;
+    const pending = colleges.filter(c => (c.subscriptionStatus || '') === 'Pending Approval' || (c.status || '') === 'Pending Approval').length;
+    const active = colleges.filter(c => (c.subscriptionStatus || 'Active') === 'Active' && (c.subscriptionStatus || '') !== 'Pending Approval').length;
+    const trials = colleges.filter(c => (c.subscriptionPlan === 'Trial' || c.subscriptionStatus === 'Trial') && (c.subscriptionStatus || '') !== 'Pending Approval').length;
     const grace = colleges.filter(c => c.subscriptionStatus === 'Grace Period').length;
-    const deactivated = colleges.filter(c => c.subscriptionStatus === 'Deactivated').length;
+    const deactivated = colleges.filter(c => c.subscriptionStatus === 'Deactivated' || c.subscriptionStatus === 'Suspended').length;
     const totalUsers = colleges.reduce((sum, c) => sum + (Number(c.totalUsers) || 0), 0);
 
-    return { total, active, trials, grace, deactivated, totalUsers };
+    return { total, pending, active, trials, grace, deactivated, totalUsers };
   }, [colleges]);
 
+  const handleApproveCollege = (college) => {
+    const collegeName = college.name || college.collegeName || 'College';
+    setModalState({
+      isOpen: true,
+      type: 'success',
+      title: `Approve ${collegeName}?`,
+      message: `Approving ${collegeName} (${college.tenantId || 'Tenant'}) will activate their ${college.subscriptionPlan || 'Trial'} subscription plan, grant full administrative and user access, and notify the college administration.`,
+      confirmText: '✔ Approve & Activate',
+      onConfirm: async () => {
+        const idToUse = college._id || college.tenantId;
+        try {
+          await api.put(`/superadmin/college/${idToUse}/approve`);
+        } catch (err) {
+          try {
+            await api.put(`/superadmin/subscriptions/${idToUse}/approve`);
+          } catch (e) {
+            try {
+              await api.put(`/auth/colleges/${idToUse}/status`, { status: 'Active' });
+            } catch (fallbackErr) {
+              console.error('Failed to approve college:', fallbackErr);
+            }
+          }
+        }
+        setColleges(prev => prev.map(c => 
+          (c._id === college._id || c.tenantId === college.tenantId) 
+            ? { ...c, subscriptionStatus: 'Active', isActive: true, paymentStatus: 'Paid' } 
+            : c
+        ));
+        if (selectedCollege && (selectedCollege._id === college._id || selectedCollege.tenantId === college.tenantId)) {
+          setSelectedCollege(prev => ({ ...prev, subscriptionStatus: 'Active', isActive: true, paymentStatus: 'Paid' }));
+        }
+      }
+    });
+  };
+
   const handleToggleStatus = (college) => {
-    const isCurrentlyDeactivated = college.subscriptionStatus === 'Deactivated';
+    const isCurrentlyDeactivated = college.subscriptionStatus === 'Deactivated' || college.subscriptionStatus === 'Suspended';
     const targetStatus = isCurrentlyDeactivated ? 'Active' : 'Deactivated';
 
     setModalState({
@@ -150,6 +188,37 @@ const SuperAdminColleges = () => {
     });
   };
 
+  const handleDeleteCollege = (college) => {
+    const collegeName = college.name || college.collegeName || 'College';
+    const tenantId = college.tenantId || college._id;
+    setModalState({
+      isOpen: true,
+      type: 'danger',
+      title: `Delete ${collegeName}?`,
+      message: `Are you sure you want to permanently delete "${collegeName}" (${tenantId})? This will completely remove the college tenant, administrator logins, and all associated institutional data. This action CANNOT be reversed.`,
+      confirmText: '🗑 Permanently Delete',
+      onConfirm: async () => {
+        const idToUse = college._id || college.tenantId;
+        try {
+          await api.delete(`/superadmin/college/${idToUse}`);
+        } catch (err) {
+          try {
+            await api.delete(`/auth/colleges/${idToUse}`);
+          } catch (fallbackErr) {
+            console.error('Failed to delete college:', fallbackErr);
+            alert(fallbackErr.response?.data?.message || 'Failed to delete college');
+            return;
+          }
+        }
+        setColleges(prev => prev.filter(c => c._id !== college._id && c.tenantId !== college.tenantId));
+        if (selectedCollege && (selectedCollege._id === college._id || selectedCollege.tenantId === college.tenantId)) {
+          setShowInspectModal(false);
+          setSelectedCollege(null);
+        }
+      }
+    });
+  };
+
   const copyToClipboard = (text, key) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
@@ -170,10 +239,11 @@ const SuperAdminColleges = () => {
       if (!matches) return false;
 
       if (activeFilter === 'ALL') return true;
-      if (activeFilter === 'ACTIVE') return (c.subscriptionStatus || 'Active') === 'Active';
-      if (activeFilter === 'TRIAL') return c.subscriptionPlan === 'Trial' || c.subscriptionStatus === 'Trial';
+      if (activeFilter === 'PENDING') return (c.subscriptionStatus || c.status || '') === 'Pending Approval';
+      if (activeFilter === 'ACTIVE') return (c.subscriptionStatus || 'Active') === 'Active' && (c.subscriptionStatus || '') !== 'Pending Approval';
+      if (activeFilter === 'TRIAL') return (c.subscriptionPlan === 'Trial' || c.subscriptionStatus === 'Trial') && (c.subscriptionStatus || '') !== 'Pending Approval';
       if (activeFilter === 'GRACE') return c.subscriptionStatus === 'Grace Period';
-      if (activeFilter === 'DEACTIVATED') return c.subscriptionStatus === 'Deactivated';
+      if (activeFilter === 'DEACTIVATED') return c.subscriptionStatus === 'Deactivated' || c.subscriptionStatus === 'Suspended';
 
       return true;
     });
@@ -294,6 +364,31 @@ const SuperAdminColleges = () => {
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>14-Day Free Tier</div>
         </div>
 
+        {metrics.pending > 0 && (
+          <div 
+            className="sa-kpi-card" 
+            style={{ 
+              padding: '1.1rem', 
+              border: '1.5px solid #f59e0b', 
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.06), rgba(245, 158, 11, 0.14))',
+              cursor: 'pointer'
+            }}
+            onClick={() => setActiveFilter('PENDING')}
+            title="Click to view colleges awaiting approval"
+          >
+            <div className="sa-kpi-top" style={{ marginBottom: '0.4rem' }}>
+              <div>
+                <div className="sa-kpi-title" style={{ color: '#d97706', fontWeight: 700 }}>Pending Approval</div>
+                <div className="sa-kpi-value" style={{ fontSize: '1.6rem', color: '#d97706' }}>{metrics.pending}</div>
+              </div>
+              <div className="sa-kpi-icon-box" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', width: '38px', height: '38px' }}>
+                <Clock size={18} />
+              </div>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600 }}>Needs Review &amp; Activation</div>
+          </div>
+        )}
+
         <div className="sa-kpi-card" style={{ padding: '1.1rem' }}>
           <div className="sa-kpi-top" style={{ marginBottom: '0.4rem' }}>
             <div>
@@ -319,6 +414,20 @@ const SuperAdminColleges = () => {
             >
               All Colleges
               <span className="sa-filter-tab-count">{colleges.length}</span>
+            </button>
+
+            <button 
+              className={`sa-filter-tab ${activeFilter === 'PENDING' ? 'active' : ''}`}
+              onClick={() => setActiveFilter('PENDING')}
+              style={metrics.pending > 0 ? { borderColor: '#f59e0b', color: '#b45309', fontWeight: 700 } : {}}
+            >
+              Pending Approval
+              <span 
+                className="sa-filter-tab-count" 
+                style={metrics.pending > 0 ? { background: '#fef3c7', color: '#b45309', fontWeight: 800 } : {}}
+              >
+                {metrics.pending}
+              </span>
             </button>
 
             <button 
@@ -410,7 +519,8 @@ const SuperAdminColleges = () => {
                   const initial = collegeName.charAt(0).toUpperCase();
                   const plan = college.subscriptionPlan || 'Trial';
                   const status = college.subscriptionStatus || 'Active';
-                  const isDeactivated = status === 'Deactivated';
+                  const isDeactivated = status === 'Deactivated' || status === 'Suspended';
+                  const isPending = status === 'Pending Approval' || college.status === 'Pending Approval';
 
                   return (
                     <tr key={college._id || college.tenantId}>
@@ -525,13 +635,19 @@ const SuperAdminColleges = () => {
 
                           <span className={`sa-status-pill ${
                             status === 'Active' ? 'sa-status-active' :
+                            isPending ? 'sa-status-grace' :
                             status === 'Grace Period' ? 'sa-status-grace' :
                             'sa-status-deactivated'
-                          }`} style={{ width: 'fit-content' }}>
+                          }`} style={{ 
+                            width: 'fit-content',
+                            background: isPending ? '#fff7ed' : undefined,
+                            color: isPending ? '#c2410c' : undefined,
+                            border: isPending ? '1px solid #fed7aa' : undefined
+                          }}>
                             <span className="sa-pulse-dot" style={{ 
                               width: '6px', 
                               height: '6px',
-                              background: status === 'Active' ? '#10b981' : status === 'Grace Period' ? '#f59e0b' : '#ef4444'
+                              background: status === 'Active' ? '#10b981' : (isPending || status === 'Grace Period') ? '#f59e0b' : '#ef4444'
                             }}></span>
                             {status}
                           </span>
@@ -557,6 +673,31 @@ const SuperAdminColleges = () => {
                       {/* Action Controls */}
                       <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          {/* Dedicated Approve Button for Pending Approval or Suspended */}
+                          {(isPending || status === 'Suspended') && (
+                            <button 
+                              onClick={() => handleApproveCollege(college)}
+                              title="Approve College & Activate Subscription"
+                              style={{ 
+                                padding: '6px 12px', 
+                                borderRadius: '8px', 
+                                border: '1px solid #86efac', 
+                                background: '#dcfce7', 
+                                color: '#15803d', 
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                boxShadow: '0 1px 3px rgba(16, 185, 129, 0.2)'
+                              }}
+                            >
+                              <CheckCircle2 size={14} />
+                              Approve
+                            </button>
+                          )}
+
                           <button 
                             onClick={() => handleOpenInspect(college)}
                             title="Inspect Details"
@@ -596,6 +737,27 @@ const SuperAdminColleges = () => {
                             }}
                           >
                             {isDeactivated ? '⚡ Activate' : '⛔ Freeze'}
+                          </button>
+
+                          <button 
+                            onClick={() => handleDeleteCollege(college)}
+                            title="Delete College"
+                            style={{ 
+                              padding: '6px 12px', 
+                              borderRadius: '8px', 
+                              border: '1px solid #fca5a5', 
+                              background: '#fff1f2', 
+                              color: '#e11d48',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            Delete
                           </button>
                         </div>
                       </td>
@@ -907,6 +1069,53 @@ const SuperAdminColleges = () => {
             </div>
 
             <div className="sa-modal-footer">
+              {(selectedCollege.subscriptionStatus === 'Pending Approval' || selectedCollege.status === 'Pending Approval' || selectedCollege.subscriptionStatus === 'Suspended') && (
+                <button 
+                  type="button"
+                  className="sa-btn"
+                  onClick={() => {
+                    setShowInspectModal(false);
+                    handleApproveCollege(selectedCollege);
+                  }}
+                  style={{ 
+                    background: '#10b981', 
+                    color: '#ffffff', 
+                    border: 'none', 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    fontWeight: 700,
+                    marginRight: 'auto',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <CheckCircle2 size={16} /> Approve &amp; Activate College
+                </button>
+              )}
+              <button 
+                type="button"
+                className="sa-btn"
+                onClick={() => {
+                  handleDeleteCollege(selectedCollege);
+                }}
+                style={{ 
+                  background: '#fee2e2', 
+                  color: '#dc2626', 
+                  border: '1px solid #fca5a5', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  fontWeight: 700,
+                  marginRight: (selectedCollege.subscriptionStatus === 'Pending Approval' || selectedCollege.status === 'Pending Approval' || selectedCollege.subscriptionStatus === 'Suspended') ? '0' : 'auto',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Trash2 size={16} /> Delete College
+              </button>
               <button 
                 className="sa-btn sa-btn-secondary" 
                 onClick={() => setShowInspectModal(false)}

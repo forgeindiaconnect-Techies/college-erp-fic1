@@ -301,7 +301,8 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
 
   const fetchPlacementData = useCallback(async () => {
     setLoading(true);
-    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+    const sessionObj = JSON.parse(sessionStorage.getItem('admin_session') || sessionStorage.getItem('placement_session') || sessionStorage.getItem('user_session') || '{}');
+    const tenantId = sessionStorage.getItem('tenantId') || sessionObj.tenantId || 'mock_college_id';
     try {
       const [compRes, jobsRes, appsRes, intRes, selRes, studentsRes, marksRes, attRes] = await Promise.all([
         getPlacementCompanies().catch(() => ({ data: [] })),
@@ -320,27 +321,20 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
         return [];
       };
 
-      // 1. Process Jobs (Merge API & All Local Storage)
+      // 1. Process Jobs (Strictly this tenant)
       let combinedJobs = readArray(jobsRes, 'jobs');
       try {
         const jobMap = new Map();
         combinedJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
 
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('erp_placement_jobs')) {
-            try {
-              const localItems = JSON.parse(localStorage.getItem(key) || '[]');
-              if (Array.isArray(localItems)) {
-                localItems.forEach(lj => {
-                  const ljId = String(lj._id || lj.jobId || lj.id);
-                  if (ljId && !jobMap.has(ljId)) {
-                    jobMap.set(ljId, lj);
-                  }
-                });
-              }
-            } catch (err) {}
-          }
+        const localItems = JSON.parse(localStorage.getItem(`erp_placement_jobs_${tenantId}`) || '[]');
+        if (Array.isArray(localItems)) {
+          localItems.forEach(lj => {
+            const ljId = String(lj._id || lj.jobId || lj.id);
+            if (ljId && !jobMap.has(ljId)) {
+              jobMap.set(ljId, lj);
+            }
+          });
         }
         combinedJobs = Array.from(jobMap.values());
       } catch (e) {
@@ -348,7 +342,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
       }
       setJobs(combinedJobs);
 
-      // 2. Process Companies (Merge API, All Local Storage, and Jobs-derived)
+      // 2. Process Companies (Strictly this tenant)
       let combinedComps = readArray(compRes, 'companies');
       try {
         const compMap = new Map();
@@ -357,21 +351,14 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
           if (cKey) compMap.set(cKey, c);
         });
 
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('erp_placement_companies')) {
-            try {
-              const localItems = JSON.parse(localStorage.getItem(key) || '[]');
-              if (Array.isArray(localItems)) {
-                localItems.forEach(lc => {
-                  const cKey = String(lc.name || lc._id || lc.companyId || '').trim().toLowerCase();
-                  if (cKey && !compMap.has(cKey)) {
-                    compMap.set(cKey, lc);
-                  }
-                });
-              }
-            } catch (err) {}
-          }
+        const localComps = JSON.parse(localStorage.getItem(`erp_placement_companies_${tenantId}`) || '[]');
+        if (Array.isArray(localComps)) {
+          localComps.forEach(lc => {
+            const cKey = String(lc.name || lc._id || lc.companyId || '').trim().toLowerCase();
+            if (cKey && !compMap.has(cKey)) {
+              compMap.set(cKey, lc);
+            }
+          });
         }
 
         // Auto derive missing partner companies from active jobs
@@ -397,7 +384,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
       }
       setCompanies(combinedComps);
 
-      // 3. Process Applications (Multi-key scan all tenant applications)
+      // 3. Process Applications (Strictly this tenant)
       let combinedApps = readArray(appsRes, 'applications');
       try {
         const appMap = new Map();
@@ -413,28 +400,21 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
           });
         });
 
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('erp_placement_applications')) {
-            try {
-              const localItems = JSON.parse(localStorage.getItem(key) || '[]');
-              if (Array.isArray(localItems)) {
-                localItems.forEach(la => {
-                  const laId = String(la._id || la.applicationId || `${la.regNo || la.rollNo || la.student}_${la.company}_${la.role}`);
-                  if (laId && !appMap.has(laId)) {
-                    appMap.set(laId, {
-                      ...la,
-                      student: la.student || la.studentName || la.name || 'Candidate',
-                      regNo: la.regNo || la.rollNo || la.registerNo || 'N/A',
-                      dept: la.dept || la.department || 'TAMIL',
-                      cgpa: la.cgpa !== undefined ? la.cgpa : 0.0,
-                      status: la.status || 'Applied'
-                    });
-                  }
-                });
-              }
-            } catch (err) {}
-          }
+        const localApps = JSON.parse(localStorage.getItem(`erp_placement_applications_${tenantId}`) || '[]');
+        if (Array.isArray(localApps)) {
+          localApps.forEach(la => {
+            const laId = String(la._id || la.applicationId || `${la.regNo || la.rollNo || la.student}_${la.company}_${la.role}`);
+            if (laId && !appMap.has(laId)) {
+              appMap.set(laId, {
+                ...la,
+                student: la.student || la.studentName || la.name || 'Candidate',
+                regNo: la.regNo || la.rollNo || la.registerNo || 'N/A',
+                dept: la.dept || la.department || 'TAMIL',
+                cgpa: la.cgpa !== undefined ? la.cgpa : 0.0,
+                status: la.status || 'Applied'
+              });
+            }
+          });
         }
         combinedApps = Array.from(appMap.values());
       } catch (e) {
@@ -442,7 +422,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
       }
       setApplications(combinedApps);
 
-      // 4. Process Interviews (Multi-key scan)
+      // 4. Process Interviews (Strictly this tenant)
       let combinedInts = readArray(intRes, 'interviews');
       try {
         const intMap = new Map();
@@ -451,21 +431,14 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
           intMap.set(iId, i);
         });
 
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('erp_placement_interviews')) {
-            try {
-              const localItems = JSON.parse(localStorage.getItem(key) || '[]');
-              if (Array.isArray(localItems)) {
-                localItems.forEach(li => {
-                  const liId = String(li._id || li.interviewId || `${li.company}_${li.round}`);
-                  if (liId && !intMap.has(liId)) {
-                    intMap.set(liId, li);
-                  }
-                });
-              }
-            } catch (err) {}
-          }
+        const localInts = JSON.parse(localStorage.getItem(`erp_placement_interviews_${tenantId}`) || '[]');
+        if (Array.isArray(localInts)) {
+          localInts.forEach(li => {
+            const liId = String(li._id || li.interviewId || `${li.company}_${li.round}`);
+            if (liId && !intMap.has(liId)) {
+              intMap.set(liId, li);
+            }
+          });
         }
         combinedInts = Array.from(intMap.values());
       } catch (e) {
@@ -473,7 +446,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
       }
       setInterviews(combinedInts);
 
-      // 5. Process Selections (Multi-key scan)
+      // 5. Process Selections (Strictly this tenant)
       let combinedSels = readArray(selRes, 'selections');
       try {
         const selMap = new Map();
@@ -482,21 +455,14 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
           selMap.set(sId, s);
         });
 
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('erp_placement_selections')) {
-            try {
-              const localItems = JSON.parse(localStorage.getItem(key) || '[]');
-              if (Array.isArray(localItems)) {
-                localItems.forEach(ls => {
-                  const lsId = String(ls._id || ls.selectionId || `${ls.regNo || ls.student}_${ls.company}`);
-                  if (lsId && !selMap.has(lsId)) {
-                    selMap.set(lsId, ls);
-                  }
-                });
-              }
-            } catch (err) {}
-          }
+        const localSels = JSON.parse(localStorage.getItem(`erp_placement_selections_${tenantId}`) || '[]');
+        if (Array.isArray(localSels)) {
+          localSels.forEach(ls => {
+            const lsId = String(ls._id || ls.selectionId || `${ls.regNo || ls.student}_${ls.company}`);
+            if (lsId && !selMap.has(lsId)) {
+              selMap.set(lsId, ls);
+            }
+          });
         }
         combinedSels = Array.from(selMap.values());
       } catch (e) {
@@ -504,7 +470,7 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
       }
       setSelections(combinedSels);
 
-      // 6. Raw students (Multi-key scan)
+      // 6. Raw students (Strictly this tenant)
       let rawStudents = readArray(studentsRes, 'students');
       try {
         const stMap = new Map();
@@ -512,22 +478,17 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
           const stId = String(st.id || st.rollNo || st.regNo || st._id);
           stMap.set(stId, st);
         });
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('erp_students')) {
-            try {
-              const localSts = JSON.parse(localStorage.getItem(key) || '[]');
-              if (Array.isArray(localSts)) {
-                localSts.forEach(st => {
-                  const stId = String(st.id || st.rollNo || st.regNo || st._id);
-                  if (stId && !stMap.has(stId)) {
-                    stMap.set(stId, st);
-                  }
-                });
-              }
-            } catch (err) {}
-          }
+
+        const localSts = JSON.parse(localStorage.getItem(`erp_students_${tenantId}`) || '[]');
+        if (Array.isArray(localSts)) {
+          localSts.forEach(st => {
+            const stId = String(st.id || st.rollNo || st.regNo || st._id);
+            if (stId && !stMap.has(stId)) {
+              stMap.set(stId, st);
+            }
+          });
         }
+
         combinedApps.forEach(app => {
           const stId = String(app.regNo || app.studentId || app.student || '');
           if (stId && !stMap.has(stId)) {
@@ -547,41 +508,31 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
         rawStudents = Array.from(stMap.values());
       } catch (e) {}
 
-      // 7. Merge Marks & Attendance for Live Student Calculations
+      // 7. Merge Marks & Attendance for Live Student Calculations (Strictly this tenant)
       const rawMarks = readArray(marksRes, 'marks');
       let localMarks = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('erp_marks')) {
-          try {
-            const rawM = JSON.parse(localStorage.getItem(key) || '[]');
-            if (Array.isArray(rawM)) {
-              rawM.forEach(item => {
-                if (item.records && Array.isArray(item.records)) {
-                  item.records.forEach(r => localMarks.push({ ...r, resultStatus: item.status || r.resultStatus }));
-                } else {
-                  localMarks.push(item);
-                }
-              });
+      try {
+        const rawM = JSON.parse(localStorage.getItem(`erp_marks_${tenantId}`) || '[]');
+        if (Array.isArray(rawM)) {
+          rawM.forEach(item => {
+            if (item.records && Array.isArray(item.records)) {
+              item.records.forEach(r => localMarks.push({ ...r, resultStatus: item.status || r.resultStatus }));
+            } else {
+              localMarks.push(item);
             }
-          } catch (err) {}
+          });
         }
-      }
+      } catch (err) {}
       const combinedMarks = [...rawMarks, ...localMarks];
 
       const rawAtt = readArray(attRes, 'attendance');
       let localAtt = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('erp_attendance')) {
-          try {
-            const rawA = JSON.parse(localStorage.getItem(key) || '[]');
-            if (Array.isArray(rawA)) {
-              rawA.forEach(a => localAtt.push(a));
-            }
-          } catch (err) {}
+      try {
+        const rawA = JSON.parse(localStorage.getItem(`erp_attendance_${tenantId}`) || '[]');
+        if (Array.isArray(rawA)) {
+          rawA.forEach(a => localAtt.push(a));
         }
-      }
+      } catch (err) {}
       const combinedAtt = [...rawAtt, ...localAtt];
 
       const enrichedStudents = rawStudents.map(st => {

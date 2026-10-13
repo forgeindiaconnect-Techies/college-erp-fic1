@@ -118,26 +118,23 @@ const StaffDashboard = () => {
         getPlacementJobs().catch(() => ({ data: [] }))
       ]);
 
-      // Multi-key placement jobs loader
+      // Multi-key placement jobs loader (strictly this tenant)
+      const sessionObj = JSON.parse(sessionStorage.getItem('staff_session') || sessionStorage.getItem('user_session') || '{}');
+      const tenantId = sessionStorage.getItem('tenantId') || sessionObj.tenantId || 'mock_college_id';
       let rawJobs = Array.isArray(jobsRes?.data) ? jobsRes.data : (jobsRes?.data?.jobs || []);
       const jobMap = new Map();
       rawJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('erp_placement_jobs')) {
-          try {
-            const localItems = JSON.parse(localStorage.getItem(key) || '[]');
-            if (Array.isArray(localItems)) {
-              localItems.forEach(lj => {
-                const ljId = String(lj._id || lj.jobId || lj.id);
-                if (ljId && !jobMap.has(ljId)) {
-                  jobMap.set(ljId, lj);
-                }
-              });
+      try {
+        const localItems = JSON.parse(localStorage.getItem(`erp_placement_jobs_${tenantId}`) || '[]');
+        if (Array.isArray(localItems)) {
+          localItems.forEach(lj => {
+            const ljId = String(lj._id || lj.jobId || lj.id);
+            if (ljId && !jobMap.has(ljId)) {
+              jobMap.set(ljId, lj);
             }
-          } catch (err) {}
+          });
         }
-      }
+      } catch (err) {}
       setPlacementJobs(Array.from(jobMap.values()));
 
       if (notifRes?.data && Array.isArray(notifRes.data)) setNotifications(notifRes.data);

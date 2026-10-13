@@ -24,13 +24,13 @@ export const calculateSubscriptionStatus = (college) => {
       return { ...fallback, planName, status: 'Expired' };
     }
 
-    // If DB explicitly marks Deactivated, Expired or Cancelled, preserve status immediately
-    if (dbStatus === 'Deactivated') {
+    // If DB explicitly marks Deactivated, Suspended, Pending Approval, Expired or Cancelled, preserve status immediately
+    if (dbStatus === 'Pending Approval' || dbStatus === 'Suspended' || dbStatus === 'Deactivated') {
       return {
         planName,
-        status: 'Deactivated',
+        status: dbStatus,
         expiryDate: endDate ? endDate.toISOString() : null,
-        daysRemaining: 0,
+        daysRemaining: Math.max(0, Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24))),
         isTrial: planName === 'Trial',
         isGracePeriod: false
       };
@@ -39,7 +39,7 @@ export const calculateSubscriptionStatus = (college) => {
     if (dbStatus === 'Expired' || dbStatus === 'Cancelled') {
       return {
         planName,
-        status: 'Expired',
+        status: dbStatus,
         expiryDate: endDate ? endDate.toISOString() : null,
         daysRemaining: 0,
         isTrial: planName === 'Trial',

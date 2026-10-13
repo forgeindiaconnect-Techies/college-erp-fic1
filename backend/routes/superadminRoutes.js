@@ -120,6 +120,48 @@ router.put('/college/:id', protect, authorize('Super Admin'), async (req, res) =
   }
 });
 
+// Delete College (Super Admin only)
+router.delete(['/college/:id', '/colleges/:id'], protect, authorize('Super Admin'), async (req, res) => {
+  try {
+    let college = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      college = await College.findById(req.params.id);
+    }
+    if (!college) {
+      college = await College.findOne({ tenantId: req.params.id });
+    }
+    if (!college) return res.status(404).json({ success: false, message: 'College not found' });
+
+    const tenantId = college.tenantId;
+    const collegeId = college._id;
+    const collegeName = college.name;
+
+    // Delete College Document
+    await College.findByIdAndDelete(collegeId);
+
+    // Delete associated User, Subscription, and Settings
+    try {
+      const User = (await import('../models/User.js')).default;
+      const Subscription = (await import('../models/Subscription.js')).default;
+      const CollegeSettings = (await import('../models/CollegeSettings.js')).default;
+
+      await Promise.allSettled([
+        User.deleteMany({ $or: [{ tenantId }, { collegeId }] }),
+        Subscription.deleteMany({ $or: [{ tenantId }, { collegeId }] }),
+        CollegeSettings.deleteMany({ $or: [{ tenantId }, { collegeId }] })
+      ]);
+    } catch (cleanupErr) {
+      console.warn('Partial cleanup notice during college delete:', cleanupErr.message);
+    }
+
+    req.app.get('io')?.emit('dataUpdated', { module: 'colleges', action: 'deleted', collegeId, tenantId });
+
+    res.json({ success: true, message: `College '${collegeName}' (${tenantId}) and its tenant records deleted successfully.` });
+  } catch (error) {
+    console.error('Failed to delete college:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // Get all subscriptions
 router.get('/subscriptions', protect, authorize('Super Admin'), collegeScope, async (req, res) => {
@@ -134,11 +176,15 @@ router.get('/subscriptions', protect, authorize('Super Admin'), collegeScope, as
       return {
         _id: c._id,
         collegeId: c._id,
+        tenantId: c.tenantId,
         collegeName: c.name,
         planName: liveStatus.planName,
         amount,
         billingCycle: c.billingCycle || 'Monthly',
         status: liveStatus.status,
+        paymentStatus: c.paymentStatus || (liveStatus.status === 'Active' && !liveStatus.isTrial ? 'Paid' : 'Pending'),
+        createdAt: c.createdAt,
+        startDate: c.trialStartDate || c.createdAt,
         endDate: liveStatus.expiryDate,
         daysRemaining: liveStatus.daysRemaining,
         email: c.email,
@@ -149,6 +195,93 @@ router.get('/subscriptions', protect, authorize('Super Admin'), collegeScope, as
     res.json(subscriptions);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Approve College Subscription
+router.put(['/subscriptions/:id/approve', '/college/:id/approve'], protect, authorize('Super Admin'), collegeScope, async (req, res) => {
+  try {
+    let college = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      college = await College.findById(req.params.id);
+    }
+    if (!college) {
+      college = await College.findOne({ tenantId: req.params.id });
+    }
+    if (!college) return res.status(404).json({ success: false, message: 'College not found' });
+
+    college.subscriptionStatus = 'Active';
+    college.paymentStatus = 'Paid';
+    college.isActive = true;
+
+    const now = new Date();
+    if (!college.trialEndDate || new Date(college.trialEndDate) <= now) {
+      const extensionMonths = college.billingCycle === 'Annually' ? 12 : (college.billingCycle === 'Quarterly' ? 3 : 1);
+      const newEnd = new Date();
+      newEnd.setMonth(newEnd.getMonth() + extensionMonths);
+      college.trialEndDate = newEnd;
+    }
+    await college.save();
+
+    await Subscription.updateMany(
+      { collegeId: college._id },
+      { $set: { status: 'Active', paymentStatus: 'Paid' } }
+    );
+
+    await sendNotification(req, {
+      tenantId: college.tenantId,
+      collegeId: college._id,
+      targetRoles: ['Admin', 'Principal'],
+      title: 'Subscription Approved',
+      message: `Your college registration and ${college.subscriptionPlan} subscription have been approved and activated!`,
+      type: 'Success'
+    });
+
+    req.app.get('io')?.emit('dataUpdated', { module: 'subscriptions', action: 'updated', collegeId: college._id });
+    req.app.get('io')?.emit('dataUpdated', { module: 'colleges', action: 'updated', collegeId: college._id });
+
+    res.json({ success: true, message: `Subscription for ${college.name} approved successfully.`, college });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Suspend College Subscription
+router.put(['/subscriptions/:id/suspend', '/college/:id/suspend'], protect, authorize('Super Admin'), collegeScope, async (req, res) => {
+  try {
+    let college = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      college = await College.findById(req.params.id);
+    }
+    if (!college) {
+      college = await College.findOne({ tenantId: req.params.id });
+    }
+    if (!college) return res.status(404).json({ success: false, message: 'College not found' });
+
+    college.subscriptionStatus = 'Suspended';
+    college.isActive = false;
+    await college.save();
+
+    await Subscription.updateMany(
+      { collegeId: college._id, status: 'Active' },
+      { $set: { status: 'Suspended' } }
+    );
+
+    await sendNotification(req, {
+      tenantId: college.tenantId,
+      collegeId: college._id,
+      targetRoles: ['Admin', 'Principal', 'Sub Admin', 'HOD', 'Staff', 'Student'],
+      title: 'Subscription Suspended',
+      message: `Your college subscription has been suspended by Super Admin.`,
+      type: 'Error'
+    });
+
+    req.app.get('io')?.emit('dataUpdated', { module: 'subscriptions', action: 'updated', collegeId: college._id });
+    req.app.get('io')?.emit('dataUpdated', { module: 'colleges', action: 'updated', collegeId: college._id });
+
+    res.json({ success: true, message: `Subscription for ${college.name} suspended.`, college });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

@@ -197,11 +197,43 @@ router.post('/forgot-password', async (req, res) => {
 
 // Register College (SaaS Onboarding)
 router.post('/register-college', async (req, res) => {
-  const { collegeName, adminName, email, phone, password, principalName, principalEmail, principalPassword } = req.body;
+  const {
+    collegeName,
+    adminName,
+    email,
+    phone,
+    password,
+    principalName,
+    principalEmail,
+    principalPassword,
+    subscriptionPlan,
+    billingCycle,
+    razorpayPaymentId,
+    razorpayOrderId,
+    razorpaySignature
+  } = req.body;
+
   try {
+    // Basic field presence validation
+    if (!collegeName || !adminName || !email || !password) {
+      return res.status(400).json({ message: 'College name, admin name, email, and password are required.' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const normalizedEmail = email?.trim().toLowerCase();
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ message: 'Please provide a valid email address.' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long and include numbers/letters.' });
+    }
+
     const normalizedPrincipalEmail = principalEmail?.trim().toLowerCase();
-    
+    if (normalizedPrincipalEmail && !emailRegex.test(normalizedPrincipalEmail)) {
+      return res.status(400).json({ message: 'Please provide a valid principal email address.' });
+    }
+
     // Check if college name already exists
     const existingCollegeByName = await College.findOne({ name: { $regex: new RegExp(`^${collegeName.trim()}$`, 'i') } });
     if (existingCollegeByName) {
@@ -210,19 +242,81 @@ router.post('/register-college', async (req, res) => {
 
     const existingCollege = await College.findOne({ email: normalizedEmail });
     if (existingCollege) {
-      return res.status(400).json({ message: `The email '${normalizedEmail}' is already used by another college. You must provide a unique admin email for each new college.` });
+      return res.status(400).json({ message: `The email '${normalizedEmail}' is already used by another college. Please provide a unique admin email.` });
     }
 
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
-      return res.status(400).json({ message: `The email '${normalizedEmail}' is already an active user account. Please use a different email.` });
+      return res.status(400).json({ message: `The email '${normalizedEmail}' is already registered to an active account. Please use a different email or log in.` });
     }
     
     if (normalizedPrincipalEmail) {
       const existingPrincipalUser = await User.findOne({ email: normalizedPrincipalEmail });
       if (existingPrincipalUser) {
-        return res.status(400).json({ message: `The email '${normalizedPrincipalEmail}' is already an active user account. Please use a different principal email.` });
+        return res.status(400).json({ message: `The principal email '${normalizedPrincipalEmail}' is already registered to another account.` });
       }
+    }
+
+    // Determine chosen plan & billing cycle
+    const validPlans = ['Trial', 'Starter', 'Basic', 'Premium', 'Elite'];
+    const chosenPlan = validPlans.includes(subscriptionPlan) ? subscriptionPlan : 'Trial';
+    const chosenCycle = ['Monthly', 'Quarterly', 'Annually'].includes(billingCycle) ? billingCycle : 'Monthly';
+
+    let planAmount = 0;
+    if (chosenPlan === 'Starter') planAmount = 10000;
+    else if (chosenPlan === 'Basic') planAmount = 15000;
+    else if (chosenPlan === 'Premium') planAmount = 20000;
+    else if (chosenPlan === 'Elite') planAmount = 35000;
+
+    if (chosenCycle === 'Annually' && planAmount > 0) {
+      planAmount = planAmount * 10; // Annual package discount (10x instead of 12x)
+    } else if (chosenCycle === 'Quarterly' && planAmount > 0) {
+      planAmount = planAmount * 3;
+    }
+
+    // Verify payment if payment details are present
+    let isPaymentVerified = false;
+    if (razorpayPaymentId && razorpayOrderId && razorpaySignature) {
+      try {
+        const generatedSignature = crypto
+          .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'IgfxpfmQCMxSPaU0T4EyhcLU')
+          .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+          .digest('hex');
+        if (generatedSignature === razorpaySignature) {
+          isPaymentVerified = true;
+        }
+      } catch (sigErr) {
+        console.error('[register-college] Signature verification error:', sigErr.message);
+      }
+    }
+
+    // Determine subscription and payment statuses
+    // Never mark as paid or active without verified payment confirmation
+    let payStatus = 'Pending';
+    let subStatus = 'Pending Approval';
+    let collegeActive = false;
+
+    if (isPaymentVerified) {
+      payStatus = 'Paid';
+      subStatus = 'Active';
+      collegeActive = true;
+    } else {
+      payStatus = 'Pending';
+      subStatus = 'Pending Approval';
+      collegeActive = false;
+    }
+
+    // Calculate dates
+    const startDate = new Date();
+    const endDate = new Date();
+    if (chosenPlan === 'Trial') {
+      endDate.setDate(startDate.getDate() + 1); // 1-Day Trial
+    } else if (chosenCycle === 'Annually') {
+      endDate.setDate(startDate.getDate() + 365);
+    } else if (chosenCycle === 'Quarterly') {
+      endDate.setDate(startDate.getDate() + 90);
+    } else {
+      endDate.setDate(startDate.getDate() + 30);
     }
 
     // Generate Tenant ID safely
@@ -234,25 +328,24 @@ router.post('/register-college', async (req, res) => {
         nextNum = lastNum + 1;
       }
     }
-    // Add randomness and timestamp to absolutely prevent race conditions or dupes
     const timestampSuffix = Date.now().toString().slice(-4);
     const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     const tenantId = `COL${String(nextNum).padStart(3, '0')}-${timestampSuffix}${randomSuffix}`;
 
-    const trialStartDate = new Date();
-    const trialEndDate = new Date();
-    trialEndDate.setDate(trialStartDate.getDate() + 1); // 1-Day Free Trial
-
     const newCollege = new College({
-      name: collegeName,
-      adminName,
-      email: email.trim().toLowerCase(),
-      phone,
+      name: collegeName.trim(),
+      adminName: adminName.trim(),
+      email: normalizedEmail,
+      phone: phone?.trim(),
       tenantId,
-      subscriptionPlan: 'Trial',
-      subscriptionStatus: 'Active',
-      trialStartDate,
-      trialEndDate,
+      subscriptionPlan: chosenPlan,
+      subscriptionStatus: subStatus,
+      paymentStatus: payStatus,
+      subscriptionAmount: planAmount,
+      billingCycle: chosenCycle,
+      isActive: collegeActive,
+      trialStartDate: startDate,
+      trialEndDate: endDate,
       adminPassword: password,
       principalEmail: normalizedPrincipalEmail,
       principalPassword
@@ -263,7 +356,7 @@ router.post('/register-college', async (req, res) => {
     const newSettings = new CollegeSettings({
       tenantId,
       collegeId: newCollege._id,
-      collegeName,
+      collegeName: collegeName.trim(),
       timezone: 'Asia/Kolkata (IST)',
       currency: 'INR (₹)',
       academicYear: '2026-2027',
@@ -278,24 +371,44 @@ router.post('/register-college', async (req, res) => {
     });
     await newSettings.save();
 
+    // Create initial Subscription record
+    try {
+      const newSubscription = new Subscription({
+        tenantId,
+        collegeId: newCollege._id,
+        collegeName: newCollege.name,
+        planName: chosenPlan,
+        amount: planAmount,
+        startDate,
+        endDate,
+        status: subStatus,
+        paymentStatus: payStatus,
+        transactionId: isPaymentVerified ? razorpayPaymentId : `TXN-PENDING-${Date.now()}`,
+        razorpayOrderId: razorpayOrderId || null
+      });
+      await newSubscription.save();
+    } catch (subErr) {
+      console.warn('[register-college] Warning: Initial subscription record creation notice:', subErr.message);
+    }
+
     try {
       const newAdmin = new User({
-        name: adminName,
-        email: email.trim().toLowerCase(),
+        name: adminName.trim(),
+        email: normalizedEmail,
         password,
-        role: 'Admin',
-        phone,
+        role: 'Admin', // Strictly Admin, never Super Admin
+        phone: phone?.trim(),
         tenantId
       });
       await newAdmin.save();
 
       if (principalName && normalizedPrincipalEmail && principalPassword) {
         const newPrincipal = new User({
-          name: principalName,
+          name: principalName.trim(),
           email: normalizedPrincipalEmail,
           password: principalPassword,
           role: 'Principal',
-          phone,
+          phone: phone?.trim(),
           tenantId
         });
         await newPrincipal.save();
@@ -303,27 +416,67 @@ router.post('/register-college', async (req, res) => {
     } catch (userError) {
       // Rollback college creation if user creation fails
       await College.findOneAndDelete({ _id: newCollege._id });
-      throw new Error('Failed to create Admin/Principal user account. College registration rolled back. ' + userError.message);
+      await Subscription.deleteMany({ tenantId });
+      throw new Error('Failed to create Admin/Principal account. College registration rolled back. ' + userError.message);
     }
 
-    // Send notifications to Super Admin and College Admin
+    // Send notification to Super Admin
     await sendNotification(req, {
       tenantId: newCollege.tenantId,
       collegeId: newCollege._id,
-      targetRoles: ['Super Admin', 'Admin'],
-      title: 'New College Registered',
-      message: `${collegeName} has been registered successfully with 1-Day Free Trial.`,
+      targetRoles: ['Super Admin'],
+      title: 'New Client Registration & Subscription',
+      message: `${collegeName} (${adminName}) has registered for the ${chosenPlan} plan (₹${planAmount.toLocaleString('en-IN')}). Payment Status: ${payStatus}, Subscription Status: ${subStatus}.`,
       type: 'Success'
     });
 
-    req.app.get('io').emit('dataUpdated', { module: 'colleges', action: 'created' });
+    req.app.get('io')?.emit('dataUpdated', { module: 'colleges', action: 'created' });
+    req.app.get('io')?.emit('dataUpdated', { module: 'subscriptions', action: 'created' });
 
     res.status(201).json({
-      message: 'Your 1-day free trial has been activated successfully.',
-      tenantId
+      success: true,
+      message: isPaymentVerified 
+        ? 'Registration completed and subscription activated successfully.'
+        : 'Registration submitted successfully! Your account and subscription are pending approval.',
+      tenantId,
+      collegeName: newCollege.name,
+      adminName: newCollege.adminName,
+      email: newCollege.email,
+      subscriptionPlan: chosenPlan,
+      subscriptionStatus: subStatus,
+      paymentStatus: payStatus,
+      amount: planAmount,
+      billingCycle: chosenCycle
     });
   } catch (error) {
+    console.error('[register-college] Error:', error);
     res.status(500).json({ message: error.message || 'An unexpected error occurred during registration.' });
+  }
+});
+
+// Create Registration Payment Order (Public for SaaS Onboarding)
+router.post('/create-registration-order', async (req, res) => {
+  const { planName, amount } = req.body;
+  try {
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ message: 'Valid amount is required for payment checkout.' });
+    }
+    const options = {
+      amount: Math.round(Number(amount) * 100), // paise
+      currency: 'INR',
+      receipt: `rcpt_reg_${Date.now().toString().slice(-8)}`
+    };
+    const order = await razorpay.orders.create(options);
+    res.json({
+      success: true,
+      orderId: order.id,
+      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_live_SlbQBi57McKtUc',
+      amount: order.amount,
+      currency: order.currency
+    });
+  } catch (error) {
+    console.warn('[auth/create-registration-order] Razorpay Order Creation Notice:', error.message);
+    res.status(500).json({ message: 'Payment gateway unconfigured or unavailable: ' + error.message });
   }
 });
 
@@ -544,6 +697,54 @@ router.put('/colleges/:id', protect, collegeScope, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+// Delete College (Super Admin only)
+router.delete('/colleges/:id', protect, collegeScope, async (req, res) => {
+  try {
+    if (req.user.role !== 'Super Admin') {
+      return res.status(403).json({ message: 'Not authorized as Super Admin' });
+    }
+
+    let college = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      college = await College.findById(req.params.id);
+    }
+    if (!college) {
+      college = await College.findOne({ tenantId: req.params.id });
+    }
+    if (!college) {
+      return res.status(404).json({ message: 'College not found' });
+    }
+
+    const tenantId = college.tenantId;
+    const collegeId = college._id;
+    const collegeName = college.name;
+
+    await College.findByIdAndDelete(collegeId);
+
+    try {
+      const User = mongoose.models.User || (await import('../models/User.js')).default;
+      const Subscription = mongoose.models.Subscription || (await import('../models/Subscription.js')).default;
+      const CollegeSettings = mongoose.models.CollegeSettings || (await import('../models/CollegeSettings.js')).default;
+
+      await Promise.allSettled([
+        User.deleteMany({ $or: [{ tenantId }, { collegeId }] }),
+        Subscription.deleteMany({ $or: [{ tenantId }, { collegeId }] }),
+        CollegeSettings.deleteMany({ $or: [{ tenantId }, { collegeId }] })
+      ]);
+    } catch (cleanupErr) {
+      console.warn('Partial cleanup notice during college delete:', cleanupErr.message);
+    }
+
+    req.app.get('io')?.emit('dataUpdated', { module: 'colleges', action: 'deleted', collegeId, tenantId });
+
+    res.json({ success: true, message: `College '${collegeName}' (${tenantId}) deleted successfully.` });
+  } catch (error) {
+    console.error('Failed to delete college:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 
 router.get('/me', protect, collegeScope, async (req, res) => {
   try {

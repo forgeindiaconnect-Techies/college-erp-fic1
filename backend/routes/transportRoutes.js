@@ -102,38 +102,34 @@ router.get('/drivers', protect, collegeScope, async (req, res) => {
   try {
     const effectiveTenantId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
 
-    // 1. Fetch TransportDriver records without tenant blocking
-    let drivers = await TransportDriver.find({})
-      .setOptions({ bypassTenant: true, skipTenant: true })
+    // 1. Fetch TransportDriver records strictly for this tenant
+    let driverFilter = {};
+    if (effectiveTenantId && effectiveTenantId !== 'system') {
+      driverFilter = {
+        $or: [
+          { collegeId: effectiveTenantId },
+          { tenantId: effectiveTenantId }
+        ]
+      };
+    }
+    const drivers = await TransportDriver.find(driverFilter)
       .lean()
       .catch(() => []);
 
-    // Filter by tenant if applicable, but retain common/unassigned drivers if none exist
-    if (effectiveTenantId && effectiveTenantId !== 'system' && Array.isArray(drivers) && drivers.length > 0) {
-      const tenantDrivers = drivers.filter(d => 
-        !d.collegeId || 
-        !d.tenantId ||
-        d.collegeId === effectiveTenantId || 
-        d.tenantId === effectiveTenantId ||
-        d.collegeId === 'unassigned_college' ||
-        d.tenantId === 'unassigned_college' ||
-        d.collegeId === 'COL001'
-      );
-      if (tenantDrivers.length > 0) {
-        drivers = tenantDrivers;
-      }
+    // 2. Also fetch any Users with role 'Driver' strictly for this tenant
+    let userFilter = { role: 'Driver' };
+    if (effectiveTenantId && effectiveTenantId !== 'system') {
+      userFilter.$or = [
+        { tenantId: effectiveTenantId },
+        { collegeId: effectiveTenantId }
+      ];
     }
-
-    // 2. Also fetch any Users with role 'Driver'
-    const userDrivers = await User.find({ role: 'Driver' })
+    const userDrivers = await User.find(userFilter)
       .select('-password')
       .lean()
       .catch(() => []);
 
-    const matchingUserDrivers = (userDrivers || []).filter(u => {
-      if (!effectiveTenantId || effectiveTenantId === 'system') return true;
-      return !u.tenantId || !u.collegeId || u.tenantId === effectiveTenantId || u.collegeId === effectiveTenantId || u.tenantId === 'COL001' || u.tenantId === 'unassigned_college';
-    });
+    const matchingUserDrivers = userDrivers || [];
 
     const driverMap = new Map();
 

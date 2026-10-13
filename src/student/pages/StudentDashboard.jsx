@@ -346,22 +346,20 @@ const StudentDashboard = () => {
         const jobMap = new Map();
         rawJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
 
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('erp_placement_jobs')) {
-            try {
-              const localItems = JSON.parse(localStorage.getItem(key) || '[]');
-              if (Array.isArray(localItems)) {
-                localItems.forEach(lj => {
-                  const ljId = String(lj._id || lj.jobId || lj.id);
-                  if (ljId && !jobMap.has(ljId)) {
-                    jobMap.set(ljId, lj);
-                  }
-                });
+        const studentSession = JSON.parse(sessionStorage.getItem('student_session') || '{}');
+        const tenantId = sessionStorage.getItem('tenantId') || studentSession.tenantId || 'mock_college_id';
+
+        try {
+          const localItems = JSON.parse(localStorage.getItem(`erp_placement_jobs_${tenantId}`) || '[]');
+          if (Array.isArray(localItems)) {
+            localItems.forEach(lj => {
+              const ljId = String(lj._id || lj.jobId || lj.id);
+              if (ljId && !jobMap.has(ljId)) {
+                jobMap.set(ljId, lj);
               }
-            } catch (err) {}
+            });
           }
-        }
+        } catch (err) {}
         setActiveDrives(Array.from(jobMap.values()));
       } catch (e) {}
 

@@ -27,11 +27,24 @@ const AdminLogin = () => {
         return;
       }
 
+      sessionStorage.setItem('admin_token', userData.token);
       sessionStorage.setItem('token', userData.token);
+      if (userData.tenantId) {
+        sessionStorage.setItem('tenantId', userData.tenantId);
+      }
+      sessionStorage.setItem('admin_session', JSON.stringify({
+        _id: userData._id,
+        name: userData.name,
+        email: userData.email,
+        role: 'Admin',
+        tenantId: userData.tenantId,
+        collegeName: userData.collegeName || 'Institution Portal'
+      }));
       sessionStorage.setItem('user_session', JSON.stringify({
         name: userData.name,
         email: userData.email,
-        role: 'Admin'
+        role: 'Admin',
+        tenantId: userData.tenantId
       }));
       navigate('/admin/dashboard');
     } catch (err) {

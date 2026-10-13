@@ -26,21 +26,11 @@ const emitPlacementUpdate = (req, action, data = {}) => {
 const tenantFilter = (req) => {
   if (req.user?.role === 'Super Admin') return {};
   const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
-  const knownColleges = ['COL001-9284712', 'COL002-8379189', 'COL003-5192834', 'COL004-3190860', 'system', 'unassigned_college', 'mock_college_id', ''];
-  if (!collegeId || collegeId === 'system') {
-    return {
-      $or: [
-        { collegeId: { $in: [null, undefined, ...knownColleges] } },
-        { tenantId: { $in: [null, undefined, ...knownColleges] } }
-      ]
-    };
-  }
+  if (!collegeId || collegeId === 'system') return {};
   return {
     $or: [
       { collegeId: collegeId },
-      { tenantId: collegeId },
-      { collegeId: { $in: [null, undefined, ...knownColleges] } },
-      { tenantId: { $in: [null, undefined, ...knownColleges] } }
+      { tenantId: collegeId }
     ]
   };
 };

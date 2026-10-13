@@ -453,6 +453,23 @@ const UnifiedLogin = () => {
             <button type="submit" className="login-submit-btn" disabled={loading}>
               {loading ? 'Authenticating...' : <><ArrowRight size={18} /> Login</>}
             </button>
+
+            <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.9rem', color: '#64748b' }}>
+              <span>Don't have an institution account? </span>
+              <Link 
+                to="/register" 
+                style={{ 
+                  color: '#4f46e5', 
+                  fontWeight: '700', 
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                Create an Account &rarr;
+              </Link>
+            </div>
           </form>
         </div>
       </div>

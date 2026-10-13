@@ -41,8 +41,13 @@ const collegeSchema = new mongoose.Schema({
   },
   subscriptionStatus: {
     type: String,
-    enum: ['Active', 'Expired', 'Cancelled', 'Grace Period', 'Deactivated'],
+    enum: ['Active', 'Expired', 'Cancelled', 'Grace Period', 'Deactivated', 'Pending Approval', 'Suspended'],
     default: 'Active'
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['Pending', 'Paid', 'Failed', 'Refunded'],
+    default: 'Pending'
   },
   trialStartDate: {
     type: Date,

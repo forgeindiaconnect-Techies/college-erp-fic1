@@ -620,6 +620,11 @@ export const getSuperAdminSubscription = (id) => api.get(`/superadmin/subscripti
 export const upgradeSubscription = (id, data) => api.put(`/superadmin/subscriptions/${id}/upgrade`, typeof data === 'string' ? { planName: data } : (data || {}));
 export const renewSubscription = (id) => api.put(`/superadmin/subscriptions/${id}/renew`);
 export const cancelSubscription = (id) => api.put(`/superadmin/subscriptions/${id}/cancel`);
+export const approveSubscription = (id) => api.put(`/superadmin/subscriptions/${id}/approve`);
+export const suspendSubscription = (id) => api.put(`/superadmin/subscriptions/${id}/suspend`);
+
+// Client Registration (SaaS Onboarding)
+export const createRegistrationOrder = (data) => api.post('/auth/create-registration-order', data);
 
 // Super Admin Trials
 export const getSuperAdminTrials = () => api.get('/superadmin/trials');
@@ -771,5 +776,8 @@ export const createDocumentRequirement = (data) => api.post('/documents/requirem
 export const uploadDocumentFile = (id, formData) => api.post(`/documents/${id}/upload`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const updateDocumentStatus = (id, status, remarks = '') => api.patch(`/documents/${id}/status`, { status, remarks });
 export const getDocumentFileUrl = (id) => `/api/documents/${id}/file`;
+
+// College Management APIs
+export const deleteCollege = (id) => api.delete(`/superadmin/college/${id}`);
 
 

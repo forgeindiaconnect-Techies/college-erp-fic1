@@ -99,28 +99,25 @@ const Dashboard = () => {
       const approvalsData = approvalsRes?.data || [];
       const analyticsResData = analyticsRes?.data || {};
 
-      // Merge placement jobs
+      const adminSession = JSON.parse(sessionStorage.getItem('admin_session') || sessionStorage.getItem('user_session') || '{}');
+      const tenantId = sessionStorage.getItem('tenantId') || adminSession.tenantId || 'mock_college_id';
+
+      // Merge placement jobs strictly for this tenant
       let rawJobs = Array.isArray(jobsRes?.data) ? jobsRes.data : (jobsRes?.data?.jobs || []);
       const jobMap = new Map();
       rawJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('erp_placement_jobs')) {
-          try {
-            const items = JSON.parse(localStorage.getItem(key) || '[]');
-            if (Array.isArray(items)) {
-              items.forEach(j => {
-                const id = String(j._id || j.jobId || j.id);
-                if (id && !jobMap.has(id)) jobMap.set(id, j);
-              });
-            }
-          } catch (e) {}
+      try {
+        const tenantLocalJobs = JSON.parse(localStorage.getItem(`erp_placement_jobs_${tenantId}`) || '[]');
+        if (Array.isArray(tenantLocalJobs)) {
+          tenantLocalJobs.forEach(j => {
+            const id = String(j._id || j.jobId || j.id);
+            if (id && !jobMap.has(id)) jobMap.set(id, j);
+          });
         }
-      }
+      } catch (e) {}
       setPlacementJobs(Array.from(jobMap.values()));
 
       // Merge student records from localStorage
-      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
       const localStudents = JSON.parse(localStorage.getItem(`erp_students_${tenantId}`) || '[]');
       const mergedStudents = [...sData];
       localStudents.forEach(ls => {
