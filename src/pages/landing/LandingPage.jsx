@@ -593,15 +593,6 @@ const LandingPage = () => {
                 <span>Get Started</span>
                 <ArrowRight size={16} />
               </button>
-
-              <button
-                type="button"
-                className="erp-btn-secondary"
-                onClick={() => scrollToSection('features')}
-              >
-                <span>Explore Features</span>
-                <Play size={13} fill="currentColor" />
-              </button>
             </div>
 
             {/* 4 Trust & Benefit Badges */}

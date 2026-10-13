@@ -1,15 +1,36 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import PrincipalSidebar from './PrincipalSidebar';
 import Navbar from '../../components/layout/Navbar';
 import '../../components/layout/Layout.css';
 import '../PrincipalResponsive.css';
 
 const PrincipalLayout = () => {
-  const [isSidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
+  const [isSidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
+  const location = useLocation();
+
+  // Close sidebar on route change when in mobile/tablet view
+  useEffect(() => {
+    if (window.innerWidth <= 768) {
+      setSidebarOpen(false);
+    }
+  }, [location.pathname]);
+
+  // Adjust sidebar state on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 768) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const toggleSidebar = () => {
-    setSidebarOpen(!isSidebarOpen);
+    setSidebarOpen(prev => !prev);
   };
 
   return (

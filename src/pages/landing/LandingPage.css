@@ -333,8 +333,11 @@ body {
 }
 
 .login-popover {
-  width: 250px;
+  width: 250px !important;
+  min-width: 240px !important;
+  max-width: calc(100vw - 20px) !important;
   padding: 8px 0;
+  box-shadow: 0 16px 36px -8px rgba(15, 23, 42, 0.22);
 }
 
 .login-popover-header {
@@ -346,12 +349,14 @@ body {
   font-size: 0.82rem;
   color: #0f172a;
   display: block;
+  white-space: nowrap;
 }
 
 .login-popover-header p {
   font-size: 0.7rem;
   color: #64748b;
   margin: 0;
+  white-space: nowrap;
 }
 
 .login-popover-list {
@@ -374,6 +379,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
   transition: all 0.15s;
 }
 
@@ -1640,21 +1646,19 @@ body {
     font-size: 1.7rem;
   }
 
-  /* CTAs side-by-side cleanly */
   .erp-hero-ctas {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 8px;
     width: 100%;
   }
 
-  .erp-btn-primary,
-  .erp-btn-secondary {
-    flex: 1;
+  .erp-btn-primary {
+    width: 100%;
     justify-content: center;
-    padding: 11px 12px;
-    font-size: 0.82rem;
-    gap: 6px;
+    padding: 13px 18px;
+    font-size: 0.92rem;
+    gap: 8px;
   }
 
   .erp-role-cards-row-1,

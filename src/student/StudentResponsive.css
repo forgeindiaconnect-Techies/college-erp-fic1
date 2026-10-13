@@ -56,7 +56,7 @@
   }
 
   /* Universal page wrapper resets */
-  .main-content > div,
+  .main-content > div:not(.profile-dropdown):not(.notification-dropdown):not(.erp-dropdown-popover),
   .student-dashboard,
   .student-timetable-page,
   .student-library-page,
@@ -65,8 +65,7 @@
   .student-marks-page,
   .student-assignments-page,
   .student-leaves-page,
-  .dashboard-container,
-  .animate-fade-in {
+  .dashboard-container {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;

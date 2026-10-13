@@ -41,16 +41,30 @@
 
 /* Every dashboard page appears here */
 .main-content {
-  flex: 1;
+  flex: 1 1 0%;
   min-width: 0;
   min-height: 0;
   width: 100%;
-  height: 100%;
+  height: auto;
   padding: 18px 20px 28px;
   background: #eef1f4;
   overflow-x: hidden;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+/* Prevent nested .main-content containers from locking scroll */
+.main-content .main-content,
+.main-content .principal-page-container {
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  overflow-y: visible !important;
+  overflow-x: visible !important;
+  padding: 0 !important;
+  background: transparent !important;
+  flex: none !important;
 }
 
 /* Shared page content width */
@@ -93,8 +107,10 @@
     overflow-x: hidden;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
-    height: 100%;
-    min-height: 0;
+    height: auto !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    touch-action: pan-y;
   }
 }
 
@@ -105,5 +121,9 @@
     overflow-x: hidden;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
+    height: auto !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    touch-action: pan-y;
   }
 }
