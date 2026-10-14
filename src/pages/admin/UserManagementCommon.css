@@ -446,32 +446,38 @@
 
   .mgmt-header-title-area {
     flex: 1 1 100% !important;
+    min-width: 0 !important;
+    width: 100% !important;
   }
 
   .mgmt-header-title-area h1 {
     font-size: 1.2rem !important;
     margin-bottom: 0.2rem !important;
+    word-break: break-word !important;
   }
 
   .mgmt-header-title-area p {
     font-size: 0.78rem !important;
     line-height: 1.35 !important;
+    word-break: break-word !important;
   }
 
   .mgmt-header-actions {
     width: 100% !important;
-    display: grid !important;
-    grid-template-columns: 1fr 1.25fr !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
     gap: 0.5rem !important;
   }
 
   .mgmt-header-actions button {
-    width: 100% !important;
-    min-width: 0 !important;
-    flex: unset !important;
+    flex: 1 1 calc(50% - 0.25rem) !important;
+    min-width: 120px !important;
+    max-width: 100% !important;
     justify-content: center !important;
     padding: 0.55rem 0.75rem !important;
     font-size: 0.78rem !important;
+    white-space: normal !important;
+    text-align: center !important;
   }
 
   .mgmt-header-meta {
@@ -479,10 +485,11 @@
     flex-direction: row !important;
     flex-wrap: wrap !important;
     align-items: center !important;
-    gap: 0.4rem 0.6rem !important;
+    gap: 0.35rem 0.5rem !important;
     margin-top: 0.65rem !important;
     padding-top: 0.5rem !important;
     font-size: 0.72rem !important;
+    width: 100% !important;
   }
 
   .mgmt-header-meta .meta-item {
@@ -490,21 +497,27 @@
     align-items: center !important;
     gap: 0.3rem !important;
     background: var(--bg-secondary, #f8fafc) !important;
-    padding: 0.25rem 0.55rem !important;
+    padding: 0.25rem 0.5rem !important;
     border-radius: 6px !important;
     border: 1px solid var(--border-color, #e2e8f0) !important;
-    font-size: 0.7rem !important;
+    font-size: 0.68rem !important;
+    max-width: 100% !important;
+    word-break: break-word !important;
   }
 
   .mgmt-header-meta .meta-bullet {
     display: none !important;
   }
 
-  /* 2-Column sleek KPI grid on small devices */
+  /* 2-Column sleek KPI grid with guaranteed zero overflow on mobile */
   .mgmt-kpi-grid,
   .mgmt-kpi-grid-4 {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 0.6rem !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .mgmt-kpi-grid > *:last-child:nth-child(odd) {
@@ -512,28 +525,52 @@
   }
 
   .mgmt-kpi-card {
-    padding: 0.65rem 0.75rem !important;
-    gap: 0.6rem !important;
+    padding: 0.6rem 0.65rem !important;
+    gap: 0.5rem !important;
     border-radius: 10px !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
   }
 
   .mgmt-kpi-icon {
-    width: 34px !important;
-    height: 34px !important;
+    width: 32px !important;
+    height: 32px !important;
     border-radius: 8px !important;
+    flex-shrink: 0 !important;
   }
 
   .mgmt-kpi-icon svg {
-    width: 18px !important;
-    height: 18px !important;
+    width: 16px !important;
+    height: 16px !important;
   }
 
-  .mgmt-kpi-label {
-    font-size: 0.65rem !important;
+  .mgmt-kpi-info {
+    min-width: 0 !important;
+    flex: 1 1 0% !important;
+    overflow: hidden !important;
+  }
+
+  .mgmt-kpi-label,
+  .mgmt-kpi-label-text {
+    font-size: 0.62rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
+    width: 100% !important;
+    letter-spacing: 0.01em !important;
   }
 
   .mgmt-kpi-value {
-    font-size: 1.15rem !important;
+    font-size: 1.05rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
+    width: 100% !important;
+    margin: 1px 0 0 !important;
   }
 
   .mgmt-table-card {
@@ -614,26 +651,41 @@
   }
 
   .mgmt-header-actions {
-    grid-template-columns: 1fr 1.3fr !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
     gap: 0.4rem !important;
   }
 
   .mgmt-header-actions button {
+    flex: 1 1 100% !important;
+    width: 100% !important;
     padding: 0.5rem 0.6rem !important;
-    font-size: 0.75rem !important;
+    font-size: 0.76rem !important;
+    justify-content: center !important;
+    text-align: center !important;
   }
 
   .mgmt-kpi-grid,
   .mgmt-kpi-grid-4 {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 0.5rem !important;
+    width: 100% !important;
   }
 
   .mgmt-kpi-card {
     padding: 0.55rem 0.65rem !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
   }
 
   .mgmt-kpi-value {
     font-size: 1.05rem !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .mgmt-kpi-grid,
+  .mgmt-kpi-grid-4 {
+    grid-template-columns: 1fr !important;
   }
 }

@@ -375,13 +375,13 @@ export default function BusinessReferralLanding() {
         </div>
 
         <div className="mgmt-header-meta">
-          <span className="meta-item">Network Status: <strong>Live & Synchronized</strong></span>
+          <span className="meta-item">Network: <strong>Live Sync Active</strong></span>
           <span className="meta-bullet">•</span>
-          <span className="meta-item">Approved Rate Cards: <strong>{approvedRules.length} Active Rules</strong></span>
+          <span className="meta-item">Rate Cards: <strong>{approvedRules.length} Active Rules</strong></span>
           <span className="meta-bullet">•</span>
-          <span className="meta-item">Categories: <strong>Banking, Insurance, Corporate Careers, Digital Accounts</strong></span>
+          <span className="meta-item">Streams: <strong>Cards, Insurance, Jobs, Banking</strong></span>
           <span className="meta-bullet">•</span>
-          <span className="meta-item">Audit Standard: <strong>100% Institutional Verification</strong></span>
+          <span className="meta-item">Audit: <strong>100% Verified</strong></span>
         </div>
       </div>
 

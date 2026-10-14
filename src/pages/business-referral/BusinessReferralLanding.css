@@ -1052,3 +1052,125 @@
   background: rgba(255, 255, 255, 0.03);
   border-color: var(--border-color);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS ENHANCEMENTS (<= 768px & <= 480px)
+   ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .bus-ref-controls-card {
+    padding: 0.75rem 0.85rem !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.75rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .bus-ref-search-wrap {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .bus-ref-filter-pills {
+    display: flex !important;
+    overflow-x: auto !important;
+    padding-bottom: 4px !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    gap: 6px !important;
+  }
+
+  .bus-filter-pill {
+    flex-shrink: 0 !important;
+    font-size: 0.75rem !important;
+    padding: 0.35rem 0.65rem !important;
+  }
+
+  .bus-ref-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+    width: 100% !important;
+  }
+
+  .bus-ref-card {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .bus-card-header {
+    padding: 1rem 1rem 0.35rem 1rem !important;
+  }
+
+  .bus-card-body {
+    padding: 0.5rem 1rem !important;
+  }
+
+  .bus-card-footer {
+    padding: 0.75rem 1rem !important;
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+
+  .bus-card-footer button,
+  .bus-card-btn-action {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .bus-metric-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.5rem !important;
+  }
+
+  .bus-metric-box {
+    padding: 8px 10px !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .bus-metric-val {
+    font-size: 0.82rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .bus-ref-roadmap-card {
+    padding: 1rem !important;
+    border-radius: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .bus-roadmap-steps {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+
+  .bus-step-connector {
+    transform: rotate(90deg) !important;
+    margin: 0 auto !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .bus-ref-search-input {
+    font-size: 0.8rem !important;
+    padding: 0.5rem 1.8rem 0.5rem 2rem !important;
+  }
+
+  .bus-card-title {
+    font-size: 1.05rem !important;
+  }
+
+  .bus-card-desc {
+    font-size: 0.8rem !important;
+    line-height: 1.4 !important;
+  }
+
+  .bus-highlight-item {
+    font-size: 0.76rem !important;
+  }
+}

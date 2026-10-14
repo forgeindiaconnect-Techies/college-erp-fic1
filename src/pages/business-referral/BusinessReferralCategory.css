@@ -1396,6 +1396,119 @@
   color: var(--text-main);
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS ENHANCEMENTS (<= 768px & <= 480px)
+   ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .cat-page-container {
+    padding: 0.75rem 0.6rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .cat-top-nav-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.6rem !important;
+  }
+
+  .cat-header-card {
+    padding: 1rem 0.85rem !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 1rem !important;
+  }
+
+  .cat-header-left {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+
+  .cat-icon-badge {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .cat-header-actions {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+  }
+
+  .cat-header-actions button {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .cat-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+
+  .cat-kpi-card {
+    padding: 0.65rem 0.75rem !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .cat-table-wrap,
+  .mgmt-table-wrapper {
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: 8px !important;
+  }
+
+  /* Modals on Mobile */
+  .bus-modal-dialog {
+    max-width: 95vw !important;
+    width: 95vw !important;
+    max-height: 90vh !important;
+    margin: 1rem auto !important;
+    border-radius: 12px !important;
+    overflow-y: auto !important;
+  }
+
+  .bus-modal-body {
+    padding: 1rem !important;
+  }
+
+  .bus-modal-footer {
+    padding: 0.75rem 1rem !important;
+    flex-direction: column-reverse !important;
+    gap: 0.5rem !important;
+  }
+
+  .bus-modal-footer button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .cat-title {
+    font-size: 1.15rem !important;
+  }
+
+  .cat-desc {
+    font-size: 0.8rem !important;
+  }
+
+  .cat-meta-pills {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.4rem !important;
+  }
+
+  .cat-kpi-val {
+    font-size: 1.05rem !important;
+  }
+}
+
 
 
 
