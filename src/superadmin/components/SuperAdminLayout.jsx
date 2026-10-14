@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../../components/layout/Navbar';
 import { ThemeContext } from '../../App';
 import '../../components/layout/Sidebar.css';
@@ -14,11 +14,39 @@ import {
   Crown,
   X,
   LogOut,
-  Award
+  Award,
+  ChevronRight,
+  ChevronDown,
+  Layers,
+  ShieldCheck,
+  Briefcase,
+  Building,
+  FileBarChart
 } from 'lucide-react';
 
 const SuperAdminSidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [expandedGroups, setExpandedGroups] = useState({});
+
+  const toggleGroup = (groupName) => {
+    setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
+  };
+
+  const isBusinessReferralActive = location.pathname.startsWith('/superadmin/business-referral') || location.pathname.startsWith('/superadmin/business-referrals');
+  const isBusinessReferralExpanded = expandedGroups['Business Referral'] !== undefined
+    ? expandedGroups['Business Referral']
+    : isBusinessReferralActive;
+
+  const superAdminBusinessReferralItems = [
+    { name: 'All Categories', path: '/superadmin/business-referral', exact: true, icon: <Layers size={16} /> },
+    { name: 'Credit Cards', path: '/superadmin/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance', path: '/superadmin/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Jobs', path: '/superadmin/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Account Opening', path: '/superadmin/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Incentives', path: '/superadmin/business-referral/incentives', icon: <Award size={16} /> },
+    { name: 'Publishing & Lead Central', path: '/superadmin/business-referrals', icon: <FileBarChart size={16} /> }
+  ];
 
   const handleLogout = () => {
     sessionStorage.removeItem('superadmin_session');
@@ -26,16 +54,24 @@ const SuperAdminSidebar = ({ isOpen, onClose }) => {
     navigate('/login');
   };
 
-  const navItems = [
+  const navItemsBefore = [
     { name: 'Dashboard', path: '/superadmin/dashboard', icon: <LayoutDashboard size={20} /> },
-    { name: 'Colleges', path: '/superadmin/colleges', icon: <Building2 size={20} /> },
-    { name: 'Business Referral', path: '/superadmin/business-referrals', icon: <Award size={20} /> },
+    { name: 'Colleges', path: '/superadmin/colleges', icon: <Building2 size={20} /> }
+  ];
+
+  const navItemsAfter = [
     { name: 'Subscriptions', path: '/superadmin/subscriptions', icon: <Crown size={20} /> },
     { name: 'Trials', path: '/superadmin/trials', icon: <ShieldAlert size={20} /> },
     { name: 'Payments', path: '/superadmin/payments', icon: <CreditCard size={20} /> },
     { name: 'Reports', path: '/superadmin/reports', icon: <BarChart3 size={20} /> },
     { name: 'Settings', path: '/superadmin/settings', icon: <Settings size={20} /> }
   ];
+
+  const handleNavClick = () => {
+    if (window.innerWidth <= 768 && onClose) {
+      onClose();
+    }
+  };
 
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
@@ -52,14 +88,70 @@ const SuperAdminSidebar = ({ isOpen, onClose }) => {
 
       <nav className="sidebar-nav">
         <ul>
-          {navItems.map((item) => (
+          {navItemsBefore.map((item) => (
             <li key={item.name} style={{ marginBottom: '0.4rem' }}>
               <NavLink
                 to={item.path}
                 className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
-                onClick={() => {
-                  if (window.innerWidth <= 768) onClose();
-                }}
+                onClick={handleNavClick}
+              >
+                {item.icon}
+                <span>{item.name}</span>
+              </NavLink>
+            </li>
+          ))}
+
+          {/* ── Business Referral Accordion Group ── */}
+          <li style={{ marginBottom: '0.4rem' }}>
+            <div 
+              className={`nav-group-header ${isBusinessReferralActive ? 'active' : ''}`}
+              onClick={() => toggleGroup('Business Referral')}
+              style={{ cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Award size={20} />
+                <span>Business Referral</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ 
+                  background: '#10b981', 
+                  color: '#ffffff', 
+                  fontSize: '9px', 
+                  fontWeight: 800, 
+                  padding: '2px 6px', 
+                  borderRadius: '10px', 
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  lineHeight: '1.2'
+                }}>New</span>
+                {isBusinessReferralExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </div>
+            </div>
+
+            <ul className={`nav-group-items ${isBusinessReferralExpanded ? 'expanded' : 'collapsed'}`}>
+              {superAdminBusinessReferralItems.map((item, i) => (
+                <li key={i}>
+                  <NavLink 
+                    to={item.path} 
+                    end={item.exact}
+                    className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
+                    style={{ paddingLeft: '2.8rem' }}
+                    onClick={handleNavClick}
+                  >
+                    {item.icon}
+                    <span>{item.name}</span>
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </li>
+
+          {navItemsAfter.map((item) => (
+            <li key={item.name} style={{ marginBottom: '0.4rem' }}>
+              <NavLink
+                to={item.path}
+                className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+                onClick={handleNavClick}
               >
                 {item.icon}
                 <span>{item.name}</span>

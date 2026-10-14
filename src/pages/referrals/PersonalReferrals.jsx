@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Award, Shield, CreditCard, Landmark, Briefcase, Plus, Search,
   CheckCircle2, Clock, XCircle, ArrowUpRight, DollarSign, Download,
   RefreshCw, Eye, Lock, AlertCircle, FileText, ChevronRight, Copy,
-  Sparkles, Check, Send, ChevronDown, CheckCheck
+  Sparkles, Check, Send, ChevronDown, CheckCheck, Filter, UserCheck, ShieldCheck,
+  TrendingUp, ArrowLeft, LayoutDashboard, Layers
 } from 'lucide-react';
 import {
   getMyReferrals, getMyReferralStats, submitReferral, getReferralDetails,
@@ -12,11 +14,24 @@ import {
 } from '../../api/index';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import DynamicFormRenderer from './DynamicFormRenderer';
+import ReferralSubmissionModal from '../../components/referrals/ReferralSubmissionModal';
+import '../admin/UserManagementCommon.css';
 import './PersonalReferrals.css';
 import './AdminReferralManagement.css';
 
 export default function PersonalReferrals() {
-  const [mainView, setMainView] = useState('opportunities'); // 'opportunities' | 'my-applications' | 'direct-lead'
+  const navigate = useNavigate();
+  const location = useLocation();
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const rootRole = ['admin', 'accounts', 'staff', 'student', 'principal', 'superadmin', 'hod', 'librarian'].includes(pathParts[0]?.toLowerCase())
+    ? pathParts[0].toLowerCase()
+    : (localStorage.getItem('role')?.toLowerCase() || 'admin');
+  const dashboardPath = `/${rootRole}/dashboard`;
+  const businessCatalogPath = `/${rootRole}/business-referral`;
+
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'my-referrals';
+  const [mainView, setMainView] = useState(initialTab === 'direct-lead' ? 'my-referrals' : initialTab); // 'my-referrals' | 'opportunities' | 'my-applications'
   const [oppCategory, setOppCategory] = useState('Insurance'); // 'Insurance' | 'Credit Card' | 'Bank Account' | 'Job Referral'
   const [publishedOpps, setPublishedOpps] = useState([]);
   const [myApplications, setMyApplications] = useState([]);
@@ -28,9 +43,13 @@ export default function PersonalReferrals() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Search & Filter
+  // Search & Filter for My Referrals & Opportunities
+  const [referralSearch, setReferralSearch] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [submitCategory, setSubmitCategory] = useState('Credit Card');
 
   // Application Modal for Published Opportunity
   const [selectedOppForApply, setSelectedOppForApply] = useState(null);
@@ -66,7 +85,20 @@ export default function PersonalReferrals() {
 
       if (statsRes?.data?.success) setStats(statsRes.data.data);
       if (listRes?.data?.success) setReferrals(listRes.data.data);
-      if (oppsRes?.data?.success) setPublishedOpps(oppsRes.data.data || []);
+      if (oppsRes?.data?.success) {
+        const clean = (oppsRes.data.data || []).filter(
+          (o) =>
+            o.opportunityCode !== 'OPP-INS-2026-001' &&
+            o.opportunityCode !== 'OPP-CRD-2026-001' &&
+            o.opportunityCode !== 'OPP-BNK-2026-001' &&
+            o.opportunityCode !== 'OPP-JOB-2026-001' &&
+            o.title !== 'Star Comprehensive Health Insurance Plan' &&
+            o.title !== 'HDFC Millennia Cashback Credit Card' &&
+            o.title !== 'ICICI Mine Student & Youth Zero-Balance Savings Account' &&
+            o.title !== 'TCS Software Engineer / Full Stack Developer Opening'
+        );
+        setPublishedOpps(clean);
+      }
       if (myAppsRes?.data?.success) {
         setMyApplications(myAppsRes.data.data || []);
         if (myAppsRes.data.stats) setMyAppStats(myAppsRes.data.stats);
@@ -174,17 +206,47 @@ export default function PersonalReferrals() {
     }
   };
 
-  // Visual Pipeline Stepper
-  const renderPipelineStepper = (status, incentiveStatus) => {
-    const stages = [
-      { label: 'Submitted', key: 'Submitted' },
-      { label: 'Under Review', key: 'Review' },
-      { label: 'Milestone Verified', key: 'Milestone' },
-      { label: 'Incentive Settled', key: 'Paid' },
+  // Visual Pipeline Stepper (Category Tailored)
+  const renderPipelineStepper = (status, incentiveStatus, category = 'Insurance') => {
+    let stages = [
+      { label: 'Submitted', desc: 'Lead Registered' },
+      { label: 'Under Review', desc: 'In Progress' },
+      { label: 'Completed', desc: 'Verified' },
+      { label: 'Incentive Settled', desc: 'Payout Completed' },
     ];
 
+    if (category === 'Insurance') {
+      stages = [
+        { label: 'Submitted', desc: 'Lead Registered' },
+        { label: 'Under Review', desc: 'Underwriting / KYC' },
+        { label: 'Policy Issued', desc: 'Policy Active' },
+        { label: 'Incentive Settled', desc: 'Payout Completed' },
+      ];
+    } else if (category === 'Job') {
+      stages = [
+        { label: 'Submitted', desc: 'Profile Submitted' },
+        { label: 'Interview / Screening', desc: 'Rounds in Progress' },
+        { label: 'Candidate Joined', desc: 'Joined Company' },
+        { label: 'Incentive Settled', desc: 'Payout Completed' },
+      ];
+    } else if (category === 'Bank Account') {
+      stages = [
+        { label: 'Submitted', desc: 'Lead Received' },
+        { label: 'KYC Review', desc: 'Biometric / Video KYC' },
+        { label: 'Account Opened', desc: 'Account Active' },
+        { label: 'Incentive Settled', desc: 'Payout Completed' },
+      ];
+    } else if (category === 'Credit Card') {
+      stages = [
+        { label: 'Submitted', desc: 'Application Received' },
+        { label: 'Bank Review', desc: 'Credit Bureau & KYC' },
+        { label: 'Card Activated', desc: 'Card Active' },
+        { label: 'Incentive Settled', desc: 'Payout Completed' },
+      ];
+    }
+
     let currentStep = 1;
-    if (['Under Review', 'Contacted', 'Application in Progress', 'Verification', 'KYC Verification', 'Provider Processing', 'Screening', 'Selected'].includes(status)) {
+    if (['Under Review', 'Contacted', 'Application in Progress', 'Verification', 'KYC Verification', 'Provider Processing', 'Screening', 'Interview Round 1', 'Interview Round 2', 'Technical Assessment', 'Selected'].includes(status)) {
       currentStep = 2;
     } else if (['Policy Issued', 'Approved', 'Issued', 'Activated', 'Account Opened', 'Joined', 'Milestone Verified'].includes(status)) {
       currentStep = 3;
@@ -208,6 +270,7 @@ export default function PersonalReferrals() {
             <div key={st.label} className={`ref-step ${isCompleted ? 'completed' : isCurrent ? 'current' : ''}`}>
               <div className="ref-step-dot">{isCompleted ? '✓' : stepNum}</div>
               <div className="ref-step-label">{st.label}</div>
+              {st.desc && <div className="ref-step-sublabel">{st.desc}</div>}
             </div>
           );
         })}
@@ -229,8 +292,19 @@ export default function PersonalReferrals() {
     return true;
   });
 
+  // Section 9: Specific Employee Dashboard KPI calculations
+  const myTotalReferrals = referrals.length;
+  const myCreditCardReferrals = referrals.filter(r => r.category === 'Credit Card').length;
+  const myInsuranceReferrals = referrals.filter(r => r.category === 'Insurance').length;
+  const myJobReferrals = referrals.filter(r => r.category === 'Job').length;
+  const myAccountOpeningReferrals = referrals.filter(r => r.category === 'Bank Account').length;
+
+  const myPaidIncentives = (stats?.incentives?.totalPaid || 0) + (myAppStats.totalIncentivesEarned || 0);
+  const myPendingIncentives = (stats?.incentives?.totalPendingApproval || 0) + (stats?.incentives?.totalApprovedUnpaid || 0) + (myAppStats.pendingIncentives || 0);
+  const myEligibleIncentives = myPaidIncentives + myPendingIncentives;
+
   return (
-    <div className="pers-ref-container" style={{ padding: '24px', background: 'var(--bg-main, #f8fafc)', minHeight: '100vh' }}>
+    <div className="management-page animate-fade-in">
       {/* ── REAL-TIME TOAST ALERT ── */}
       {toastMessage && (
         <div className="ref-floating-toast">
@@ -247,143 +321,222 @@ export default function PersonalReferrals() {
         </div>
       )}
 
-      {/* ── HERO BANNER ── */}
-      <div className="pers-hero-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-          <span className="pers-hero-badge">ENTERPRISE PARTNERSHIP REWARDS</span>
-          <div className="ref-live-sync-pill" style={{ background: 'rgba(255,255,255,0.15)', borderColor: 'rgba(255,255,255,0.3)', color: '#ffffff' }}>
-            <span className="ref-pulse-dot" style={{ backgroundColor: '#4ade80' }}></span>
-            <span>Live Sync Active</span>
-            <span style={{ opacity: 0.85, fontSize: '0.78rem' }}>• {lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+      {/* ── Real-Time ERP Header Card ── */}
+      <div className="mgmt-header-card">
+        <div className="mgmt-header-bar" style={{ background: 'linear-gradient(90deg, #2563eb, #4f46e5, #0284c7)' }}></div>
+        
+        <div className="mgmt-header-top">
+          <div className="mgmt-header-title-area">
+            <div className="mgmt-sync-badge">
+              <span className="mgmt-sync-dot"></span>
+              <span>Real-Time Business Referral & Earnings Sync Active</span>
+            </div>
+            <h1>My Submissions & Referral Portfolio</h1>
+            <p>
+              Submit and track verified referrals for Insurance, Credit Cards, Bank Accounts, and Corporate Hiring Mandates. Monitor real-time status, milestone verification, and authorized incentive disbursements.
+            </p>
+          </div>
+
+          <div className="mgmt-header-actions">
+            <button
+              type="button"
+              className="mgmt-btn-secondary"
+              onClick={fetchAllData}
+              disabled={refreshing}
+            >
+              <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+              <span>{refreshing ? 'Syncing...' : 'Sync'}</span>
+            </button>
+            <button
+              type="button"
+              className="mgmt-btn-primary"
+              onClick={() => setShowSubmitModal(true)}
+            >
+              <Plus size={16} />
+              <span>+ Submit Referral Lead</span>
+            </button>
           </div>
         </div>
-        <h1 className="pers-hero-title">Business Opportunities & Referral Portal</h1>
-        <p className="pers-hero-sub">
-          Apply for officially published institution partner opportunities across Insurance, Credit Cards, Bank Accounts, and Jobs. Track real-time progress, provider verification, and earn authorized incentive payouts.
-        </p>
-      </div>
 
-      {/* ── PRIVACY BANNER ── */}
-      <div className="pers-privacy-banner">
-        <Lock size={16} />
-        <span>
-          <strong>Confidential & Tenant-Isolated:</strong> Your application entries, personal documents, and earned incentive rewards are strictly private and accessible only to you and authorized institutional administrators.
-        </span>
-      </div>
-
-      {/* ── PRIVATE EARNINGS CARDS ── */}
-      <div className="pers-earnings-grid">
-        <div className="pers-earn-card" style={{ borderLeft: '4px solid #059669' }}>
-          <div className="pers-earn-label">
-            <DollarSign size={16} className="text-emerald-600" />
-            Total Incentives Disbursed
-          </div>
-          <div className="pers-earn-value" style={{ color: '#059669' }}>
-            ₹{((stats?.incentives?.totalPaid || 0) + (myAppStats.totalIncentivesEarned || 0)).toLocaleString()}
-          </div>
-          <div className="pers-earn-meta">Directly credited via bank transfer</div>
-        </div>
-
-        <div className="pers-earn-card" style={{ borderLeft: '4px solid #2563eb' }}>
-          <div className="pers-earn-label">
-            <Clock size={16} className="text-blue-600" />
-            Approved & Processing
-          </div>
-          <div className="pers-earn-value" style={{ color: '#2563eb' }}>
-            ₹{((stats?.incentives?.totalApprovedUnpaid || 0) + (myAppStats.pendingIncentives || 0)).toLocaleString()}
-          </div>
-          <div className="pers-earn-meta">Approved, awaiting next disbursement batch</div>
-        </div>
-
-        <div className="pers-earn-card" style={{ borderLeft: '4px solid #7c3aed' }}>
-          <div className="pers-earn-label">
-            <Award size={16} className="text-purple-600" />
-            Active Opportunities Applied
-          </div>
-          <div className="pers-earn-value" style={{ color: '#7c3aed' }}>
-            {myApplications.length} Opportunities
-          </div>
-          <div className="pers-earn-meta">Live tracking with stage steppers</div>
-        </div>
-
-        <div className="pers-earn-card" style={{ borderLeft: '4px solid #ea580c' }}>
-          <div className="pers-earn-label">
-            <CheckCircle2 size={16} className="text-orange-600" />
-            Total Referrals Registered
-          </div>
-          <div className="pers-earn-value" style={{ color: '#ea580c' }}>
-            {referrals.length} Leads
-          </div>
-          <div className="pers-earn-meta">Direct customer lead submissions</div>
+        <div className="mgmt-header-meta">
+          <span className="meta-item">Module: <strong>Business Referral</strong></span>
+          <span className="meta-bullet">•</span>
+          <span className="meta-item">Section: <strong>My Submissions & Earnings</strong></span>
+          <span className="meta-bullet">•</span>
+          <span className="meta-item">Privacy: <strong>100% Confidential & Tenant-Isolated</strong></span>
+          <span className="meta-bullet">•</span>
+          <span className="meta-item">Live Sync: <strong>{lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></span>
         </div>
       </div>
 
-      {/* ── TOP VIEW NAVIGATION TABS ── */}
-      <div style={{ display: 'flex', gap: '10px', borderBottom: '2px solid #e2e8f0', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <button
-          onClick={() => setMainView('opportunities')}
-          style={{
-            padding: '11px 20px',
-            border: 'none',
-            background: 'none',
-            fontWeight: 800,
-            fontSize: '0.95rem',
-            color: mainView === 'opportunities' ? '#2563eb' : '#64748b',
-            borderBottom: mainView === 'opportunities' ? '3px solid #2563eb' : 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <Award size={18} />
-          <span>Browse Published Opportunities ({publishedOpps.length})</span>
-        </button>
+      {/* ── SECTION 9: 8 EMPLOYEE KPI SUMMARY CARDS ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '1.5rem' }}>
+        {/* Row 1: Category Referral Counts */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+          <div className="mgmt-kpi-card" style={{ borderLeft: '4px solid #3b82f6' }}>
+            <div className="mgmt-kpi-icon" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb' }}>
+              <FileText size={20} />
+            </div>
+            <div className="mgmt-kpi-info">
+              <span className="mgmt-kpi-label">My Total Referrals</span>
+              <h3 className="mgmt-kpi-value">{myTotalReferrals}</h3>
+            </div>
+          </div>
 
-        <button
-          onClick={() => setMainView('my-applications')}
-          style={{
-            padding: '11px 20px',
-            border: 'none',
-            background: 'none',
-            fontWeight: 800,
-            fontSize: '0.95rem',
-            color: mainView === 'my-applications' ? '#2563eb' : '#64748b',
-            borderBottom: mainView === 'my-applications' ? '3px solid #2563eb' : 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <CheckCircle2 size={18} />
-          <span>My Applications Tracking ({myApplications.length})</span>
-        </button>
+          <div className="mgmt-kpi-card" style={{ borderLeft: '4px solid #1e40af' }}>
+            <div className="mgmt-kpi-icon" style={{ background: 'rgba(30, 64, 175, 0.1)', color: '#1e40af' }}>
+              <CreditCard size={20} />
+            </div>
+            <div className="mgmt-kpi-info">
+              <span className="mgmt-kpi-label">My Credit Card Referrals</span>
+              <h3 className="mgmt-kpi-value" style={{ color: '#1e40af' }}>{myCreditCardReferrals}</h3>
+            </div>
+          </div>
 
-        <button
-          onClick={() => setMainView('direct-lead')}
-          style={{
-            padding: '11px 20px',
-            border: 'none',
-            background: 'none',
-            fontWeight: 800,
-            fontSize: '0.95rem',
-            color: mainView === 'direct-lead' ? '#2563eb' : '#64748b',
-            borderBottom: mainView === 'direct-lead' ? '3px solid #2563eb' : 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <Plus size={18} />
-          <span>Direct Lead Submission & Referrals ({referrals.length})</span>
-        </button>
+          <div className="mgmt-kpi-card" style={{ borderLeft: '4px solid #0284c7' }}>
+            <div className="mgmt-kpi-icon" style={{ background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7' }}>
+              <Shield size={20} />
+            </div>
+            <div className="mgmt-kpi-info">
+              <span className="mgmt-kpi-label">My Insurance Referrals</span>
+              <h3 className="mgmt-kpi-value" style={{ color: '#0284c7' }}>{myInsuranceReferrals}</h3>
+            </div>
+          </div>
+
+          <div className="mgmt-kpi-card" style={{ borderLeft: '4px solid #ea580c' }}>
+            <div className="mgmt-kpi-icon" style={{ background: 'rgba(234, 88, 12, 0.1)', color: '#ea580c' }}>
+              <Briefcase size={20} />
+            </div>
+            <div className="mgmt-kpi-info">
+              <span className="mgmt-kpi-label">My Job Referrals</span>
+              <h3 className="mgmt-kpi-value" style={{ color: '#ea580c' }}>{myJobReferrals}</h3>
+            </div>
+          </div>
+
+          <div className="mgmt-kpi-card" style={{ borderLeft: '4px solid #059669' }}>
+            <div className="mgmt-kpi-icon" style={{ background: 'rgba(5, 150, 105, 0.1)', color: '#059669' }}>
+              <Landmark size={20} />
+            </div>
+            <div className="mgmt-kpi-info">
+              <span className="mgmt-kpi-label">My Account Opening</span>
+              <h3 className="mgmt-kpi-value" style={{ color: '#059669' }}>{myAccountOpeningReferrals}</h3>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Incentive Financial Totals */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+          <div className="mgmt-kpi-card" style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)', border: '1px solid #bbf7d0', borderLeft: '4px solid #10b981' }}>
+            <div className="mgmt-kpi-icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
+              <DollarSign size={22} />
+            </div>
+            <div className="mgmt-kpi-info">
+              <span className="mgmt-kpi-label" style={{ color: '#166534', fontWeight: 700 }}>My Eligible Incentives</span>
+              <h3 className="mgmt-kpi-value" style={{ color: '#15803d' }}>
+                ₹{myEligibleIncentives.toLocaleString()}
+              </h3>
+            </div>
+          </div>
+
+          <div className="mgmt-kpi-card" style={{ background: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 100%)', border: '1px solid #fed7aa', borderLeft: '4px solid #f97316' }}>
+            <div className="mgmt-kpi-icon" style={{ background: '#ffedd5', color: '#ea580c' }}>
+              <Clock size={22} />
+            </div>
+            <div className="mgmt-kpi-info">
+              <span className="mgmt-kpi-label" style={{ color: '#9a3412', fontWeight: 700 }}>My Pending Incentives</span>
+              <h3 className="mgmt-kpi-value" style={{ color: '#c2410c' }}>
+                ₹{myPendingIncentives.toLocaleString()}
+              </h3>
+            </div>
+          </div>
+
+          <div className="mgmt-kpi-card" style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)', border: '1px solid #bfdbfe', borderLeft: '4px solid #2563eb' }}>
+            <div className="mgmt-kpi-icon" style={{ background: '#dbeafe', color: '#2563eb' }}>
+              <CheckCircle2 size={22} />
+            </div>
+            <div className="mgmt-kpi-info">
+              <span className="mgmt-kpi-label" style={{ color: '#1e40af', fontWeight: 700 }}>My Paid Incentives</span>
+              <h3 className="mgmt-kpi-value" style={{ color: '#1d4ed8' }}>
+                ₹{myPaidIncentives.toLocaleString()}
+              </h3>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* ── Main ERP Management Card ── */}
+      <div className="mgmt-table-card">
+        <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color, #e2e8f0)', padding: '12px 18px', background: 'var(--bg-card, #ffffff)', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setMainView('my-referrals')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: (mainView === 'my-referrals' || mainView === 'direct-lead') ? '1px solid #2563eb' : '1px solid transparent',
+              background: (mainView === 'my-referrals' || mainView === 'direct-lead') ? '#eff6ff' : 'transparent',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              color: (mainView === 'my-referrals' || mainView === 'direct-lead') ? '#1d4ed8' : '#64748b',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <FileText size={16} />
+            <span>My Referrals ({referrals.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainView('opportunities')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: mainView === 'opportunities' ? '1px solid #2563eb' : '1px solid transparent',
+              background: mainView === 'opportunities' ? '#eff6ff' : 'transparent',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              color: mainView === 'opportunities' ? '#1d4ed8' : '#64748b',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Award size={16} />
+            <span>Browse Published Opportunities ({publishedOpps.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainView('my-applications')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: mainView === 'my-applications' ? '1px solid #2563eb' : '1px solid transparent',
+              background: mainView === 'my-applications' ? '#eff6ff' : 'transparent',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              color: mainView === 'my-applications' ? '#1d4ed8' : '#64748b',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <CheckCircle2 size={16} />
+            <span>My Applications Tracking ({myApplications.length})</span>
+          </button>
+        </div>
 
       {/* ── VIEW 1: BROWSE PUBLISHED OPPORTUNITIES ── */}
       {mainView === 'opportunities' && (
-        <div>
+        <div style={{ padding: '20px' }}>
           {/* Sub Categories Pill Selector */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
             <button
@@ -505,7 +658,7 @@ export default function PersonalReferrals() {
 
       {/* ── VIEW 2: MY APPLICATIONS TRACKING ── */}
       {mainView === 'my-applications' && (
-        <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '20px' }}>
+        <div style={{ padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
@@ -582,8 +735,8 @@ export default function PersonalReferrals() {
                     </div>
                   </div>
 
-                  {/* 4-Stage Stepper Progress */}
-                  {renderPipelineStepper(app.status, app.incentiveStatus)}
+                  {/* 4-Stage Stepper Progress (Category-Tailored) */}
+                  {renderPipelineStepper(app.status, app.incentiveStatus, app.category)}
 
                   {/* Submitted Data Summary */}
                   <div style={{ background: '#f8fafc', borderRadius: '8px', padding: '10px 14px', marginTop: '14px', fontSize: '0.8rem' }}>
@@ -604,233 +757,348 @@ export default function PersonalReferrals() {
         </div>
       )}
 
-      {/* ── VIEW 3: DIRECT REFERRAL SUBMISSION & EXISTING TRACKING ── */}
-      {mainView === 'direct-lead' && (
-        <div>
-          {/* Direct Lead Registration Tiles */}
-          <div className="pers-categories-section">
-            <h2 className="pers-section-title">Direct Referral Registration</h2>
-            <p className="pers-section-sub">Select one of the 4 partner categories below to register a direct client lead:</p>
+      {/* ── VIEW 3: MY REFERRALS & LIVE TRACKING ── */}
+      {(mainView === 'my-referrals' || mainView === 'direct-lead') && (() => {
+        const filteredDirectReferrals = referrals.filter((r) => {
+          if (categoryFilter !== 'All' && r.category !== categoryFilter) return false;
+          if (statusFilter !== 'All' && r.status !== statusFilter) return false;
+          if (referralSearch) {
+            const q = referralSearch.toLowerCase();
+            const applicantName = (
+              r.insuranceDetails?.applicantName ||
+              r.creditCardDetails?.applicantName ||
+              r.bankAccountDetails?.applicantName ||
+              r.jobDetails?.candidateName ||
+              ''
+            ).toLowerCase();
+            const phone = (
+              r.insuranceDetails?.applicantPhone ||
+              r.creditCardDetails?.applicantPhone ||
+              r.bankAccountDetails?.applicantPhone ||
+              r.jobDetails?.candidatePhone ||
+              ''
+            );
+            const code = (r.referralCode || '').toLowerCase();
+            if (!applicantName.includes(q) && !phone.includes(q) && !code.includes(q)) return false;
+          }
+          return true;
+        });
 
-            <div className="pers-cat-grid">
-              <div
-                className={`pers-cat-card ${selectedCategory === 'Insurance' ? 'selected' : ''}`}
-                onClick={() => setSelectedCategory(selectedCategory === 'Insurance' ? null : 'Insurance')}
-              >
-                <div>
-                  <div className="pers-cat-header">
-                    <div className="pers-cat-icon" style={{ background: '#eff6ff', color: '#2563eb' }}>🛡️</div>
-                    <div className="pers-cat-title">Insurance</div>
-                  </div>
-                  <p className="pers-cat-desc">
-                    Refer family or friends for Health, Term Life, and Motor insurance from top providers.
-                  </p>
-                </div>
-                <div className="pers-cat-footer" style={{ color: '#2563eb' }}>
-                  <span>{selectedCategory === 'Insurance' ? 'Form Open ▲' : 'Submit Lead →'}</span>
-                  <span>Reward up to ₹800</span>
-                </div>
+        return (
+          <div style={{ padding: '20px' }}>
+            {/* Header with Quick Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                  Referral Records & Verification Pipeline
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted, #64748b)' }}>
+                  Live institutional ledger of your referrals, applicant milestones, and authorized payout settlements.
+                </p>
               </div>
 
-              <div
-                className={`pers-cat-card ${selectedCategory === 'Credit Card' ? 'selected' : ''}`}
-                onClick={() => setSelectedCategory(selectedCategory === 'Credit Card' ? null : 'Credit Card')}
-              >
-                <div>
-                  <div className="pers-cat-header">
-                    <div className="pers-cat-icon" style={{ background: '#f5f3ff', color: '#7c3aed' }}>💳</div>
-                    <div className="pers-cat-title">Credit Cards</div>
-                  </div>
-                  <p className="pers-cat-desc">
-                    Refer applicants for leading bank cards with zero joining fee and cashback rewards.
-                  </p>
-                </div>
-                <div className="pers-cat-footer" style={{ color: '#7c3aed' }}>
-                  <span>{selectedCategory === 'Credit Card' ? 'Form Open ▲' : 'Submit Lead →'}</span>
-                  <span>Reward up to ₹1,000</span>
-                </div>
-              </div>
-
-              <div
-                className={`pers-cat-card ${selectedCategory === 'Bank Account' ? 'selected' : ''}`}
-                onClick={() => setSelectedCategory(selectedCategory === 'Bank Account' ? null : 'Bank Account')}
-              >
-                <div>
-                  <div className="pers-cat-header">
-                    <div className="pers-cat-icon" style={{ background: '#fffbeb', color: '#d97706' }}>🏛️</div>
-                    <div className="pers-cat-title">Bank Accounts</div>
-                  </div>
-                  <p className="pers-cat-desc">
-                    Refer students and staff for zero-balance or corporate salary accounts with digital KYC.
-                  </p>
-                </div>
-                <div className="pers-cat-footer" style={{ color: '#d97706' }}>
-                  <span>{selectedCategory === 'Bank Account' ? 'Form Open ▲' : 'Submit Lead →'}</span>
-                  <span>Reward up to ₹500</span>
-                </div>
-              </div>
-
-              <div
-                className={`pers-cat-card ${selectedCategory === 'Job' ? 'selected' : ''}`}
-                onClick={() => setSelectedCategory(selectedCategory === 'Job' ? null : 'Job')}
-              >
-                <div>
-                  <div className="pers-cat-header">
-                    <div className="pers-cat-icon" style={{ background: '#ecfdf5', color: '#059669' }}>💼</div>
-                    <div className="pers-cat-title">Job Referrals</div>
-                  </div>
-                  <p className="pers-cat-desc">
-                    Refer qualified graduates and professionals for partner corporate openings.
-                  </p>
-                </div>
-                <div className="pers-cat-footer" style={{ color: '#059669' }}>
-                  <span>{selectedCategory === 'Job' ? 'Form Open ▲' : 'Submit Lead →'}</span>
-                  <span>Reward up to ₹2,500</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Direct Submission Modal / Slide */}
-          {selectedCategory && (
-            <div style={{ background: '#ffffff', borderRadius: '16px', border: '2px solid #3b82f6', padding: '20px', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>Submit {selectedCategory} Referral</h3>
-                <button onClick={() => setSelectedCategory(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
-              </div>
-
-              {selectedCategory === 'Insurance' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-                  <div>
-                    <label className="ref-form-label">Insurer Provider</label>
-                    <input type="text" className="ref-input" value={formInsurance.provider} onChange={(e) => setFormInsurance({ ...formInsurance, provider: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="ref-form-label">Applicant Name</label>
-                    <input type="text" className="ref-input" placeholder="Full name" value={formInsurance.applicantName} onChange={(e) => setFormInsurance({ ...formInsurance, applicantName: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="ref-form-label">Mobile Phone</label>
-                    <input type="text" className="ref-input" placeholder="10-digit number" value={formInsurance.applicantPhone} onChange={(e) => setFormInsurance({ ...formInsurance, applicantPhone: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="ref-form-label">Sum Insured (₹)</label>
-                    <input type="number" className="ref-input" value={formInsurance.estimatedSumInsured} onChange={(e) => setFormInsurance({ ...formInsurance, estimatedSumInsured: Number(e.target.value) })} />
-                  </div>
-                </div>
-              )}
-
-              {selectedCategory === 'Credit Card' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-                  <div>
-                    <label className="ref-form-label">Bank Name</label>
-                    <input type="text" className="ref-input" value={formCreditCard.bankName} onChange={(e) => setFormCreditCard({ ...formCreditCard, bankName: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="ref-form-label">Applicant Name (on PAN)</label>
-                    <input type="text" className="ref-input" value={formCreditCard.applicantName} onChange={(e) => setFormCreditCard({ ...formCreditCard, applicantName: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="ref-form-label">Phone</label>
-                    <input type="text" className="ref-input" value={formCreditCard.applicantPhone} onChange={(e) => setFormCreditCard({ ...formCreditCard, applicantPhone: e.target.value })} />
-                  </div>
-                </div>
-              )}
-
-              {selectedCategory === 'Bank Account' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-                  <div>
-                    <label className="ref-form-label">Bank</label>
-                    <input type="text" className="ref-input" value={formBankAccount.bankName} onChange={(e) => setFormBankAccount({ ...formBankAccount, bankName: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="ref-form-label">Applicant Name</label>
-                    <input type="text" className="ref-input" value={formBankAccount.applicantName} onChange={(e) => setFormBankAccount({ ...formBankAccount, applicantName: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="ref-form-label">Phone</label>
-                    <input type="text" className="ref-input" value={formBankAccount.applicantPhone} onChange={(e) => setFormBankAccount({ ...formBankAccount, applicantPhone: e.target.value })} />
-                  </div>
-                </div>
-              )}
-
-              {selectedCategory === 'Job' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-                  <div>
-                    <label className="ref-form-label">Company Name</label>
-                    <input type="text" className="ref-input" value={formJob.companyName} onChange={(e) => setFormJob({ ...formJob, companyName: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="ref-form-label">Candidate Name</label>
-                    <input type="text" className="ref-input" value={formJob.candidateName} onChange={(e) => setFormJob({ ...formJob, candidateName: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="ref-form-label">Phone</label>
-                    <input type="text" className="ref-input" value={formJob.candidatePhone} onChange={(e) => setFormJob({ ...formJob, candidatePhone: e.target.value })} />
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={formJob.candidateConsentGiven} onChange={(e) => setFormJob({ ...formJob, candidateConsentGiven: e.target.checked })} />
-                      <span>Candidate has given explicit permission for recruitment referral *</span>
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button type="button" className="ref-btn-secondary" onClick={() => setSelectedCategory(null)}>Cancel</button>
-                <button type="button" className="ref-btn-primary" disabled={submitting} onClick={() => handleSubmitLead(selectedCategory)}>
-                  {submitting ? 'Submitting...' : 'Confirm Submission →'}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="mgmt-btn-secondary"
+                  onClick={() => {
+                    setSubmitCategory('Credit Card');
+                    setShowSubmitModal(true);
+                  }}
+                  title="Submit Credit Card Referral"
+                >
+                  💳 + Credit Card
+                </button>
+                <button
+                  type="button"
+                  className="mgmt-btn-secondary"
+                  onClick={() => {
+                    setSubmitCategory('Insurance');
+                    setShowSubmitModal(true);
+                  }}
+                  title="Submit Insurance Referral"
+                >
+                  🛡️ + Insurance
+                </button>
+                <button
+                  type="button"
+                  className="mgmt-btn-secondary"
+                  onClick={() => {
+                    setSubmitCategory('Bank Account');
+                    setShowSubmitModal(true);
+                  }}
+                  title="Submit Bank Account Referral"
+                >
+                  🏛️ + Bank Account
+                </button>
+                <button
+                  type="button"
+                  className="mgmt-btn-secondary"
+                  onClick={() => {
+                    setSubmitCategory('Job');
+                    setShowSubmitModal(true);
+                  }}
+                  title="Submit Job Opening Referral"
+                >
+                  💼 + Job Opening
+                </button>
+                <button
+                  type="button"
+                  className="mgmt-btn-primary"
+                  onClick={() => {
+                    setSubmitCategory('Credit Card');
+                    setShowSubmitModal(true);
+                  }}
+                >
+                  <Plus size={16} />
+                  <span>Submit New Referral</span>
                 </button>
               </div>
             </div>
-          )}
 
-          {/* Referrals Tracking Table */}
-          <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '20px' }}>
-            <h3 style={{ margin: '0 0 14px', fontSize: '1.1rem', fontWeight: 800 }}>Direct Referral Leads Tracking</h3>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-                <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                  <tr>
-                    <th style={{ padding: '10px 14px', textAlign: 'left' }}>Referral Code</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left' }}>Category</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left' }}>Applicant</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left' }}>Status</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left' }}>Incentive</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {referrals.map((r) => (
-                    <tr key={r._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px 14px', fontWeight: 700, fontFamily: 'monospace' }}>
-                        {r.referralCode}
-                        <button
-                          className={`ref-copy-btn ${copiedId === r._id ? 'copied' : ''}`}
-                          onClick={() => handleCopy(r.referralCode, r._id)}
-                        >
-                          <Copy size={12} />
-                          <span>{copiedId === r._id ? '✓' : 'Copy'}</span>
-                        </button>
-                      </td>
-                      <td style={{ padding: '12px 14px' }}>{r.category}</td>
-                      <td style={{ padding: '12px 14px', fontWeight: 600 }}>
-                        {r.insuranceDetails?.applicantName || r.creditCardDetails?.applicantName || r.bankAccountDetails?.applicantName || r.jobDetails?.candidateName || 'N/A'}
-                      </td>
-                      <td style={{ padding: '12px 14px' }}>
-                        <span className={`ref-badge ${r.status?.toLowerCase().replace(/\s+/g, '-')}`}>{r.status}</span>
-                      </td>
-                      <td style={{ padding: '12px 14px', fontWeight: 700, color: '#059669' }}>
-                        ₹{r.incentiveAmount || 0} ({r.incentiveStatus})
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* Filter and Search Bar */}
+            <div className="mgmt-filters-row" style={{ marginBottom: '16px', background: '#f8fafc', padding: '12px 16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginRight: '4px' }}>
+                  <Filter size={14} /> Category:
+                </span>
+                {['All', 'Credit Card', 'Insurance', 'Bank Account', 'Job'].map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoryFilter(cat)}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      border: categoryFilter === cat ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                      background: categoryFilter === cat ? '#eff6ff' : '#ffffff',
+                      color: categoryFilter === cat ? '#1d4ed8' : '#475569',
+                      fontWeight: categoryFilter === cat ? 700 : 500,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b' }}>Status:</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    style={{
+                      padding: '5px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.82rem',
+                      color: '#1e293b',
+                      outline: 'none',
+                      background: '#ffffff'
+                    }}
+                  >
+                    <option value="All">All Statuses</option>
+                    <option value="Submitted">Submitted</option>
+                    <option value="Under Review">Under Review</option>
+                    <option value="Milestone Verified">Milestone Verified</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Paid">Paid</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+
+                <div style={{ position: 'relative', minWidth: '220px' }}>
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '8px', color: '#94a3b8' }} />
+                  <input
+                    type="text"
+                    placeholder="Search code, name, phone..."
+                    value={referralSearch}
+                    onChange={(e) => setReferralSearch(e.target.value)}
+                    style={{
+                      padding: '5px 10px 5px 30px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.82rem',
+                      width: '100%',
+                      outline: 'none',
+                      background: '#ffffff'
+                    }}
+                  />
+                  {referralSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setReferralSearch('')}
+                      style={{ position: 'absolute', right: '6px', top: '5px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '0.8rem' }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Referrals Tracking Table */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
+                  Showing {filteredDirectReferrals.length} {filteredDirectReferrals.length === 1 ? 'record' : 'records'}
+                </div>
+                {refreshing && (
+                  <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <RefreshCw size={13} className="spin" /> Syncing with institutional network...
+                  </span>
+                )}
+              </div>
+
+              {filteredDirectReferrals.length === 0 ? (
+                <div style={{ padding: '48px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', border: '1px solid #e2e8f0' }}>
+                    <FileText size={24} style={{ color: '#94a3b8' }} />
+                  </div>
+                  {referrals.length === 0 ? (
+                    <>
+                      <h4 style={{ margin: '0 0 4px', color: '#1e293b', fontSize: '1rem', fontWeight: 800 }}>No referrals registered yet</h4>
+                      <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: '0.84rem', maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
+                        Submit your first referral lead using the buttons above to earn authorized institutional incentives.
+                      </p>
+                      <button
+                        type="button"
+                        className="mgmt-btn-primary"
+                        onClick={() => {
+                          setSubmitCategory('Credit Card');
+                          setShowSubmitModal(true);
+                        }}
+                      >
+                        <Plus size={15} /> Submit Your First Referral
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <h4 style={{ margin: '0 0 4px', color: '#1e293b', fontSize: '1rem', fontWeight: 800 }}>No matching records found</h4>
+                      <p style={{ margin: '0 0 14px', color: '#64748b', fontSize: '0.84rem' }}>
+                        No submissions match the current category, status, or search query.
+                      </p>
+                      <button
+                        type="button"
+                        className="mgmt-btn-secondary"
+                        onClick={() => {
+                          setCategoryFilter('All');
+                          setStatusFilter('All');
+                          setReferralSearch('');
+                        }}
+                      >
+                        Reset Filter Options
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="mgmt-table-wrapper" style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflowX: 'auto' }}>
+                  <table className="mgmt-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#475569', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>Referral Code</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#475569', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>Category & Offering</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#475569', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>Applicant Name & Contact</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#475569', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>Consent</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#475569', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>Pipeline Status</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#475569', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>Incentive Reward</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#475569', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>Submission Date</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700, color: '#475569', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredDirectReferrals.map((r) => {
+                        const applicantName = r.insuranceDetails?.applicantName || r.creditCardDetails?.applicantName || r.bankAccountDetails?.applicantName || r.jobDetails?.candidateName || 'N/A';
+                        const applicantPhone = r.insuranceDetails?.applicantPhone || r.creditCardDetails?.applicantPhone || r.bankAccountDetails?.applicantPhone || r.jobDetails?.candidatePhone || '';
+                        const productInfo = r.insuranceDetails?.provider || r.creditCardDetails?.bankName || r.bankAccountDetails?.bankName || r.jobDetails?.companyName || '';
+
+                        return (
+                          <tr key={r._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '10px 14px', fontWeight: 700, fontFamily: 'monospace' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ color: '#1e293b' }}>{r.referralCode}</span>
+                                <button
+                                  type="button"
+                                  className={`ref-copy-btn ${copiedId === r._id ? 'copied' : ''}`}
+                                  onClick={() => handleCopy(r.referralCode, r._id)}
+                                  title="Copy Referral Code"
+                                  style={{ padding: '2px 6px', fontSize: '0.72rem', borderRadius: '4px' }}
+                                >
+                                  <Copy size={11} />
+                                  <span>{copiedId === r._id ? '✓' : 'Copy'}</span>
+                                </button>
+                              </div>
+                            </td>
+
+                            <td style={{ padding: '10px 14px' }}>
+                              <div style={{ fontWeight: 700, color: '#0f172a' }}>{r.category}</div>
+                              {productInfo && (
+                                <div style={{ fontSize: '0.76rem', color: '#64748b' }}>{productInfo}</div>
+                              )}
+                            </td>
+
+                            <td style={{ padding: '10px 14px' }}>
+                              <div style={{ fontWeight: 600, color: '#1e293b' }}>{applicantName}</div>
+                              {applicantPhone && (
+                                <div style={{ fontSize: '0.76rem', color: '#64748b' }}>+91 {applicantPhone}</div>
+                              )}
+                            </td>
+
+                            <td style={{ padding: '10px 14px' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#ecfdf5', color: '#065f46', padding: '2px 7px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 600 }}>
+                                <Check size={11} /> Recorded
+                              </span>
+                            </td>
+
+                            <td style={{ padding: '10px 14px' }}>
+                              <span className={`ref-badge ${r.status?.toLowerCase().replace(/\s+/g, '-')}`}>
+                                {r.status}
+                              </span>
+                            </td>
+
+                            <td style={{ padding: '10px 14px' }}>
+                              <div style={{ fontWeight: 800, color: r.incentiveAmount > 0 ? '#059669' : '#64748b' }}>
+                                {r.incentiveAmount > 0 ? `₹${r.incentiveAmount}` : 'Rule Pending'}
+                              </div>
+                              <div style={{ fontSize: '0.73rem', color: '#64748b' }}>
+                                {r.incentiveStatus || 'None'}
+                              </div>
+                            </td>
+
+                            <td style={{ padding: '10px 14px', fontSize: '0.8rem', color: '#64748b' }}>
+                              {new Date(r.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </td>
+
+                            <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                className="mgmt-btn-secondary"
+                                style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                onClick={() => {
+                                  setSelectedRef(r);
+                                  setShowDetailModal(true);
+                                }}
+                              >
+                                <Eye size={13} />
+                                <span>Audit</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+      </div>
 
       {/* ── OPPORTUNITY DETAILS MODAL ── */}
       {oppDetailModal && (
@@ -939,6 +1207,297 @@ export default function PersonalReferrals() {
           </div>
         </div>
       )}
+
+      {/* ── REFERRAL DETAIL MODAL ── */}
+      {showDetailModal && selectedRef && (
+        <div className="ref-modal-overlay" onClick={() => setShowDetailModal(false)}>
+          <div className="ref-modal-card" style={{ maxWidth: '640px', width: '92%' }} onClick={(e) => e.stopPropagation()}>
+            <div className="ref-modal-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '14px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '3px 8px', borderRadius: '4px', background: '#eff6ff', color: '#1d4ed8', textTransform: 'uppercase' }}>
+                    {selectedRef.category}
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Submitted {new Date(selectedRef.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+                <div className="ref-modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>Referral {selectedRef.referralCode}</span>
+                  <button
+                    type="button"
+                    className={`ref-copy-btn ${copiedId === selectedRef._id ? 'copied' : ''}`}
+                    onClick={() => handleCopy(selectedRef.referralCode, selectedRef._id)}
+                  >
+                    <Copy size={13} />
+                    <span>{copiedId === selectedRef._id ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
+              </div>
+              <button type="button" className="ref-modal-close" onClick={() => setShowDetailModal(false)}>✕</button>
+            </div>
+
+            <div className="ref-modal-body" style={{ maxHeight: '72vh', overflowY: 'auto', padding: '20px 0' }}>
+              {/* Stepper */}
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', marginBottom: '10px' }}>Application Processing Pipeline</div>
+                {renderPipelineStepper(selectedRef.status, selectedRef.incentiveStatus, selectedRef.category)}
+              </div>
+
+              {/* Applicant Info Box */}
+              <div style={{ background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '16px', marginBottom: '18px' }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <UserCheck size={16} className="text-blue-600" />
+                  <span>Applicant Information</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', fontSize: '0.85rem' }}>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Name:</span>{' '}
+                    <strong>{selectedRef.insuranceDetails?.applicantName || selectedRef.creditCardDetails?.applicantName || selectedRef.bankAccountDetails?.applicantName || selectedRef.jobDetails?.candidateName || 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Phone:</span>{' '}
+                    <strong>+91 {selectedRef.insuranceDetails?.applicantPhone || selectedRef.creditCardDetails?.applicantPhone || selectedRef.bankAccountDetails?.applicantPhone || selectedRef.jobDetails?.candidatePhone || 'N/A'}</strong>
+                  </div>
+                  {(selectedRef.insuranceDetails?.applicantEmail || selectedRef.creditCardDetails?.applicantEmail || selectedRef.bankAccountDetails?.applicantEmail || selectedRef.jobDetails?.candidateEmail) && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Email:</span>{' '}
+                      <span>{selectedRef.insuranceDetails?.applicantEmail || selectedRef.creditCardDetails?.applicantEmail || selectedRef.bankAccountDetails?.applicantEmail || selectedRef.jobDetails?.candidateEmail}</span>
+                    </div>
+                  )}
+                  {(selectedRef.insuranceDetails?.provider || selectedRef.creditCardDetails?.bankName || selectedRef.bankAccountDetails?.bankName || selectedRef.jobDetails?.companyName) && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Target Partner:</span>{' '}
+                      <strong>{selectedRef.insuranceDetails?.provider || selectedRef.creditCardDetails?.bankName || selectedRef.bankAccountDetails?.bankName || selectedRef.jobDetails?.companyName}</strong>
+                    </div>
+                  )}
+                  {/* Category-Specific Rich Fields */}
+                  {selectedRef.creditCardDetails?.cardProduct && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Card Product:</span>{' '}
+                      <strong>{selectedRef.creditCardDetails.cardProduct}</strong>
+                    </div>
+                  )}
+                  {selectedRef.creditCardDetails?.employmentType && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Employment:</span>{' '}
+                      <span>{selectedRef.creditCardDetails.employmentType}</span>
+                    </div>
+                  )}
+                  {selectedRef.creditCardDetails?.referralSource && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Referral Source:</span>{' '}
+                      <span>{selectedRef.creditCardDetails.referralSource}</span>
+                    </div>
+                  )}
+                  {selectedRef.creditCardDetails?.partnerReferenceNumber && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Partner Ref #:</span>{' '}
+                      <span style={{ fontFamily: 'monospace' }}>{selectedRef.creditCardDetails.partnerReferenceNumber}</span>
+                    </div>
+                  )}
+
+                  {/* Insurance Fields */}
+                  {selectedRef.insuranceDetails?.selectedOffering && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Offering:</span>{' '}
+                      <strong>{selectedRef.insuranceDetails.selectedOffering}</strong>
+                    </div>
+                  )}
+                  {selectedRef.insuranceDetails?.sumInsuredTier && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Sum Insured:</span>{' '}
+                      <span>{selectedRef.insuranceDetails.sumInsuredTier}</span>
+                    </div>
+                  )}
+                  {selectedRef.insuranceDetails?.insuranceCategory && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Insurance Type:</span>{' '}
+                      <span>{selectedRef.insuranceDetails.insuranceCategory}</span>
+                    </div>
+                  )}
+                  {selectedRef.insuranceDetails?.partnerReferenceNumber && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Partner Ref #:</span>{' '}
+                      <span style={{ fontFamily: 'monospace' }}>{selectedRef.insuranceDetails.partnerReferenceNumber}</span>
+                    </div>
+                  )}
+
+                  {/* Job Fields */}
+                  {selectedRef.jobDetails?.jobRole && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Job Role:</span>{' '}
+                      <strong>{selectedRef.jobDetails.jobRole}</strong>
+                    </div>
+                  )}
+                  {selectedRef.jobDetails?.jobReferenceId && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Job Ref ID:</span>{' '}
+                      <span style={{ fontFamily: 'monospace' }}>{selectedRef.jobDetails.jobReferenceId}</span>
+                    </div>
+                  )}
+                  {selectedRef.jobDetails?.experienceLevel && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Experience:</span>{' '}
+                      <span>{selectedRef.jobDetails.experienceLevel}</span>
+                    </div>
+                  )}
+                  {selectedRef.jobDetails?.referrerRelationship && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Relationship:</span>{' '}
+                      <span>{selectedRef.jobDetails.referrerRelationship}</span>
+                    </div>
+                  )}
+
+                  {/* Bank Account Fields */}
+                  {selectedRef.bankAccountDetails?.accountProduct && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Account Product:</span>{' '}
+                      <strong>{selectedRef.bankAccountDetails.accountProduct}</strong>
+                    </div>
+                  )}
+                  {selectedRef.bankAccountDetails?.accountType && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Account Type:</span>{' '}
+                      <span>{selectedRef.bankAccountDetails.accountType}</span>
+                    </div>
+                  )}
+                  {selectedRef.bankAccountDetails?.applicantType && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Applicant Type:</span>{' '}
+                      <span>{selectedRef.bankAccountDetails.applicantType}</span>
+                    </div>
+                  )}
+                  {selectedRef.bankAccountDetails?.partnerReferenceNumber && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Partner Ref #:</span>{' '}
+                      <span style={{ fontFamily: 'monospace' }}>{selectedRef.bankAccountDetails.partnerReferenceNumber}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Consent Badge */}
+                {(() => {
+                  const consentNotice =
+                    selectedRef.creditCardDetails?.consentNoticeVersion ||
+                    selectedRef.insuranceDetails?.consentNoticeVersion ||
+                    selectedRef.jobDetails?.consentNoticeVersion ||
+                    selectedRef.bankAccountDetails?.consentNoticeVersion ||
+                    'v1.0-GEN-CONSENT';
+
+                  const consentTime =
+                    selectedRef.creditCardDetails?.consentTimestamp ||
+                    selectedRef.insuranceDetails?.consentTimestamp ||
+                    selectedRef.jobDetails?.consentTimestamp ||
+                    selectedRef.bankAccountDetails?.consentTimestamp;
+
+                  return (
+                    <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <ShieldCheck size={16} className="text-emerald-600" />
+                        <span style={{ fontSize: '0.82rem', color: '#065f46', fontWeight: 600 }}>
+                          Applicant Consent: Explicitly Verified & Recorded ({consentNotice})
+                        </span>
+                      </div>
+                      {consentTime && (
+                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                          Timestamp: {new Date(consentTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Status & Review Remarks */}
+              <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '16px', marginBottom: '18px' }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', marginBottom: '10px' }}>
+                  Current Status & Admin Verification
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <span className={`ref-badge ${selectedRef.status?.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {selectedRef.status}
+                  </span>
+                  {selectedRef.milestoneVerified && (
+                    <span style={{ background: '#ecfdf5', color: '#065f46', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700 }}>
+                      ✓ Verified: {selectedRef.verifiedMilestoneName || 'Completed'}
+                    </span>
+                  )}
+                </div>
+                {selectedRef.notes && (
+                  <div style={{ fontSize: '0.83rem', color: '#475569', marginTop: '6px' }}>
+                    <span style={{ fontWeight: 600 }}>Referral Notes:</span> {selectedRef.notes}
+                  </div>
+                )}
+                {selectedRef.rejectionReason && (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.83rem', marginTop: '8px' }}>
+                    <strong>Rejection Reason:</strong> {selectedRef.rejectionReason}
+                  </div>
+                )}
+                {selectedRef.returnReason && (
+                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '8px 12px', borderRadius: '8px', fontSize: '0.83rem', marginTop: '8px' }}>
+                    <strong>Returned for Correction:</strong> {selectedRef.returnReason}
+                  </div>
+                )}
+              </div>
+
+              {/* Incentive Settlement Details */}
+              <div style={{ background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0', padding: '16px', marginBottom: '18px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' }}>Incentive Settlement</div>
+                    <div style={{ fontSize: '0.88rem', color: '#14532d', marginTop: '2px' }}>
+                      Status: <strong>{selectedRef.incentiveStatus || 'None'}</strong>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#059669' }}>
+                    {selectedRef.incentiveAmount > 0 ? `₹${selectedRef.incentiveAmount}` : 'Rule Pending'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Status History / Audit Trail */}
+              {selectedRef.statusHistory?.length > 0 && (
+                <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '16px' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '10px' }}>
+                    Status Audit History
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {selectedRef.statusHistory.map((hist, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.8rem', borderBottom: i < selectedRef.statusHistory.length - 1 ? '1px dashed #e2e8f0' : 'none', paddingBottom: '6px' }}>
+                        <div>
+                          <strong style={{ color: '#1e293b' }}>{hist.status}</strong>
+                          <span style={{ color: '#64748b' }}> • by {hist.role || 'Admin'}</span>
+                          {hist.remarks && <div style={{ color: '#475569', fontSize: '0.78rem' }}>{hist.remarks}</div>}
+                        </div>
+                        <span style={{ color: '#94a3b8', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                          {new Date(hist.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, {new Date(hist.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="ref-modal-footer">
+              <button type="button" className="ref-btn-secondary" onClick={() => setShowDetailModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── REFERRAL SUBMISSION MODAL ── */}
+      <ReferralSubmissionModal
+        isOpen={showSubmitModal}
+        onClose={() => setShowSubmitModal(false)}
+        defaultCategory={submitCategory}
+        onSuccess={() => {
+          fetchAllData();
+        }}
+      />
     </div>
   );
 }

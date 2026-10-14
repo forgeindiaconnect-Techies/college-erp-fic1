@@ -1,57 +1,29 @@
 /* Personal Referral Dashboard Styling */
 .pers-ref-container {
   padding: 1.5rem 2rem;
-  background: var(--bg-main, #f8fafc);
-  min-height: calc(100vh - 70px);
-  color: #1e293b;
-  font-family: inherit;
+  max-width: 1440px;
+  margin: 0 auto;
+  min-height: calc(100vh - 72px);
+  color: var(--text-main, #0f172a);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  box-sizing: border-box;
 }
 
-.pers-hero-card {
-  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
-  border-radius: 18px;
-  padding: 1.75rem 2rem;
-  color: #ffffff;
-  margin-bottom: 1.75rem;
-  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.25);
-  position: relative;
-  overflow: hidden;
+.pers-ref-container * {
+  box-sizing: border-box;
 }
 
-.pers-hero-card::after {
-  content: '🏆';
-  position: absolute;
-  right: 25px;
-  bottom: -10px;
-  font-size: 7rem;
-  opacity: 0.12;
-  pointer-events: none;
-}
-
-.pers-hero-badge {
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.8px;
-  display: inline-block;
-  margin-bottom: 10px;
-}
-
-.pers-hero-title {
-  font-size: 1.75rem;
-  font-weight: 800;
-  margin-bottom: 6px;
-  letter-spacing: -0.5px;
-}
-
-.pers-hero-sub {
-  color: #bfdbfe;
-  font-size: 0.95rem;
-  max-width: 650px;
-  line-height: 1.5;
+.pers-privacy-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(55, 48, 165, 0.04);
+  border: 1px solid rgba(55, 48, 165, 0.15);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted, #475569);
+  line-height: 1.45;
 }
 
 /* Private Earnings Cards */
@@ -222,3 +194,14 @@
   font-size: 0.82rem;
   margin-bottom: 1.5rem;
 }
+
+/* ── Dark Mode Adaptations ── */
+.dark .pers-ref-container {
+  color: var(--text-main);
+}
+
+.dark .pers-form-wrapper {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+

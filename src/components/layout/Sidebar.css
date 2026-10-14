@@ -132,7 +132,8 @@
   background: rgba(255, 255, 255, 0.13);
 }
 
-.nav-link.active {
+.nav-link.active,
+.nav-group-header.active {
   color: #ffffff;
   background: #2b506c;
   border-left: 3px solid #7dd3fc;

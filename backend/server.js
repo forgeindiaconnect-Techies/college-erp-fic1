@@ -360,7 +360,7 @@ const autoSeedIfEmpty = async () => {
           name: "Principal",
           email: "principal@college.edu",
           password: "123456",
-          role: "principal",
+          role: "Principal",
         });
         console.log("✅ Principal created");
       } else {

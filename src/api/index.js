@@ -787,7 +787,8 @@ export const getMyReferralStats = () => api.get('/referrals/my-stats');
 export const getAdminReferrals = (params = {}) => api.get('/referrals', { params });
 export const getReferralDetails = (id) => api.get(`/referrals/${id}`);
 export const updateReferralStatus = (id, data) => api.patch(`/referrals/${id}/status`, data);
-export const getIncentiveRules = () => api.get('/referrals/rules');
+export const getIncentiveRules = (params = {}) => api.get('/referrals/rules', { params });
+export const getIncentiveRuleByCategory = (category) => api.get(`/referrals/rules/category/${encodeURIComponent(category)}`);
 export const createIncentiveRule = (data) => api.post('/referrals/rules', data);
 export const updateIncentiveRule = (id, data) => api.patch(`/referrals/rules/${id}`, data);
 export const getIncentives = (params = {}) => api.get('/referrals/incentives', { params });
@@ -796,7 +797,11 @@ export const processIncentivePayout = (data) => api.post('/referrals/incentives/
 export const reverseIncentive = (id, data) => api.post(`/referrals/incentives/${id}/reverse`, data);
 export const getAdminReferralOverview = (params = {}) => api.get('/referrals/admin-overview', { params });
 export const getSuperAdminReferralOverview = () => api.get('/referrals/superadmin-overview');
-export const getReferralExportCsvUrl = (collegeId) => `/api/referrals/export/csv${collegeId ? `?collegeId=${collegeId}` : ''}`;
+export const getReferrerReport = (userId, params = {}) => api.get(`/referrals/referrer/${userId}`, { params });
+export const getReferralExportCsvUrl = (params = {}) => {
+  const query = new URLSearchParams(params).toString();
+  return `/api/referrals/export/csv${query ? `?${query}` : ''}`;
+};
 
 // ── Super Admin-Controlled Business Opportunity Publishing & Application APIs ─
 export const getSuperAdminOpportunities = (params = {}) => api.get('/opportunities/superadmin', { params });

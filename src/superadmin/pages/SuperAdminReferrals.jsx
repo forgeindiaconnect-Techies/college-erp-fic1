@@ -96,7 +96,18 @@ export default function SuperAdminReferrals() {
     try {
       const res = await getSuperAdminOpportunities();
       if (res?.data?.success) {
-        setOpportunities(res.data.data || []);
+        const cleanList = (res.data.data || []).filter(
+          (o) =>
+            o.opportunityCode !== 'OPP-INS-2026-001' &&
+            o.opportunityCode !== 'OPP-CRD-2026-001' &&
+            o.opportunityCode !== 'OPP-BNK-2026-001' &&
+            o.opportunityCode !== 'OPP-JOB-2026-001' &&
+            o.title !== 'Star Comprehensive Health Insurance Plan' &&
+            o.title !== 'HDFC Millennia Cashback Credit Card' &&
+            o.title !== 'ICICI Mine Student & Youth Zero-Balance Savings Account' &&
+            o.title !== 'TCS Software Engineer / Full Stack Developer Opening'
+        );
+        setOpportunities(cleanList);
         if (res.data.counts) setOppCounts(res.data.counts);
       }
     } catch (err) {

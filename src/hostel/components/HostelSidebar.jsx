@@ -1,15 +1,17 @@
 import React, { useState, useContext } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { SettingsContext } from '../../App';
 import { 
   Building, DoorOpen, Users, UserCheck, Utensils, 
   CreditCard, AlertOctagon, UserPlus, Clock, FileText,
-  LayoutDashboard, LogOut, ChevronRight, ChevronDown, CheckCircle, X, Award
+  LayoutDashboard, LogOut, ChevronRight, ChevronDown, CheckCircle, X, Award, Network,
+  ShieldCheck, Layers, Briefcase, FileCheck
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
 const HostelSidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [expandedGroups, setExpandedGroups] = useState({
     'Accommodation': true,
     'Student Logistics': true,
@@ -20,6 +22,21 @@ const HostelSidebar = ({ isOpen, onClose }) => {
   const toggleGroup = (groupName) => {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
   };
+
+  const isBusinessReferralActive = location.pathname.startsWith('/hostel/business-referral') || location.pathname.startsWith('/hostel/referrals');
+  const isBusinessReferralExpanded = expandedGroups['Business Referral'] !== undefined
+    ? expandedGroups['Business Referral']
+    : isBusinessReferralActive;
+
+  const hostelBusinessReferralItems = [
+    { name: 'All Categories', path: '/hostel/business-referral', exact: true, icon: <Layers size={16} /> },
+    { name: 'Credit Cards', path: '/hostel/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance', path: '/hostel/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Jobs', path: '/hostel/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Account Opening', path: '/hostel/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Incentives', path: '/hostel/business-referral/incentives', icon: <Award size={16} /> },
+    { name: 'My Submissions', path: '/hostel/referrals', icon: <FileCheck size={16} /> }
+  ];
 
   const handleNavClick = () => {
     if (window.innerWidth <= 768 && onClose) {
@@ -60,8 +77,7 @@ const HostelSidebar = ({ isOpen, onClose }) => {
         { name: 'Mess Menu', path: '/hostel/mess-menu', icon: <Utensils size={20} /> },
         { name: 'Complaints', path: '/hostel/complaints', icon: <AlertOctagon size={20} /> },
         { name: 'Hostel Fees', path: '/hostel/fees', icon: <CreditCard size={20} /> },
-        { name: 'Hostel Reports', path: '/hostel/reports', icon: <FileText size={20} /> },
-        { name: 'Business Referral', path: '/hostel/referrals', icon: <Award size={20} /> }
+        { name: 'Hostel Reports', path: '/hostel/reports', icon: <FileText size={20} /> }
       ]
     }
   ];
@@ -113,6 +129,50 @@ const HostelSidebar = ({ isOpen, onClose }) => {
               <LayoutDashboard size={20} />
               <span>Hostel Dashboard</span>
             </NavLink>
+          </li>
+
+          <li style={{ marginBottom: '0.5rem' }}>
+            <div 
+              className={`nav-group-header ${isBusinessReferralActive ? 'active' : ''}`}
+              onClick={() => toggleGroup('Business Referral')}
+              style={{ cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Network size={20} />
+                <span>Business Referral</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ 
+                  background: '#10b981', 
+                  color: '#ffffff', 
+                  fontSize: '9px', 
+                  fontWeight: 800, 
+                  padding: '2px 6px', 
+                  borderRadius: '10px', 
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  lineHeight: '1.2'
+                }}>New</span>
+                {isBusinessReferralExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </div>
+            </div>
+
+            <ul className={`nav-group-items ${isBusinessReferralExpanded ? 'expanded' : 'collapsed'}`}>
+              {hostelBusinessReferralItems.map((item, i) => (
+                <li key={i}>
+                  <NavLink 
+                    to={item.path} 
+                    end={item.exact}
+                    className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
+                    style={{ paddingLeft: '2.8rem' }}
+                    onClick={handleNavClick}
+                  >
+                    {item.icon}
+                    <span>{item.name}</span>
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
           </li>
 
           {menuGroups.map((group, idx) => (

@@ -93,6 +93,12 @@ import SuperAdminSettings from './superadmin/pages/SuperAdminSettings';
 import SuperAdminReferrals from './superadmin/pages/SuperAdminReferrals';
 import AdminReferralManagement from './pages/referrals/AdminReferralManagement';
 import PersonalReferrals from './pages/referrals/PersonalReferrals';
+import BusinessReferralLanding from './pages/business-referral/BusinessReferralLanding';
+import BusinessReferralIncentives from './pages/business-referral/BusinessReferralIncentives';
+import BusinessReferralCreditCard from './pages/business-referral/BusinessReferralCreditCard';
+import BusinessReferralInsurance from './pages/business-referral/BusinessReferralInsurance';
+import BusinessReferralJob from './pages/business-referral/BusinessReferralJob';
+import BusinessReferralAccountOpening from './pages/business-referral/BusinessReferralAccountOpening';
 
 import PrincipalLayout from './principal/components/PrincipalLayout';
 import PrincipalDashboard from './principal/pages/PrincipalDashboard';
@@ -430,6 +436,14 @@ function App() {
               <Route path="trials" element={<SuperAdminTrials />} />
               <Route path="payments" element={<SuperAdminPayments />} />
               <Route path="business-referrals" element={<SuperAdminReferrals />} />
+              <Route path="business-referral" element={<BusinessReferralLanding />} />
+              <Route path="business-referral/credit-card" element={<BusinessReferralCreditCard />} />
+              <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
+              <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
+              <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
+              <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
+              <Route path="referrals" element={<PersonalReferrals />} />
+              <Route path="business-referral/my-referrals" element={<PersonalReferrals />} />
               <Route path="reports" element={<SuperAdminReports />} />
               <Route path="settings" element={<SuperAdminSettings />} />
             </Route>
@@ -493,7 +507,15 @@ function App() {
               <Route path="activity-logs" element={<ActivityLogs />} />
               <Route path="analytics"     element={<SystemAnalytics />} />
               <Route path="subscription"  element={<AdminSubscription />} />
+              <Route path="business-referral" element={<BusinessReferralLanding />} />
+              <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
+              <Route path="business-referral/credit-card" element={<BusinessReferralCreditCard />} />
+              <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
+              <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
+              <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
               <Route path="business-referrals" element={<AdminReferralManagement />} />
+              <Route path="referrals" element={<PersonalReferrals />} />
+              <Route path="business-referral/my-referrals" element={<PersonalReferrals />} />
             </Route>
 
 
@@ -523,6 +545,12 @@ function App() {
               <Route path="placements"    element={<PrincipalPlacements />} />
               <Route path="settings"      element={<Settings />} />
               <Route path="referrals"     element={<PersonalReferrals />} />
+              <Route path="business-referral" element={<BusinessReferralLanding />} />
+              <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
+              <Route path="business-referral/credit-card" element={<BusinessReferralCreditCard />} />
+              <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
+              <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
+              <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
             </Route>
 
             {/* ── HOD ROUTES ── */}
@@ -549,6 +577,12 @@ function App() {
               <Route path="library"       element={<HodLibrary />} />
               <Route path="settings"      element={<HodSettings />} />
               <Route path="referrals"     element={<PersonalReferrals />} />
+              <Route path="business-referral" element={<BusinessReferralLanding />} />
+              <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
+              <Route path="business-referral/credit-card" element={<BusinessReferralCreditCard />} />
+              <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
+              <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
+              <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
             </Route>
 
             {/* ── STAFF ROUTES ── */}
@@ -569,6 +603,12 @@ function App() {
               <Route path="library"    element={<StaffLibrary />} />
               <Route path="support"    element={<StaffSupport />} />
               <Route path="referrals"  element={<PersonalReferrals />} />
+              <Route path="business-referral" element={<BusinessReferralLanding />} />
+              <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
+              <Route path="business-referral/credit-card" element={<BusinessReferralCreditCard />} />
+              <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
+              <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
+              <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
             </Route>
 
             {/* ── STUDENT ROUTES ── */}
@@ -591,6 +631,12 @@ function App() {
               <Route path="welfare"     element={<StudentWelfare />} />
               <Route path="transport"   element={<StudentTransport />} />
               <Route path="referrals"   element={<PersonalReferrals />} />
+              <Route path="business-referral" element={<BusinessReferralLanding />} />
+              <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
+              <Route path="business-referral/credit-card" element={<BusinessReferralCreditCard />} />
+              <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
+              <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
+              <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
             </Route>
 
             {/* ── PARENT ROUTES ── */}
@@ -606,6 +652,12 @@ function App() {
               <Route path="exams" element={<ParentTimetable />} />
               <Route path="transport" element={<ParentTransport />} />
               <Route path="referrals" element={<PersonalReferrals />} />
+              <Route path="business-referral" element={<BusinessReferralLanding />} />
+              <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
+              <Route path="business-referral/credit-card" element={<BusinessReferralCreditCard />} />
+              <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
+              <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
+              <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
             </Route>
 
             {/* ── ACCOUNTS ROUTES ── */}
@@ -628,6 +680,12 @@ function App() {
               <Route path="reports" element={<AccountsReports />} />
               <Route path="scholarships" element={<Scholarships />} />
               <Route path="referrals" element={<PersonalReferrals />} />
+              <Route path="business-referral" element={<BusinessReferralLanding />} />
+              <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
+              <Route path="business-referral/credit-card" element={<BusinessReferralCreditCard />} />
+              <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
+              <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
+              <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
             </Route>
 
             {/* ── DRIVER ROUTES ── */}
@@ -644,6 +702,12 @@ function App() {
               <Route path="notifications" element={<DriverNotifications />} />
               <Route path="attendance" element={<DriverAttendance />} />
               <Route path="referrals"  element={<PersonalReferrals />} />
+              <Route path="business-referral" element={<BusinessReferralLanding />} />
+              <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
+              <Route path="business-referral/credit-card" element={<BusinessReferralCreditCard />} />
+              <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
+              <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
+              <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
             </Route>
 
             {/* ── HOSTEL WARDEN ROUTES ── */}
@@ -663,6 +727,12 @@ function App() {
               <Route path="attendance" element={<HostelDashboard defaultTab="Attendance" />} />
               <Route path="reports" element={<HostelDashboard defaultTab="Reports" />} />
               <Route path="referrals" element={<PersonalReferrals />} />
+              <Route path="business-referral" element={<BusinessReferralLanding />} />
+              <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
+              <Route path="business-referral/credit-card" element={<BusinessReferralCreditCard />} />
+              <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
+              <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
+              <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
             </Route>
 
             {/* ── LIBRARIAN ROUTES ── */}
@@ -680,6 +750,12 @@ function App() {
               <Route path="members" element={<LibrarianDashboard defaultTab="Student Members" />} />
               <Route path="reports" element={<LibrarianDashboard defaultTab="Fines & Analytics" />} />
               <Route path="referrals" element={<PersonalReferrals />} />
+              <Route path="business-referral" element={<BusinessReferralLanding />} />
+              <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
+              <Route path="business-referral/credit-card" element={<BusinessReferralCreditCard />} />
+              <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
+              <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
+              <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
             </Route>
 
             {/* ── PLACEMENT OFFICER ROUTES ── */}
@@ -695,6 +771,12 @@ function App() {
               <Route path="selections" element={<PlacementDashboard defaultTab="Selected Students" />} />
               <Route path="reports" element={<PlacementDashboard defaultTab="Reports" />} />
               <Route path="referrals" element={<PersonalReferrals />} />
+              <Route path="business-referral" element={<BusinessReferralLanding />} />
+              <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
+              <Route path="business-referral/credit-card" element={<BusinessReferralCreditCard />} />
+              <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
+              <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
+              <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
             </Route>
           </Routes>
         </BrowserRouter>

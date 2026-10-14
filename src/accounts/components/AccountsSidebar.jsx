@@ -5,7 +5,7 @@ import {
   LayoutDashboard, CreditCard, AlertCircle, Banknote,
   Receipt, FileText, FileCheck, LogOut, ChevronRight, ChevronDown,
   History, PieChart, Award, X, Wallet, FileBarChart,
-  UserPlus, Layers, ShieldCheck, CalendarCheck
+  UserPlus, Layers, ShieldCheck, CalendarCheck, Network, Briefcase, Building
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -94,8 +94,7 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
         { name: 'Salary Management', path: '/accounts/salary', icon: <Banknote size={20} /> },
         { name: 'Expense Tracking', path: '/accounts/expenses', icon: <PieChart size={20} /> },
         { name: 'Receipt Generation', path: '/accounts/receipts', icon: <Receipt size={20} /> },
-        { name: 'Scholarships', path: '/accounts/scholarships', icon: <Award size={20} /> },
-        { name: 'Business Referral', path: '/accounts/referrals', icon: <Award size={20} /> }
+        { name: 'Scholarships', path: '/accounts/scholarships', icon: <Award size={20} /> }
       ]
     },
     {
@@ -118,6 +117,21 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
     }
   ];
 
+  const isBusinessReferralActive = location.pathname.startsWith('/accounts/business-referral') || location.pathname.startsWith('/accounts/referrals');
+  const isBusinessReferralExpanded = expandedGroups['Business Referral'] !== undefined
+    ? expandedGroups['Business Referral']
+    : isBusinessReferralActive;
+
+  const accountsBusinessReferralItems = [
+    { name: 'All Categories', path: '/accounts/business-referral', exact: true, icon: <Layers size={16} /> },
+    { name: 'Credit Cards', path: '/accounts/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance', path: '/accounts/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Jobs', path: '/accounts/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Account Opening', path: '/accounts/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Incentives', path: '/accounts/business-referral/incentives', icon: <Award size={16} /> },
+    { name: 'My Submissions', path: '/accounts/referrals', icon: <FileCheck size={16} /> }
+  ];
+
   const sessionCollege = account?.collegeName && account.collegeName !== 'Institution Portal' ? account.collegeName : null;
 
   const displayCollegeName = sessionCollege 
@@ -131,7 +145,7 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
             {displayCollegeName}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 500, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-            Accounts Portal
+            Accounts Department
           </span>
         </div>
         <button className="sidebar-close-btn" onClick={onClose} aria-label="Close sidebar">
@@ -151,6 +165,50 @@ const AccountsSidebar = ({ isOpen, onClose }) => {
               <LayoutDashboard size={20} />
               <span>Dashboard</span>
             </NavLink>
+          </li>
+
+          <li style={{ marginBottom: '0.5rem' }}>
+            <div 
+              className={`nav-group-header ${isBusinessReferralActive ? 'active' : ''}`}
+              onClick={() => toggleGroup('Business Referral')}
+              style={{ cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Network size={20} />
+                <span>Business Referral</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ 
+                  background: '#10b981', 
+                  color: '#ffffff', 
+                  fontSize: '9px', 
+                  fontWeight: 800, 
+                  padding: '2px 6px', 
+                  borderRadius: '10px', 
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  lineHeight: '1.2'
+                }}>New</span>
+                {isBusinessReferralExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </div>
+            </div>
+
+            <ul className={`nav-group-items ${isBusinessReferralExpanded ? 'expanded' : 'collapsed'}`}>
+              {accountsBusinessReferralItems.map((item, i) => (
+                <li key={i}>
+                  <NavLink 
+                    to={item.path} 
+                    end={item.exact}
+                    className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
+                    style={{ paddingLeft: '2.8rem' }}
+                    onClick={handleNavClick}
+                  >
+                    {item.icon}
+                    <span>{item.name}</span>
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
           </li>
 
           {menuGroups.map((group, idx) => {

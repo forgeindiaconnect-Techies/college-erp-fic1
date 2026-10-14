@@ -60,6 +60,20 @@ const incentiveRuleSchema = new mongoose.Schema(
       type: String,
       default: 'Incentive subject to reversal if customer cancels within 30 days.',
     },
+    approvalStatus: {
+      type: String,
+      enum: ['Approved', 'Draft', 'Pending Approval', 'Archived'],
+      default: 'Approved',
+      index: true,
+    },
+    consentRequirement: {
+      type: String,
+      default: 'Explicit applicant consent recorded prior to application routing.',
+    },
+    disbursementCondition: {
+      type: String,
+      default: 'Processed in the institutional settlement cycle following partner clearance.',
+    },
     isActive: {
       type: Boolean,
       default: true,

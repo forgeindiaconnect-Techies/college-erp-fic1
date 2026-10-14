@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Referral from '../models/Referral.js';
 import IncentiveRule from '../models/IncentiveRule.js';
 import IncentiveRecord from '../models/IncentiveRecord.js';
@@ -42,6 +43,10 @@ const ensureDefaultRules = async (tenantId) => {
           amount: 750,
           eligibilityConditions: 'Policy verified as issued by insurer with valid policy number.',
           cancellationPolicy: 'Reversible if free-look cancellation occurs within 15 days.',
+          consentRequirement: 'Applicant explicit consent recorded prior to policy proposal generation.',
+          disbursementCondition: 'Cleared upon underwriter reconciliation statement release.',
+          approvalStatus: 'Approved',
+          isActive: true,
           tenantId,
         },
         {
@@ -50,11 +55,15 @@ const ensureDefaultRules = async (tenantId) => {
           category: 'Credit Card',
           partnerName: 'All',
           productOrRole: 'All',
-          milestone: 'Activated',
+          milestone: 'Physical card dispatch & activation confirmation',
           amountType: 'Fixed',
           amount: 1000,
-          eligibilityConditions: 'Card approval confirmed and card activated by customer.',
+          eligibilityConditions: 'Applicant must meet minimum partner bank income and credit score criteria. Valid PAN and KYC verification required.',
           cancellationPolicy: 'Duplicate applications within 90 days are void.',
+          consentRequirement: 'Primary applicant explicit digital or signed consent recorded prior to application routing.',
+          disbursementCondition: 'Processed in the subsequent institutional settlement cycle following partner clearance.',
+          approvalStatus: 'Approved',
+          isActive: true,
           tenantId,
         },
         {
@@ -63,11 +72,15 @@ const ensureDefaultRules = async (tenantId) => {
           category: 'Bank Account',
           partnerName: 'All',
           productOrRole: 'All',
-          milestone: 'Account Opened',
+          milestone: 'Successful digital Video-KYC completion & account allocation',
           amountType: 'Fixed',
           amount: 500,
-          eligibilityConditions: 'KYC verified and official account opened with branch confirmation.',
-          cancellationPolicy: 'Requires customer initial funding verification.',
+          eligibilityConditions: 'KYC verified and official account opened with initial deposit or mobile banking activation.',
+          cancellationPolicy: 'Requires customer initial funding verification within 30 days.',
+          consentRequirement: 'Applicant consent verified prior to initiating partner digital account journey.',
+          disbursementCondition: 'Reconciled bi-weekly via partner core banking system reports.',
+          approvalStatus: 'Approved',
+          isActive: true,
           tenantId,
         },
         {
@@ -76,15 +89,25 @@ const ensureDefaultRules = async (tenantId) => {
           category: 'Job',
           partnerName: 'All',
           productOrRole: 'All',
-          milestone: 'Joined',
+          milestone: 'Candidate onboarding & completion of initial joining milestone',
           amountType: 'Fixed',
           amount: 2500,
-          eligibilityConditions: 'Candidate successfully joins partner company and completes 1st week.',
-          cancellationPolicy: 'Void if candidate fails background check or no-shows on joining date.',
+          eligibilityConditions: 'Candidate successfully joins partner company and completes initial onboarding milestone without prior active application.',
+          cancellationPolicy: 'Void if candidate fails background check or leaves during initial probation.',
+          consentRequirement: 'Candidate formal written consent and resume submission authorization required.',
+          disbursementCondition: 'Disbursed following verified candidate joining and attendance verification.',
+          approvalStatus: 'Approved',
+          isActive: true,
           tenantId,
         },
       ];
       await IncentiveRule.insertMany(defaultRules);
+    } else {
+      // Ensure existing rules have approvalStatus set to Approved if undefined
+      await IncentiveRule.updateMany(
+        { tenantId, approvalStatus: { $exists: false } },
+        { $set: { approvalStatus: 'Approved' } }
+      );
     }
   } catch (err) {
     console.error('Error auto-seeding incentive rules:', err.message);
@@ -111,21 +134,60 @@ router.post('/', protect, collegeScope, async (req, res) => {
     await ensureDefaultRules(tenantId);
 
     // ── Duplicate Checks & Consent Validation ──
-    if (category === 'Job') {
-      if (!jobDetails || !jobDetails.candidateConsentGiven) {
+    if (category === 'Insurance') {
+      if (!insuranceDetails || insuranceDetails.applicantConsentGiven === false) {
         return res.status(400).json({
           success: false,
-          message: 'Explicit candidate consent is mandatory before submitting a job referral.',
+          message: 'Explicit applicant consent is mandatory before submitting an insurance referral.',
         });
       }
-      if (!jobDetails.candidatePhone || !jobDetails.candidateName) {
-        return res.status(400).json({ success: false, message: 'Candidate name and contact phone are required.' });
+      if (!insuranceDetails.applicantName || !insuranceDetails.applicantPhone) {
+        return res.status(400).json({ success: false, message: 'Applicant name and contact phone are required.' });
+      }
+
+      insuranceDetails.consentTimestamp = insuranceDetails.consentTimestamp ? new Date(insuranceDetails.consentTimestamp) : new Date();
+      insuranceDetails.consentNoticeVersion = insuranceDetails.consentNoticeVersion || 'v1.2-FIC-INS-CONSENT';
+      insuranceDetails.applicantConsentGiven = true;
+
+      const phone = insuranceDetails.applicantPhone;
+      const provider = insuranceDetails.provider;
+      if (phone && provider) {
+        const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+        const existing = await Referral.findOne({
+          category: 'Insurance',
+          tenantId,
+          'insuranceDetails.applicantPhone': phone,
+          'insuranceDetails.provider': provider,
+          createdAt: { $gte: threeMonthsAgo },
+          status: { $nin: ['Rejected', 'Cancelled'] },
+        });
+        if (existing) {
+          return res.status(400).json({
+            success: false,
+            message: `An active insurance referral for this applicant with ${provider} already exists (Ref: ${existing.referralCode}). Submissions within 90 days are protected against duplicates.`,
+          });
+        }
       }
     }
 
     if (category === 'Credit Card') {
-      const phone = creditCardDetails?.applicantPhone;
-      const bank = creditCardDetails?.bankName;
+      if (!creditCardDetails || creditCardDetails.applicantConsentGiven === false) {
+        return res.status(400).json({
+          success: false,
+          message: 'Explicit applicant consent is mandatory before submitting a credit card referral.',
+        });
+      }
+      if (!creditCardDetails.applicantName || !creditCardDetails.applicantPhone) {
+        return res.status(400).json({ success: false, message: 'Applicant name and contact phone are required.' });
+      }
+
+      // Record verified consent timestamp and compliance notice version
+      creditCardDetails.consentTimestamp = creditCardDetails.consentTimestamp ? new Date(creditCardDetails.consentTimestamp) : new Date();
+      creditCardDetails.consentNoticeVersion = creditCardDetails.consentNoticeVersion || 'v2.4-FIC-CC-CONSENT';
+      creditCardDetails.applicantConsentGiven = true;
+
+      const phone = creditCardDetails.applicantPhone;
+      const bank = creditCardDetails.bankName;
       if (phone && bank) {
         const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
         const existing = await Referral.findOne({
@@ -146,20 +208,72 @@ router.post('/', protect, collegeScope, async (req, res) => {
     }
 
     if (category === 'Bank Account') {
-      const phone = bankAccountDetails?.applicantPhone;
-      const bank = bankAccountDetails?.bankName;
+      if (!bankAccountDetails || bankAccountDetails.applicantConsentGiven === false) {
+        return res.status(400).json({
+          success: false,
+          message: 'Explicit applicant consent is mandatory before submitting a bank account referral.',
+        });
+      }
+      if (!bankAccountDetails.applicantName || !bankAccountDetails.applicantPhone) {
+        return res.status(400).json({ success: false, message: 'Applicant name and contact phone are required.' });
+      }
+
+      bankAccountDetails.consentTimestamp = bankAccountDetails.consentTimestamp ? new Date(bankAccountDetails.consentTimestamp) : new Date();
+      bankAccountDetails.consentNoticeVersion = bankAccountDetails.consentNoticeVersion || 'v1.2-FIC-ACC-CONSENT';
+      bankAccountDetails.applicantConsentGiven = true;
+
+      const phone = bankAccountDetails.applicantPhone;
+      const bank = bankAccountDetails.bankName;
       if (phone && bank) {
+        const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
         const existing = await Referral.findOne({
           category: 'Bank Account',
           tenantId,
           'bankAccountDetails.applicantPhone': phone,
           'bankAccountDetails.bankName': bank,
+          createdAt: { $gte: threeMonthsAgo },
           status: { $nin: ['Rejected', 'Cancelled'] },
         });
         if (existing) {
           return res.status(400).json({
             success: false,
-            message: `A bank account lead for this customer with ${bank} already exists (Code: ${existing.referralCode}).`,
+            message: `A bank account lead for this customer with ${bank} already exists (Code: ${existing.referralCode}). Submissions within 90 days are protected against duplicates.`,
+          });
+        }
+      }
+    }
+
+    if (category === 'Job') {
+      if (!jobDetails || !jobDetails.candidateConsentGiven) {
+        return res.status(400).json({
+          success: false,
+          message: 'Explicit candidate consent is mandatory before submitting a job referral.',
+        });
+      }
+      if (!jobDetails.candidatePhone || !jobDetails.candidateName) {
+        return res.status(400).json({ success: false, message: 'Candidate name and contact phone are required.' });
+      }
+
+      jobDetails.consentTimestamp = jobDetails.consentTimestamp ? new Date(jobDetails.consentTimestamp) : new Date();
+      jobDetails.consentNoticeVersion = jobDetails.consentNoticeVersion || 'v1.2-FIC-JOB-CONSENT';
+      jobDetails.candidateConsentGiven = true;
+
+      const phone = jobDetails.candidatePhone;
+      const company = jobDetails.companyName;
+      if (phone && company) {
+        const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+        const existing = await Referral.findOne({
+          category: 'Job',
+          tenantId,
+          'jobDetails.candidatePhone': phone,
+          'jobDetails.companyName': company,
+          createdAt: { $gte: threeMonthsAgo },
+          status: { $nin: ['Rejected', 'Cancelled'] },
+        });
+        if (existing) {
+          return res.status(400).json({
+            success: false,
+            message: `A job candidate referral for this phone number at ${company} already exists (Code: ${existing.referralCode}). Submissions within 90 days are protected against duplicates.`,
           });
         }
       }
@@ -178,6 +292,7 @@ router.post('/', protect, collegeScope, async (req, res) => {
       },
     ];
 
+    const submitterEmpId = req.user.referenceId || req.user.studentId || (req.user.phone ? `EMP-${req.user.phone.slice(-4)}` : `USR-${req.user._id.toString().slice(-4).toUpperCase()}`);
     const referralData = {
       referralCode,
       category,
@@ -188,6 +303,8 @@ router.post('/', protect, collegeScope, async (req, res) => {
       submitterEmail: req.user.email || '',
       submitterRole: req.user.role || 'User',
       submitterDepartment: req.user.department || 'General',
+      submitterEmployeeId: submitterEmpId,
+      applicationSubmissionDate: new Date(),
       status: 'Submitted',
       statusHistory: initialHistory,
       insuranceDetails: category === 'Insurance' ? insuranceDetails : undefined,
@@ -198,6 +315,13 @@ router.post('/', protect, collegeScope, async (req, res) => {
 
     const newReferral = await Referral.create(referralData);
 
+    // Determine consent notice version for audit log
+    let consentNotice = 'v1.0-GEN-CONSENT';
+    if (category === 'Credit Card') consentNotice = newReferral.creditCardDetails?.consentNoticeVersion || 'v2.4-FIC-CC-CONSENT';
+    else if (category === 'Insurance') consentNotice = newReferral.insuranceDetails?.consentNoticeVersion || 'v1.2-FIC-INS-CONSENT';
+    else if (category === 'Job') consentNotice = newReferral.jobDetails?.consentNoticeVersion || 'v1.2-FIC-JOB-CONSENT';
+    else if (category === 'Bank Account') consentNotice = newReferral.bankAccountDetails?.consentNoticeVersion || 'v1.2-FIC-ACC-CONSENT';
+
     // Create Audit Log
     await ReferralAuditLog.create({
       referralId: newReferral._id,
@@ -207,7 +331,7 @@ router.post('/', protect, collegeScope, async (req, res) => {
       performedByName: req.user.name || 'User',
       performedByRole: req.user.role || 'User',
       toStatus: 'Submitted',
-      details: `New ${category} referral created by ${req.user.name} (${req.user.role})`,
+      details: `New ${category} referral created by ${req.user.name} (${req.user.role}) with recorded applicant consent (${consentNotice})`,
       tenantId,
       collegeId: tenantId,
     });
@@ -351,7 +475,7 @@ router.get('/my-stats', protect, collegeScope, async (req, res) => {
   }
 });
 
-// ── 4. ADMIN & SUPER ADMIN LIST ALL REFERRALS (SCOPED) ────────────────────────
+// ── 4. ADMIN & SUPER ADMIN LIST ALL REFERRALS (SCOPED & ENHANCED FILTERS) ────────────────────────
 router.get('/', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal'), async (req, res) => {
   try {
     const isSuperAdmin = req.user.role === 'Super Admin';
@@ -361,7 +485,19 @@ router.get('/', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Ad
       tenantId = req.query.collegeId;
     }
 
-    const { category, status, search, submitterRole, department } = req.query;
+    const {
+      category,
+      status,
+      incentiveStatus,
+      search,
+      submitterRole,
+      department,
+      referrer,
+      startDate,
+      endDate,
+      page,
+      limit,
+    } = req.query;
 
     const query = {};
     if (!isSuperAdmin || (req.query.collegeId && req.query.collegeId !== 'all')) {
@@ -370,59 +506,200 @@ router.get('/', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Ad
 
     if (category && category !== 'All') query.category = category;
     if (status && status !== 'All') query.status = status;
+    if (incentiveStatus && incentiveStatus !== 'All') query.incentiveStatus = incentiveStatus;
     if (submitterRole && submitterRole !== 'All') query.submitterRole = submitterRole;
     if (department && department !== 'All') query.submitterDepartment = department;
 
-    if (search) {
-      query.$or = [
-        { referralCode: { $regex: search, $options: 'i' } },
-        { submitterName: { $regex: search, $options: 'i' } },
-        { 'insuranceDetails.applicantName': { $regex: search, $options: 'i' } },
-        { 'creditCardDetails.applicantName': { $regex: search, $options: 'i' } },
-        { 'bankAccountDetails.applicantName': { $regex: search, $options: 'i' } },
-        { 'jobDetails.candidateName': { $regex: search, $options: 'i' } },
+    // Filter by specific referrer
+    if (referrer && referrer !== 'All') {
+      if (mongoose.Types.ObjectId.isValid(referrer)) {
+        query.submittedBy = referrer;
+      } else {
+        query.$or = [
+          { submitterName: { $regex: referrer, $options: 'i' } },
+          { submitterEmployeeId: { $regex: referrer, $options: 'i' } },
+        ];
+      }
+    }
+
+    // Date range filter
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
+
+    // Comprehensive Search across Referrer, Employee ID, Candidate, Application IDs, Referral Code, Phones
+    if (search && search.trim()) {
+      const s = search.trim();
+      const searchConditions = [
+        { referralCode: { $regex: s, $options: 'i' } },
+        { submitterName: { $regex: s, $options: 'i' } },
+        { submitterEmployeeId: { $regex: s, $options: 'i' } },
+        { submitterEmail: { $regex: s, $options: 'i' } },
+        { 'insuranceDetails.applicantName': { $regex: s, $options: 'i' } },
+        { 'insuranceDetails.policyNumber': { $regex: s, $options: 'i' } },
+        { 'insuranceDetails.partnerReferenceNumber': { $regex: s, $options: 'i' } },
+        { 'insuranceDetails.applicantPhone': { $regex: s, $options: 'i' } },
+        { 'creditCardDetails.applicantName': { $regex: s, $options: 'i' } },
+        { 'creditCardDetails.applicationNumber': { $regex: s, $options: 'i' } },
+        { 'creditCardDetails.partnerReferenceNumber': { $regex: s, $options: 'i' } },
+        { 'creditCardDetails.applicantPhone': { $regex: s, $options: 'i' } },
+        { 'bankAccountDetails.applicantName': { $regex: s, $options: 'i' } },
+        { 'bankAccountDetails.accountNumberMasked': { $regex: s, $options: 'i' } },
+        { 'bankAccountDetails.partnerReferenceNumber': { $regex: s, $options: 'i' } },
+        { 'bankAccountDetails.applicantPhone': { $regex: s, $options: 'i' } },
+        { 'jobDetails.candidateName': { $regex: s, $options: 'i' } },
+        { 'jobDetails.jobReferenceId': { $regex: s, $options: 'i' } },
+        { 'jobDetails.jobRole': { $regex: s, $options: 'i' } },
+        { 'jobDetails.candidatePhone': { $regex: s, $options: 'i' } },
       ];
+
+      if (query.$or) {
+        query.$and = [{ $or: query.$or }, { $or: searchConditions }];
+        delete query.$or;
+      } else {
+        query.$or = searchConditions;
+      }
     }
 
-    const referrals = await Referral.find(query)
-      .sort({ createdAt: -1 })
-      .populate('incentiveRecord');
+    // Pagination or all
+    const totalCount = await Referral.countDocuments(query);
+    let referralsQuery = Referral.find(query).sort({ createdAt: -1 }).populate('incentiveRecord');
 
-    res.json({ success: true, count: referrals.length, data: referrals });
+    if (page && limit && limit !== 'all') {
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 20;
+      referralsQuery = referralsQuery.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const referrals = await referralsQuery;
+
+    res.json({
+      success: true,
+      count: referrals.length,
+      total: totalCount,
+      page: parseInt(page, 10) || 1,
+      totalPages: limit && limit !== 'all' ? Math.ceil(totalCount / parseInt(limit, 10)) : 1,
+      data: referrals,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// ── 5. GET SINGLE REFERRAL DETAILS WITH AUDIT LOGS ────────────────────────────
-router.get('/:id', protect, collegeScope, async (req, res) => {
+// ── 4B. DETAILED INDIVIDUAL REFERRER REPORT (AUDIT & TRACEABILITY) ─────────────
+router.get('/referrer/:userId', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal'), async (req, res) => {
   try {
-    const referral = await Referral.findById(req.params.id)
-      .populate('submittedBy', 'name email role department')
-      .populate('incentiveRecord');
-
-    if (!referral) {
-      return res.status(404).json({ success: false, message: 'Referral not found' });
+    const { userId } = req.params;
+    let user = null;
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId).select('name email role department referenceId studentId phone');
+    }
+    if (!user) {
+      user = await User.findOne({ $or: [{ referenceId: userId }, { name: userId }] }).select('name email role department referenceId studentId phone');
     }
 
-    // Privacy & permission check:
-    const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal'].includes(req.user.role);
-    if (!isPrivileged && referral.submittedBy._id.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, message: 'Access denied: You can only view your own referrals.' });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Referrer not found' });
     }
 
-    // Fetch audit logs
-    const auditLogs = await ReferralAuditLog.find({ referralId: referral._id }).sort({ timestamp: -1 });
+    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    const isSuperAdmin = req.user.role === 'Super Admin';
+    const refQuery = { submittedBy: user._id };
+    if (!isSuperAdmin) refQuery.tenantId = tenantId;
 
-    res.json({ success: true, data: referral, auditLogs });
+    const referrals = await Referral.find(refQuery).sort({ createdAt: -1 }).populate('incentiveRecord');
+    const incentives = await IncentiveRecord.find({ earnedBy: user._id, ...(isSuperAdmin ? {} : { tenantId }) }).sort({ createdAt: -1 });
+
+    const totalReferrals = referrals.length;
+    const eligibleCount = referrals.filter(r => r.incentiveEligible).length;
+    const rejectedCount = referrals.filter(r => ['Rejected', 'Cancelled'].includes(r.status)).length;
+    const pendingReviewCount = referrals.filter(r => !r.incentiveEligible && !['Rejected', 'Cancelled'].includes(r.status)).length;
+
+    let totalEligibleIncentive = 0;
+    let totalPaid = 0;
+    let totalPending = 0;
+
+    incentives.forEach(inc => {
+      if (inc.status === 'Paid') {
+        totalPaid += inc.amount;
+        totalEligibleIncentive += inc.amount;
+      } else if (['Pending Approval', 'Approved', 'Calculated', 'Processing'].includes(inc.status)) {
+        totalPending += inc.amount;
+        totalEligibleIncentive += inc.amount;
+      }
+    });
+
+    const categoryBreakdown = {
+      'Credit Card': referrals.filter(r => r.category === 'Credit Card').length,
+      'Insurance': referrals.filter(r => r.category === 'Insurance').length,
+      'Job': referrals.filter(r => r.category === 'Job').length,
+      'Bank Account': referrals.filter(r => r.category === 'Bank Account').length,
+    };
+
+    const categoryFinancials = {
+      'Credit Card': { count: categoryBreakdown['Credit Card'], eligible: 0, paid: 0, pending: 0 },
+      'Insurance': { count: categoryBreakdown['Insurance'], eligible: 0, paid: 0, pending: 0 },
+      'Job': { count: categoryBreakdown['Job'], eligible: 0, paid: 0, pending: 0 },
+      'Bank Account': { count: categoryBreakdown['Bank Account'], eligible: 0, paid: 0, pending: 0 },
+    };
+
+    incentives.forEach(inc => {
+      if (categoryFinancials[inc.category]) {
+        if (inc.status === 'Paid') {
+          categoryFinancials[inc.category].paid += inc.amount;
+          categoryFinancials[inc.category].eligible += inc.amount;
+        } else if (['Pending Approval', 'Approved', 'Calculated', 'Processing'].includes(inc.status)) {
+          categoryFinancials[inc.category].pending += inc.amount;
+          categoryFinancials[inc.category].eligible += inc.amount;
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        profile: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          department: user.department || 'General',
+          employeeId: user.referenceId || user.studentId || (user.phone ? `EMP-${user.phone.slice(-4)}` : `USR-${user._id.toString().slice(-4).toUpperCase()}`),
+          phone: user.phone || 'N/A',
+        },
+        summary: {
+          totalReferrals,
+          eligibleCount,
+          rejectedCount,
+          pendingReviewCount,
+          totalEligibleIncentive,
+          totalPaid,
+          totalPending,
+        },
+        categoryBreakdown,
+        categoryFinancials,
+        referrals,
+        incentives,
+      },
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// ── 6. ADMIN UPDATE STATUS & VERIFY MILESTONE (TRIGGERS INCENTIVE ENGINE) ─────
+// ── 5. ADMIN UPDATE STATUS & VERIFY MILESTONE (TRIGGERS INCENTIVE ENGINE) ─────
 router.patch('/:id/status', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Admin', 'Accounts'), async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid referral ID format' });
+    }
+
     const {
       status,
       remarks,
@@ -431,6 +708,7 @@ router.patch('/:id/status', protect, collegeScope, authorize('Admin', 'Super Adm
       policyNumber,
       applicationNumber,
       accountNumberMasked,
+      jobReferenceId,
       isReturnedForCorrection,
     } = req.body;
 
@@ -465,6 +743,13 @@ router.patch('/:id/status', protect, collegeScope, authorize('Admin', 'Super Adm
       referral.bankAccountDetails.accountNumberMasked = accountNumberMasked;
       referral.bankAccountDetails.accountActivated = true;
     }
+    if (referral.category === 'Job' && jobReferenceId) {
+      if (!referral.jobDetails) referral.jobDetails = {};
+      referral.jobDetails.jobReferenceId = jobReferenceId;
+      if (status === 'Joined') {
+        referral.jobDetails.joiningVerified = true;
+      }
+    }
 
     // Add to history
     referral.statusHistory.push({
@@ -498,11 +783,12 @@ router.patch('/:id/status', protect, collegeScope, authorize('Admin', 'Super Adm
       referral.verifiedAt = new Date();
       referral.verifiedBy = req.user.name || 'Admin';
 
-      // Look up applicable rule for this category & milestone
+      // Look up applicable rule for this category & milestone (strictly approved rules)
       const rule = await IncentiveRule.findOne({
         tenantId: referral.tenantId,
         category: referral.category,
         isActive: true,
+        approvalStatus: 'Approved',
         $or: [{ milestone: activeMilestone }, { milestone: 'All' }],
       });
 
@@ -519,6 +805,22 @@ router.patch('/:id/status', protect, collegeScope, authorize('Admin', 'Super Adm
 
         const incCode = `INC-${referral.category.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}-${Math.floor(100 + Math.random() * 900)}`;
 
+        const candidateName =
+          referral.insuranceDetails?.applicantName ||
+          referral.creditCardDetails?.applicantName ||
+          referral.bankAccountDetails?.applicantName ||
+          referral.jobDetails?.candidateName ||
+          'N/A';
+        const candidateAppId =
+          referral.insuranceDetails?.policyNumber ||
+          referral.creditCardDetails?.applicationNumber ||
+          referral.bankAccountDetails?.accountNumberMasked ||
+          referral.jobDetails?.jobReferenceId ||
+          referral.insuranceDetails?.partnerReferenceNumber ||
+          referral.creditCardDetails?.partnerReferenceNumber ||
+          referral.bankAccountDetails?.partnerReferenceNumber ||
+          referral.referralCode;
+
         const newIncentive = await IncentiveRecord.create({
           incentiveCode: incCode,
           referralId: referral._id,
@@ -528,6 +830,13 @@ router.patch('/:id/status', protect, collegeScope, authorize('Admin', 'Super Adm
           earnedByName: referral.submitterName,
           earnedByRole: referral.submitterRole,
           earnedByDepartment: referral.submitterDepartment,
+          earnedByEmployeeId: referral.submitterEmployeeId || (referral.submittedBy ? referral.submittedBy.toString().slice(-6).toUpperCase() : 'EMP-001'),
+          candidateName,
+          candidateApplicationId: candidateAppId,
+          referralDate: referral.createdAt || new Date(),
+          approvalDate: new Date(),
+          incentiveRate: calcAmount,
+          eligibleCount: 1,
           tenantId: referral.tenantId,
           collegeId: referral.collegeId,
           amount: calcAmount,
@@ -636,13 +945,62 @@ router.patch('/:id/status', protect, collegeScope, authorize('Admin', 'Super Adm
   }
 });
 
+// Helper for read routes: optional auth if bearer provided, safe fallback for public read
+const optionalProtect = async (req, res, next) => {
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    return protect(req, res, () => {
+      collegeScope(req, res, next);
+    });
+  }
+  req.collegeId = req.query.tenantId || req.query.collegeId || 'COL001';
+  next();
+};
+
 // ── 7. INCENTIVE RULES CRUD ───────────────────────────────────────────────────
-router.get('/rules', protect, collegeScope, async (req, res) => {
+router.get('/rules', optionalProtect, async (req, res) => {
   try {
-    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    const tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId)) || req.query.tenantId || 'COL001';
     await ensureDefaultRules(tenantId);
-    const rules = await IncentiveRule.find({ tenantId }).sort({ createdAt: -1 });
+
+    const filter = { tenantId, isActive: true };
+    if (req.query.category) {
+      filter.category = new RegExp(`^${req.query.category.trim()}$`, 'i');
+    }
+    if (req.query.approvalStatus) {
+      filter.approvalStatus = req.query.approvalStatus;
+    }
+
+    const rules = await IncentiveRule.find(filter).sort({ createdAt: -1 });
     res.json({ success: true, count: rules.length, data: rules });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/rules/category/:category', optionalProtect, async (req, res) => {
+  try {
+    const tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId)) || req.query.tenantId || 'COL001';
+    await ensureDefaultRules(tenantId);
+
+    const rawCategory = req.params.category.replace(/-/g, ' ').trim();
+    // Map common slug aliases to canonical category name
+    let canonicalCategory = rawCategory;
+    if (/credit\s*card/i.test(rawCategory)) canonicalCategory = 'Credit Card';
+    else if (/insurance/i.test(rawCategory)) canonicalCategory = 'Insurance';
+    else if (/account|bank/i.test(rawCategory)) canonicalCategory = 'Bank Account';
+    else if (/job/i.test(rawCategory)) canonicalCategory = 'Job';
+
+    const rule = await IncentiveRule.findOne({
+      tenantId,
+      isActive: true,
+      approvalStatus: 'Approved',
+      category: new RegExp(`^${canonicalCategory}$`, 'i'),
+    }).sort({ createdAt: -1 });
+
+    if (!rule) {
+      return res.json({ success: true, data: null, message: 'No approved reward terms available yet.' });
+    }
+    res.json({ success: true, data: rule });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -661,6 +1019,9 @@ router.post('/rules', protect, collegeScope, authorize('Admin', 'Super Admin'), 
       maxLimit,
       eligibilityConditions,
       cancellationPolicy,
+      consentRequirement,
+      disbursementCondition,
+      approvalStatus,
     } = req.body;
 
     const tenantId = req.collegeId || req.user.tenantId || 'COL001';
@@ -678,6 +1039,9 @@ router.post('/rules', protect, collegeScope, authorize('Admin', 'Super Admin'), 
       maxLimit: Number(maxLimit) || 0,
       eligibilityConditions,
       cancellationPolicy,
+      consentRequirement,
+      disbursementCondition,
+      approvalStatus: approvalStatus || 'Approved',
       tenantId,
       collegeId: tenantId,
       createdBy: req.user._id,
@@ -702,6 +1066,10 @@ router.post('/rules', protect, collegeScope, authorize('Admin', 'Super Admin'), 
 
 router.patch('/rules/:id', protect, collegeScope, authorize('Admin', 'Super Admin'), async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid rule ID format' });
+    }
+
     const rule = await IncentiveRule.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!rule) return res.status(404).json({ success: false, message: 'Rule not found' });
 
@@ -716,6 +1084,50 @@ router.patch('/rules/:id', protect, collegeScope, authorize('Admin', 'Super Admi
     } catch (ioErr) {}
 
     res.json({ success: true, message: 'Incentive rule updated.', data: rule });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.patch('/rules/:id/approve', protect, collegeScope, authorize('Admin', 'Super Admin'), async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid rule ID format' });
+    }
+
+    const rule = await IncentiveRule.findByIdAndUpdate(
+      req.params.id,
+      { approvalStatus: 'Approved', isActive: true },
+      { new: true }
+    );
+    if (!rule) return res.status(404).json({ success: false, message: 'Rule not found' });
+
+    // Real-Time Socket Emission
+    try {
+      req.app.get('io')?.emit('dataUpdated', {
+        module: 'referral_rules',
+        action: 'approved',
+        data: rule,
+        message: `Rule approved: ${rule.ruleName}`,
+      });
+    } catch (ioErr) {}
+
+    res.json({ success: true, message: 'Incentive rule approved.', data: rule });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.delete('/rules/:id', protect, collegeScope, authorize('Admin', 'Super Admin'), async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid rule ID format' });
+    }
+
+    const rule = await IncentiveRule.findByIdAndDelete(req.params.id);
+    if (!rule) return res.status(404).json({ success: false, message: 'Rule not found' });
+
+    res.json({ success: true, message: 'Incentive rule deleted successfully.' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -739,12 +1151,63 @@ router.get('/incentives', protect, collegeScope, async (req, res) => {
     if (req.query.category && req.query.category !== 'All') {
       query.category = req.query.category;
     }
+    if (req.query.earnedBy) {
+      query.earnedBy = req.query.earnedBy;
+    }
+
+    if (req.query.search && req.query.search.trim()) {
+      const s = req.query.search.trim();
+      query.$or = [
+        { incentiveCode: { $regex: s, $options: 'i' } },
+        { referralCode: { $regex: s, $options: 'i' } },
+        { earnedByName: { $regex: s, $options: 'i' } },
+        { earnedByEmployeeId: { $regex: s, $options: 'i' } },
+        { candidateName: { $regex: s, $options: 'i' } },
+        { candidateApplicationId: { $regex: s, $options: 'i' } },
+        { payoutRef: { $regex: s, $options: 'i' } },
+      ];
+    }
+
+    if (req.query.startDate || req.query.endDate) {
+      query.createdAt = {};
+      if (req.query.startDate) query.createdAt.$gte = new Date(req.query.startDate);
+      if (req.query.endDate) {
+        const end = new Date(req.query.endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
 
     const incentives = await IncentiveRecord.find(query)
       .sort({ createdAt: -1 })
-      .populate('referralId');
+      .populate('referralId')
+      .populate('payoutRecordId');
 
-    res.json({ success: true, count: incentives.length, data: incentives });
+    // Aggregate summary calculations for reports
+    let totalEligible = 0;
+    let totalPaid = 0;
+    let totalPending = 0;
+
+    incentives.forEach(inc => {
+      if (inc.status === 'Paid') {
+        totalPaid += inc.amount;
+        totalEligible += inc.amount;
+      } else if (['Pending Approval', 'Approved', 'Calculated', 'Processing'].includes(inc.status)) {
+        totalPending += inc.amount;
+        totalEligible += inc.amount;
+      }
+    });
+
+    res.json({
+      success: true,
+      count: incentives.length,
+      totals: {
+        totalEligible,
+        totalPaid,
+        totalPending,
+      },
+      data: incentives,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -752,6 +1215,10 @@ router.get('/incentives', protect, collegeScope, async (req, res) => {
 
 router.patch('/incentives/:id/approve', protect, collegeScope, authorize('Admin', 'Super Admin', 'Accounts'), async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid incentive ID format' });
+    }
+
     const { decision, remarks, reason } = req.body; // decision: 'Approved' | 'Rejected'
     if (!decision || !['Approved', 'Rejected'].includes(decision)) {
       return res.status(400).json({ success: false, message: 'Decision must be Approved or Rejected' });
@@ -975,6 +1442,10 @@ router.post('/incentives/payout', protect, collegeScope, authorize('Admin', 'Sup
 // ── 10. REVERSAL / CANCELLATION WORKFLOW ───────────────────────────────────────
 router.post('/incentives/:id/reverse', protect, collegeScope, authorize('Admin', 'Super Admin'), async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid incentive ID format' });
+    }
+
     const { reversalReason } = req.body;
     if (!reversalReason) {
       return res.status(400).json({ success: false, message: 'Reversal reason is required.' });
@@ -1115,18 +1586,46 @@ router.get('/admin-overview', protect, collegeScope, authorize('Admin', 'Super A
       .sort((a, b) => b.totalReferrals - a.totalReferrals)
       .slice(0, 10);
 
+    // Comprehensive Category-Wise Summaries
+    const categories = ['Credit Card', 'Insurance', 'Job', 'Bank Account'];
+    const categorySummaries = {};
+    categories.forEach(cat => {
+      const catRefs = allReferrals.filter(r => r.category === cat);
+      const catIncs = allIncentives.filter(i => i.category === cat);
+      let catPaid = 0;
+      let catPending = 0;
+      catIncs.forEach(inc => {
+        if (inc.status === 'Paid') catPaid += inc.amount;
+        else if (['Pending Approval', 'Approved', 'Calculated', 'Processing'].includes(inc.status)) catPending += inc.amount;
+      });
+      categorySummaries[cat] = {
+        totalReferrals: catRefs.length,
+        submitted: catRefs.filter(r => r.status === 'Submitted').length,
+        underReview: catRefs.filter(r => ['Under Review', 'Contacted', 'Application in Progress', 'Verification', 'KYC Verification', 'Screening', 'Interview Round 1', 'Interview Round 2', 'Technical Assessment', 'Selected'].includes(r.status)).length,
+        approved: catRefs.filter(r => ['Policy Issued', 'Approved', 'Issued', 'Activated', 'Account Opened', 'Joined'].includes(r.status)).length,
+        rejected: catRefs.filter(r => ['Rejected', 'Cancelled'].includes(r.status)).length,
+        eligibleIncentive: catPaid + catPending,
+        paidIncentive: catPaid,
+        pendingIncentive: catPending,
+      };
+    });
+
     res.json({
       success: true,
       data: {
         totalReferrals: allReferrals.length,
-        pendingCount: allReferrals.filter(r => r.status === 'Submitted').length,
-        inProgressCount: allReferrals.filter(r =>
+        totalSubmitted: allReferrals.filter(r => r.status === 'Submitted').length,
+        underReview: allReferrals.filter(r =>
           ['Under Review', 'Contacted', 'Application in Progress', 'Verification', 'KYC Verification', 'Screening', 'Interview Round 1', 'Interview Round 2', 'Technical Assessment', 'Selected'].includes(r.status)
         ).length,
-        convertedCount: convertedReferrals.length,
-        rejectedCount: allReferrals.filter(r => ['Rejected', 'Cancelled'].includes(r.status)).length,
+        approved: convertedReferrals.length,
+        rejected: allReferrals.filter(r => ['Rejected', 'Cancelled'].includes(r.status)).length,
+        totalEligibleIncentives: totalPaid + totalPendingApproval + totalApprovedUnpaid,
+        totalPaidIncentives: totalPaid,
+        totalPendingIncentives: totalPendingApproval + totalApprovedUnpaid,
         categoryCounts,
         categoryConversions,
+        categorySummaries,
         financials: {
           totalPaid,
           totalPendingApproval,
@@ -1203,15 +1702,99 @@ router.get('/export/csv', protect, collegeScope, async (req, res) => {
   try {
     const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal'].includes(req.user.role);
     const tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    const { type, category, status, startDate, endDate, referrerId } = req.query;
+
+    if (type === 'incentives') {
+      const incQuery = { tenantId };
+      if (!isPrivileged) incQuery.earnedBy = req.user._id;
+      if (category && category !== 'All') incQuery.category = category;
+      if (status && status !== 'All') incQuery.status = status;
+      if (referrerId) incQuery.earnedBy = referrerId;
+
+      const incentives = await IncentiveRecord.find(incQuery).sort({ createdAt: -1 });
+      const header = [
+        'Incentive Code',
+        'Referral Code',
+        'Category',
+        'Referrer Name',
+        'Employee ID',
+        'Candidate Name',
+        'Candidate Application ID',
+        'Referral Date',
+        'Status',
+        'Rate (₹)',
+        'Eligible Qty',
+        'Total Eligible (₹)',
+        'Amount Paid (₹)',
+        'Pending Amount (₹)',
+        'Payment Date',
+        'Transaction Ref (UTR)',
+      ];
+      const rows = incentives.map(inc => {
+        const isPaid = inc.status === 'Paid';
+        const paidAmount = isPaid ? inc.amount : 0;
+        const pendingAmount = isPaid ? 0 : inc.amount;
+        return [
+          inc.incentiveCode,
+          inc.referralCode,
+          inc.category,
+          `"${(inc.earnedByName || '').replace(/"/g, '""')}"`,
+          inc.earnedByEmployeeId || 'N/A',
+          `"${(inc.candidateName || 'N/A').replace(/"/g, '""')}"`,
+          inc.candidateApplicationId || 'N/A',
+          inc.referralDate ? new Date(inc.referralDate).toLocaleDateString() : new Date(inc.createdAt).toLocaleDateString(),
+          inc.status,
+          inc.incentiveRate || inc.amount,
+          inc.eligibleCount || 1,
+          inc.amount,
+          paidAmount,
+          pendingAmount,
+          inc.paidAt ? new Date(inc.paidAt).toLocaleDateString() : 'N/A',
+          inc.payoutRef || 'N/A',
+        ].join(',');
+      });
+
+      const csvContent = [header.join(','), ...rows].join('\n');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="consolidated_incentives_${Date.now()}.csv"`);
+      return res.status(200).send(csvContent);
+    }
 
     const query = { tenantId };
     if (!isPrivileged) {
       query.submittedBy = req.user._id;
     }
+    if (category && category !== 'All') query.category = category;
+    if (status && status !== 'All') query.status = status;
+    if (referrerId) query.submittedBy = referrerId;
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
 
     const referrals = await Referral.find(query).sort({ createdAt: -1 });
 
-    const header = ['Referral Code', 'Category', 'Applicant/Candidate', 'Phone', 'Submitter Name', 'Role', 'Status', 'Incentive Eligible', 'Incentive Status', 'Incentive Amount', 'Submitted Date'];
+    const header = [
+      'Referral ID',
+      'Category',
+      'Referrer Name',
+      'Referrer Employee ID',
+      'Department',
+      'Candidate Name',
+      'Candidate Phone',
+      'Application / Ref ID',
+      'Referral Date',
+      'Submission Date',
+      'Application Status',
+      'Milestone Verified',
+      'Eligible Incentive (₹)',
+      'Incentive Status',
+    ];
     const rows = referrals.map(r => {
       const applicantName =
         r.insuranceDetails?.applicantName ||
@@ -1225,27 +1808,68 @@ router.get('/export/csv', protect, collegeScope, async (req, res) => {
         r.bankAccountDetails?.applicantPhone ||
         r.jobDetails?.candidatePhone ||
         'N/A';
+      const appId =
+        r.insuranceDetails?.policyNumber ||
+        r.creditCardDetails?.applicationNumber ||
+        r.bankAccountDetails?.accountNumberMasked ||
+        r.jobDetails?.jobReferenceId ||
+        r.insuranceDetails?.partnerReferenceNumber ||
+        r.creditCardDetails?.partnerReferenceNumber ||
+        r.bankAccountDetails?.partnerReferenceNumber ||
+        r.referralCode;
 
       return [
         r.referralCode,
         r.category,
+        `"${(r.submitterName || '').replace(/"/g, '""')}"`,
+        r.submitterEmployeeId || 'N/A',
+        r.submitterDepartment || 'General',
         `"${applicantName.replace(/"/g, '""')}"`,
         applicantPhone,
-        `"${r.submitterName.replace(/"/g, '""')}"`,
-        r.submitterRole,
-        r.status,
-        r.incentiveEligible ? 'Yes' : 'No',
-        r.incentiveStatus,
-        r.incentiveAmount || 0,
+        appId,
         new Date(r.createdAt).toLocaleDateString(),
+        r.applicationSubmissionDate ? new Date(r.applicationSubmissionDate).toLocaleDateString() : new Date(r.createdAt).toLocaleDateString(),
+        r.status,
+        r.milestoneVerified ? 'Yes' : 'No',
+        r.incentiveEligible ? r.incentiveAmount : 0,
+        r.incentiveStatus,
       ].join(',');
     });
 
     const csvContent = [header.join(','), ...rows].join('\n');
-
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="referrals_report_${Date.now()}.csv"`);
     res.status(200).send(csvContent);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── 14. GET SINGLE REFERRAL DETAILS WITH AUDIT LOGS (STATIC ROUTES PRIORITY) ──
+router.get('/:id', protect, collegeScope, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid referral ID format' });
+    }
+
+    const referral = await Referral.findById(req.params.id)
+      .populate('submittedBy', 'name email role department')
+      .populate('incentiveRecord');
+
+    if (!referral) {
+      return res.status(404).json({ success: false, message: 'Referral not found' });
+    }
+
+    // Privacy & permission check:
+    const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal'].includes(req.user.role);
+    if (!isPrivileged && referral.submittedBy && referral.submittedBy._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied: You can only view your own referrals.' });
+    }
+
+    // Fetch audit logs
+    const auditLogs = await ReferralAuditLog.find({ referralId: referral._id }).sort({ timestamp: -1 });
+
+    res.json({ success: true, data: referral, auditLogs });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

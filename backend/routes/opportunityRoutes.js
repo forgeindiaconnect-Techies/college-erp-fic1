@@ -87,155 +87,20 @@ export const getDefaultFormSchema = (category, subCategory = '') => {
   ];
 };
 
-// Auto-seed Initial Published Opportunities across all 4 categories if database is empty
+// Clean up and purge seeded dummy opportunities across all categories
 export const autoSeedOpportunitiesIfEmpty = async () => {
   try {
-    const count = await Opportunity.countDocuments();
-    if (count > 0) return;
-
-    const seedData = [
-      // 1. Insurance
-      {
-        opportunityCode: 'OPP-INS-2026-001',
-        title: 'Star Comprehensive Health Insurance Plan',
-        description: 'Comprehensive family health cover with 100% cashless treatment across 14,000+ network hospitals, zero co-pay, and cumulative bonus.',
-        category: 'Insurance',
-        subCategory: 'Health Insurance',
-        providerName: 'Star Health Allied Insurance',
-        benefits: [
-          'Cashless hospitalization in 14,000+ hospitals nationwide',
-          'Coverage for pre and post-hospitalization medical expenses',
-          'Free annual health checkup for all insured members',
-          'Tax savings under Section 80D up to ₹25,000',
-        ],
-        eligibilityCriteria: 'Any student, staff member, parent, or referred family member aged 18 to 65 years.',
-        requirements: ['Aadhaar Card', 'PAN Card', 'Pre-existing medical declaration'],
-        keyHighlights: ['₹5 Lakh - ₹50 Lakh Cover', 'Zero Co-Payment', 'No Room Rent Capping'],
-        targetColleges: ['ALL'],
-        targetRoles: ['ALL'],
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-        status: 'Published',
-        formSchema: getDefaultFormSchema('Insurance', 'Health Insurance'),
-        formVersion: 1,
-        incentiveConfig: {
-          milestone: 'Policy Issued',
-          amountType: 'Fixed',
-          amount: 800,
-          terms: 'Incentive of ₹800 paid when applicant completes proposal and policy is officially issued with policy number.',
-        },
-        bannerColor: '#059669',
-        iconName: 'Shield',
-        createdByName: 'Super Admin',
-      },
-      // 2. Credit Card
-      {
-        opportunityCode: 'OPP-CRD-2026-001',
-        title: 'HDFC Millennia Cashback Credit Card',
-        description: 'Premium everyday cashback card offering 5% cashback on Amazon, Flipkart, Swiggy, and Zomato, plus complimentary airport lounge access.',
-        category: 'Credit Card',
-        subCategory: 'Cashback Credit Card',
-        providerName: 'HDFC Bank',
-        benefits: [
-          '5% Cashback on Amazon, Flipkart, Myntra, Swiggy, Zomato, and Uber',
-          '1% Cashback on all other offline and online retail spends',
-          '8 Complimentary domestic airport lounge access visits per calendar year',
-          'Zero joining fee on annual spend milestone waiver',
-        ],
-        eligibilityCriteria: 'Age 21-60. Salaried monthly income ₹35,000+ or self-employed ITR ₹6 Lakhs/year.',
-        requirements: ['Valid PAN Card', 'Aadhaar Card', 'Last 3 months salary slips or bank statement'],
-        keyHighlights: ['5% Flat Cashback', '8 Free Lounge Visits', 'Instant Digital Approval'],
-        targetColleges: ['ALL'],
-        targetRoles: ['ALL'],
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-        status: 'Published',
-        formSchema: getDefaultFormSchema('Credit Card'),
-        formVersion: 1,
-        incentiveConfig: {
-          milestone: 'Card Activated',
-          amountType: 'Fixed',
-          amount: 1000,
-          terms: 'Incentive of ₹1,000 credited upon card approval and first transaction activation by customer.',
-        },
-        bannerColor: '#2563eb',
-        iconName: 'CreditCard',
-        createdByName: 'Super Admin',
-      },
-      // 3. Bank Account
-      {
-        opportunityCode: 'OPP-BNK-2026-001',
-        title: 'ICICI Mine Student & Youth Zero-Balance Savings Account',
-        description: 'Instant zero-balance savings account with instant virtual debit card, zero minimum balance charges, and free mobile banking.',
-        category: 'Bank Account',
-        subCategory: 'Savings Account',
-        providerName: 'ICICI Bank',
-        benefits: [
-          'Zero minimum balance maintenance commitment forever',
-          'Instant virtual debit card for online transactions and UPI',
-          'Free unlimited IMPS, NEFT, and RTGS fund transfers',
-          'Exclusive discounts on food delivery, entertainment, and shopping',
-        ],
-        eligibilityCriteria: 'Indian citizen aged 18 to 35 years with valid Aadhaar and PAN.',
-        requirements: ['Aadhaar Number with OTP', 'Original PAN Card for Video KYC'],
-        keyHighlights: ['Zero Minimum Balance', 'Instant Virtual Debit Card', '10-Minute Video KYC'],
-        targetColleges: ['ALL'],
-        targetRoles: ['ALL'],
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-        status: 'Published',
-        formSchema: getDefaultFormSchema('Bank Account'),
-        formVersion: 1,
-        incentiveConfig: {
-          milestone: 'Account Opened',
-          amountType: 'Fixed',
-          amount: 500,
-          terms: 'Incentive of ₹500 granted once Video KYC is verified and official account number is generated.',
-        },
-        bannerColor: '#d97706',
-        iconName: 'Landmark',
-        createdByName: 'Super Admin',
-      },
-      // 4. Job Referral
-      {
-        opportunityCode: 'OPP-JOB-2026-001',
-        title: 'TCS Software Engineer / Full Stack Developer Opening',
-        description: 'Hiring talented engineering graduates and experienced developers for enterprise cloud applications, React, Node.js, and Java backend development.',
-        category: 'Job Referral',
-        subCategory: 'IT / Software',
-        providerName: 'Tata Consultancy Services (TCS)',
-        benefits: [
-          'Competitive CTC of ₹5.5 LPA - ₹9.0 LPA based on experience and assessment',
-          'Hybrid work model with top-tier healthcare benefits and life insurance',
-          'Global technology training programs and certifications reimbursement',
-          'Career growth across international clients and modern cloud projects',
-        ],
-        eligibilityCriteria: 'B.E./B.Tech/MCA/M.Tech with 0 to 3 years experience. 60%+ throughout academics.',
-        requirements: ['Updated Resume (PDF)', 'GitHub / Project portfolio', 'Candidate prior consent'],
-        keyHighlights: ['₹5.5 - 9.0 LPA CTC', 'Pan-India Locations', 'Immediate Joining'],
-        targetColleges: ['ALL'],
-        targetRoles: ['ALL'],
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-        status: 'Published',
-        formSchema: getDefaultFormSchema('Job Referral'),
-        formVersion: 1,
-        incentiveConfig: {
-          milestone: 'Joined',
-          amountType: 'Fixed',
-          amount: 2500,
-          terms: 'Incentive of ₹2,500 disbursed upon candidate completing first 7 days post joining date.',
-        },
-        bannerColor: '#7c3aed',
-        iconName: 'Briefcase',
-        createdByName: 'Super Admin',
-      },
-    ];
-
-    await Opportunity.insertMany(seedData);
-    console.log('✅ Auto-seeded 4 default published business opportunities (Insurance, Card, Bank, Job)!');
+    await Opportunity.deleteMany({
+      $or: [
+        { opportunityCode: { $in: ['OPP-INS-2026-001', 'OPP-CRD-2026-001', 'OPP-BNK-2026-001', 'OPP-JOB-2026-001'] } },
+        { title: 'Star Comprehensive Health Insurance Plan' },
+        { title: 'HDFC Millennia Cashback Credit Card' },
+        { title: 'ICICI Mine Student & Youth Zero-Balance Savings Account' },
+        { title: 'TCS Software Engineer / Full Stack Developer Opening' }
+      ]
+    });
   } catch (err) {
-    console.warn('Failed to auto-seed opportunities:', err.message);
+    console.warn('Failed to clean dummy opportunities:', err.message);
   }
 };
 
@@ -468,6 +333,31 @@ router.put('/superadmin/:id', protect, authorize('Super Admin', 'Admin'), async 
       message: 'Opportunity updated successfully.',
       data: opportunity,
     });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── 3B. SUPER ADMIN: DELETE OPPORTUNITY ─────────────────────────────────────────
+router.delete('/superadmin/:id', protect, authorize('Super Admin', 'Admin'), async (req, res) => {
+  try {
+    const opportunity = await Opportunity.findByIdAndDelete(req.params.id);
+    if (!opportunity) {
+      return res.status(404).json({ success: false, message: 'Opportunity not found' });
+    }
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('dataUpdated', {
+          module: 'opportunities',
+          action: 'deleted',
+          id: req.params.id,
+          message: `Opportunity "${opportunity.title}" deleted`,
+        });
+      }
+    } catch (ioErr) {}
+
+    res.json({ success: true, message: 'Opportunity deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

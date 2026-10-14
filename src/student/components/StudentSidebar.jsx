@@ -1,10 +1,11 @@
 import React from 'react';
 import { SettingsContext } from '../../App';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarCheck, BookOpenCheck,
   ClipboardList, CreditCard, Calendar, FileText,
-  Settings, LogOut, ChevronRight, ChevronDown, Megaphone, GraduationCap, Home, Briefcase, Library, ShieldAlert, X, Award
+  Settings, LogOut, ChevronRight, ChevronDown, Megaphone, GraduationCap, Home, Briefcase, Library, ShieldAlert, X, Award, Network,
+  ShieldCheck, Layers, Building, FileCheck
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -21,6 +22,7 @@ const getStudentSession = () => {
 const StudentSidebar = ({ isOpen, onClose }) => {
   const { collegeSettings } = React.useContext(SettingsContext) || {};
   const navigate = useNavigate();
+  const location = useLocation();
   const student = getStudentSession();
 
   const [expandedGroups, setExpandedGroups] = React.useState({ Academics: true });
@@ -28,6 +30,21 @@ const StudentSidebar = ({ isOpen, onClose }) => {
   const toggleGroup = (groupName) => {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
   };
+
+  const isBusinessReferralActive = location.pathname.startsWith('/student/business-referral') || location.pathname.startsWith('/student/referrals');
+  const isBusinessReferralExpanded = expandedGroups['Business Referral'] !== undefined
+    ? expandedGroups['Business Referral']
+    : isBusinessReferralActive;
+
+  const studentBusinessReferralItems = [
+    { name: 'All Categories', path: '/student/business-referral', exact: true, icon: <Layers size={16} /> },
+    { name: 'Credit Cards', path: '/student/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance', path: '/student/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Jobs', path: '/student/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Account Opening', path: '/student/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Incentives', path: '/student/business-referral/incentives', icon: <Award size={16} /> },
+    { name: 'My Submissions', path: '/student/referrals', icon: <FileCheck size={16} /> }
+  ];
 
   const handleNavClick = () => {
     if (window.innerWidth <= 768 && onClose) {
@@ -61,8 +78,7 @@ const StudentSidebar = ({ isOpen, onClose }) => {
       icon: <FileText size={20} />,
       items: [
         { name: 'Fee Status', path: '/student/fees', icon: <CreditCard size={20} /> },
-        { name: 'Leave Requests', path: '/student/leaves', icon: <FileText size={20} /> },
-        { name: 'Business Referral', path: '/student/referrals', icon: <Award size={20} /> }
+        { name: 'Leave Requests', path: '/student/leaves', icon: <FileText size={20} /> }
       ]
     },
     {
@@ -122,6 +138,50 @@ const StudentSidebar = ({ isOpen, onClose }) => {
               <LayoutDashboard size={20} />
               <span>Dashboard</span>
             </NavLink>
+          </li>
+
+          <li style={{ marginBottom: '0.5rem' }}>
+            <div 
+              className={`nav-group-header ${isBusinessReferralActive ? 'active' : ''}`}
+              onClick={() => toggleGroup('Business Referral')}
+              style={{ cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Network size={20} />
+                <span>Business Referral</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ 
+                  background: '#10b981', 
+                  color: '#ffffff', 
+                  fontSize: '9px', 
+                  fontWeight: 800, 
+                  padding: '2px 6px', 
+                  borderRadius: '10px', 
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  lineHeight: '1.2'
+                }}>New</span>
+                {isBusinessReferralExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </div>
+            </div>
+
+            <ul className={`nav-group-items ${isBusinessReferralExpanded ? 'expanded' : 'collapsed'}`}>
+              {studentBusinessReferralItems.map((item, i) => (
+                <li key={i}>
+                  <NavLink 
+                    to={item.path} 
+                    end={item.exact}
+                    className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
+                    style={{ paddingLeft: '2.8rem' }}
+                    onClick={handleNavClick}
+                  >
+                    {item.icon}
+                    <span>{item.name}</span>
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
           </li>
 
           {menuGroups.map((group, idx) => (

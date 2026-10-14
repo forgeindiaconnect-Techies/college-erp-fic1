@@ -1,0 +1,921 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Briefcase, User, Building2, MapPin, FileCheck, CheckCircle2,
+  AlertCircle, Lock, ArrowRight, ArrowLeft, Copy, Check, Loader2, X, Users
+} from 'lucide-react';
+import { submitReferral } from '../../api/index';
+import './CreditCardReferralModal.css';
+
+export default function JobReferralModal({
+  isOpen,
+  onClose,
+  defaultSector = 'IT / Software',
+  defaultCompany = '',
+  onSuccess = null,
+  rootRole = 'admin'
+}) {
+  const navigate = useNavigate();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [successReferral, setSuccessReferral] = useState(null);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  // Form State
+  const [formData, setFormData] = useState({
+    // Step 1: Candidate Details
+    candidateName: '',
+    candidatePhone: '',
+    candidateEmail: '',
+    candidateCity: '',
+    experienceLevel: 'Fresher (0-1 yr)',
+
+    // Step 2: Job Details
+    sector: 'IT / Software',
+    companyName: 'Tata Consultancy Services (TCS)',
+    jobRole: 'Associate Software Engineer',
+    jobReferenceId: 'REQ-2026-IT01',
+    jobLocation: 'Chennai',
+    referrerRelationship: 'Alumni',
+    expectedCtc: '',
+    notes: '',
+
+    // Step 3: Consent & Notice
+    candidateConsentGiven: false,
+    consentNoticeVersion: 'v1.2-FIC-JOB-CONSENT',
+    consentTimestamp: null,
+  });
+
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  // Verified Corporate Hiring Partners & Standard Role Catalog
+  const corporatePartners = [
+    'Tata Consultancy Services (TCS)',
+    'Infosys Limited',
+    'Wipro Technologies',
+    'Cognizant (CTS)',
+    'HDFC Bank Ltd',
+    'ICICI Bank Ltd',
+    'Deloitte Consulting',
+    'Larsen & Toubro (L&T)'
+  ];
+
+  const rolesBySector = {
+    'IT / Software': [
+      { role: 'Associate Software Engineer', reqId: 'REQ-2026-IT01' },
+      { role: 'Full Stack Web Developer', reqId: 'REQ-2026-IT02' },
+      { role: 'Quality Assurance & Test Engineer', reqId: 'REQ-2026-IT03' },
+      { role: 'Cloud Infrastructure / DevOps Associate', reqId: 'REQ-2026-IT04' }
+    ],
+    'Non-IT / Core Engineering': [
+      { role: 'Graduate Engineer Trainee (GET)', reqId: 'REQ-2026-CORE01' },
+      { role: 'Design & CAD Engineer', reqId: 'REQ-2026-CORE02' },
+      { role: 'Quality Control & Production Supervisor', reqId: 'REQ-2026-CORE03' },
+      { role: 'Site Operations Executive', reqId: 'REQ-2026-CORE04' }
+    ],
+    'Banking / Finance': [
+      { role: 'Relationship Manager - Retail Banking', reqId: 'REQ-2026-BF01' },
+      { role: 'Credit Risk Analyst', reqId: 'REQ-2026-BF02' },
+      { role: 'Operations & Settlement Executive', reqId: 'REQ-2026-BF03' },
+      { role: 'Wealth Management Associate', reqId: 'REQ-2026-BF04' }
+    ],
+    'EdTech / Education': [
+      { role: 'Academic Counselor / Advisor', reqId: 'REQ-2026-ED01' },
+      { role: 'Instructional Content Associate', reqId: 'REQ-2026-ED02' },
+      { role: 'Student Experience Coordinator', reqId: 'REQ-2026-ED03' }
+    ],
+    'BPO / Operations': [
+      { role: 'Process Executive - Customer Success', reqId: 'REQ-2026-OPS01' },
+      { role: 'Technical Support Specialist', reqId: 'REQ-2026-OPS02' },
+      { role: 'Data Operations Associate', reqId: 'REQ-2026-OPS03' }
+    ],
+    'Healthcare / Pharma': [
+      { role: 'Medical Data Documentation Specialist', reqId: 'REQ-2026-HC01' },
+      { role: 'Healthcare Operations Executive', reqId: 'REQ-2026-HC02' }
+    ],
+    'Other': [
+      { role: 'Corporate Management Trainee', reqId: 'REQ-2026-GEN01' },
+      { role: 'Executive Assistant - Business Operations', reqId: 'REQ-2026-GEN02' }
+    ]
+  };
+
+  const experienceLevels = [
+    'Fresher (0-1 yr)',
+    'Junior (1-3 yrs)',
+    'Mid-level (3-5 yrs)',
+    'Senior (5+ yrs)'
+  ];
+
+  const relationshipTypes = [
+    'Alumni',
+    'Colleague',
+    'Mentee',
+    'Academic Peer',
+    'Personal',
+    'Other'
+  ];
+
+  const locationsList = [
+    'Chennai',
+    'Bangalore',
+    'Hyderabad',
+    'Pune',
+    'Mumbai',
+    'Delhi NCR',
+    'Coimbatore',
+    'Remote / Hybrid'
+  ];
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentStep(1);
+      setError(null);
+      setFieldErrors({});
+      setSuccessReferral(null);
+      setCopiedCode(false);
+
+      let sec = 'IT / Software';
+      if (defaultSector) {
+        const secStr = String(defaultSector).toLowerCase();
+        if (secStr.includes('non-it') || secStr.includes('core')) sec = 'Non-IT / Core Engineering';
+        else if (secStr.includes('banking') || secStr.includes('finance')) sec = 'Banking / Finance';
+        else if (secStr.includes('edtech') || secStr.includes('education')) sec = 'EdTech / Education';
+        else if (secStr.includes('bpo') || secStr.includes('operations')) sec = 'BPO / Operations';
+        else if (secStr.includes('health') || secStr.includes('pharma')) sec = 'Healthcare / Pharma';
+        else if (secStr.includes('it') || secStr.includes('software')) sec = 'IT / Software';
+      }
+      const initialRoles = rolesBySector[sec] || rolesBySector['IT / Software'];
+
+      setFormData({
+        candidateName: '',
+        candidatePhone: '',
+        candidateEmail: '',
+        candidateCity: '',
+        experienceLevel: 'Fresher (0-1 yr)',
+        sector: sec,
+        companyName: defaultCompany || corporatePartners[0],
+        jobRole: initialRoles[0]?.role || 'Associate Software Engineer',
+        jobReferenceId: initialRoles[0]?.reqId || 'REQ-2026-IT01',
+        jobLocation: 'Chennai',
+        referrerRelationship: 'Alumni',
+        expectedCtc: '',
+        notes: '',
+        candidateConsentGiven: false,
+        consentNoticeVersion: 'v1.2-FIC-JOB-CONSENT',
+        consentTimestamp: null,
+      });
+    }
+  }, [isOpen, defaultSector, defaultCompany]);
+
+  if (!isOpen) return null;
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+
+      if (name === 'sector') {
+        const available = rolesBySector[value] || rolesBySector['IT / Software'];
+        updated.jobRole = available[0]?.role || '';
+        updated.jobReferenceId = available[0]?.reqId || '';
+      }
+
+      if (name === 'jobRole') {
+        const roles = rolesBySector[prev.sector] || [];
+        const matched = roles.find(r => r.role === value);
+        if (matched) updated.jobReferenceId = matched.reqId;
+      }
+
+      return updated;
+    });
+
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: null }));
+    }
+  };
+
+  const validateStep = (stepNumber) => {
+    const errors = {};
+
+    if (stepNumber === 1) {
+      if (!formData.candidateName || formData.candidateName.trim().length < 3) {
+        errors.candidateName = 'Enter the candidate’s full legal name (minimum 3 characters).';
+      }
+
+      const phoneRegex = /^[6-9]\d{9}$/;
+      const cleanedPhone = (formData.candidatePhone || '').replace(/\D/g, '');
+      if (!phoneRegex.test(cleanedPhone)) {
+        errors.candidatePhone = 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!formData.candidateEmail || !emailRegex.test(formData.candidateEmail.trim())) {
+        errors.candidateEmail = 'Valid candidate email is required for interview scheduling.';
+      }
+
+      if (!formData.candidateCity || formData.candidateCity.trim().length < 2) {
+        errors.candidateCity = 'Enter the candidate’s current city of residence.';
+      }
+    }
+
+    if (stepNumber === 2) {
+      if (!formData.companyName) {
+        errors.companyName = 'Select a verified partner employer.';
+      }
+      if (!formData.jobRole) {
+        errors.jobRole = 'Select an active job role.';
+      }
+      if (!formData.jobReferenceId) {
+        errors.jobReferenceId = 'Job Reference ID is required to match genuine vacancies.';
+      }
+    }
+
+    if (stepNumber === 3) {
+      if (!formData.candidateConsentGiven) {
+        errors.candidateConsentGiven = 'Candidate consent is mandatory before sharing profile details with hiring teams.';
+      }
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleNext = () => {
+    if (validateStep(currentStep)) {
+      if (currentStep === 3 && !formData.consentTimestamp) {
+        setFormData(prev => ({ ...prev, consentTimestamp: new Date().toISOString() }));
+      }
+      setCurrentStep(prev => prev + 1);
+    }
+  };
+
+  const handleBack = () => {
+    setError(null);
+    setCurrentStep(prev => Math.max(1, prev - 1));
+  };
+
+  const handleSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!validateStep(1) || !validateStep(2) || !validateStep(3)) {
+      setError('Please resolve all validation errors before submitting.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError(null);
+
+      const payload = {
+        category: 'Job',
+        jobDetails: {
+          sector: formData.sector,
+          companyName: formData.companyName,
+          jobRole: formData.jobRole,
+          jobReferenceId: formData.jobReferenceId.trim(),
+          jobLocation: formData.jobLocation,
+          candidateName: formData.candidateName.trim(),
+          candidatePhone: formData.candidatePhone.trim().replace(/\D/g, ''),
+          candidateEmail: formData.candidateEmail.trim(),
+          candidateCity: formData.candidateCity.trim(),
+          experienceLevel: formData.experienceLevel,
+          experienceYears: formData.experienceLevel,
+          referrerRelationship: formData.referrerRelationship,
+          expectedCtc: formData.expectedCtc ? formData.expectedCtc.trim() : '',
+          candidateConsentGiven: true,
+          consentTimestamp: formData.consentTimestamp || new Date().toISOString(),
+          consentNoticeVersion: formData.consentNoticeVersion,
+          notes: formData.notes ? formData.notes.trim() : '',
+        }
+      };
+
+      const res = await submitReferral(payload);
+
+      if (res && res.data && res.data.success) {
+        setSuccessReferral(res.data.data);
+        if (onSuccess) onSuccess(res.data.data);
+      } else {
+        throw new Error(res?.data?.message || 'Referral submission failed. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error submitting job referral:', err);
+      setError(err?.response?.data?.message || err.message || 'Server error occurred while submitting referral.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCopyCode = (code) => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(code);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
+
+  return (
+    <div className="cc-modal-overlay" onClick={onClose}>
+      <div className="cc-modal-dialog" onClick={(e) => e.stopPropagation()}>
+        
+        {/* Header */}
+        <div className="cc-modal-header" style={{ background: 'linear-gradient(135deg, #3730a3 0%, #312e81 100%)' }}>
+          <div className="cc-header-left">
+            <div className="cc-header-icon" style={{ background: 'rgba(255, 255, 255, 0.2)' }}>
+              <Briefcase size={24} />
+            </div>
+            <div>
+              <h2 className="cc-header-title">Submit Job Referral</h2>
+              <p className="cc-header-sub">Verified Institutional Corporate Hiring Referral Program</p>
+            </div>
+          </div>
+          <button type="button" className="cc-modal-close" onClick={onClose} title="Close">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Success View */}
+        {successReferral ? (
+          <div className="cc-modal-body">
+            <div className="cc-success-box">
+              <div className="cc-success-badge" style={{ background: '#eef2ff', color: '#4f46e5', borderColor: '#c7d2fe' }}>
+                <CheckCircle2 size={36} />
+              </div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.3rem', color: '#0f172a', fontWeight: 800 }}>
+                Candidate Referral Successfully Recorded!
+              </h3>
+              <p style={{ margin: '0 0 16px 0', color: '#64748b', fontSize: '0.88rem' }}>
+                The profile has been saved to the institutional recruitment referral database.
+              </p>
+
+              {/* Unique Referral Reference Code Display */}
+              <div className="cc-code-card" style={{ borderColor: '#c7d2fe' }}>
+                <div>
+                  <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, display: 'block' }}>
+                    Unique Referral Reference
+                  </span>
+                  <span className="cc-code-text" style={{ color: '#4338ca' }}>{successReferral.referralCode}</span>
+                </div>
+                <button
+                  type="button"
+                  className={`ref-copy-btn ${copiedCode ? 'copied' : ''}`}
+                  onClick={() => handleCopyCode(successReferral.referralCode)}
+                >
+                  <Copy size={13} />
+                  <span>{copiedCode ? 'Copied! ✓' : 'Copy'}</span>
+                </button>
+              </div>
+
+              {/* Summary Details */}
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', textAlign: 'left', margin: '20px auto', maxWidth: '520px', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div><span style={{ color: '#64748b' }}>Candidate:</span> <strong>{successReferral.jobDetails?.candidateName}</strong></div>
+                  <div><span style={{ color: '#64748b' }}>Company:</span> <strong>{successReferral.jobDetails?.companyName}</strong></div>
+                  <div><span style={{ color: '#64748b' }}>Role:</span> <strong>{successReferral.jobDetails?.jobRole}</strong></div>
+                  <div><span style={{ color: '#64748b' }}>Req ID:</span> <strong>{successReferral.jobDetails?.jobReferenceId}</strong></div>
+                  <div><span style={{ color: '#64748b' }}>Status:</span> <strong style={{ color: '#4f46e5' }}>Submitted</strong></div>
+                  <div><span style={{ color: '#64748b' }}>Consent Notice:</span> <strong style={{ fontFamily: 'monospace' }}>{successReferral.jobDetails?.consentNoticeVersion}</strong></div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  className="cc-btn-sec"
+                  onClick={() => {
+                    setSuccessReferral(null);
+                    setCurrentStep(1);
+                  }}
+                >
+                  Submit Another Candidate
+                </button>
+                <button
+                  type="button"
+                  className="cc-btn-pri"
+                  style={{ background: '#4338ca', borderColor: '#4338ca' }}
+                  onClick={() => {
+                    onClose();
+                    navigate(`/${rootRole}/referrals`);
+                  }}
+                >
+                  <span>View in My Referrals →</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* 4-Step Progress Indicator */}
+            <div className="cc-stepper-wrap">
+              <div className="cc-stepper">
+                {/* Step 1 */}
+                <div
+                  className={`cc-step-item ${currentStep === 1 ? 'active' : ''} ${currentStep > 1 ? 'completed clickable' : ''}`}
+                  onClick={() => currentStep > 1 && setCurrentStep(1)}
+                >
+                  <div className="cc-step-bubble">{currentStep > 1 ? <Check size={14} /> : '1'}</div>
+                  <div className="cc-step-text">
+                    <span className="cc-step-label">Step 1</span>
+                    <span className="cc-step-title">Candidate</span>
+                  </div>
+                </div>
+
+                <div className={`cc-step-divider ${currentStep > 1 ? 'completed' : ''}`} />
+
+                {/* Step 2 */}
+                <div
+                  className={`cc-step-item ${currentStep === 2 ? 'active' : ''} ${currentStep > 2 ? 'completed clickable' : ''}`}
+                  onClick={() => currentStep > 2 && setCurrentStep(2)}
+                >
+                  <div className="cc-step-bubble">{currentStep > 2 ? <Check size={14} /> : '2'}</div>
+                  <div className="cc-step-text">
+                    <span className="cc-step-label">Step 2</span>
+                    <span className="cc-step-title">Job Details</span>
+                  </div>
+                </div>
+
+                <div className={`cc-step-divider ${currentStep > 2 ? 'completed' : ''}`} />
+
+                {/* Step 3 */}
+                <div
+                  className={`cc-step-item ${currentStep === 3 ? 'active' : ''} ${currentStep > 3 ? 'completed clickable' : ''}`}
+                  onClick={() => currentStep > 3 && setCurrentStep(3)}
+                >
+                  <div className="cc-step-bubble">{currentStep > 3 ? <Check size={14} /> : '3'}</div>
+                  <div className="cc-step-text">
+                    <span className="cc-step-label">Step 3</span>
+                    <span className="cc-step-title">Consent</span>
+                  </div>
+                </div>
+
+                <div className={`cc-step-divider ${currentStep > 3 ? 'completed' : ''}`} />
+
+                {/* Step 4 */}
+                <div className={`cc-step-item ${currentStep === 4 ? 'active' : ''}`}>
+                  <div className="cc-step-bubble">4</div>
+                  <div className="cc-step-text">
+                    <span className="cc-step-label">Step 4</span>
+                    <span className="cc-step-title">Review & Submit</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="cc-modal-body">
+              {error && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '12px 16px', borderRadius: '10px', fontSize: '0.85rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertCircle size={16} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* ── STEP 1: CANDIDATE ── */}
+              {currentStep === 1 && (
+                <div>
+                  <div className="cc-form-group">
+                    <label className="cc-form-label">
+                      Candidate Full Legal Name <span className="req">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="candidateName"
+                      className={`cc-input ${fieldErrors.candidateName ? 'error' : ''}`}
+                      placeholder="e.g. Priyadarshini Srinivasan"
+                      value={formData.candidateName}
+                      onChange={handleChange}
+                      autoFocus
+                    />
+                    {fieldErrors.candidateName && (
+                      <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.candidateName}</div>
+                    )}
+                  </div>
+
+                  <div className="cc-grid-2">
+                    <div className="cc-form-group">
+                      <label className="cc-form-label">
+                        10-Digit Mobile Number <span className="req">*</span>
+                      </label>
+                      <div className="cc-phone-input-wrap">
+                        <span className="cc-phone-prefix">+91</span>
+                        <input
+                          type="tel"
+                          name="candidatePhone"
+                          maxLength={10}
+                          className="cc-phone-input"
+                          placeholder="9876543210"
+                          value={formData.candidatePhone}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      {fieldErrors.candidatePhone && (
+                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.candidatePhone}</div>
+                      )}
+                    </div>
+
+                    <div className="cc-form-group">
+                      <label className="cc-form-label">
+                        Candidate Email <span className="req">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        name="candidateEmail"
+                        className={`cc-input ${fieldErrors.candidateEmail ? 'error' : ''}`}
+                        placeholder="candidate@gmail.com"
+                        value={formData.candidateEmail}
+                        onChange={handleChange}
+                      />
+                      {fieldErrors.candidateEmail && (
+                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.candidateEmail}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="cc-grid-2">
+                    <div className="cc-form-group">
+                      <label className="cc-form-label">
+                        Current City / Location <span className="req">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="candidateCity"
+                        className={`cc-input ${fieldErrors.candidateCity ? 'error' : ''}`}
+                        placeholder="e.g. Bangalore, Chennai, Hyderabad"
+                        value={formData.candidateCity}
+                        onChange={handleChange}
+                      />
+                      {fieldErrors.candidateCity && (
+                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.candidateCity}</div>
+                      )}
+                    </div>
+
+                    <div className="cc-form-group">
+                      <label className="cc-form-label">
+                        Experience Level <span className="req">*</span>
+                      </label>
+                      <select
+                        name="experienceLevel"
+                        className="cc-select"
+                        value={formData.experienceLevel}
+                        onChange={handleChange}
+                      >
+                        {experienceLevels.map(lvl => (
+                          <option key={lvl} value={lvl}>{lvl}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── STEP 2: JOB DETAILS ── */}
+              {currentStep === 2 && (
+                <div>
+                  <div className="cc-grid-2">
+                    <div className="cc-form-group">
+                      <label className="cc-form-label">
+                        Opportunity Sector <span className="req">*</span>
+                      </label>
+                      <select
+                        name="sector"
+                        className="cc-select"
+                        value={formData.sector}
+                        onChange={handleChange}
+                      >
+                        {Object.keys(rolesBySector).map(sec => (
+                          <option key={sec} value={sec}>{sec}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="cc-form-group">
+                      <label className="cc-form-label">
+                        Corporate Partner <span className="req">*</span>
+                      </label>
+                      <select
+                        name="companyName"
+                        className="cc-select"
+                        value={formData.companyName}
+                        onChange={handleChange}
+                      >
+                        {corporatePartners.map(cmp => (
+                          <option key={cmp} value={cmp}>{cmp}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="cc-form-group">
+                    <label className="cc-form-label">
+                      Actual Available Job / Role <span className="req">*</span>
+                    </label>
+                    <select
+                      name="jobRole"
+                      className="cc-select"
+                      value={formData.jobRole}
+                      onChange={handleChange}
+                    >
+                      {(rolesBySector[formData.sector] || []).map(r => (
+                        <option key={r.role} value={r.role}>{r.role}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="cc-grid-2">
+                    <div className="cc-form-group">
+                      <label className="cc-form-label">
+                        Job Reference / Requisition ID <span className="req">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="jobReferenceId"
+                        className={`cc-input ${fieldErrors.jobReferenceId ? 'error' : ''}`}
+                        placeholder="e.g. REQ-2026-IT01"
+                        value={formData.jobReferenceId}
+                        onChange={handleChange}
+                      />
+                      {fieldErrors.jobReferenceId && (
+                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.jobReferenceId}</div>
+                      )}
+                    </div>
+
+                    <div className="cc-form-group">
+                      <label className="cc-form-label">
+                        Work Location <span className="req">*</span>
+                      </label>
+                      <select
+                        name="jobLocation"
+                        className="cc-select"
+                        value={formData.jobLocation}
+                        onChange={handleChange}
+                      >
+                        {locationsList.map(loc => (
+                          <option key={loc} value={loc}>{loc}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="cc-grid-2">
+                    <div className="cc-form-group">
+                      <label className="cc-form-label">
+                        Referrer Relationship <span className="req">*</span>
+                      </label>
+                      <select
+                        name="referrerRelationship"
+                        className="cc-select"
+                        value={formData.referrerRelationship}
+                        onChange={handleChange}
+                      >
+                        {relationshipTypes.map(rel => (
+                          <option key={rel} value={rel}>{rel}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="cc-form-group">
+                      <label className="cc-form-label">
+                        Expected CTC <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="expectedCtc"
+                        className="cc-input"
+                        placeholder="e.g. 6.5 LPA"
+                        value={formData.expectedCtc}
+                        onChange={handleChange}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="cc-form-group">
+                    <label className="cc-form-label">
+                      Technical Highlights / Recommendation Notes <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
+                    </label>
+                    <textarea
+                      name="notes"
+                      rows={2}
+                      className="cc-textarea"
+                      placeholder="e.g. React.js, Python, AWS certified, campus placement coordinator reference."
+                      value={formData.notes}
+                      onChange={handleChange}
+                    />
+                  </div>
+
+                  <div className="cc-privacy-callout">
+                    <Briefcase size={20} className="cc-privacy-icon" />
+                    <div>
+                      <div className="cc-privacy-title">Mandate Integrity</div>
+                      <div className="cc-privacy-desc">
+                        Roles correspond to pre-approved corporate talent acquisitions. Inventing vacancies is prohibited.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── STEP 3: CANDIDATE CONSENT ── */}
+              {currentStep === 3 && (
+                <div>
+                  <div className="cc-consent-box">
+                    <div className="cc-consent-notice-title">
+                      <span>Recruitment Referral Privacy Notice</span>
+                      <span className="cc-consent-ver">{formData.consentNoticeVersion}</span>
+                    </div>
+                    <ul className="cc-consent-points">
+                      <li><strong>Purpose of Sharing:</strong> Candidate profile details are shared exclusively with {formData.companyName} talent acquisition teams for evaluation against {formData.jobRole} ({formData.jobReferenceId}).</li>
+                      <li><strong>Zero Candidate Fees:</strong> No applicant is ever charged any recruitment, exam, or placement fees under institutional ethics guidelines.</li>
+                      <li><strong>Institutional Accountability:</strong> Submissions must be verified candidates with genuine academic/professional ties to the referrer ({formData.referrerRelationship}).</li>
+                    </ul>
+                  </div>
+
+                  <label className="cc-checkbox-label">
+                    <input
+                      type="checkbox"
+                      name="candidateConsentGiven"
+                      className="cc-checkbox"
+                      checked={formData.candidateConsentGiven}
+                      onChange={(e) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          candidateConsentGiven: e.target.checked,
+                          consentTimestamp: e.target.checked ? new Date().toISOString() : null
+                        }));
+                        if (fieldErrors.candidateConsentGiven) {
+                          setFieldErrors(prev => ({ ...prev, candidateConsentGiven: null }));
+                        }
+                      }}
+                    />
+                    <span className="cc-checkbox-text">
+                      I confirm that the candidate has explicitly reviewed the role opening and granted permission to share their contact information and profile with {formData.companyName} for recruitment consideration.
+                    </span>
+                  </label>
+                  {fieldErrors.candidateConsentGiven && (
+                    <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.candidateConsentGiven}</div>
+                  )}
+
+                  {formData.consentTimestamp && (
+                    <div style={{ marginTop: '10px', fontSize: '0.78rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Check size={14} />
+                      <span>Consent timestamp recorded: {new Date(formData.consentTimestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── STEP 4: REVIEW & SUBMIT ── */}
+              {currentStep === 4 && (
+                <div>
+                  {/* Review Candidate */}
+                  <div className="cc-review-card">
+                    <div className="cc-review-header">
+                      <div className="cc-review-title">
+                        <User size={15} className="text-blue-600" />
+                        <span>Candidate Information</span>
+                      </div>
+                      <button type="button" className="cc-edit-btn" onClick={() => setCurrentStep(1)}>
+                        Edit
+                      </button>
+                    </div>
+                    <div className="cc-review-grid">
+                      <div className="cc-review-item">
+                        <span>Candidate Name</span>
+                        <strong>{formData.candidateName}</strong>
+                      </div>
+                      <div className="cc-review-item">
+                        <span>Mobile</span>
+                        <strong>+91 {formData.candidatePhone}</strong>
+                      </div>
+                      <div className="cc-review-item">
+                        <span>Email</span>
+                        <strong>{formData.candidateEmail}</strong>
+                      </div>
+                      <div className="cc-review-item">
+                        <span>City & Experience</span>
+                        <strong>{formData.candidateCity} • {formData.experienceLevel}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Review Job Details */}
+                  <div className="cc-review-card">
+                    <div className="cc-review-header">
+                      <div className="cc-review-title">
+                        <Briefcase size={15} className="text-indigo-600" />
+                        <span>Job Opening Details</span>
+                      </div>
+                      <button type="button" className="cc-edit-btn" onClick={() => setCurrentStep(2)}>
+                        Edit
+                      </button>
+                    </div>
+                    <div className="cc-review-grid">
+                      <div className="cc-review-item">
+                        <span>Corporate Partner</span>
+                        <strong>{formData.companyName}</strong>
+                      </div>
+                      <div className="cc-review-item">
+                        <span>Sector</span>
+                        <strong>{formData.sector}</strong>
+                      </div>
+                      <div className="cc-review-item" style={{ gridColumn: 'span 2' }}>
+                        <span>Role & Requisition</span>
+                        <strong>{formData.jobRole} ({formData.jobReferenceId})</strong>
+                      </div>
+                      <div className="cc-review-item">
+                        <span>Location</span>
+                        <strong>{formData.jobLocation}</strong>
+                      </div>
+                      <div className="cc-review-item">
+                        <span>Relationship</span>
+                        <strong>{formData.referrerRelationship}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Review Consent */}
+                  <div className="cc-review-card">
+                    <div className="cc-review-header">
+                      <div className="cc-review-title">
+                        <Lock size={15} className="text-purple-600" />
+                        <span>Candidate Consent Record</span>
+                      </div>
+                      <button type="button" className="cc-edit-btn" onClick={() => setCurrentStep(3)}>
+                        Edit
+                      </button>
+                    </div>
+                    <div className="cc-review-grid">
+                      <div className="cc-review-item">
+                        <span>Consent Status</span>
+                        <strong style={{ color: '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Check size={14} /> Explicit Candidate Consent Confirmed
+                        </strong>
+                      </div>
+                      <div className="cc-review-item">
+                        <span>Notice Version</span>
+                        <strong style={{ fontFamily: 'monospace' }}>{formData.consentNoticeVersion}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="cc-modal-footer">
+              {currentStep > 1 ? (
+                <button
+                  type="button"
+                  className="cc-btn-sec"
+                  onClick={handleBack}
+                  disabled={submitting}
+                >
+                  <ArrowLeft size={16} /> Back
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="cc-btn-sec"
+                  onClick={onClose}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+              )}
+
+              {currentStep < 4 ? (
+                <button
+                  type="button"
+                  className="cc-btn-pri"
+                  style={{ background: '#4338ca', borderColor: '#4338ca' }}
+                  onClick={handleNext}
+                >
+                  <span>Continue</span>
+                  <ArrowRight size={16} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="cc-btn-pri"
+                  style={{ background: '#4338ca', borderColor: '#4338ca' }}
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 size={16} className="cc-spin" />
+                      <span>Saving Candidate...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={16} />
+                      <span>Submit Job Referral</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

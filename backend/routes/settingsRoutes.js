@@ -83,8 +83,15 @@ router.get('/', async (req, res) => {
     }
     res.json(defaultSettings);
   } catch (error) {
-    console.error('Settings GET Error:', error);
-    res.status(500).json({ message: 'Server Error fetching settings' });
+    console.error('Settings GET Error (returning offline fallback):', error.message);
+    res.json({
+      collegeName: 'Campus ERP Portal',
+      primaryColor: '#0d9488',
+      secondaryColor: '#059669',
+      academicYear: '2026-2027',
+      timezone: 'Asia/Kolkata (IST)',
+      currency: 'INR (₹)'
+    });
   }
 });
 

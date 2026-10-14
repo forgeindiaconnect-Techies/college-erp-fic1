@@ -43,6 +43,36 @@ const incentiveRecordSchema = new mongoose.Schema(
       type: String,
       default: 'General',
     },
+    earnedByEmployeeId: {
+      type: String,
+      default: '',
+      index: true,
+    },
+    candidateName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    candidateApplicationId: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    referralDate: {
+      type: Date,
+      default: Date.now,
+    },
+    approvalDate: {
+      type: Date,
+    },
+    incentiveRate: {
+      type: Number,
+      default: 0,
+    },
+    eligibleCount: {
+      type: Number,
+      default: 1,
+    },
     tenantId: {
       type: String,
       required: true,
