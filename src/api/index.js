@@ -798,6 +798,12 @@ export const reverseIncentive = (id, data) => api.post(`/referrals/incentives/${
 export const getAdminReferralOverview = (params = {}) => api.get('/referrals/admin-overview', { params });
 export const getSuperAdminReferralOverview = () => api.get('/referrals/superadmin-overview');
 export const getReferrerReport = (userId, params = {}) => api.get(`/referrals/referrer/${userId}`, { params });
+export const getReferrerWiseReport = (params = {}) => api.get('/referrals/reports/referrer-wise', { params });
+export const recordIncentivePayment = (data) => api.post('/referrals/incentive-payment', data);
+export const getReferrerWiseExportUrl = (params = {}) => {
+  const query = new URLSearchParams(params).toString();
+  return `/api/referrals/reports/referrer-wise/export${query ? `?${query}` : ''}`;
+};
 export const getReferralExportCsvUrl = (params = {}) => {
   const query = new URLSearchParams(params).toString();
   return `/api/referrals/export/csv${query ? `?${query}` : ''}`;
@@ -816,4 +822,73 @@ export const getMyOpportunityApplications = (params = {}) => api.get('/opportuni
 export const updateOpportunityApplicationStatus = (appId, data) => api.patch(`/opportunities/applications/${appId}/status`, data);
 export const getOpportunityExportCsvUrl = (id) => `/api/opportunities/export/${id}`;
 
+// ── Business Referral Dynamic Form Configuration APIs ──────────────────────────
+export const getPublicReferralFormConfig = (category) => api.get(`/referrals/config/public/${encodeURIComponent(category)}`);
+export const getAllReferralFormConfigs = () => api.get('/referrals/config/all');
+export const getReferralFormConfigByCategory = (category) => api.get(`/referrals/config/category/${encodeURIComponent(category)}`);
+export const updateReferralFormConfig = (category, data) => api.put(`/referrals/config/${encodeURIComponent(category)}`, data);
+export const addReferralPartner = (category, data) => api.post(`/referrals/config/${encodeURIComponent(category)}/partner`, data);
+export const toggleReferralPartner = (category, partnerId) => api.patch(`/referrals/config/${encodeURIComponent(category)}/partner/${partnerId}/toggle`);
+export const addReferralProduct = (category, partnerId, data) => api.post(`/referrals/config/${encodeURIComponent(category)}/partner/${partnerId}/product`, data);
+export const toggleReferralProduct = (category, partnerId, productId) => api.patch(`/referrals/config/${encodeURIComponent(category)}/partner/${partnerId}/product/${productId}/toggle`);
+export const resetReferralFormConfig = (category) => api.post(`/referrals/config/${encodeURIComponent(category)}/reset`);
+export const deleteIncentiveRule = (id) => api.delete(`/referrals/rules/${id}`);
+export const getReferralConfigHistory = (params = {}) => api.get('/referrals/config/history/logs', { params });
+export const updateReferralFormFields = (category, fieldsConfig) => api.put(`/referrals/config/${encodeURIComponent(category)}/fields`, { fieldsConfig });
+export const updateReferralPolicy = (category, data) => api.put(`/referrals/config/${encodeURIComponent(category)}/policy`, data);
+export const publishReferralForm = (category) => api.post(`/referrals/config/${encodeURIComponent(category)}/publish`);
+export const unpublishReferralForm = (category) => api.post(`/referrals/config/${encodeURIComponent(category)}/unpublish`);
+export const saveReferralFormDraft = (category, data) => api.post(`/referrals/config/${encodeURIComponent(category)}/draft`, data);
+
+// ── Watchman Management & Campus Security Operations APIs ──────────────────────
+// Admin Watchman Management
+export const getWatchmen = () => api.get('/watchman');
+export const createWatchman = (data) => api.post('/watchman', data);
+export const updateWatchman = (id, data) => api.put(`/watchman/${id}`, data);
+export const toggleWatchmanStatus = (id) => api.patch(`/watchman/${id}/status`);
+export const resetWatchmanPassword = (id, newPassword) => api.post(`/watchman/${id}/reset-password`, { newPassword });
+export const deleteWatchman = (id) => api.delete(`/watchman/${id}`);
+
+// Watchman Dashboard Operations
+export const getWatchmanProfile = () => api.get('/watchman/me');
+export const changeWatchmanPassword = (data) => api.post('/watchman/change-password', data);
+export const getWatchmanStats = () => api.get('/watchman/stats');
+
+// Visitor Operations
+export const getActiveVisitors = () => api.get('/watchman/visitors/active');
+export const recordVisitorEntry = (data) => api.post('/watchman/visitors/entry', data);
+export const recordVisitorExit = (id, data = {}) => api.post(`/watchman/visitors/${id}/exit`, data);
+export const verifyVisitorPass = (query) => api.get(`/watchman/visitors/verify/${encodeURIComponent(query)}`);
+export const getPreRegisteredVisitors = () => api.get('/watchman/visitors/pre-registered');
+export const admitPreRegisteredVisitor = (id, data = {}) => api.post(`/watchman/visitors/${id}/admit`, data);
+export const getVisitorHistory = (params = {}) => api.get('/watchman/visitors/history', { params });
+
+// Delivery & Parcel Operations
+export const getParcels = (params = {}) => api.get('/watchman/parcels', { params });
+export const logParcel = (data) => api.post('/watchman/parcels', data);
+export const handoverParcel = (id, data = {}) => api.patch(`/watchman/parcels/${id}/handover`, data);
+
+// Vehicle Operations
+export const getVehicles = (params = {}) => api.get('/watchman/vehicles', { params });
+export const recordVehicleEntry = (data) => api.post('/watchman/vehicles/entry', data);
+export const recordVehicleExit = (id) => api.patch(`/watchman/vehicles/${id}/exit`);
+
+// Student & Staff Gate Movement Registers
+export const getStudentMovements = (params = {}) => api.get('/watchman/student-register', { params });
+export const recordStudentMovement = (data) => api.post('/watchman/student-register', data);
+export const getStaffMovements = (params = {}) => api.get('/watchman/staff-register', { params });
+export const recordStaffMovement = (data) => api.post('/watchman/staff-register', data);
+
+// Attendance & Shift Operations
+export const getWatchmanAttendance = () => api.get('/watchman/attendance');
+export const watchmanClockIn = (data = {}) => api.post('/watchman/attendance/clock-in', data);
+export const watchmanClockOut = (data = {}) => api.post('/watchman/attendance/clock-out', data);
+
+// Emergency & Incident Reports
+export const getSecurityIncidents = (params = {}) => api.get('/watchman/incidents', { params });
+export const reportSecurityIncident = (data) => api.post('/watchman/incidents', data);
+export const updateSecurityIncident = (id, data) => api.patch(`/watchman/incidents/${id}`, data);
+
+// Notifications
+export const getWatchmanNotifications = () => api.get('/watchman/notifications');
 

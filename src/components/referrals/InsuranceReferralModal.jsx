@@ -4,7 +4,8 @@ import {
   Shield, Heart, Car, UserCheck, Building2, User, FileCheck, CheckCircle2,
   AlertCircle, Lock, ArrowRight, ArrowLeft, Copy, Check, Loader2, X
 } from 'lucide-react';
-import { submitReferral } from '../../api/index';
+import { submitReferral, getPublicReferralFormConfig } from '../../api/index';
+import DynamicFieldRenderer from './DynamicFieldRenderer';
 import './CreditCardReferralModal.css';
 
 export default function InsuranceReferralModal({
@@ -21,6 +22,8 @@ export default function InsuranceReferralModal({
   const [error, setError] = useState(null);
   const [successReferral, setSuccessReferral] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [formConfig, setFormConfig] = useState(null);
+  const [customFields, setCustomFields] = useState({});
 
   // Form State
   const [formData, setFormData] = useState({
@@ -46,8 +49,8 @@ export default function InsuranceReferralModal({
 
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // Approved Underwriters / Insurers
-  const approvedInsurers = [
+  // Approved Underwriters / Insurers (Default Fallback)
+  const defaultApprovedInsurers = [
     'Star Health & Allied Insurance',
     'HDFC ERGO General Insurance',
     'ICICI Lombard General Insurance',
@@ -55,8 +58,8 @@ export default function InsuranceReferralModal({
     'Care Health Insurance'
   ];
 
-  // Approved Offerings by Category
-  const offeringsByCategory = {
+  // Approved Offerings by Category (Default Fallback)
+  const defaultOfferingsByCategory = {
     Health: [
       'Comprehensive Family Floater Plan',
       'Optima Secure Hospitalization Shield',
@@ -83,6 +86,10 @@ export default function InsuranceReferralModal({
     ]
   };
 
+  const [approvedInsurers, setApprovedInsurers] = useState(defaultApprovedInsurers);
+  const [offeringsByCategory, setOfferingsByCategory] = useState(defaultOfferingsByCategory);
+  const [configLoaded, setConfigLoaded] = useState(false);
+
   const sumInsuredTiers = [
     '₹3,00,000 (3 Lakhs)',
     '₹5,00,000 (5 Lakhs)',
@@ -93,10 +100,53 @@ export default function InsuranceReferralModal({
   ];
 
   useEffect(() => {
+    const fetchInsuranceConfig = async () => {
+      try {
+        const res = await getPublicReferralFormConfig('Insurance');
+        if (res?.data?.success && res.data.data) {
+          setFormConfig(res.data.data);
+          if (res.data.data.partners) {
+            const partners = res.data.data.partners.filter((p) => p.isActive !== false);
+            if (partners.length > 0) {
+              setApprovedInsurers(partners.map((p) => p.name));
+            }
+
+            const dynamicOfferings = { Health: [], Motor: [], Life: [], Property: [] };
+            partners.forEach((p) => {
+              (p.products || []).forEach((prod) => {
+                if (prod.isActive !== false) {
+                  const cat = prod.productCategory || 'Health';
+                  if (dynamicOfferings[cat]) {
+                    dynamicOfferings[cat].push(prod.name);
+                  } else {
+                    dynamicOfferings[cat] = [prod.name];
+                  }
+                }
+              });
+            });
+
+            // Ensure non-empty fallback for categories
+            Object.keys(defaultOfferingsByCategory).forEach((cat) => {
+              if (!dynamicOfferings[cat] || dynamicOfferings[cat].length === 0) {
+                dynamicOfferings[cat] = defaultOfferingsByCategory[cat];
+              }
+            });
+
+            setOfferingsByCategory(dynamicOfferings);
+            setConfigLoaded(true);
+          }
+        }
+      } catch (err) {
+        console.warn('Using default insurance catalog:', err.message);
+      }
+    };
+
     if (isOpen) {
+      fetchInsuranceConfig();
       setCurrentStep(1);
       setError(null);
       setFieldErrors({});
+      setCustomFields({});
       setSuccessReferral(null);
       setCopiedCode(false);
 
@@ -129,6 +179,17 @@ export default function InsuranceReferralModal({
   }, [isOpen, defaultCategory, defaultProvider]);
 
   if (!isOpen) return null;
+
+  const handleCustomFieldChange = (fieldKey, value) => {
+    setCustomFields(prev => ({ ...prev, [fieldKey]: value }));
+    if (fieldErrors[fieldKey]) {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      });
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -172,6 +233,15 @@ export default function InsuranceReferralModal({
       if (!formData.city || formData.city.trim().length < 2) {
         errors.city = 'Enter the applicant’s residential city or campus location.';
       }
+
+      // Dynamic custom fields validation for Step 1
+      const step1Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
+      step1Custom.forEach(f => {
+        const val = customFields[f.fieldKey];
+        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
+        }
+      });
     }
 
     if (stepNumber === 2) {
@@ -181,6 +251,15 @@ export default function InsuranceReferralModal({
       if (!formData.selectedOffering) {
         errors.selectedOffering = 'Select an approved insurance offering.';
       }
+
+      // Dynamic custom fields validation for Step 2
+      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2);
+      step2Custom.forEach(f => {
+        const val = customFields[f.fieldKey];
+        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
+        }
+      });
     }
 
     if (stepNumber === 3) {
@@ -222,6 +301,23 @@ export default function InsuranceReferralModal({
 
       const payload = {
         category: 'Insurance',
+        formVersion: formConfig?.version || 1,
+        partnerName: formData.provider,
+        productName: formData.selectedOffering,
+        notes: formData.notes ? formData.notes.trim() : '',
+        customFields: customFields,
+        formData: {
+          applicantName: formData.applicantName.trim(),
+          applicantPhone: formData.applicantPhone.trim().replace(/\D/g, ''),
+          applicantEmail: formData.applicantEmail ? formData.applicantEmail.trim() : '',
+          city: formData.city.trim(),
+          provider: formData.provider,
+          insuranceCategory: formData.insuranceCategory,
+          selectedOffering: formData.selectedOffering,
+          sumInsuredTier: formData.sumInsuredTier,
+          partnerReferenceNumber: formData.partnerReferenceNumber ? formData.partnerReferenceNumber.trim() : '',
+          ...customFields
+        },
         insuranceDetails: {
           provider: formData.provider,
           insuranceCategory: formData.insuranceCategory,
@@ -421,6 +517,14 @@ export default function InsuranceReferralModal({
                 </div>
               )}
 
+              {/* Draft Status Banner */}
+              {formConfig && formConfig.status === 'draft' && (
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '12px 16px', borderRadius: '10px', fontSize: '0.85rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertCircle size={16} />
+                  <span>Notice: This Insurance Referral Form is currently in Draft status. Submissions are paused.</span>
+                </div>
+              )}
+
               {/* ── STEP 1: APPLICANT ── */}
               {currentStep === 1 && (
                 <div>
@@ -498,6 +602,14 @@ export default function InsuranceReferralModal({
                       <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.city}</div>
                     )}
                   </div>
+
+                  {/* Dynamic Step 1 Custom Fields */}
+                  <DynamicFieldRenderer
+                    fields={(formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1))}
+                    values={customFields}
+                    onChange={handleCustomFieldChange}
+                    errors={fieldErrors}
+                  />
                 </div>
               )}
 
@@ -601,6 +713,14 @@ export default function InsuranceReferralModal({
                     />
                   </div>
 
+                  {/* Dynamic Step 2 Custom Fields */}
+                  <DynamicFieldRenderer
+                    fields={(formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2)}
+                    values={customFields}
+                    onChange={handleCustomFieldChange}
+                    errors={fieldErrors}
+                  />
+
                   <div className="cc-privacy-callout">
                     <Shield size={20} className="cc-privacy-icon" />
                     <div>
@@ -621,11 +741,17 @@ export default function InsuranceReferralModal({
                       <span>Statutory Insurance Privacy Notice</span>
                       <span className="cc-consent-ver">{formData.consentNoticeVersion}</span>
                     </div>
-                    <ul className="cc-consent-points">
-                      <li><strong>Purpose of Processing:</strong> Contact information is collected strictly to enable authorized underwriters ({formData.provider}) to provide insurance advisory and quotation for {formData.selectedOffering}.</li>
-                      <li><strong>Zero Sensitive Health Data:</strong> No medical records, diagnostic tests, or payment passwords are collected or stored in this ERP system.</li>
-                      <li><strong>Referrer Verification:</strong> Institutional incentive eligibility is calculated strictly upon genuine policy verification and approved milestones.</li>
-                    </ul>
+                    {formConfig?.generalSettings?.consentText ? (
+                      <p style={{ margin: '8px 0', fontSize: '0.84rem', color: '#334155', lineHeight: 1.5 }}>
+                        {formConfig.generalSettings.consentText}
+                      </p>
+                    ) : (
+                      <ul className="cc-consent-points">
+                        <li><strong>Purpose of Processing:</strong> Contact information is collected strictly to enable authorized underwriters ({formData.provider}) to provide insurance advisory and quotation for {formData.selectedOffering}.</li>
+                        <li><strong>Zero Sensitive Health Data:</strong> No medical records, diagnostic tests, or payment passwords are collected or stored in this ERP system.</li>
+                        <li><strong>Referrer Verification:</strong> Institutional incentive eligibility is calculated strictly upon genuine policy verification and approved milestones.</li>
+                      </ul>
+                    )}
                   </div>
 
                   <label className="cc-checkbox-label">
@@ -755,6 +881,28 @@ export default function InsuranceReferralModal({
                       </div>
                     </div>
                   </div>
+
+                  {/* Dynamic Custom Details Review */}
+                  {Object.keys(customFields).length > 0 && (
+                    <div className="cc-review-card">
+                      <div className="cc-review-header">
+                        <div className="cc-review-title">
+                          <FileCheck size={15} className="text-purple-600" />
+                          <span>Additional Custom Details</span>
+                        </div>
+                      </div>
+                      <div className="cc-review-grid">
+                        {(formConfig?.fieldsConfig || [])
+                          .filter(f => !f.isSystem && customFields[f.fieldKey] !== undefined && customFields[f.fieldKey] !== '')
+                          .map(f => (
+                            <div key={f.fieldKey} className="cc-review-item">
+                              <span>{f.label}</span>
+                              <strong>{Array.isArray(customFields[f.fieldKey]) ? customFields[f.fieldKey].join(', ') : String(customFields[f.fieldKey])}</strong>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

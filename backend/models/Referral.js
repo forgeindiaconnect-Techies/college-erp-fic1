@@ -249,9 +249,45 @@ const referralSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    paidAmount: {
+      type: Number,
+      default: 0,
+    },
+    paymentReferenceNumber: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    paymentDate: {
+      type: Date,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['Unpaid', 'Pending', 'Partially Paid', 'Paid'],
+      default: 'Pending',
+      index: true,
+    },
+    paymentHistory: [
+      {
+        amount: { type: Number, required: true },
+        paymentDate: { type: Date, default: Date.now },
+        transactionReference: { type: String, default: '' },
+        paymentMode: { type: String, default: 'Bank Transfer' },
+        paidBy: { type: String, default: 'Admin' },
+        notes: { type: String, default: '' },
+      },
+    ],
     incentiveRecord: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'IncentiveRecord',
+    },
+    formVersion: {
+      type: Number,
+      default: 1,
+    },
+    customFields: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
     },
   },
   {

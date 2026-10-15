@@ -74,8 +74,8 @@ export const DEFAULT_CATEGORY_CONFIGS = {
   'account-opening': {
     id: 'account-opening',
     categoryKey: 'Bank Account',
-    title: 'Account Opening Referral',
-    subtitle: 'Digital Savings & Salary Accounts',
+    title: 'Bank Account Referral',
+    subtitle: 'Partner Banks & Account Products',
     badge: 'Instant Processing',
     badgeColor: 'purple',
     accentColor: '#9333ea',
@@ -122,6 +122,30 @@ export const DEFAULT_CATEGORY_CONFIGS = {
 const STORAGE_KEY = 'erp_superadmin_custom_categories';
 const EVENT_NAME = 'erp_category_config_updated';
 
+// Helper to remove accidental duplicate repeated sentences in text
+const deduplicateText = (text) => {
+  if (!text || typeof text !== 'string') return text;
+  const trimmed = text.trim();
+  const half = Math.floor(trimmed.length / 2);
+  const part1 = trimmed.slice(0, half).trim();
+  const part2 = trimmed.slice(half).trim();
+  if (part1 && (part1 === part2 || part2.startsWith(part1))) return part1;
+
+  // Check if any sentence is repeated identically
+  const sentences = trimmed.split(/(?<=[.?!])\s+/);
+  if (sentences.length > 1) {
+    const unique = [];
+    sentences.forEach((s) => {
+      const sTrim = s.trim();
+      if (sTrim && !unique.some((u) => u.toLowerCase() === sTrim.toLowerCase())) {
+        unique.push(sTrim);
+      }
+    });
+    return unique.join(' ');
+  }
+  return trimmed;
+};
+
 // Read all custom overrides from localStorage
 export const getCustomCategoryOverrides = () => {
   try {
@@ -142,7 +166,7 @@ export const getCategoryConfig = (categoryId) => {
 
   if (!catOverride) return defaultCfg;
 
-  return {
+  const merged = {
     ...defaultCfg,
     ...catOverride,
     metrics: {
@@ -156,6 +180,16 @@ export const getCategoryConfig = (categoryId) => {
       ? catOverride.tags
       : defaultCfg.tags
   };
+
+  if (categoryId === 'account-opening' && (!merged.title || merged.title === 'Account Opening Referral')) {
+    merged.title = 'Bank Account Referral';
+  }
+
+  if (merged.description) {
+    merged.description = deduplicateText(merged.description);
+  }
+
+  return merged;
 };
 
 // Save custom override for a category and notify all listening pages

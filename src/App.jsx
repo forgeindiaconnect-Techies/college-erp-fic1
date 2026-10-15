@@ -62,6 +62,7 @@ import LibraryManagement from './pages/library/LibraryManagement';
 import LibrarianManagement from './pages/library/LibrarianManagement';
 import TransportManagement from './pages/transport/TransportManagement';
 import DriverManagement from './pages/admin/DriverManagement';
+import AdminWatchmanManagement from './pages/watchman/AdminWatchmanManagement';
 import HostelManagement from './pages/hostel/HostelManagement';
 import HostelDashboard from './pages/hostel/HostelDashboard';
 import HostelLayout from './hostel/components/HostelLayout';
@@ -99,6 +100,8 @@ import BusinessReferralCreditCard from './pages/business-referral/BusinessReferr
 import BusinessReferralInsurance from './pages/business-referral/BusinessReferralInsurance';
 import BusinessReferralJob from './pages/business-referral/BusinessReferralJob';
 import BusinessReferralAccountOpening from './pages/business-referral/BusinessReferralAccountOpening';
+import BusinessReferralSettings from './superadmin/pages/BusinessReferralSettings';
+import CollegeMultiTalentEvent from './superadmin/pages/CollegeMultiTalentEvent';
 
 import PrincipalLayout from './principal/components/PrincipalLayout';
 import PrincipalDashboard from './principal/pages/PrincipalDashboard';
@@ -236,6 +239,24 @@ import LibrarianDashboard from './librarian/pages/LibrarianDashboard';
 import PlacementLayout, { PlacementGuard } from './placement/components/PlacementLayout';
 import PlacementDashboard from './placement/pages/PlacementDashboard';
 
+// Watchman Layout & Pages
+import WatchmanLayout from './watchman/components/WatchmanLayout';
+import WatchmanDashboard from './watchman/pages/WatchmanDashboard';
+import VisitorEntryPage from './watchman/pages/VisitorEntryPage';
+import VisitorExitPage from './watchman/pages/VisitorExitPage';
+import QrVerificationPage from './watchman/pages/QrVerificationPage';
+import PreRegisteredVisitorsPage from './watchman/pages/PreRegisteredVisitorsPage';
+import DeliveryParcelPage from './watchman/pages/DeliveryParcelPage';
+import VehicleRegisterPage from './watchman/pages/VehicleRegisterPage';
+import StudentRegisterPage from './watchman/pages/StudentRegisterPage';
+import StaffRegisterPage from './watchman/pages/StaffRegisterPage';
+import AttendanceShiftPage from './watchman/pages/AttendanceShiftPage';
+import IncidentReportsPage from './watchman/pages/IncidentReportsPage';
+import VisitorHistoryPage from './watchman/pages/VisitorHistoryPage';
+import WatchmanNotificationsPage from './watchman/pages/WatchmanNotificationsPage';
+import WatchmanProfilePage from './watchman/pages/WatchmanProfilePage';
+import WatchmanChangePasswordPage from './watchman/pages/WatchmanChangePasswordPage';
+
 import Unauthorized from './pages/Unauthorized';
 
 import './index.css';
@@ -327,6 +348,13 @@ const HostelGuard = ({ children }) => {
   return <Navigate to="/login" replace />;
 };
 
+const WatchmanGuard = ({ children }) => {
+  const session = sessionStorage.getItem('watchman_session');
+  if (session) return children;
+  if (hasAnyOtherSession('watchman_session')) return <Navigate to="/unauthorized" replace />;
+  return <Navigate to="/login" replace />;
+};
+
 function App() {
   const [theme, setTheme] = useState('light');
   const [collegeSettings, setCollegeSettings] = useState({
@@ -408,6 +436,7 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
+            <Route path="/landing" element={<LandingPage />} />
             <Route path="/login" element={<UnifiedLogin />} />
             <Route path="/get-access" element={<GetAccess />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -444,6 +473,10 @@ function App() {
               <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
               <Route path="referrals" element={<PersonalReferrals />} />
               <Route path="business-referral/my-referrals" element={<PersonalReferrals />} />
+              <Route path="referral-settings" element={<BusinessReferralSettings />} />
+              <Route path="business-referral-settings" element={<BusinessReferralSettings />} />
+              <Route path="college-multi-talent-event" element={<CollegeMultiTalentEvent />} />
+              <Route path="multi-talent-event" element={<CollegeMultiTalentEvent />} />
               <Route path="reports" element={<SuperAdminReports />} />
               <Route path="settings" element={<SuperAdminSettings />} />
             </Route>
@@ -500,6 +533,7 @@ function App() {
               <Route path="placement-management" element={<PlacementOfficerManagement />} />
               <Route path="assignments"   element={<AdminAssignments />} />
               <Route path="accounts-management" element={<AccountsOfficerManagement />} />
+              <Route path="watchman-management" element={<AdminWatchmanManagement />} />
               <Route path="ai"            element={<AIAssistant />} />
               <Route path="announcements" element={<AnnouncementsManagement />} />
               <Route path="permissions"   element={<RolePermissions />} />
@@ -777,6 +811,29 @@ function App() {
               <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
               <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
               <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
+            </Route>
+
+            {/* ── WATCHMAN ROUTES ── */}
+            <Route path="/watchman" element={<WatchmanGuard><GlobalLockdown><WatchmanLayout /></GlobalLockdown></WatchmanGuard>}>
+              <Route index element={<Navigate to="/watchman/dashboard" replace />} />
+              <Route path="dashboard" element={<WatchmanDashboard />} />
+              <Route path="visitor-entry" element={<VisitorEntryPage />} />
+              <Route path="visitor-exit" element={<VisitorExitPage />} />
+              <Route path="visitor-pass-verification" element={<QrVerificationPage />} />
+              <Route path="qr-verification" element={<QrVerificationPage />} />
+              <Route path="pre-registered" element={<PreRegisteredVisitorsPage />} />
+              <Route path="parcels" element={<DeliveryParcelPage />} />
+              <Route path="vehicle-register" element={<VehicleRegisterPage />} />
+              <Route path="vehicles" element={<VehicleRegisterPage />} />
+              <Route path="student-register" element={<StudentRegisterPage />} />
+              <Route path="staff-register" element={<StaffRegisterPage />} />
+              <Route path="attendance-shift" element={<AttendanceShiftPage />} />
+              <Route path="attendance" element={<AttendanceShiftPage />} />
+              <Route path="incidents" element={<IncidentReportsPage />} />
+              <Route path="visitor-history" element={<VisitorHistoryPage />} />
+              <Route path="notifications" element={<WatchmanNotificationsPage />} />
+              <Route path="profile" element={<WatchmanProfilePage />} />
+              <Route path="change-password" element={<WatchmanChangePasswordPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

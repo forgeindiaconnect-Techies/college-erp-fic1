@@ -4,7 +4,8 @@ import {
   Briefcase, User, Building2, MapPin, FileCheck, CheckCircle2,
   AlertCircle, Lock, ArrowRight, ArrowLeft, Copy, Check, Loader2, X, Users
 } from 'lucide-react';
-import { submitReferral } from '../../api/index';
+import { submitReferral, getPublicReferralFormConfig } from '../../api/index';
+import DynamicFieldRenderer from './DynamicFieldRenderer';
 import './CreditCardReferralModal.css';
 
 export default function JobReferralModal({
@@ -21,6 +22,8 @@ export default function JobReferralModal({
   const [error, setError] = useState(null);
   const [successReferral, setSuccessReferral] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [formConfig, setFormConfig] = useState(null);
+  const [customFields, setCustomFields] = useState({});
 
   // Form State
   const [formData, setFormData] = useState({
@@ -49,8 +52,8 @@ export default function JobReferralModal({
 
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // Verified Corporate Hiring Partners & Standard Role Catalog
-  const corporatePartners = [
+  // Verified Corporate Hiring Partners & Standard Role Catalog (Default Fallback)
+  const defaultCorporatePartners = [
     'Tata Consultancy Services (TCS)',
     'Infosys Limited',
     'Wipro Technologies',
@@ -61,7 +64,7 @@ export default function JobReferralModal({
     'Larsen & Toubro (L&T)'
   ];
 
-  const rolesBySector = {
+  const defaultRolesBySector = {
     'IT / Software': [
       { role: 'Associate Software Engineer', reqId: 'REQ-2026-IT01' },
       { role: 'Full Stack Web Developer', reqId: 'REQ-2026-IT02' },
@@ -100,6 +103,10 @@ export default function JobReferralModal({
     ]
   };
 
+  const [corporatePartners, setCorporatePartners] = useState(defaultCorporatePartners);
+  const [rolesBySector, setRolesBySector] = useState(defaultRolesBySector);
+  const [configLoaded, setConfigLoaded] = useState(false);
+
   const experienceLevels = [
     'Fresher (0-1 yr)',
     'Junior (1-3 yrs)',
@@ -128,10 +135,53 @@ export default function JobReferralModal({
   ];
 
   useEffect(() => {
+    const fetchJobConfig = async () => {
+      try {
+        const res = await getPublicReferralFormConfig('Job');
+        if (res?.data?.success && res.data.data) {
+          setFormConfig(res.data.data);
+          if (res.data.data.partners) {
+            const partners = res.data.data.partners.filter((p) => p.isActive !== false);
+            if (partners.length > 0) {
+              setCorporatePartners(partners.map((p) => p.name));
+            }
+
+            const dynamicRoles = {};
+            partners.forEach((p) => {
+              (p.products || []).forEach((prod) => {
+                if (prod.isActive !== false) {
+                  const sector = prod.productCategory || 'IT / Software';
+                  if (!dynamicRoles[sector]) dynamicRoles[sector] = [];
+                  dynamicRoles[sector].push({
+                    role: prod.name,
+                    reqId: `REQ-${p.code || 'CORP'}-${prod.id.slice(-4)}`
+                  });
+                }
+              });
+            });
+
+            // Fallback to default roles for empty sectors
+            Object.keys(defaultRolesBySector).forEach((sector) => {
+              if (!dynamicRoles[sector] || dynamicRoles[sector].length === 0) {
+                dynamicRoles[sector] = defaultRolesBySector[sector];
+              }
+            });
+
+            setRolesBySector(dynamicRoles);
+            setConfigLoaded(true);
+          }
+        }
+      } catch (err) {
+        console.warn('Using default job catalog:', err.message);
+      }
+    };
+
     if (isOpen) {
+      fetchJobConfig();
       setCurrentStep(1);
       setError(null);
       setFieldErrors({});
+      setCustomFields({});
       setSuccessReferral(null);
       setCopiedCode(false);
 
@@ -169,6 +219,17 @@ export default function JobReferralModal({
   }, [isOpen, defaultSector, defaultCompany]);
 
   if (!isOpen) return null;
+
+  const handleCustomFieldChange = (fieldKey, value) => {
+    setCustomFields(prev => ({ ...prev, [fieldKey]: value }));
+    if (fieldErrors[fieldKey]) {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      });
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -217,6 +278,15 @@ export default function JobReferralModal({
       if (!formData.candidateCity || formData.candidateCity.trim().length < 2) {
         errors.candidateCity = 'Enter the candidate’s current city of residence.';
       }
+
+      // Dynamic custom fields validation for Step 1
+      const step1Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
+      step1Custom.forEach(f => {
+        const val = customFields[f.fieldKey];
+        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
+        }
+      });
     }
 
     if (stepNumber === 2) {
@@ -229,6 +299,15 @@ export default function JobReferralModal({
       if (!formData.jobReferenceId) {
         errors.jobReferenceId = 'Job Reference ID is required to match genuine vacancies.';
       }
+
+      // Dynamic custom fields validation for Step 2
+      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2);
+      step2Custom.forEach(f => {
+        const val = customFields[f.fieldKey];
+        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
+        }
+      });
     }
 
     if (stepNumber === 3) {
@@ -268,6 +347,23 @@ export default function JobReferralModal({
 
       const payload = {
         category: 'Job',
+        formVersion: formConfig?.version || 1,
+        partnerName: formData.companyName,
+        productName: formData.jobRole,
+        notes: formData.notes ? formData.notes.trim() : '',
+        customFields: customFields,
+        formData: {
+          applicantName: formData.candidateName.trim(),
+          applicantPhone: formData.candidatePhone.trim().replace(/\D/g, ''),
+          applicantEmail: formData.candidateEmail.trim(),
+          city: formData.candidateCity.trim(),
+          companyName: formData.companyName,
+          jobRole: formData.jobRole,
+          sector: formData.sector,
+          jobLocation: formData.jobLocation,
+          jobReferenceId: formData.jobReferenceId.trim(),
+          ...customFields
+        },
         jobDetails: {
           sector: formData.sector,
           companyName: formData.companyName,
@@ -469,6 +565,14 @@ export default function JobReferralModal({
                 </div>
               )}
 
+              {/* Draft Status Banner */}
+              {formConfig && formConfig.status === 'draft' && (
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '12px 16px', borderRadius: '10px', fontSize: '0.85rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertCircle size={16} />
+                  <span>Notice: This Job Referral Form is currently in Draft status. Submissions are paused.</span>
+                </div>
+              )}
+
               {/* ── STEP 1: CANDIDATE ── */}
               {currentStep === 1 && (
                 <div>
@@ -564,6 +668,14 @@ export default function JobReferralModal({
                       </select>
                     </div>
                   </div>
+
+                  {/* Dynamic Step 1 Custom Fields */}
+                  <DynamicFieldRenderer
+                    fields={(formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1))}
+                    values={customFields}
+                    onChange={handleCustomFieldChange}
+                    errors={fieldErrors}
+                  />
                 </div>
               )}
 
@@ -701,6 +813,14 @@ export default function JobReferralModal({
                     />
                   </div>
 
+                  {/* Dynamic Step 2 Custom Fields */}
+                  <DynamicFieldRenderer
+                    fields={(formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2)}
+                    values={customFields}
+                    onChange={handleCustomFieldChange}
+                    errors={fieldErrors}
+                  />
+
                   <div className="cc-privacy-callout">
                     <Briefcase size={20} className="cc-privacy-icon" />
                     <div>
@@ -721,11 +841,17 @@ export default function JobReferralModal({
                       <span>Recruitment Referral Privacy Notice</span>
                       <span className="cc-consent-ver">{formData.consentNoticeVersion}</span>
                     </div>
-                    <ul className="cc-consent-points">
-                      <li><strong>Purpose of Sharing:</strong> Candidate profile details are shared exclusively with {formData.companyName} talent acquisition teams for evaluation against {formData.jobRole} ({formData.jobReferenceId}).</li>
-                      <li><strong>Zero Candidate Fees:</strong> No applicant is ever charged any recruitment, exam, or placement fees under institutional ethics guidelines.</li>
-                      <li><strong>Institutional Accountability:</strong> Submissions must be verified candidates with genuine academic/professional ties to the referrer ({formData.referrerRelationship}).</li>
-                    </ul>
+                    {formConfig?.generalSettings?.consentText ? (
+                      <p style={{ margin: '8px 0', fontSize: '0.84rem', color: '#334155', lineHeight: 1.5 }}>
+                        {formConfig.generalSettings.consentText}
+                      </p>
+                    ) : (
+                      <ul className="cc-consent-points">
+                        <li><strong>Purpose of Sharing:</strong> Candidate profile details are shared exclusively with {formData.companyName} talent acquisition teams for evaluation against {formData.jobRole} ({formData.jobReferenceId}).</li>
+                        <li><strong>Zero Candidate Fees:</strong> No applicant is ever charged any recruitment, exam, or placement fees under institutional ethics guidelines.</li>
+                        <li><strong>Institutional Accountability:</strong> Submissions must be verified candidates with genuine academic/professional ties to the referrer ({formData.referrerRelationship}).</li>
+                      </ul>
+                    )}
                   </div>
 
                   <label className="cc-checkbox-label">
@@ -855,6 +981,28 @@ export default function JobReferralModal({
                       </div>
                     </div>
                   </div>
+
+                  {/* Dynamic Custom Details Review */}
+                  {Object.keys(customFields).length > 0 && (
+                    <div className="cc-review-card">
+                      <div className="cc-review-header">
+                        <div className="cc-review-title">
+                          <FileCheck size={15} className="text-purple-600" />
+                          <span>Additional Custom Details</span>
+                        </div>
+                      </div>
+                      <div className="cc-review-grid">
+                        {(formConfig?.fieldsConfig || [])
+                          .filter(f => !f.isSystem && customFields[f.fieldKey] !== undefined && customFields[f.fieldKey] !== '')
+                          .map(f => (
+                            <div key={f.fieldKey} className="cc-review-item">
+                              <span>{f.label}</span>
+                              <strong>{Array.isArray(customFields[f.fieldKey]) ? customFields[f.fieldKey].join(', ') : String(customFields[f.fieldKey])}</strong>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -149,11 +149,11 @@ const ParentSidebar = ({ isOpen, onClose }) => {
 
   const parentBusinessReferralItems = [
     { name: 'All Categories', path: '/parent/business-referral', exact: true, icon: <Layers size={16} /> },
-    { name: 'Credit Cards', path: '/parent/business-referral/credit-card', icon: <CreditCard size={16} /> },
-    { name: 'Insurance', path: '/parent/business-referral/insurance', icon: <ShieldCheck size={16} /> },
-    { name: 'Jobs', path: '/parent/business-referral/job-referral', icon: <Briefcase size={16} /> },
-    { name: 'Account Opening', path: '/parent/business-referral/account-opening', icon: <Building size={16} /> },
-    { name: 'Incentives', path: '/parent/business-referral/incentives', icon: <Award size={16} /> },
+    { name: 'Credit Card Referral', path: '/parent/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance Referral', path: '/parent/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Job Referral', path: '/parent/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Bank Account Referral', path: '/parent/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Incentives & Rules', path: '/parent/business-referral/incentives', icon: <Award size={16} /> },
     { name: 'My Submissions', path: '/parent/referrals', icon: <FileCheck size={16} /> }
   ];
 

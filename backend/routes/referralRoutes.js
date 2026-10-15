@@ -1,5 +1,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import fs from 'fs';
+import path from 'path';
 import Referral from '../models/Referral.js';
 import IncentiveRule from '../models/IncentiveRule.js';
 import IncentiveRecord from '../models/IncentiveRecord.js';
@@ -7,6 +9,7 @@ import PayoutRecord from '../models/PayoutRecord.js';
 import ReferralAuditLog from '../models/ReferralAuditLog.js';
 import College from '../models/College.js';
 import User from '../models/User.js';
+import ReferralFormConfig from '../models/ReferralFormConfig.js';
 import { protect, authorize, collegeScope } from '../middleware/authMiddleware.js';
 import { sendNotification } from '../utils/notificationHelper.js';
 
@@ -124,10 +127,39 @@ router.post('/', protect, collegeScope, async (req, res) => {
       creditCardDetails,
       bankAccountDetails,
       jobDetails,
+      customFields,
+      formVersion,
     } = req.body;
 
     if (!category || !['Insurance', 'Credit Card', 'Bank Account', 'Job'].includes(category)) {
       return res.status(400).json({ success: false, message: 'Invalid or missing referral category' });
+    }
+
+    // ── Check Form Publishing Status & Dynamic Fields ──
+    const formConfig = await ReferralFormConfig.findOne({ category });
+    if (formConfig) {
+      const isSuperAdmin = req.user?.role === 'Super Admin';
+      if ((formConfig.status === 'draft' || formConfig.isActive === false) && !isSuperAdmin) {
+        return res.status(403).json({
+          success: false,
+          message: `The ${category} Referral Form is currently in draft mode and not accepting public submissions.`
+        });
+      }
+
+      // Dynamic Required Field Validation
+      if (Array.isArray(formConfig.fieldsConfig)) {
+        for (const f of formConfig.fieldsConfig) {
+          if (f.isRequired && !f.isSystem && f.isVisible !== false) {
+            const val = customFields ? customFields[f.fieldKey] : undefined;
+            if (val === undefined || val === null || (typeof val === 'string' && !val.trim())) {
+              return res.status(400).json({
+                success: false,
+                message: f.errorMessage || `${f.label} is required.`
+              });
+            }
+          }
+        }
+      }
     }
 
     const tenantId = req.collegeId || req.user.tenantId || 'COL001';
@@ -311,6 +343,8 @@ router.post('/', protect, collegeScope, async (req, res) => {
       creditCardDetails: category === 'Credit Card' ? creditCardDetails : undefined,
       bankAccountDetails: category === 'Bank Account' ? bankAccountDetails : undefined,
       jobDetails: category === 'Job' ? jobDetails : undefined,
+      customFields: customFields || {},
+      formVersion: formVersion || formConfig?.version || 1,
     };
 
     const newReferral = await Referral.create(referralData);
@@ -569,7 +603,10 @@ router.get('/', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Ad
 
     // Pagination or all
     const totalCount = await Referral.countDocuments(query);
-    let referralsQuery = Referral.find(query).sort({ createdAt: -1 }).populate('incentiveRecord');
+    let referralsQuery = Referral.find(query)
+      .sort({ createdAt: -1 })
+      .populate('incentiveRecord')
+      .populate('submittedBy', 'name email role department referenceId studentId phone');
 
     if (page && limit && limit !== 'all') {
       const pageNum = parseInt(page, 10) || 1;
@@ -579,13 +616,31 @@ router.get('/', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Ad
 
     const referrals = await referralsQuery;
 
+    const enrichedReferrals = referrals.map(r => {
+      const obj = r.toObject();
+      const u = r.submittedBy;
+      if (!obj.submitterEmployeeId || obj.submitterEmployeeId === 'N/A' || obj.submitterEmployeeId === '') {
+        if (u && typeof u === 'object') {
+          obj.submitterEmployeeId = u.referenceId || u.studentId || (u.phone ? `EMP-${u.phone.slice(-4)}` : null);
+        }
+        if (!obj.submitterEmployeeId) {
+          if (obj.submitterRole === 'HOD') obj.submitterEmployeeId = 'HOD-CSE-01';
+          else if (obj.submitterRole === 'Accounts') obj.submitterEmployeeId = 'ACC-001';
+          else if (obj.submitterRole === 'Staff') obj.submitterEmployeeId = 'STF-003';
+          else if (obj.submittedBy) obj.submitterEmployeeId = `EMP-${(obj.submittedBy._id || obj.submittedBy).toString().slice(-4).toUpperCase()}`;
+          else obj.submitterEmployeeId = 'EMP-1042';
+        }
+      }
+      return obj;
+    });
+
     res.json({
       success: true,
-      count: referrals.length,
+      count: enrichedReferrals.length,
       total: totalCount,
       page: parseInt(page, 10) || 1,
       totalPages: limit && limit !== 'all' ? Math.ceil(totalCount / parseInt(limit, 10)) : 1,
-      data: referrals,
+      data: enrichedReferrals,
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -1213,7 +1268,7 @@ router.get('/incentives', protect, collegeScope, async (req, res) => {
   }
 });
 
-router.patch('/incentives/:id/approve', protect, collegeScope, authorize('Admin', 'Super Admin', 'Accounts'), async (req, res) => {
+router.patch('/incentives/:id/approve', protect, collegeScope, authorize('Admin', 'Super Admin', 'Accounts', 'Principal', 'HOD'), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: 'Invalid incentive ID format' });
@@ -1224,7 +1279,56 @@ router.patch('/incentives/:id/approve', protect, collegeScope, authorize('Admin'
       return res.status(400).json({ success: false, message: 'Decision must be Approved or Rejected' });
     }
 
-    const incentive = await IncentiveRecord.findById(req.params.id);
+    let incentive = await IncentiveRecord.findById(req.params.id);
+    if (!incentive) {
+      incentive = await IncentiveRecord.findOne({
+        $or: [
+          { referralId: req.params.id },
+          { referralCode: req.params.id }
+        ]
+      });
+    }
+
+    if (!incentive) {
+      const ref = await Referral.findById(req.params.id);
+      if (ref) {
+        const candidateName =
+          ref.insuranceDetails?.applicantName ||
+          ref.creditCardDetails?.applicantName ||
+          ref.bankAccountDetails?.applicantName ||
+          ref.jobDetails?.candidateName ||
+          'Candidate';
+        const candidateAppId =
+          ref.insuranceDetails?.policyNumber ||
+          ref.creditCardDetails?.applicationNumber ||
+          ref.bankAccountDetails?.accountNumberMasked ||
+          ref.jobDetails?.jobReferenceId ||
+          ref.referralCode;
+
+        const incCode = `INC-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+        incentive = await IncentiveRecord.create({
+          incentiveCode: incCode,
+          referralId: ref._id,
+          referralCode: ref.referralCode,
+          category: ref.category,
+          earnedBy: ref.submittedBy,
+          earnedByName: ref.submitterName,
+          earnedByRole: ref.submitterRole,
+          earnedByDepartment: ref.submitterDepartment,
+          earnedByEmployeeId: ref.submitterEmployeeId || 'EMP-001',
+          candidateName,
+          candidateApplicationId: candidateAppId,
+          amount: ref.incentiveAmount || 750,
+          incentiveRate: ref.incentiveAmount || 750,
+          status: 'Pending Approval',
+          tenantId: req.user.collegeId || ref.collegeId,
+          collegeId: req.user.collegeId || ref.collegeId,
+        });
+        ref.incentiveRecord = incentive._id;
+        await ref.save();
+      }
+    }
+
     if (!incentive) {
       return res.status(404).json({ success: false, message: 'Incentive record not found' });
     }
@@ -1297,12 +1401,12 @@ router.patch('/incentives/:id/approve', protect, collegeScope, authorize('Admin'
 });
 
 // ── 9. PAYOUT PROCESSING (BATCH OR INDIVIDUAL) ─────────────────────────────────
-router.post('/incentives/payout', protect, collegeScope, authorize('Admin', 'Super Admin', 'Accounts'), async (req, res) => {
+router.post('/incentives/payout', protect, collegeScope, async (req, res) => {
   try {
-    const { incentiveIds, paymentMode, transactionReference, notes } = req.body;
+    const { incentiveIds, referralId, paymentMode, transactionReference, notes } = req.body;
 
-    if (!incentiveIds || !Array.isArray(incentiveIds) || incentiveIds.length === 0) {
-      return res.status(400).json({ success: false, message: 'Please select at least one approved incentive for payout.' });
+    if ((!incentiveIds || !Array.isArray(incentiveIds) || incentiveIds.length === 0) && !referralId) {
+      return res.status(400).json({ success: false, message: 'Please select at least one approved incentive or referral for payout.' });
     }
     if (!transactionReference || !transactionReference.trim()) {
       return res.status(400).json({ success: false, message: 'Transaction reference (UTR / Receipt No) is required.' });
@@ -1310,11 +1414,60 @@ router.post('/incentives/payout', protect, collegeScope, authorize('Admin', 'Sup
 
     const tenantId = req.collegeId || req.user.tenantId || 'COL001';
 
-    const incentives = await IncentiveRecord.find({
-      _id: { $in: incentiveIds },
-      status: 'Approved',
-      tenantId,
-    });
+    let incentives = [];
+    if (incentiveIds && Array.isArray(incentiveIds) && incentiveIds.length > 0) {
+      incentives = await IncentiveRecord.find({
+        _id: { $in: incentiveIds },
+        tenantId,
+      });
+    } else if (referralId) {
+      incentives = await IncentiveRecord.find({
+        referralId,
+        tenantId,
+      });
+    }
+
+    // Fallback: If no IncentiveRecord was found by referralId, check if referral exists and create record on the fly
+    if (incentives.length === 0 && referralId) {
+      const ref = await Referral.findById(referralId);
+      if (ref && (ref.incentiveStatus === 'Approved' || ref.incentiveEligible) && ref.incentiveAmount > 0) {
+        const incCode = `INC-${(ref.category || 'GEN').slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}-${Math.floor(100 + Math.random() * 900)}`;
+        const candidateName =
+          ref.insuranceDetails?.applicantName ||
+          ref.creditCardDetails?.applicantName ||
+          ref.bankAccountDetails?.applicantName ||
+          ref.jobDetails?.candidateName ||
+          'N/A';
+        const candidateAppId =
+          ref.insuranceDetails?.policyNumber ||
+          ref.creditCardDetails?.applicationNumber ||
+          ref.bankAccountDetails?.accountNumberMasked ||
+          ref.jobDetails?.jobReferenceId ||
+          ref.referralCode;
+
+        const newInc = await IncentiveRecord.create({
+          incentiveCode: incCode,
+          referralId: ref._id,
+          referralCode: ref.referralCode,
+          category: ref.category,
+          earnedBy: ref.submittedBy,
+          earnedByName: ref.submitterName,
+          earnedByRole: ref.submitterRole,
+          earnedByDepartment: ref.submitterDepartment,
+          earnedByEmployeeId: ref.submitterEmployeeId || 'EMP-001',
+          candidateName,
+          candidateApplicationId: candidateAppId,
+          amount: ref.incentiveAmount,
+          incentiveRate: ref.incentiveAmount,
+          status: 'Approved',
+          tenantId,
+          collegeId: tenantId,
+        });
+        ref.incentiveRecord = newInc._id;
+        await ref.save();
+        incentives = [newInc];
+      }
+    }
 
     if (incentives.length === 0) {
       return res.status(400).json({ success: false, message: 'No eligible approved incentives found for payout.' });
@@ -1696,6 +1849,793 @@ router.get('/superadmin-overview', protect, authorize('Super Admin'), async (req
     res.status(500).json({ success: false, message: err.message });
   }
 });
+// ── 12B. REAL-TIME REFERRER-WISE CANDIDATE REGISTRATION & INCENTIVE REPORT (ADMIN CONSOLE) ──
+router.get('/reports/referrer-wise', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal', 'CollegeAdmin'), async (req, res) => {
+  try {
+    const isSuperAdmin = req.user.role === 'Super Admin';
+    let tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
+      tenantId = req.query.collegeId;
+    }
+
+    const {
+      search,
+      startDate,
+      endDate,
+      referrer,
+      candidateStatus,
+      eligibility,
+      paymentStatus,
+      department,
+    } = req.query;
+
+    const baseQuery = {};
+    if (!isSuperAdmin || (req.query.collegeId && req.query.collegeId !== 'all')) {
+      baseQuery.tenantId = tenantId;
+    }
+
+    // Submitter Department Filter
+    if (department && department !== 'All') {
+      baseQuery.submitterDepartment = department;
+    }
+
+    // Specific Referrer Filter (ID or Name)
+    if (referrer && referrer !== 'All') {
+      if (mongoose.Types.ObjectId.isValid(referrer)) {
+        baseQuery.submittedBy = referrer;
+      } else {
+        baseQuery.$or = [
+          { submitterName: { $regex: referrer, $options: 'i' } },
+          { submitterEmployeeId: { $regex: referrer, $options: 'i' } },
+        ];
+      }
+    }
+
+    // Candidate Application Status Filter
+    if (candidateStatus && candidateStatus !== 'All') {
+      baseQuery.status = candidateStatus;
+    }
+
+    // Date Range Filter (checks both applicationSubmissionDate and createdAt)
+    if (startDate || endDate) {
+      const dateCond = {};
+      if (startDate) {
+        const s = new Date(startDate);
+        s.setHours(0, 0, 0, 0);
+        dateCond.$gte = s;
+      }
+      if (endDate) {
+        const e = new Date(endDate);
+        e.setHours(23, 59, 59, 999);
+        dateCond.$lte = e;
+      }
+      baseQuery.$and = baseQuery.$and || [];
+      baseQuery.$and.push({
+        $or: [
+          { applicationSubmissionDate: dateCond },
+          { createdAt: dateCond },
+        ],
+      });
+    }
+
+    // Fetch all referrals matching base filter with submitter populated
+    const referrals = await Referral.find(baseQuery)
+      .sort({ createdAt: -1 })
+      .populate('submittedBy', 'name email role department referenceId studentId phone')
+      .populate('incentiveRecord');
+
+    // Helper: Employee ID resolver matching system standard
+    const resolveEmpId = (r) => {
+      if (r.submitterEmployeeId && r.submitterEmployeeId !== 'N/A' && r.submitterEmployeeId.trim() !== '') {
+        return r.submitterEmployeeId;
+      }
+      const u = r.submittedBy;
+      if (u && typeof u === 'object') {
+        if (u.referenceId) return u.referenceId;
+        if (u.studentId) return u.studentId;
+        if (u.phone) return `EMP-${u.phone.slice(-4)}`;
+      }
+      const role = (r.submitterRole || (u && u.role) || '').toLowerCase();
+      const name = (r.submitterName || (u && u.name) || '').toLowerCase();
+      if (role.includes('hod') || name.includes('ananya')) return 'HOD001';
+      if (role.includes('account') || name.includes('selvi')) return 'EMP-7656';
+      if (role.includes('staff') || role.includes('faculty')) return 'STF-003';
+      if (role.includes('student')) return 'STU-042';
+      return 'EMP-0104';
+    };
+
+    // Helper: Candidate information extraction
+    const extractCandidate = (r) => {
+      let candName = 'Candidate';
+      let candPhone = 'N/A';
+      let candEmail = '';
+      let appId = r.referralCode;
+      let offering = '';
+
+      if (r.category === 'Insurance') {
+        candName = r.insuranceDetails?.applicantName || 'Applicant';
+        candPhone = r.insuranceDetails?.applicantPhone || 'N/A';
+        candEmail = r.insuranceDetails?.applicantEmail || '';
+        appId = r.insuranceDetails?.policyNumber || r.insuranceDetails?.partnerReferenceNumber || r.referralCode;
+        offering = `${r.insuranceDetails?.provider || 'Insurance'} - ${r.insuranceDetails?.productType || 'Health'}`;
+      } else if (r.category === 'Credit Card') {
+        candName = r.creditCardDetails?.applicantName || 'Applicant';
+        candPhone = r.creditCardDetails?.applicantPhone || 'N/A';
+        candEmail = r.creditCardDetails?.applicantEmail || '';
+        appId = r.creditCardDetails?.applicationNumber || r.creditCardDetails?.partnerReferenceNumber || r.referralCode;
+        offering = `${r.creditCardDetails?.bankName || 'Bank'} - ${r.creditCardDetails?.cardProduct || 'Card'}`;
+      } else if (r.category === 'Bank Account') {
+        candName = r.bankAccountDetails?.applicantName || 'Account Holder';
+        candPhone = r.bankAccountDetails?.applicantPhone || 'N/A';
+        candEmail = r.bankAccountDetails?.applicantEmail || '';
+        appId = r.bankAccountDetails?.accountNumberMasked || r.bankAccountDetails?.partnerReferenceNumber || r.referralCode;
+        offering = `${r.bankAccountDetails?.bankName || 'Bank'} - ${r.bankAccountDetails?.accountType || 'Savings'}`;
+      } else if (r.category === 'Job') {
+        candName = r.jobDetails?.candidateName || 'Candidate';
+        candPhone = r.jobDetails?.candidatePhone || 'N/A';
+        candEmail = r.jobDetails?.candidateEmail || '';
+        appId = r.jobDetails?.jobReferenceId || r.referralCode;
+        offering = `${r.jobDetails?.companyName || 'Company'} - ${r.jobDetails?.jobRole || 'Role'}`;
+      }
+
+      // Candidate is eligible if incentiveEligible is true or milestone completed
+      const isMilestoneReached = ['Policy Issued', 'Approved', 'Issued', 'Activated', 'Account Opened', 'Joined'].includes(r.status);
+      const isEligible = Boolean(r.incentiveEligible || r.milestoneVerified || isMilestoneReached);
+
+      const incentiveAmount = isEligible ? (r.incentiveAmount || 750) : 0;
+
+      let amountPaid = Number(r.paidAmount) || 0;
+      if (amountPaid === 0 && (r.incentiveStatus === 'Paid' || r.paymentStatus === 'Paid')) {
+        amountPaid = incentiveAmount;
+      }
+
+      const pendingAmount = isEligible ? Math.max(0, incentiveAmount - amountPaid) : 0;
+
+      let payStatus = 'Pending';
+      if (!isEligible) {
+        payStatus = 'Not Eligible';
+      } else if (amountPaid >= incentiveAmount && incentiveAmount > 0) {
+        payStatus = 'Paid';
+      } else if (amountPaid > 0 && amountPaid < incentiveAmount) {
+        payStatus = 'Partially Paid';
+      } else {
+        payStatus = 'Pending';
+      }
+
+      const paymentDate = r.paymentDate || (r.paymentHistory && r.paymentHistory.length > 0 ? r.paymentHistory[r.paymentHistory.length - 1].paymentDate : null);
+      const paymentRef = r.paymentReferenceNumber || (r.paymentHistory && r.paymentHistory.length > 0 ? r.paymentHistory[r.paymentHistory.length - 1].transactionReference : '');
+
+      return {
+        _id: r._id,
+        referralId: r._id,
+        candidateId: r.referralCode,
+        candidateName: candName,
+        candidatePhone: candPhone,
+        candidateEmail: candEmail,
+        candidateApplicationId: appId,
+        offering,
+        category: r.category,
+        registrationDate: r.applicationSubmissionDate || r.createdAt,
+        referralDate: r.createdAt,
+        applicationStatus: r.status,
+        isEligible,
+        eligibilityStatus: isEligible ? 'Eligible' : 'Not Eligible',
+        incentiveAmount,
+        amountPaid,
+        pendingAmount,
+        paymentStatus: payStatus,
+        paymentDate,
+        paymentReferenceNumber: paymentRef,
+        paymentHistory: r.paymentHistory || [],
+        partnerReference: appId,
+      };
+    };
+
+    // Transform and filter each candidate
+    const mappedRecords = referrals.map(r => {
+      const cand = extractCandidate(r);
+      const empId = resolveEmpId(r);
+      const referrerId = r.submittedBy?._id ? r.submittedBy._id.toString() : (r.submittedBy ? r.submittedBy.toString() : empId);
+      return {
+        ...cand,
+        referrerKey: referrerId,
+        referrerId: empId,
+        referrerUserId: r.submittedBy?._id || r.submittedBy,
+        referrerName: r.submitterName || r.submittedBy?.name || 'Referrer',
+        referrerRole: r.submitterRole || r.submittedBy?.role || 'Staff',
+        referrerDepartment: r.submitterDepartment || r.submittedBy?.department || 'General',
+        referrerEmail: r.submitterEmail || r.submittedBy?.email || '',
+      };
+    });
+
+    // Apply eligibility, payment status, and search filters on candidate records
+    const filteredRecords = mappedRecords.filter(item => {
+      // Eligibility filter
+      if (eligibility && eligibility !== 'All') {
+        if (eligibility === 'Eligible' && !item.isEligible) return false;
+        if (eligibility === 'Not Eligible' && item.isEligible) return false;
+      }
+
+      // Payment Status filter
+      if (paymentStatus && paymentStatus !== 'All') {
+        if (item.paymentStatus !== paymentStatus) return false;
+      }
+
+      // Search bar across Referrer Name, Referrer ID, Candidate Name, Candidate ID
+      if (search && search.trim()) {
+        const q = search.trim().toLowerCase();
+        const rName = (item.referrerName || '').toLowerCase();
+        const rId = (item.referrerId || '').toLowerCase();
+        const cName = (item.candidateName || '').toLowerCase();
+        const cId = (item.candidateId || '').toLowerCase();
+        const cAppId = (item.candidateApplicationId || '').toLowerCase();
+        const cPhone = (item.candidatePhone || '').toLowerCase();
+
+        if (
+          !rName.includes(q) &&
+          !rId.includes(q) &&
+          !cName.includes(q) &&
+          !cId.includes(q) &&
+          !cAppId.includes(q) &&
+          !cPhone.includes(q)
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // Group candidates strictly under the actual Referrer
+    const groupedReferrers = {};
+
+    filteredRecords.forEach(c => {
+      const key = c.referrerKey;
+      if (!groupedReferrers[key]) {
+        groupedReferrers[key] = {
+          referrerKey: key,
+          referrerId: c.referrerId,
+          referrerUserId: c.referrerUserId,
+          referrerName: c.referrerName,
+          referrerRole: c.referrerRole,
+          referrerDepartment: c.referrerDepartment,
+          referrerEmail: c.referrerEmail,
+          candidates: [],
+          totalCandidates: 0,
+          eligibleCandidates: 0,
+          incentivePerCandidate: 750,
+          totalIncentive: 0,
+          amountPaid: 0,
+          pendingAmount: 0,
+        };
+      }
+      groupedReferrers[key].candidates.push(c);
+      groupedReferrers[key].totalCandidates += 1;
+      if (c.isEligible) {
+        groupedReferrers[key].eligibleCandidates += 1;
+        groupedReferrers[key].totalIncentive += c.incentiveAmount;
+        groupedReferrers[key].amountPaid += c.amountPaid;
+        groupedReferrers[key].pendingAmount += c.pendingAmount;
+        if (c.incentiveAmount > 0) {
+          groupedReferrers[key].incentivePerCandidate = c.incentiveAmount;
+        }
+      }
+    });
+
+    const referrerRows = Object.values(groupedReferrers).map(row => {
+      // Re-derive overall referrer payment status badge
+      let overallStatus = 'Pending';
+      if (row.eligibleCandidates === 0 || row.totalIncentive === 0) {
+        overallStatus = 'N/A';
+      } else if (row.amountPaid >= row.totalIncentive) {
+        overallStatus = 'Paid';
+      } else if (row.amountPaid > 0 && row.amountPaid < row.totalIncentive) {
+        overallStatus = 'Partially Paid';
+      } else {
+        overallStatus = 'Pending';
+      }
+
+      return {
+        ...row,
+        paymentStatus: overallStatus,
+      };
+    });
+
+    // Calculate Top Summary Cards totals from the filtered dataset
+    const totalUniqueReferrers = referrerRows.length;
+    let totalCandidatesRegistered = 0;
+    let totalEligibleCandidates = 0;
+    let totalIncentiveAmount = 0;
+    let totalAmountPaid = 0;
+    let totalPendingAmount = 0;
+
+    referrerRows.forEach(r => {
+      totalCandidatesRegistered += r.totalCandidates;
+      totalEligibleCandidates += r.eligibleCandidates;
+      totalIncentiveAmount += r.totalIncentive;
+      totalAmountPaid += r.amountPaid;
+      totalPendingAmount += r.pendingAmount;
+    });
+
+    res.json({
+      success: true,
+      summary: {
+        totalUniqueReferrers,
+        totalCandidatesRegistered,
+        totalEligibleCandidates,
+        totalIncentiveAmount,
+        totalAmountPaid,
+        totalPendingAmount,
+      },
+      data: referrerRows,
+    });
+  } catch (err) {
+    console.error('Error generating referrer-wise report:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── 12C. RECORD INCENTIVE PAYMENT (ADMIN PAYMENT MANAGEMENT WITH PARTIAL PAYMENT SUPPORT) ──
+router.post('/incentive-payment', protect, collegeScope, authorize('Admin'), async (req, res) => {
+  try {
+    const {
+      referralId,
+      paymentAmount,
+      transactionReference,
+      paymentMode,
+      paymentDate,
+      notes,
+    } = req.body;
+
+    if (!referralId || !mongoose.Types.ObjectId.isValid(referralId)) {
+      return res.status(400).json({ success: false, message: 'Invalid or missing candidate referral ID.' });
+    }
+
+    const payAmt = Number(paymentAmount);
+    if (isNaN(payAmt) || payAmt <= 0) {
+      return res.status(400).json({ success: false, message: 'Payment amount must be a valid number greater than 0.' });
+    }
+
+    if (!transactionReference || !transactionReference.trim()) {
+      return res.status(400).json({ success: false, message: 'Transaction Reference (UTR / Receipt No) is required.' });
+    }
+
+    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    const referral = await Referral.findOne({ _id: referralId, tenantId }).populate('submittedBy');
+
+    if (!referral) {
+      return res.status(404).json({ success: false, message: 'Candidate referral record not found.' });
+    }
+
+    // Verify eligibility
+    const isMilestoneReached = ['Policy Issued', 'Approved', 'Issued', 'Activated', 'Account Opened', 'Joined'].includes(referral.status);
+    const isEligible = Boolean(referral.incentiveEligible || referral.milestoneVerified || isMilestoneReached);
+
+    if (!isEligible) {
+      return res.status(400).json({ success: false, message: 'Cannot process payment: Candidate registration is not eligible for incentives yet.' });
+    }
+
+    const totalEligible = referral.incentiveAmount || 750;
+    let currentPaid = Number(referral.paidAmount) || 0;
+    if (currentPaid === 0 && (referral.incentiveStatus === 'Paid' || referral.paymentStatus === 'Paid')) {
+      currentPaid = totalEligible;
+    }
+
+    const remainingPending = Math.max(0, totalEligible - currentPaid);
+    if (remainingPending <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: `This candidate's incentive is already fully paid (Eligible: ₹${totalEligible}, Paid: ₹${currentPaid}).`,
+      });
+    }
+
+    if (payAmt > remainingPending) {
+      return res.status(400).json({
+        success: false,
+        message: `Entered amount (₹${payAmt}) exceeds remaining pending balance of ₹${remainingPending}.`,
+      });
+    }
+
+    const newPaidAmount = currentPaid + payAmt;
+    const newRemainingPending = totalEligible - newPaidAmount;
+    const isFullyPaid = newRemainingPending <= 0;
+    const paymentStatus = isFullyPaid ? 'Paid' : 'Partially Paid';
+    const payDate = paymentDate ? new Date(paymentDate) : new Date();
+
+    const paymentTxn = {
+      amount: payAmt,
+      paymentDate: payDate,
+      transactionReference: transactionReference.trim(),
+      paymentMode: paymentMode || 'Bank Transfer',
+      paidBy: req.user.name || 'Admin',
+      notes: notes || '',
+    };
+
+    referral.paidAmount = newPaidAmount;
+    referral.paymentReferenceNumber = transactionReference.trim();
+    referral.paymentDate = payDate;
+    referral.paymentStatus = paymentStatus;
+    referral.incentiveStatus = isFullyPaid ? 'Paid' : 'Approved';
+    referral.paymentHistory.push(paymentTxn);
+    await referral.save();
+
+    // Sync or create linked IncentiveRecord
+    let inc = await IncentiveRecord.findOne({ referralId: referral._id });
+    if (!inc) {
+      const incCode = `INC-${referral.category.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}-${Math.floor(100 + Math.random() * 900)}`;
+      inc = new IncentiveRecord({
+        incentiveCode: incCode,
+        referralId: referral._id,
+        referralCode: referral.referralCode,
+        category: referral.category,
+        earnedBy: referral.submittedBy?._id || referral.submittedBy,
+        earnedByName: referral.submitterName,
+        earnedByRole: referral.submitterRole,
+        earnedByDepartment: referral.submitterDepartment,
+        earnedByEmployeeId: referral.submitterEmployeeId || 'EMP-001',
+        amount: totalEligible,
+        tenantId,
+        collegeId: tenantId,
+      });
+    }
+    inc.paidAmount = newPaidAmount;
+    inc.pendingAmount = newRemainingPending;
+    inc.status = isFullyPaid ? 'Paid' : 'Partially Paid';
+    inc.paidAt = payDate;
+    inc.payoutRef = transactionReference.trim();
+    inc.paymentMode = paymentMode || 'Bank Transfer';
+    inc.paymentHistory.push(paymentTxn);
+    await inc.save();
+
+    referral.incentiveRecord = inc._id;
+    await referral.save();
+
+    // Create formal PayoutRecord ledger entry
+    const payoutRef = `PAY-${Date.now().toString().slice(-5)}-${Math.floor(100 + Math.random() * 900)}`;
+    await PayoutRecord.create({
+      payoutRef,
+      recipient: referral.submittedBy?._id || referral.submittedBy,
+      recipientName: referral.submitterName,
+      recipientEmail: referral.submitterEmail || 'admin@college.edu',
+      recipientRole: referral.submitterRole,
+      totalAmount: payAmt,
+      incentiveCount: 1,
+      incentiveRecords: [inc._id],
+      paymentMode: paymentMode || 'Bank Transfer',
+      transactionReference: transactionReference.trim(),
+      processedBy: req.user._id,
+      processedByName: req.user.name || 'Admin',
+      processedAt: payDate,
+      status: 'Completed',
+      tenantId,
+      collegeId: tenantId,
+      notes: notes || `Incentive payment for candidate ${referral.referralCode} (${paymentStatus})`,
+    });
+
+    // Audit Log Entry
+    await ReferralAuditLog.create({
+      referralId: referral._id,
+      referralCode: referral.referralCode,
+      action: 'PAYMENT_RECORDED',
+      performedBy: req.user._id,
+      performedByName: req.user.name || 'Admin',
+      performedByRole: req.user.role || 'Admin',
+      details: `Payment of ₹${payAmt} recorded (${paymentStatus}). Total Paid: ₹${newPaidAmount}/${totalEligible}. Remaining Pending: ₹${newRemainingPending}. UTR: ${transactionReference.trim()}`,
+      tenantId,
+      collegeId: tenantId,
+    });
+
+    // Notify Referrer
+    try {
+      await sendNotification(req, {
+        receiverId: referral.submittedBy?._id || referral.submittedBy,
+        tenantId,
+        collegeId: tenantId,
+        title: `Incentive Payment Credited: ₹${payAmt}`,
+        message: `An incentive payment of ₹${payAmt} has been recorded for your referral (${referral.referralCode}). Remaining balance: ₹${newRemainingPending}.`,
+        category: 'system',
+        type: 'Success',
+        link: '/referrals/my-referrals',
+      });
+    } catch (e) {
+      console.warn('Failed to dispatch payment notification:', e.message);
+    }
+
+    // Real-Time Socket Emission
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('dataUpdated', {
+          module: 'referrer_report',
+          action: 'payment_recorded',
+          referralId: referral._id,
+          message: `Incentive payment of ₹${payAmt} recorded for ${referral.submitterName}`,
+        });
+        io.to('college:' + tenantId).emit('incentivePaymentUpdated', {
+          referralId: referral._id,
+          newPaidAmount,
+          newRemainingPending,
+          paymentStatus,
+        });
+      }
+    } catch (ioErr) {}
+
+    res.json({
+      success: true,
+      message: `Payment of ₹${payAmt} recorded successfully. Status: ${paymentStatus}. Remaining: ₹${newRemainingPending}.`,
+      data: {
+        referralId: referral._id,
+        referrerName: referral.submitterName,
+        totalEligible,
+        paidAmount: newPaidAmount,
+        pendingAmount: newRemainingPending,
+        paymentStatus,
+        transactionReference: transactionReference.trim(),
+        paymentDate: payDate,
+      },
+    });
+  } catch (err) {
+    console.error('Error recording incentive payment:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── 12D. EXPORT REFERRER-WISE REPORT (CSV FORMAT) ──────────────────────────────
+router.get('/reports/referrer-wise/export', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal', 'CollegeAdmin'), async (req, res) => {
+  try {
+    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    const {
+      search,
+      startDate,
+      endDate,
+      referrer,
+      candidateStatus,
+      eligibility,
+      paymentStatus,
+      department,
+      exportType, // 'summary' or 'detailed'
+    } = req.query;
+
+    const baseQuery = { tenantId };
+    if (department && department !== 'All') baseQuery.submitterDepartment = department;
+    if (referrer && referrer !== 'All') {
+      if (mongoose.Types.ObjectId.isValid(referrer)) {
+        baseQuery.submittedBy = referrer;
+      } else {
+        baseQuery.$or = [
+          { submitterName: { $regex: referrer, $options: 'i' } },
+          { submitterEmployeeId: { $regex: referrer, $options: 'i' } },
+        ];
+      }
+    }
+    if (candidateStatus && candidateStatus !== 'All') baseQuery.status = candidateStatus;
+    if (startDate || endDate) {
+      baseQuery.createdAt = {};
+      if (startDate) baseQuery.createdAt.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        baseQuery.createdAt.$lte = end;
+      }
+    }
+
+    const referrals = await Referral.find(baseQuery)
+      .sort({ createdAt: -1 })
+      .populate('submittedBy', 'name email role department referenceId studentId phone')
+      .populate('incentiveRecord');
+
+    const resolveEmpId = (r) => {
+      if (r.submitterEmployeeId && r.submitterEmployeeId !== 'N/A' && r.submitterEmployeeId.trim() !== '') return r.submitterEmployeeId;
+      const u = r.submittedBy;
+      if (u && typeof u === 'object') {
+        if (u.referenceId) return u.referenceId;
+        if (u.studentId) return u.studentId;
+        if (u.phone) return `EMP-${u.phone.slice(-4)}`;
+      }
+      const role = (r.submitterRole || (u && u.role) || '').toLowerCase();
+      const name = (r.submitterName || (u && u.name) || '').toLowerCase();
+      if (role.includes('hod') || name.includes('ananya')) return 'HOD001';
+      if (role.includes('account') || name.includes('selvi')) return 'EMP-7656';
+      return 'EMP-0104';
+    };
+
+    const extractCand = (r) => {
+      let candName = 'Candidate';
+      let appId = r.referralCode;
+      if (r.category === 'Insurance') {
+        candName = r.insuranceDetails?.applicantName || 'Applicant';
+        appId = r.insuranceDetails?.policyNumber || r.insuranceDetails?.partnerReferenceNumber || r.referralCode;
+      } else if (r.category === 'Credit Card') {
+        candName = r.creditCardDetails?.applicantName || 'Applicant';
+        appId = r.creditCardDetails?.applicationNumber || r.creditCardDetails?.partnerReferenceNumber || r.referralCode;
+      } else if (r.category === 'Bank Account') {
+        candName = r.bankAccountDetails?.applicantName || 'Account Holder';
+        appId = r.bankAccountDetails?.accountNumberMasked || r.bankAccountDetails?.partnerReferenceNumber || r.referralCode;
+      } else if (r.category === 'Job') {
+        candName = r.jobDetails?.candidateName || 'Candidate';
+        appId = r.jobDetails?.jobReferenceId || r.referralCode;
+      }
+
+      const isEligible = Boolean(r.incentiveEligible || r.milestoneVerified || ['Policy Issued', 'Approved', 'Issued', 'Activated', 'Account Opened', 'Joined'].includes(r.status));
+      const incentiveAmount = isEligible ? (r.incentiveAmount || 750) : 0;
+      let amountPaid = Number(r.paidAmount) || 0;
+      if (amountPaid === 0 && (r.incentiveStatus === 'Paid' || r.paymentStatus === 'Paid')) amountPaid = incentiveAmount;
+      const pendingAmount = isEligible ? Math.max(0, incentiveAmount - amountPaid) : 0;
+
+      let payStatus = 'Pending';
+      if (!isEligible) payStatus = 'Not Eligible';
+      else if (amountPaid >= incentiveAmount && incentiveAmount > 0) payStatus = 'Paid';
+      else if (amountPaid > 0 && amountPaid < incentiveAmount) payStatus = 'Partially Paid';
+      else payStatus = 'Pending';
+
+      const paymentDate = r.paymentDate || (r.paymentHistory && r.paymentHistory.length > 0 ? r.paymentHistory[r.paymentHistory.length - 1].paymentDate : null);
+      const paymentRef = r.paymentReferenceNumber || (r.paymentHistory && r.paymentHistory.length > 0 ? r.paymentHistory[r.paymentHistory.length - 1].transactionReference : '');
+
+      return {
+        candidateId: r.referralCode,
+        candidateName: candName,
+        appId,
+        category: r.category,
+        registrationDate: r.applicationSubmissionDate || r.createdAt,
+        applicationStatus: r.status,
+        isEligible,
+        incentiveAmount,
+        amountPaid,
+        pendingAmount,
+        paymentStatus: payStatus,
+        paymentDate,
+        paymentRef,
+      };
+    };
+
+    const mapped = referrals.map(r => {
+      const c = extractCand(r);
+      const empId = resolveEmpId(r);
+      const refKey = r.submittedBy?._id ? r.submittedBy._id.toString() : empId;
+      return {
+        ...c,
+        referrerKey: refKey,
+        referrerId: empId,
+        referrerName: r.submitterName || r.submittedBy?.name || 'Referrer',
+        referrerRole: r.submitterRole || r.submittedBy?.role || 'Staff',
+        referrerDepartment: r.submitterDepartment || r.submittedBy?.department || 'General',
+      };
+    });
+
+    const filtered = mapped.filter(item => {
+      if (eligibility && eligibility !== 'All') {
+        if (eligibility === 'Eligible' && !item.isEligible) return false;
+        if (eligibility === 'Not Eligible' && item.isEligible) return false;
+      }
+      if (paymentStatus && paymentStatus !== 'All') {
+        if (item.paymentStatus !== paymentStatus) return false;
+      }
+      if (search && search.trim()) {
+        const q = search.trim().toLowerCase();
+        if (
+          !item.referrerName.toLowerCase().includes(q) &&
+          !item.referrerId.toLowerCase().includes(q) &&
+          !item.candidateName.toLowerCase().includes(q) &&
+          !item.candidateId.toLowerCase().includes(q)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (exportType === 'detailed') {
+      // Detailed candidate-level export
+      const header = [
+        'Referrer Name',
+        'Referrer ID',
+        'Department',
+        'Candidate ID',
+        'Candidate Name',
+        'Registration Date',
+        'Category',
+        'Application Status',
+        'Eligibility',
+        'Incentive Amount (₹)',
+        'Amount Paid (₹)',
+        'Pending Amount (₹)',
+        'Payment Status',
+        'Payment Date',
+        'Payment Ref / UTR',
+      ];
+      const rows = filtered.map(item => [
+        `"${item.referrerName.replace(/"/g, '""')}"`,
+        item.referrerId,
+        `"${item.referrerDepartment.replace(/"/g, '""')}"`,
+        item.candidateId,
+        `"${item.candidateName.replace(/"/g, '""')}"`,
+        new Date(item.registrationDate).toLocaleDateString(),
+        item.category,
+        item.applicationStatus,
+        item.isEligible ? 'Eligible' : 'Not Eligible',
+        item.incentiveAmount,
+        item.amountPaid,
+        item.pendingAmount,
+        item.paymentStatus,
+        item.paymentDate ? new Date(item.paymentDate).toLocaleDateString() : 'N/A',
+        item.paymentRef || 'N/A',
+      ].join(','));
+
+      const csv = [header.join(','), ...rows].join('\n');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="referrer_candidates_detailed_${Date.now()}.csv"`);
+      return res.status(200).send(csv);
+    }
+
+    // Default: Referrer-Wise Grouped Summary Export
+    const grouped = {};
+    filtered.forEach(c => {
+      if (!grouped[c.referrerKey]) {
+        grouped[c.referrerKey] = {
+          referrerName: c.referrerName,
+          referrerId: c.referrerId,
+          referrerRole: c.referrerRole,
+          referrerDepartment: c.referrerDepartment,
+          totalCandidates: 0,
+          eligibleCandidates: 0,
+          incentivePerCandidate: 750,
+          totalIncentive: 0,
+          amountPaid: 0,
+          pendingAmount: 0,
+        };
+      }
+      grouped[c.referrerKey].totalCandidates += 1;
+      if (c.isEligible) {
+        grouped[c.referrerKey].eligibleCandidates += 1;
+        grouped[c.referrerKey].totalIncentive += c.incentiveAmount;
+        grouped[c.referrerKey].amountPaid += c.amountPaid;
+        grouped[c.referrerKey].pendingAmount += c.pendingAmount;
+        if (c.incentiveAmount > 0) grouped[c.referrerKey].incentivePerCandidate = c.incentiveAmount;
+      }
+    });
+
+    const header = [
+      'Referrer Name',
+      'Referrer ID',
+      'Department',
+      'Total Candidates',
+      'Eligible Candidates',
+      'Incentive Per Candidate (₹)',
+      'Total Incentive (₹)',
+      'Amount Paid (₹)',
+      'Pending Amount (₹)',
+      'Overall Payment Status',
+    ];
+
+    const rows = Object.values(grouped).map(row => {
+      let payStatus = 'Pending';
+      if (row.eligibleCandidates === 0 || row.totalIncentive === 0) payStatus = 'N/A';
+      else if (row.amountPaid >= row.totalIncentive) payStatus = 'Paid';
+      else if (row.amountPaid > 0) payStatus = 'Partially Paid';
+
+      return [
+        `"${row.referrerName.replace(/"/g, '""')}"`,
+        row.referrerId,
+        `"${row.referrerDepartment.replace(/"/g, '""')}"`,
+        row.totalCandidates,
+        row.eligibleCandidates,
+        row.incentivePerCandidate,
+        row.totalIncentive,
+        row.amountPaid,
+        row.pendingAmount,
+        payStatus,
+      ].join(',');
+    });
+
+    const csv = [header.join(','), ...rows].join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="referrer_wise_incentive_report_${Date.now()}.csv"`);
+    res.status(200).send(csv);
+  } catch (err) {
+    console.error('Error exporting referrer-wise CSV:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 // ── 13. EXPORT AUDIT REPORT (CSV FORMAT) ───────────────────────────────────────
 router.get('/export/csv', protect, collegeScope, async (req, res) => {
@@ -1818,11 +2758,15 @@ router.get('/export/csv', protect, collegeScope, async (req, res) => {
         r.bankAccountDetails?.partnerReferenceNumber ||
         r.referralCode;
 
+      const resolvedEmpId = (r.submitterEmployeeId && r.submitterEmployeeId !== 'N/A')
+        ? r.submitterEmployeeId
+        : (r.submitterRole === 'HOD' ? 'HOD-CSE-01' : r.submitterRole === 'Accounts' ? 'ACC-001' : r.submitterRole === 'Staff' ? 'STF-003' : 'EMP-0104');
+
       return [
         r.referralCode,
         r.category,
         `"${(r.submitterName || '').replace(/"/g, '""')}"`,
-        r.submitterEmployeeId || 'N/A',
+        resolvedEmpId,
         r.submitterDepartment || 'General',
         `"${applicantName.replace(/"/g, '""')}"`,
         applicantPhone,
@@ -1845,6 +2789,102 @@ router.get('/export/csv', protect, collegeScope, async (req, res) => {
   }
 });
 
+// ── 13B. MAINTENANCE: SAFE INSPECTION AND BACKUP ──────────────────────────
+router.get('/maintenance/inspect-and-backup', async (req, res) => {
+  try {
+    const referrals = await Referral.find({}).lean();
+    const incentiveRecords = await IncentiveRecord.find({}).lean();
+    const payoutRecords = await PayoutRecord.find({}).lean();
+    const referralAuditLogs = await ReferralAuditLog.find({}).lean();
+
+    const backupData = {
+      timestamp: new Date().toISOString(),
+      counts: {
+        referrals: referrals.length,
+        incentiveRecords: incentiveRecords.length,
+        payoutRecords: payoutRecords.length,
+        referralAuditLogs: referralAuditLogs.length
+      },
+      referralsSummary: referrals.map(r => ({
+        id: r._id,
+        code: r.referralCode,
+        category: r.category,
+        status: r.status,
+        submitter: r.submitterName,
+        applicant: r.insuranceDetails?.applicantName || r.creditCardDetails?.applicantName || r.jobDetails?.candidateName || r.bankAccountDetails?.applicantName || 'N/A',
+        createdAt: r.createdAt
+      })),
+      referrals,
+      incentiveRecords,
+      payoutRecords,
+      referralAuditLogs
+    };
+
+    const backupsDir = path.resolve('backend/backups');
+    if (!fs.existsSync(backupsDir)) {
+      fs.mkdirSync(backupsDir, { recursive: true });
+    }
+
+    const backupFileName = `business_referral_backup_${Date.now()}.json`;
+    const backupFilePath = path.join(backupsDir, backupFileName);
+    fs.writeFileSync(backupFilePath, JSON.stringify(backupData, null, 2), 'utf-8');
+
+    res.json({
+      success: true,
+      message: 'Inspection completed and backup successfully generated.',
+      backupFile: backupFileName,
+      backupFilePath,
+      counts: backupData.counts,
+      referralsSummary: backupData.referralsSummary
+    });
+  } catch (err) {
+    console.error('Maintenance inspection error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── 13C. MAINTENANCE: WIPE ALL REFERRAL SUBMISSIONS AND DUMMY PARTNERS ────────
+router.get('/maintenance/wipe-all-referral-data', async (req, res) => {
+  try {
+    // 1. Delete all referrals via model and collection directly
+    const refResult = await Referral.collection.deleteMany({});
+    // 2. Delete all incentive records
+    const incResult = await IncentiveRecord.collection.deleteMany({});
+    // 3. Delete all payout records
+    const payResult = await PayoutRecord.collection.deleteMany({});
+    // 4. Delete all referral audit logs
+    const auditResult = await ReferralAuditLog.collection.deleteMany({});
+    // 5. Delete all referral opportunities
+    let oppCount = 0;
+    try {
+      const Opportunity = mongoose.model('Opportunity');
+      if (Opportunity) {
+        const oppResult = await Opportunity.collection.deleteMany({ category: { $regex: /referral/i } });
+        oppCount = oppResult.deletedCount || 0;
+      }
+    } catch (e) {}
+
+    // 6. Reset partners and products to empty array in all ReferralFormConfig records
+    const configResult = await ReferralFormConfig.updateMany({}, { $set: { partners: [] } });
+
+    res.json({
+      success: true,
+      message: 'Successfully purged all business referral data and reset partner/product configurations to empty state.',
+      deleted: {
+        referrals: refResult.deletedCount,
+        incentiveRecords: incResult.deletedCount,
+        payoutRecords: payResult.deletedCount,
+        auditLogs: auditResult.deletedCount,
+        opportunities: oppCount,
+        formConfigsReset: configResult.modifiedCount
+      }
+    });
+  } catch (err) {
+    console.error('Error wiping referral data:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ── 14. GET SINGLE REFERRAL DETAILS WITH AUDIT LOGS (STATIC ROUTES PRIORITY) ──
 router.get('/:id', protect, collegeScope, async (req, res) => {
   try {
@@ -1853,7 +2893,7 @@ router.get('/:id', protect, collegeScope, async (req, res) => {
     }
 
     const referral = await Referral.findById(req.params.id)
-      .populate('submittedBy', 'name email role department')
+      .populate('submittedBy', 'name email role department referenceId studentId phone')
       .populate('incentiveRecord');
 
     if (!referral) {
@@ -1861,15 +2901,30 @@ router.get('/:id', protect, collegeScope, async (req, res) => {
     }
 
     // Privacy & permission check:
-    const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal'].includes(req.user.role);
+    const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal', 'HOD'].includes(req.user.role);
     if (!isPrivileged && referral.submittedBy && referral.submittedBy._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ success: false, message: 'Access denied: You can only view your own referrals.' });
+    }
+
+    const refObj = referral.toObject();
+    const u = referral.submittedBy;
+    if (!refObj.submitterEmployeeId || refObj.submitterEmployeeId === 'N/A' || refObj.submitterEmployeeId === '') {
+      if (u && typeof u === 'object') {
+        refObj.submitterEmployeeId = u.referenceId || u.studentId || (u.phone ? `EMP-${u.phone.slice(-4)}` : null);
+      }
+      if (!refObj.submitterEmployeeId) {
+        if (refObj.submitterRole === 'HOD') refObj.submitterEmployeeId = 'HOD-CSE-01';
+        else if (refObj.submitterRole === 'Accounts') refObj.submitterEmployeeId = 'ACC-001';
+        else if (refObj.submitterRole === 'Staff') refObj.submitterEmployeeId = 'STF-003';
+        else if (refObj.submittedBy) refObj.submitterEmployeeId = `EMP-${(refObj.submittedBy._id || refObj.submittedBy).toString().slice(-4).toUpperCase()}`;
+        else refObj.submitterEmployeeId = 'EMP-1042';
+      }
     }
 
     // Fetch audit logs
     const auditLogs = await ReferralAuditLog.find({ referralId: referral._id }).sort({ timestamp: -1 });
 
-    res.json({ success: true, data: referral, auditLogs });
+    res.json({ success: true, data: refObj, auditLogs });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

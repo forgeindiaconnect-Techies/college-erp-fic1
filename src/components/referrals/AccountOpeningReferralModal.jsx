@@ -4,7 +4,8 @@ import {
   Landmark, User, Building2, Wallet, FileCheck, CheckCircle2,
   AlertCircle, Lock, ArrowRight, ArrowLeft, Copy, Check, Loader2, X, ShieldAlert
 } from 'lucide-react';
-import { submitReferral } from '../../api/index';
+import { submitReferral, getPublicReferralFormConfig } from '../../api/index';
+import DynamicFieldRenderer from './DynamicFieldRenderer';
 import './CreditCardReferralModal.css';
 
 export default function AccountOpeningReferralModal({
@@ -21,6 +22,8 @@ export default function AccountOpeningReferralModal({
   const [error, setError] = useState(null);
   const [successReferral, setSuccessReferral] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [formConfig, setFormConfig] = useState(null);
+  const [customFields, setCustomFields] = useState({});
 
   // Form State
   const [formData, setFormData] = useState({
@@ -46,16 +49,16 @@ export default function AccountOpeningReferralModal({
 
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // Participating Banks
-  const participatingBanks = [
+  // Participating Banks (Default Fallback)
+  const defaultParticipatingBanks = [
     'HDFC Bank',
     'ICICI Bank',
     'State Bank of India',
     'Axis Bank'
   ];
 
-  // Approved Institutional Products
-  const productsByAccountType = {
+  // Approved Institutional Products (Default Fallback)
+  const defaultProductsByAccountType = {
     'Student Zero-Balance': [
       'Campus Zero-Balance Student Savings',
       'Smart Student Digital Account with UPI',
@@ -87,18 +90,67 @@ export default function AccountOpeningReferralModal({
     'Other'
   ];
 
-  const accountTypesList = [
+  const defaultAccountTypesList = [
     'Student Zero-Balance',
     'Savings Account',
     'Salary Account',
     'Current Account'
   ];
 
+  const [participatingBanks, setParticipatingBanks] = useState(defaultParticipatingBanks);
+  const [productsByAccountType, setProductsByAccountType] = useState(defaultProductsByAccountType);
+  const [accountTypesList, setAccountTypesList] = useState(defaultAccountTypesList);
+  const [configLoaded, setConfigLoaded] = useState(false);
+
   useEffect(() => {
+    const fetchAccountConfig = async () => {
+      try {
+        const res = await getPublicReferralFormConfig('Bank Account');
+        if (res?.data?.success && res.data.data) {
+          setFormConfig(res.data.data);
+          if (res.data.data.partners) {
+            const partners = res.data.data.partners.filter((p) => p.isActive !== false);
+            if (partners.length > 0) {
+              setParticipatingBanks(partners.map((p) => p.name));
+            }
+
+            if (res.data.data.categoriesList && res.data.data.categoriesList.length > 0) {
+              setAccountTypesList(res.data.data.categoriesList);
+            }
+
+            const dynamicProducts = {};
+            partners.forEach((p) => {
+              (p.products || []).forEach((prod) => {
+                if (prod.isActive !== false) {
+                  const type = prod.productCategory || 'Savings Account';
+                  if (!dynamicProducts[type]) dynamicProducts[type] = [];
+                  dynamicProducts[type].push(prod.name);
+                }
+              });
+            });
+
+            // Ensure non-empty fallback for account types
+            Object.keys(defaultProductsByAccountType).forEach((type) => {
+              if (!dynamicProducts[type] || dynamicProducts[type].length === 0) {
+                dynamicProducts[type] = defaultProductsByAccountType[type];
+              }
+            });
+
+            setProductsByAccountType(dynamicProducts);
+            setConfigLoaded(true);
+          }
+        }
+      } catch (err) {
+        console.warn('Using default banking catalog:', err.message);
+      }
+    };
+
     if (isOpen) {
+      fetchAccountConfig();
       setCurrentStep(1);
       setError(null);
       setFieldErrors({});
+      setCustomFields({});
       setSuccessReferral(null);
       setCopiedCode(false);
 
@@ -131,6 +183,20 @@ export default function AccountOpeningReferralModal({
   }, [isOpen, defaultAccountType, defaultBank]);
 
   if (!isOpen) return null;
+
+  const step1CustomFields = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
+  const step2CustomFields = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2);
+
+  const handleCustomFieldChange = (fieldKey, value) => {
+    setCustomFields(prev => ({ ...prev, [fieldKey]: value }));
+    if (fieldErrors[fieldKey]) {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      });
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -174,6 +240,15 @@ export default function AccountOpeningReferralModal({
       if (!formData.city || formData.city.trim().length < 2) {
         errors.city = 'Enter the applicant’s campus location or city.';
       }
+
+      // Dynamic custom fields validation for Step 1
+      const step1Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
+      step1Custom.forEach(f => {
+        const val = customFields[f.fieldKey];
+        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
+        }
+      });
     }
 
     if (stepNumber === 2) {
@@ -183,6 +258,15 @@ export default function AccountOpeningReferralModal({
       if (!formData.accountProduct) {
         errors.accountProduct = 'Select an approved account product.';
       }
+
+      // Dynamic custom fields validation for Step 2
+      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2);
+      step2Custom.forEach(f => {
+        const val = customFields[f.fieldKey];
+        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
+        }
+      });
     }
 
     if (stepNumber === 3) {
@@ -222,6 +306,23 @@ export default function AccountOpeningReferralModal({
 
       const payload = {
         category: 'Bank Account',
+        formVersion: formConfig?.version || 1,
+        partnerName: formData.bankName,
+        productName: formData.accountProduct,
+        notes: formData.notes ? formData.notes.trim() : '',
+        customFields: customFields,
+        formData: {
+          applicantName: formData.applicantName.trim(),
+          applicantPhone: formData.applicantPhone.trim().replace(/\D/g, ''),
+          applicantEmail: formData.applicantEmail ? formData.applicantEmail.trim() : '',
+          applicantType: formData.applicantType,
+          city: formData.city.trim(),
+          bankName: formData.bankName,
+          accountType: formData.accountType,
+          accountProduct: formData.accountProduct,
+          partnerReferenceNumber: formData.partnerReferenceNumber ? formData.partnerReferenceNumber.trim() : '',
+          ...customFields
+        },
         bankAccountDetails: {
           bankName: formData.bankName,
           accountProduct: formData.accountProduct,
@@ -420,6 +521,13 @@ export default function AccountOpeningReferralModal({
                 </div>
               )}
 
+              {formConfig?.status === 'draft' && (
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '10px 14px', borderRadius: '8px', fontSize: '0.82rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertCircle size={15} />
+                  <span><strong>Draft Form Notice:</strong> This Bank Account Referral form is currently in draft mode. Submissions are restricted to administrators.</span>
+                </div>
+              )}
+
               {/* ── STEP 1: APPLICANT ── */}
               {currentStep === 1 && (
                 <div>
@@ -515,6 +623,18 @@ export default function AccountOpeningReferralModal({
                       </select>
                     </div>
                   </div>
+
+                  {/* Dynamic Custom Fields configured by Admin for Step 1 */}
+                  {step1CustomFields.length > 0 && (
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0' }}>
+                      <DynamicFieldRenderer
+                        fields={step1CustomFields}
+                        values={customFields}
+                        errors={fieldErrors}
+                        onChange={handleCustomFieldChange}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -599,6 +719,18 @@ export default function AccountOpeningReferralModal({
                     />
                   </div>
 
+                  {/* Dynamic Custom Fields configured by Admin for Step 2 */}
+                  {step2CustomFields.length > 0 && (
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0', marginBottom: '16px' }}>
+                      <DynamicFieldRenderer
+                        fields={step2CustomFields}
+                        values={customFields}
+                        errors={fieldErrors}
+                        onChange={handleCustomFieldChange}
+                      />
+                    </div>
+                  )}
+
                   <div className="cc-privacy-callout">
                     <ShieldAlert size={20} className="cc-privacy-icon" style={{ color: '#7e22ce' }} />
                     <div>
@@ -644,7 +776,9 @@ export default function AccountOpeningReferralModal({
                       }}
                     />
                     <span className="cc-checkbox-text">
-                      I confirm that the applicant has explicitly consented to share their name, contact number, and campus association with {formData.bankName} for official account opening assistance.
+                      {formConfig?.generalSettings?.consentText
+                        ? formConfig.generalSettings.consentText.replace('{partnerName}', formData.bankName || 'the partner bank')
+                        : `I confirm that the applicant has explicitly consented to share their name, contact number, and campus association with ${formData.bankName} for official account opening assistance.`}
                     </span>
                   </label>
                   {fieldErrors.consentGiven && (
@@ -749,6 +883,30 @@ export default function AccountOpeningReferralModal({
                       </div>
                     </div>
                   </div>
+
+                  {/* Dynamic Custom Fields Review Card */}
+                  {Object.keys(customFields).length > 0 && (
+                    <div className="cc-review-card">
+                      <div className="cc-review-header">
+                        <div className="cc-review-title">
+                          <Check size={15} className="text-indigo-600" />
+                          <span>Additional Custom Details</span>
+                        </div>
+                      </div>
+                      <div className="cc-review-grid">
+                        {customFieldsConfig.map(fld => {
+                          const val = customFields[fld.fieldName];
+                          if (val === undefined || val === null || val === '') return null;
+                          return (
+                            <div key={fld.fieldName} className="cc-review-item">
+                              <span>{fld.label}</span>
+                              <strong>{Array.isArray(val) ? val.join(', ') : (typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val))}</strong>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

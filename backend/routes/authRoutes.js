@@ -149,7 +149,24 @@ router.post('/login', async (req, res) => {
         }
       } catch (err) {}
 
+      let watchmanExtra = {};
+      if (user.role === 'Watchman') {
+        try {
+          const Watchman = mongoose.models.Watchman || (await import('../models/Watchman.js')).default;
+          const wDoc = await Watchman.findOne({ $or: [{ user: user._id }, { email: user.email }] });
+          if (wDoc) {
+            watchmanExtra = {
+              employeeId: wDoc.employeeId,
+              assignedGate: wDoc.assignedGate,
+              shift: wDoc.shift,
+              phone: wDoc.phone
+            };
+          }
+        } catch (e) {}
+      }
+
       res.json({
+        ...watchmanExtra,
         _id: user._id,
         userId: user._id,
         name: user.name,

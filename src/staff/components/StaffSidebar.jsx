@@ -37,11 +37,11 @@ const StaffSidebar = ({ isOpen, onClose }) => {
 
   const staffBusinessReferralItems = [
     { name: 'All Categories', path: '/staff/business-referral', exact: true, icon: <Layers size={16} /> },
-    { name: 'Credit Cards', path: '/staff/business-referral/credit-card', icon: <CreditCard size={16} /> },
-    { name: 'Insurance', path: '/staff/business-referral/insurance', icon: <ShieldCheck size={16} /> },
-    { name: 'Jobs', path: '/staff/business-referral/job-referral', icon: <Briefcase size={16} /> },
-    { name: 'Account Opening', path: '/staff/business-referral/account-opening', icon: <Building size={16} /> },
-    { name: 'Incentives', path: '/staff/business-referral/incentives', icon: <Award size={16} /> },
+    { name: 'Credit Card Referral', path: '/staff/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance Referral', path: '/staff/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Job Referral', path: '/staff/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Bank Account Referral', path: '/staff/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Incentives & Rules', path: '/staff/business-referral/incentives', icon: <Award size={16} /> },
     { name: 'My Submissions', path: '/staff/referrals', icon: <FileCheck size={16} /> }
   ];
 

@@ -3,12 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Network, Award, CreditCard, Shield, Briefcase, Landmark,
   ArrowRight, CheckCircle2, TrendingUp, Sparkles, Filter, Search,
-  DollarSign, ChevronRight, Info, ExternalLink, SlidersHorizontal,
+  DollarSign, ChevronRight, Info, ExternalLink, SlidersHorizontal, Sliders,
   Layers, Users, Check, Clock, AlertTriangle, ArrowLeft, LayoutDashboard,
   Edit, Save, RotateCcw, X
 } from 'lucide-react';
 import { getIncentiveRules } from '../../api';
 import EditCategoryModal from '../../components/referrals/EditCategoryModal';
+import BusinessReferralCategoryNav from '../../components/referrals/BusinessReferralCategoryNav';
 import { getCustomCategoryOverrides } from '../../utils/categoryConfig';
 import '../admin/UserManagementCommon.css';
 import './BusinessReferralLanding.css';
@@ -253,8 +254,8 @@ export default function BusinessReferralLanding() {
     },
     {
       id: 'account-opening',
-      title: 'Account Opening Referral',
-      subtitle: 'Digital Savings & Salary Accounts',
+      title: 'Bank Account Referral',
+      subtitle: 'Partner Banks & Account Products',
       icon: <Landmark size={26} />,
       badge: 'Instant Processing',
       badgeColor: 'purple',
@@ -281,7 +282,7 @@ export default function BusinessReferralLanding() {
     return rawCategories.map((cat) => {
       const override = customCategoryOverrides[cat.id];
       if (override) {
-        return {
+        const merged = {
           ...cat,
           ...override,
           metrics: {
@@ -291,6 +292,10 @@ export default function BusinessReferralLanding() {
           highlights: override.highlights || cat.highlights,
           tags: override.tags || cat.tags,
         };
+        if (cat.id === 'account-opening' && (!merged.title || merged.title === 'Account Opening Referral')) {
+          merged.title = 'Bank Account Referral';
+        }
+        return merged;
       }
       return cat;
     });
@@ -311,9 +316,12 @@ export default function BusinessReferralLanding() {
   });
 
   return (
-    <div className="management-page animate-fade-in">
+    <div className="management-page animate-fade-in" style={{ padding: '24px 32px' }}>
+      {/* ── Top Category Tabs Navigation ── */}
+      <BusinessReferralCategoryNav activeCategory="all" />
+
       {/* ── Real-Time ERP Header Card (Matches Screenshot 3 standard) ── */}
-      <div className="mgmt-header-card">
+      <div className="mgmt-header-card" style={{ marginBottom: '24px' }}>
         <div className="mgmt-header-bar" style={{ background: 'linear-gradient(90deg, #3730a5, #10b981, #06b6d4)' }}></div>
         
         <div className="mgmt-header-top">
@@ -341,15 +349,27 @@ export default function BusinessReferralLanding() {
             </button>
 
             {rootRole === 'superadmin' ? (
-              <button
-                type="button"
-                className="mgmt-btn-primary"
-                onClick={() => navigate('/superadmin/business-referrals')}
-                title="Open Publishing & Lead Central to Create & Edit Opportunities"
-              >
-                <Edit size={16} />
-                <span>Publishing & Opportunity Central</span>
-              </button>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="mgmt-btn-secondary"
+                  style={{ background: '#f0fdf4', color: '#15803d', borderColor: '#bbf7d0', fontWeight: 700 }}
+                  onClick={() => navigate('/superadmin/referral-settings')}
+                  title="Configure Partner Banks, Products, Fields & Incentives"
+                >
+                  <Sliders size={16} />
+                  <span>Business Referral Settings</span>
+                </button>
+                <button
+                  type="button"
+                  className="mgmt-btn-primary"
+                  onClick={() => navigate('/superadmin/business-referrals')}
+                  title="Open Publishing & Lead Central to Create & Edit Opportunities"
+                >
+                  <Edit size={16} />
+                  <span>Publishing Central</span>
+                </button>
+              </div>
             ) : rootRole === 'admin' ? (
               <button
                 type="button"

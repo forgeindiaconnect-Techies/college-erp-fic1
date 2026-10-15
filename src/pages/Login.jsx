@@ -50,6 +50,11 @@ const applySession = (userData) => {
   } else if (role === 'Placement') {
     sessionPayload.id = userData.referenceId;
     sessionPayload.department = userData.department || 'Training & Placement Cell';
+  } else if (role === 'Watchman') {
+    sessionPayload.employeeId = userData.employeeId || userData.referenceId || 'WCH-1001';
+    sessionPayload.assignedGate = userData.assignedGate || 'Main Gate 1';
+    sessionPayload.shift = userData.shift || 'Morning';
+    sessionPayload.phone = userData.phone || '';
   }
   sessionStorage.setItem(`${roleKey}_session`, JSON.stringify(sessionPayload));
 
@@ -70,11 +75,8 @@ const UnifiedLogin = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const initialRole = queryParams.get('role');
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState(initialRole || '');
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -83,25 +85,26 @@ const UnifiedLogin = () => {
     if (queryParams.get('deactivated') === 'true') {
       setError('Your college account has been deactivated. Please contact your Super Admin.');
     }
-    setEmail('');
-    setPassword('');
     setError('');
-  }, [location.search, selectedRole]);
+  }, [location.search]);
 
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
     setLoading(true);
     setError('');
 
-    if (!selectedRole) {
-      setError('Please select a User Role before logging in.');
+    const cleanEmail = (email || '').trim();
+    const cleanPassword = (password || '').trim();
+
+    if (!cleanEmail || !cleanPassword) {
+      setError('Please enter your username/email and password.');
       setLoading(false);
       return;
     }
 
     try {
-      // Try backend first
-      const res = await loginUser({ email, password });
+      // 1. Try backend authentication
+      const res = await loginUser({ email: cleanEmail, password: cleanPassword });
       const userData = res.data;
       
       // Normalize roles to safely compare them
@@ -116,25 +119,20 @@ const UnifiedLogin = () => {
       };
       
       const actualRole = roleMap[userData.role?.toLowerCase()] || userData.role;
-      const expectedRole = roleMap[selectedRole?.toLowerCase()] || selectedRole;
-      
-      // ENFORCE ROLE MATCH: Prevent cross-portal login with wrong credentials
-      if (actualRole !== expectedRole) {
-        setError(`Access Denied: These credentials are not authorized for the ${expectedRole} portal.`);
-        setLoading(false);
-        return;
-      }
       
       // If subscription is expired, redirect to upgrade
       if (userData.subscription && userData.subscription.status === 'Expired') {
-        applySession(userData); // Save session so we know who is logged in
+        applySession(userData);
         navigate('/upgrade-plan');
         return;
       }
       
-      const dest = applySession(userData);
-      if (dest) { navigate(dest); return; }
-      setError('Unknown role. Cannot redirect.');
+      const dest = applySession({ ...userData, role: actualRole });
+      if (dest) {
+        navigate(dest);
+        return;
+      }
+      setError('Unknown role assigned to this account. Cannot redirect.');
       setLoading(false);
     } catch (err) {
       // Offline / Locally provisioned user fallback (Librarians, Placement Officers, Drivers, etc.)
@@ -312,84 +310,18 @@ const UnifiedLogin = () => {
 
       <div className="login-form-section">
         <div className="login-card-container">
-          <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start', marginBottom: '1.25rem' }}>
-            <button
-              type="button"
-              onClick={() => {
-                navigate('/');
-              }}
-              className="login-back-btn"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: 'var(--bg-secondary, #f1f5f9)',
-                border: '1px solid var(--border-color, #e2e8f0)',
-                color: 'var(--text-main, #334155)',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                padding: '7px 14px',
-                borderRadius: '10px',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--primary, #3b82f6)';
-                e.currentTarget.style.color = '#ffffff';
-                e.currentTarget.style.borderColor = 'var(--primary, #3b82f6)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'var(--bg-secondary, #f1f5f9)';
-                e.currentTarget.style.color = 'var(--text-main, #334155)';
-                e.currentTarget.style.borderColor = 'var(--border-color, #e2e8f0)';
-              }}
-            >
-              <ArrowLeft size={16} />
-              <span>Back</span>
-            </button>
-          </div>
+
 
           <div className="login-card-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div style={{ padding: '16px 24px', background: '#1e293b', borderRadius: '16px', marginBottom: '20px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
               <img src="/logo.svg" alt="ERPSYS Logo" style={{ width: '140px', height: 'auto', display: 'block' }} />
             </div>
-            <h2>{initialRole ? `${initialRole} Login` : 'Welcome Back!'}</h2>
-            <p>{initialRole ? `Login to your ${initialRole} account` : 'Login to your ERP account'}</p>
+            <h2>Welcome Back!</h2>
+            <p>Login to your institution ERP account</p>
           </div>
 
           <form onSubmit={handleLogin} className="unified-form" autoComplete="off">
-            {!initialRole && (
-              <div className="input-group" style={{ marginBottom: '1.2rem' }}>
-                <label>User Role</label>
-                <CustomSelect 
-                  value={selectedRole}
-                  onChange={(e) => {
-                    setSelectedRole(e.target.value);
-                    setEmail('');
-                    setPassword('');
-                    setError('');
-                  }}
-                  options={[
-                    { value: 'Super Admin', label: 'Super Admin' },
-                    { value: 'Admin', label: 'Admin' },
-                    { value: 'Principal', label: 'Principal' },
-                    { value: 'HOD', label: 'HOD' },
-                    { value: 'Staff', label: 'Staff' },
-                    { value: 'Student', label: 'Student' },
-                    { value: 'Parent', label: 'Parent' },
-                    { value: 'Accounts', label: 'Accounts' },
-                    { value: 'Librarian', label: 'Librarian / Library' },
-                    { value: 'Placement', label: 'Placement Officer / Cell' },
-                    { value: 'Driver', label: 'Driver' },
-                    { value: 'Hostel', label: 'Hostel' }
-                  ]}
-                  placeholder="Select Role"
-                  icon={Users}
-                  required={true}
-                />
-              </div>
-            )}
+
 
             <div className="input-group">
               <label>Username / Email</label>

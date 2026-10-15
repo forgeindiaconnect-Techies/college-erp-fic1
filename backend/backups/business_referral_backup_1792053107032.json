@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-10-15T08:31:47.032Z",
+  "counts": {
+    "referrals": 0,
+    "incentiveRecords": 0,
+    "payoutRecords": 0,
+    "referralAuditLogs": 0
+  },
+  "referralsSummary": [],
+  "referrals": [],
+  "incentiveRecords": [],
+  "payoutRecords": [],
+  "referralAuditLogs": []
+}

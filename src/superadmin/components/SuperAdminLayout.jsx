@@ -21,7 +21,9 @@ import {
   ShieldCheck,
   Briefcase,
   Building,
-  FileBarChart
+  FileBarChart,
+  Sliders,
+  Trophy
 } from 'lucide-react';
 
 const SuperAdminSidebar = ({ isOpen, onClose }) => {
@@ -33,19 +35,18 @@ const SuperAdminSidebar = ({ isOpen, onClose }) => {
     setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
   };
 
-  const isBusinessReferralActive = location.pathname.startsWith('/superadmin/business-referral') || location.pathname.startsWith('/superadmin/business-referrals');
+  const isBusinessReferralActive = location.pathname.startsWith('/superadmin/business-referral') || 
+    location.pathname.startsWith('/superadmin/business-referrals') || 
+    location.pathname.startsWith('/superadmin/referral-settings');
   const isBusinessReferralExpanded = expandedGroups['Business Referral'] !== undefined
     ? expandedGroups['Business Referral']
     : isBusinessReferralActive;
 
   const superAdminBusinessReferralItems = [
-    { name: 'All Categories', path: '/superadmin/business-referral', exact: true, icon: <Layers size={16} /> },
-    { name: 'Credit Cards', path: '/superadmin/business-referral/credit-card', icon: <CreditCard size={16} /> },
-    { name: 'Insurance', path: '/superadmin/business-referral/insurance', icon: <ShieldCheck size={16} /> },
-    { name: 'Jobs', path: '/superadmin/business-referral/job-referral', icon: <Briefcase size={16} /> },
-    { name: 'Account Opening', path: '/superadmin/business-referral/account-opening', icon: <Building size={16} /> },
-    { name: 'Incentives', path: '/superadmin/business-referral/incentives', icon: <Award size={16} /> },
-    { name: 'Publishing & Lead Central', path: '/superadmin/business-referrals', icon: <FileBarChart size={16} /> }
+    { name: 'Credit Card Referral', path: '/superadmin/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance Referral', path: '/superadmin/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Job Referral', path: '/superadmin/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Bank Account Referral', path: '/superadmin/business-referral/account-opening', icon: <Building size={16} /> }
   ];
 
   const handleLogout = () => {

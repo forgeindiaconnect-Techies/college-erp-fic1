@@ -295,20 +295,20 @@ export default function ReferrerReportModal({ isOpen, onClose, referrerId, onVie
                   </span>
                 </div>
 
-                <div className="mgmt-table-wrapper" style={{ overflowX: 'auto' }}>
-                  <table className="mgmt-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <div className="mgmt-table-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+                  <table className="mgmt-table" style={{ width: '100%', minWidth: '1150px', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                     <thead>
                       <tr>
-                        <th style={{ padding: '8px 12px' }}>Ref Code</th>
-                        <th style={{ padding: '8px 12px' }}>Category</th>
-                        <th style={{ padding: '8px 12px' }}>Referred Candidate</th>
-                        <th style={{ padding: '8px 12px' }}>Application / Ref ID</th>
-                        <th style={{ padding: '8px 12px' }}>Referral Date</th>
-                        <th style={{ padding: '8px 12px' }}>Application Status</th>
-                        <th style={{ padding: '8px 12px' }}>Milestone / Eligibility</th>
-                        <th style={{ padding: '8px 12px' }}>Rate & Incentive</th>
-                        <th style={{ padding: '8px 12px' }}>Payment Status</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'center' }}>Action</th>
+                        <th style={{ padding: '8px 12px', whiteSpace: 'nowrap', minWidth: '120px' }}>Ref Code</th>
+                        <th style={{ padding: '8px 12px', whiteSpace: 'nowrap', minWidth: '120px' }}>Category</th>
+                        <th style={{ padding: '8px 12px', whiteSpace: 'nowrap', minWidth: '160px' }}>Referred Candidate</th>
+                        <th style={{ padding: '8px 12px', whiteSpace: 'nowrap', minWidth: '140px' }}>Application / Ref ID</th>
+                        <th style={{ padding: '8px 12px', whiteSpace: 'nowrap', minWidth: '120px' }}>Referral Date</th>
+                        <th style={{ padding: '8px 12px', whiteSpace: 'nowrap', minWidth: '130px' }}>Application Status</th>
+                        <th style={{ padding: '8px 12px', whiteSpace: 'nowrap', minWidth: '140px' }}>Milestone / Eligibility</th>
+                        <th style={{ padding: '8px 12px', whiteSpace: 'nowrap', minWidth: '130px' }}>Rate & Incentive</th>
+                        <th style={{ padding: '8px 12px', whiteSpace: 'nowrap', minWidth: '120px' }}>Payment Status</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'center', whiteSpace: 'nowrap', minWidth: '120px' }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>

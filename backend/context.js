@@ -13,7 +13,7 @@ mongoose.plugin((schema) => {
 
   // ONLY global system models across all tenants
   const globalModels = [
-    'College', 'SystemSetting', 'User', 'Subscription', 'LoginLog'
+    'College', 'SystemSetting', 'User', 'Subscription', 'LoginLog', 'ReferralFormConfig', 'ReferralConfigAudit'
   ];
 
   queryMethods.forEach(method => {

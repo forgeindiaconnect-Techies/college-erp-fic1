@@ -4,7 +4,7 @@ import { SettingsContext } from '../../App';
 import { 
   X, LayoutDashboard, Building2, GraduationCap, Users, Heart, BookOpen, 
   Calendar, CalendarCheck, FileSpreadsheet, BookOpenCheck, Inbox, FileBarChart, 
-  ClipboardList, Megaphone, ShieldCheck, Settings, ChevronRight, ChevronDown, 
+  ClipboardList, Megaphone, ShieldCheck, Shield, Settings, ChevronRight, ChevronDown, 
   Wallet, Activity, PieChart, LogOut, Library, Bus, Building, Briefcase, Bot, Layers, Clock, Award, Network,
   CreditCard
 } from 'lucide-react';
@@ -27,11 +27,11 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const adminBusinessReferralItems = [
     { name: 'All Categories', path: '/admin/business-referral', exact: true, icon: <Layers size={16} /> },
-    { name: 'Credit Cards', path: '/admin/business-referral/credit-card', icon: <CreditCard size={16} /> },
-    { name: 'Insurance', path: '/admin/business-referral/insurance', icon: <ShieldCheck size={16} /> },
-    { name: 'Jobs', path: '/admin/business-referral/job-referral', icon: <Briefcase size={16} /> },
-    { name: 'Account Opening', path: '/admin/business-referral/account-opening', icon: <Building size={16} /> },
-    { name: 'Incentives', path: '/admin/business-referral/incentives', icon: <Award size={16} /> },
+    { name: 'Credit Card Referral', path: '/admin/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance Referral', path: '/admin/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Job Referral', path: '/admin/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Bank Account Referral', path: '/admin/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Incentives & Rules', path: '/admin/business-referral/incentives', icon: <Award size={16} /> },
     { name: 'Management Console', path: '/admin/business-referrals', icon: <FileBarChart size={16} /> }
   ];
 
@@ -55,7 +55,8 @@ const Sidebar = ({ isOpen, onClose }) => {
         { name: 'Parents', path: '/admin/parents', icon: <Heart size={20} /> },
         { name: 'Drivers', path: '/admin/drivers', icon: <Bus size={20} /> },
         { name: 'Library', path: '/admin/librarian-management', icon: <Library size={20} /> },
-        { name: 'Placement', path: '/admin/placement-management', icon: <Briefcase size={20} /> }
+        { name: 'Placement', path: '/admin/placement-management', icon: <Briefcase size={20} /> },
+        { name: 'Watchman Management', path: '/admin/watchman-management', icon: <Shield size={20} /> }
       ]
     },
     {

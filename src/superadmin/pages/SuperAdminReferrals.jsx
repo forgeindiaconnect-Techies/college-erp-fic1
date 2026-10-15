@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Building2, Award, DollarSign, TrendingUp, Users, CheckCircle2,
   Clock, ArrowRight, RefreshCw, Filter, Search, Globe, ChevronDown,
   Sparkles, X, Plus, Shield, CreditCard, Landmark, Briefcase, Eye,
-  Play, Pause, AlertCircle, FileText, Download, Check, Edit, ChevronRight
+  Play, Pause, AlertCircle, FileText, Download, Check, Edit, ChevronRight,
+  Sliders, Layers
 } from 'lucide-react';
 import {
   getSuperAdminReferralOverview,
@@ -23,9 +25,14 @@ import '../../pages/referrals/AdminReferralManagement.css';
 import './SuperAdminDashboard.css';
 
 export default function SuperAdminReferrals() {
-  const [activeModule, setActiveModule] = useState('Insurance'); // 'Insurance' | 'Credit Card' | 'Bank Account' | 'Job Referral' | 'colleges'
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialModule = searchParams.get('tab') === 'colleges' ? 'colleges' : 'Insurance';
+  const [activeModule, setActiveModule] = useState(initialModule); // 'Insurance' | 'Credit Card' | 'Bank Account' | 'Job Referral' | 'colleges'
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Modal Tab navigation
+  const [oppModalTab, setOppModalTab] = useState('details'); // 'details' | 'benefits' | 'form' | 'incentives'
 
   // Multi-tenant & Overview
   const [overviewData, setOverviewData] = useState(null);
@@ -33,6 +40,25 @@ export default function SuperAdminReferrals() {
   const [searchQuery, setSearchQuery] = useState('');
   const [lastSyncTime, setLastSyncTime] = useState(new Date());
   const [toastMessage, setToastMessage] = useState(null);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'colleges') {
+      setActiveModule('colleges');
+    } else if (tab && ['Insurance', 'Credit Card', 'Bank Account', 'Job Referral'].includes(tab)) {
+      setActiveModule(tab);
+    }
+  }, [searchParams]);
+
+  const handleSwitchModule = (mod) => {
+    setActiveModule(mod);
+    setSubCategoryFilter('All');
+    if (mod === 'colleges') {
+      setSearchParams({ tab: 'colleges' });
+    } else {
+      setSearchParams({ tab: mod });
+    }
+  };
 
   // Opportunities State
   const [opportunities, setOpportunities] = useState([]);
@@ -184,6 +210,7 @@ export default function SuperAdminReferrals() {
       },
       formSchema: [],
     });
+    setOppModalTab('details');
     setShowOpportunityModal(true);
   };
 
@@ -212,6 +239,7 @@ export default function SuperAdminReferrals() {
       },
       formSchema: opp.formSchema || [],
     });
+    setOppModalTab('details');
     setShowOpportunityModal(true);
   };
 
@@ -470,11 +498,11 @@ export default function SuperAdminReferrals() {
         </div>
       </div>
 
-      {/* ── 4 SEPARATE MODULE NAVIGATION TABS ── */}
+      {/* ── 5 SEPARATE MODULE NAVIGATION TABS ── */}
       <div className="opp-module-tabs">
         <button
           className={`opp-module-tab ${activeModule === 'Insurance' ? 'active' : ''}`}
-          onClick={() => { setActiveModule('Insurance'); setSubCategoryFilter('All'); }}
+          onClick={() => handleSwitchModule('Insurance')}
         >
           <Shield size={18} />
           <span>Insurance Management</span>
@@ -483,7 +511,7 @@ export default function SuperAdminReferrals() {
 
         <button
           className={`opp-module-tab ${activeModule === 'Credit Card' ? 'active' : ''}`}
-          onClick={() => { setActiveModule('Credit Card'); setSubCategoryFilter('All'); }}
+          onClick={() => handleSwitchModule('Credit Card')}
         >
           <CreditCard size={18} />
           <span>Credit Card Management</span>
@@ -492,7 +520,7 @@ export default function SuperAdminReferrals() {
 
         <button
           className={`opp-module-tab ${activeModule === 'Bank Account' ? 'active' : ''}`}
-          onClick={() => { setActiveModule('Bank Account'); setSubCategoryFilter('All'); }}
+          onClick={() => handleSwitchModule('Bank Account')}
         >
           <Landmark size={18} />
           <span>Account Opening Management</span>
@@ -501,7 +529,7 @@ export default function SuperAdminReferrals() {
 
         <button
           className={`opp-module-tab ${activeModule === 'Job Referral' ? 'active' : ''}`}
-          onClick={() => { setActiveModule('Job Referral'); setSubCategoryFilter('All'); }}
+          onClick={() => handleSwitchModule('Job Referral')}
         >
           <Briefcase size={18} />
           <span>Job Referral Management</span>
@@ -510,7 +538,11 @@ export default function SuperAdminReferrals() {
 
         <button
           className={`opp-module-tab ${activeModule === 'colleges' ? 'active' : ''}`}
-          onClick={() => setActiveModule('colleges')}
+          onClick={() => handleSwitchModule('colleges')}
+          style={{
+            borderColor: activeModule === 'colleges' ? '#3b82f6' : undefined,
+            fontWeight: 700
+          }}
         >
           <Building2 size={18} />
           <span>College Multi-Tenant Lead Central</span>
@@ -878,36 +910,44 @@ export default function SuperAdminReferrals() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                background: 'linear-gradient(135deg, #1e293b, #334155)',
-                color: '#fff',
-                padding: '14px 20px',
-                borderRadius: '12px',
+                background: 'var(--bg-card, #ffffff)',
+                border: '1px solid var(--border-color, #e2e8f0)',
+                color: 'var(--text-main, #0f172a)',
+                padding: '16px 20px',
+                borderRadius: '14px',
                 marginBottom: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                flexWrap: 'wrap',
+                gap: '12px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Building2 size={22} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Building2 size={22} />
+                  </div>
                   <div>
-                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Managing Institution:</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Managing Multi-Tenant Institution</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
                       {selectedCollegeObj ? (selectedCollegeObj.name || selectedCollegeObj.collegeName) : 'College'}
                     </div>
                   </div>
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => setSelectedCollegeId('ALL')}
                   style={{
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    padding: '8px 14px',
-                    background: 'rgba(255,255,255,0.1)',
-                    border: '1px solid rgba(255,255,255,0.2)',
+                    padding: '8px 16px',
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
                     borderRadius: '8px',
-                    color: '#fff',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
+                    color: '#334155',
+                    fontSize: '0.86rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
                   }}
                 >
                   <Globe size={16} />
@@ -935,197 +975,392 @@ export default function SuperAdminReferrals() {
               </button>
             </div>
 
+            {/* Modal Tabs Navigation */}
+            <div style={{
+              display: 'flex',
+              gap: '4px',
+              borderBottom: '1px solid #e2e8f0',
+              padding: '0 20px',
+              background: '#f8fafc',
+              overflowX: 'auto'
+            }}>
+              <button
+                type="button"
+                onClick={() => setOppModalTab('details')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '10px 14px',
+                  border: 'none',
+                  borderBottom: oppModalTab === 'details' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                  background: 'transparent',
+                  color: oppModalTab === 'details' ? '#2563eb' : '#64748b',
+                  fontWeight: oppModalTab === 'details' ? 700 : 500,
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <FileText size={15} />
+                <span>1. Opportunity Details</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOppModalTab('benefits')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '10px 14px',
+                  border: 'none',
+                  borderBottom: oppModalTab === 'benefits' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                  background: 'transparent',
+                  color: oppModalTab === 'benefits' ? '#2563eb' : '#64748b',
+                  fontWeight: oppModalTab === 'benefits' ? 700 : 500,
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Award size={15} />
+                <span>2. Benefits & Eligibility</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOppModalTab('form')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '10px 14px',
+                  border: 'none',
+                  borderBottom: oppModalTab === 'form' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                  background: 'transparent',
+                  color: oppModalTab === 'form' ? '#2563eb' : '#64748b',
+                  fontWeight: oppModalTab === 'form' ? 700 : 500,
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Sliders size={15} />
+                <span>3. Form Fields Builder</span>
+                <span style={{
+                  fontSize: '0.72rem',
+                  background: oppModalTab === 'form' ? '#2563eb' : '#e2e8f0',
+                  color: oppModalTab === 'form' ? '#ffffff' : '#334155',
+                  padding: '2px 7px',
+                  borderRadius: '10px',
+                  fontWeight: 700
+                }}>
+                  {oppFormData.formSchema?.length || 0} fields
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOppModalTab('incentives')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '10px 14px',
+                  border: 'none',
+                  borderBottom: oppModalTab === 'incentives' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                  background: 'transparent',
+                  color: oppModalTab === 'incentives' ? '#2563eb' : '#64748b',
+                  fontWeight: oppModalTab === 'incentives' ? 700 : 500,
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <DollarSign size={15} />
+                <span>4. Incentive & Rewards</span>
+              </button>
+            </div>
+
             <form onSubmit={handleSaveOpportunity} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-              <div className="ref-modal-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+              <div className="ref-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                {/* ── TAB 1: DETAILS ── */}
+                {oppModalTab === 'details' && (
                   <div>
-                    <label className="ref-form-label">Opportunity Title *</label>
-                    <input
-                      type="text"
-                      className="ref-input"
-                      placeholder="e.g. Star Comprehensive Health Insurance"
-                      value={oppFormData.title}
-                      onChange={(e) => setOppFormData({ ...oppFormData, title: e.target.value })}
-                      required
-                    />
-                  </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                      <div>
+                        <label className="ref-form-label">Opportunity Title *</label>
+                        <input
+                          type="text"
+                          className="ref-input"
+                          placeholder="e.g. Star Comprehensive Health Insurance"
+                          value={oppFormData.title}
+                          onChange={(e) => setOppFormData({ ...oppFormData, title: e.target.value })}
+                          required
+                        />
+                      </div>
 
-                  <div>
-                    <label className="ref-form-label">Partner / Provider / Bank / Company *</label>
-                    <input
-                      type="text"
-                      className="ref-input"
-                      placeholder="e.g. Star Health / HDFC Bank / TCS"
-                      value={oppFormData.providerName}
-                      onChange={(e) => setOppFormData({ ...oppFormData, providerName: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
+                      <div>
+                        <label className="ref-form-label">Partner / Provider / Bank / Company *</label>
+                        <input
+                          type="text"
+                          className="ref-input"
+                          placeholder="e.g. Star Health / HDFC Bank / TCS"
+                          value={oppFormData.providerName}
+                          onChange={(e) => setOppFormData({ ...oppFormData, providerName: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                  <div>
-                    <label className="ref-form-label">Sub-Category / Specific Product *</label>
-                    <input
-                      type="text"
-                      className="ref-input"
-                      placeholder="e.g. Term Life Insurance, Cashback Card, Savings Account"
-                      value={oppFormData.subCategory}
-                      onChange={(e) => setOppFormData({ ...oppFormData, subCategory: e.target.value })}
-                      required
-                    />
-                  </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                      <div>
+                        <label className="ref-form-label">Sub-Category / Specific Product *</label>
+                        <input
+                          type="text"
+                          className="ref-input"
+                          placeholder="e.g. Term Life Insurance, Cashback Card, Savings Account"
+                          value={oppFormData.subCategory}
+                          onChange={(e) => setOppFormData({ ...oppFormData, subCategory: e.target.value })}
+                          required
+                        />
+                      </div>
 
-                  <div>
-                    <label className="ref-form-label">Publishing Status</label>
-                    <select
-                      className="ref-select"
-                      value={oppFormData.status}
-                      onChange={(e) => setOppFormData({ ...oppFormData, status: e.target.value })}
-                    >
-                      <option value="Published">Published (Live to Applicants)</option>
-                      <option value="Draft">Save as Draft</option>
-                      <option value="Paused">Paused</option>
-                      <option value="Closed">Closed</option>
-                    </select>
-                  </div>
-                </div>
+                      <div>
+                        <label className="ref-form-label">Publishing Status</label>
+                        <select
+                          className="ref-select"
+                          value={oppFormData.status}
+                          onChange={(e) => setOppFormData({ ...oppFormData, status: e.target.value })}
+                        >
+                          <option value="Published">Published (Live to Applicants)</option>
+                          <option value="Draft">Save as Draft</option>
+                          <option value="Paused">Paused</option>
+                          <option value="Closed">Closed</option>
+                        </select>
+                      </div>
+                    </div>
 
-                <div className="ref-form-group">
-                  <label className="ref-form-label">Opportunity Description *</label>
-                  <textarea
-                    rows={3}
-                    className="ref-textarea"
-                    placeholder="Provide a compelling overview of this product, what applicants receive, and provider credentials..."
-                    value={oppFormData.description}
-                    onChange={(e) => setOppFormData({ ...oppFormData, description: e.target.value })}
-                    required
-                  />
-                </div>
-
-                {/* Benefits & Highlights */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                  <div>
-                    <label className="ref-form-label">Key Benefits (one per line)</label>
-                    <textarea
-                      rows={3}
-                      className="ref-textarea"
-                      placeholder="Cashless in 14,000+ hospitals&#10;5% cashback on Swiggy & Zomato&#10;Zero joining fee"
-                      value={oppFormData.benefits}
-                      onChange={(e) => setOppFormData({ ...oppFormData, benefits: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="ref-form-label">Key Highlights / Badges (one per line)</label>
-                    <textarea
-                      rows={3}
-                      className="ref-textarea"
-                      placeholder="Instant Approval&#10;Zero Annual Fee&#10;₹5 Lakh Coverage"
-                      value={oppFormData.keyHighlights}
-                      onChange={(e) => setOppFormData({ ...oppFormData, keyHighlights: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                {/* Eligibility & Requirements */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                  <div>
-                    <label className="ref-form-label">Eligibility Criteria</label>
-                    <textarea
-                      rows={2}
-                      className="ref-textarea"
-                      placeholder="e.g. Age 18-65. Salaried monthly income ₹35,000+"
-                      value={oppFormData.eligibilityCriteria}
-                      onChange={(e) => setOppFormData({ ...oppFormData, eligibilityCriteria: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="ref-form-label">Requirements / Documents (one per line)</label>
-                    <textarea
-                      rows={2}
-                      className="ref-textarea"
-                      placeholder="Aadhaar Card&#10;PAN Card&#10;Last 3 months salary slip"
-                      value={oppFormData.requirements}
-                      onChange={(e) => setOppFormData({ ...oppFormData, requirements: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                {/* Dates & Targeting */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                  <div>
-                    <label className="ref-form-label">Application Start Date</label>
-                    <input
-                      type="date"
-                      className="ref-input"
-                      value={oppFormData.startDate}
-                      onChange={(e) => setOppFormData({ ...oppFormData, startDate: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="ref-form-label">Closing Date (Leave blank for ongoing)</label>
-                    <input
-                      type="date"
-                      className="ref-input"
-                      value={oppFormData.endDate}
-                      onChange={(e) => setOppFormData({ ...oppFormData, endDate: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                {/* Incentive Configuration Box */}
-                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px', marginBottom: '18px' }}>
-                  <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#166534', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <DollarSign size={16} /> Applicable Incentive Rule & Outcome Milestone
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label className="ref-form-label" style={{ color: '#14532d' }}>Trigger Milestone *</label>
-                      <input
-                        type="text"
-                        className="ref-input"
-                        placeholder="e.g. Policy Issued, Card Activated, Account Opened, Joined"
-                        value={oppFormData.incentiveConfig.milestone}
-                        onChange={(e) => setOppFormData({
-                          ...oppFormData,
-                          incentiveConfig: { ...oppFormData.incentiveConfig, milestone: e.target.value }
-                        })}
+                    <div className="ref-form-group">
+                      <label className="ref-form-label">Opportunity Description *</label>
+                      <textarea
+                        rows={3}
+                        className="ref-textarea"
+                        placeholder="Provide a compelling overview of this product, what applicants receive, and provider credentials..."
+                        value={oppFormData.description}
+                        onChange={(e) => setOppFormData({ ...oppFormData, description: e.target.value })}
                         required
                       />
                     </div>
-                    <div>
-                      <label className="ref-form-label" style={{ color: '#14532d' }}>Reward Amount (₹) *</label>
-                      <input
-                        type="number"
-                        className="ref-input"
-                        value={oppFormData.incentiveConfig.amount}
-                        onChange={(e) => setOppFormData({
-                          ...oppFormData,
-                          incentiveConfig: { ...oppFormData.incentiveConfig, amount: Number(e.target.value) }
-                        })}
-                        required
-                      />
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                      <div>
+                        <label className="ref-form-label">Application Start Date</label>
+                        <input
+                          type="date"
+                          className="ref-input"
+                          value={oppFormData.startDate}
+                          onChange={(e) => setOppFormData({ ...oppFormData, startDate: e.target.value })}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="ref-form-label">Closing Date (Leave blank for ongoing)</label>
+                        <input
+                          type="date"
+                          className="ref-input"
+                          value={oppFormData.endDate}
+                          onChange={(e) => setOppFormData({ ...oppFormData, endDate: e.target.value })}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* ── FORM BUILDER INTEGRATION ── */}
-                <FormBuilderEditor
-                  schema={oppFormData.formSchema}
-                  onChange={(updatedSchema) => setOppFormData({ ...oppFormData, formSchema: updatedSchema })}
-                />
+                {/* ── TAB 2: BENEFITS & ELIGIBILITY ── */}
+                {oppModalTab === 'benefits' && (
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                      <div>
+                        <label className="ref-form-label">Key Benefits (one per line)</label>
+                        <textarea
+                          rows={4}
+                          className="ref-textarea"
+                          placeholder="Cashless in 14,000+ hospitals&#10;5% cashback on Swiggy & Zomato&#10;Zero joining fee"
+                          value={oppFormData.benefits}
+                          onChange={(e) => setOppFormData({ ...oppFormData, benefits: e.target.value })}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="ref-form-label">Key Highlights / Badges (one per line)</label>
+                        <textarea
+                          rows={4}
+                          className="ref-textarea"
+                          placeholder="Instant Approval&#10;Zero Annual Fee&#10;₹5 Lakh Coverage"
+                          value={oppFormData.keyHighlights}
+                          onChange={(e) => setOppFormData({ ...oppFormData, keyHighlights: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                      <div>
+                        <label className="ref-form-label">Eligibility Criteria</label>
+                        <textarea
+                          rows={3}
+                          className="ref-textarea"
+                          placeholder="e.g. Age 18-65. Salaried monthly income ₹35,000+"
+                          value={oppFormData.eligibilityCriteria}
+                          onChange={(e) => setOppFormData({ ...oppFormData, eligibilityCriteria: e.target.value })}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="ref-form-label">Requirements / Documents (one per line)</label>
+                        <textarea
+                          rows={3}
+                          className="ref-textarea"
+                          placeholder="Aadhaar Card&#10;PAN Card&#10;Last 3 months salary slip"
+                          value={oppFormData.requirements}
+                          onChange={(e) => setOppFormData({ ...oppFormData, requirements: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── TAB 3: FORM BUILDER INTEGRATION ── */}
+                {oppModalTab === 'form' && (
+                  <div>
+                    <div style={{
+                      background: '#eff6ff',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '10px',
+                      padding: '12px 16px',
+                      marginBottom: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px'
+                    }}>
+                      <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#2563eb', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Sliders size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1e3a8a' }}>
+                          Integrated Opportunity Form Fields Builder
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#3b82f6' }}>
+                          Add, edit, or customize fields required from applicants when applying for this {oppFormData.category} opportunity.
+                        </div>
+                      </div>
+                    </div>
+
+                    <FormBuilderEditor
+                      schema={oppFormData.formSchema}
+                      onChange={(updatedSchema) => setOppFormData({ ...oppFormData, formSchema: updatedSchema })}
+                    />
+                  </div>
+                )}
+
+                {/* ── TAB 4: INCENTIVES & RULES ── */}
+                {oppModalTab === 'incentives' && (
+                  <div>
+                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px', marginBottom: '18px' }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#166534', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <DollarSign size={18} /> Applicable Incentive Rule & Outcome Milestone
+                      </div>
+                      <p style={{ margin: '0 0 14px 0', fontSize: '0.82rem', color: '#15803d' }}>
+                        Define the milestone condition that triggers the incentive payout and the reward amount per successful applicant referral.
+                      </p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                        <div>
+                          <label className="ref-form-label" style={{ color: '#14532d' }}>Trigger Milestone *</label>
+                          <input
+                            type="text"
+                            className="ref-input"
+                            placeholder="e.g. Policy Issued, Card Activated, Account Opened, Joined"
+                            value={oppFormData.incentiveConfig.milestone}
+                            onChange={(e) => setOppFormData({
+                              ...oppFormData,
+                              incentiveConfig: { ...oppFormData.incentiveConfig, milestone: e.target.value }
+                            })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="ref-form-label" style={{ color: '#14532d' }}>Reward Amount (₹) *</label>
+                          <input
+                            type="number"
+                            className="ref-input"
+                            value={oppFormData.incentiveConfig.amount}
+                            onChange={(e) => setOppFormData({
+                              ...oppFormData,
+                              incentiveConfig: { ...oppFormData.incentiveConfig, amount: Number(e.target.value) }
+                            })}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="ref-form-label" style={{ color: '#14532d' }}>Verification Terms & Conditions</label>
+                        <input
+                          type="text"
+                          className="ref-input"
+                          placeholder="e.g. Incentive calculated and approved upon official milestone verification."
+                          value={oppFormData.incentiveConfig.terms || ''}
+                          onChange={(e) => setOppFormData({
+                            ...oppFormData,
+                            incentiveConfig: { ...oppFormData.incentiveConfig, terms: e.target.value }
+                          })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="ref-modal-footer">
-                <button type="button" className="ref-btn-secondary" onClick={() => setShowOpportunityModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="ref-btn-primary">
-                  <Check size={16} /> Save & {oppFormData.status === 'Published' ? 'Publish' : 'Save as Draft'}
-                </button>
+              <div className="ref-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {oppModalTab !== 'details' && (
+                    <button
+                      type="button"
+                      className="ref-btn-secondary"
+                      onClick={() => {
+                        if (oppModalTab === 'benefits') setOppModalTab('details');
+                        else if (oppModalTab === 'form') setOppModalTab('benefits');
+                        else if (oppModalTab === 'incentives') setOppModalTab('form');
+                      }}
+                    >
+                      ← Previous Tab
+                    </button>
+                  )}
+                  {oppModalTab !== 'incentives' && (
+                    <button
+                      type="button"
+                      className="ref-btn-secondary"
+                      style={{ background: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8', fontWeight: 600 }}
+                      onClick={() => {
+                        if (oppModalTab === 'details') setOppModalTab('benefits');
+                        else if (oppModalTab === 'benefits') setOppModalTab('form');
+                        else if (oppModalTab === 'form') setOppModalTab('incentives');
+                      }}
+                    >
+                      Next Tab →
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" className="ref-btn-secondary" onClick={() => setShowOpportunityModal(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="ref-btn-primary">
+                    <Check size={16} /> Save & {oppFormData.status === 'Published' ? 'Publish' : 'Save as Draft'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

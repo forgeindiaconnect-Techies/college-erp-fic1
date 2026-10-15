@@ -6,6 +6,7 @@ import {
   FileCheck2, ShieldCheck, Loader2, Edit
 } from 'lucide-react';
 import { getIncentiveRules } from '../../api';
+import BusinessReferralCategoryNav from '../../components/referrals/BusinessReferralCategoryNav';
 import '../admin/UserManagementCommon.css';
 import './BusinessReferralCategory.css';
 
@@ -133,9 +134,12 @@ export default function BusinessReferralIncentives() {
   const isRuleApproved = matchedRule && (matchedRule.approvalStatus === 'Approved' || (!matchedRule.approvalStatus && matchedRule.isActive));
 
   return (
-    <div className="management-page animate-fade-in">
+    <div className="management-page animate-fade-in" style={{ padding: '24px 32px' }}>
+      {/* ── Top Category Tabs Navigation ── */}
+      <BusinessReferralCategoryNav activeCategory="incentives" />
+
       {/* ── Real-Time ERP Header Card (Matches Screenshot 3 standard) ── */}
-      <div className="mgmt-header-card">
+      <div className="mgmt-header-card" style={{ marginBottom: '24px' }}>
         <div className="mgmt-header-bar" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #10b981)' }}></div>
         
         <div className="mgmt-header-top">

@@ -88,12 +88,30 @@ const incentiveRecordSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    paidAmount: {
+      type: Number,
+      default: 0,
+    },
+    pendingAmount: {
+      type: Number,
+      default: 0,
+    },
     status: {
       type: String,
-      enum: ['Calculated', 'Pending Approval', 'Approved', 'Rejected', 'Processing', 'Paid', 'Reversed'],
+      enum: ['Calculated', 'Pending Approval', 'Approved', 'Rejected', 'Processing', 'Partially Paid', 'Paid', 'Reversed'],
       default: 'Pending Approval',
       index: true,
     },
+    paymentHistory: [
+      {
+        amount: { type: Number, required: true },
+        paymentDate: { type: Date, default: Date.now },
+        transactionReference: { type: String, default: '' },
+        paymentMode: { type: String, default: 'Bank Transfer' },
+        paidBy: { type: String, default: 'Admin' },
+        notes: { type: String, default: '' },
+      },
+    ],
 
     // ── Immutable Snapshot of the Applied Rule ──
     ruleSnapshot: {

@@ -10,7 +10,7 @@ import {
 import {
   getMyReferrals, getMyReferralStats, submitReferral, getReferralDetails,
   getPublishedOpportunities, getPublishedOpportunityDetails, applyForOpportunity,
-  getMyOpportunityApplications
+  getMyOpportunityApplications, processIncentivePayout
 } from '../../api/index';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import DynamicFormRenderer from './DynamicFormRenderer';
@@ -72,6 +72,52 @@ export default function PersonalReferrals() {
   const [lastSyncTime, setLastSyncTime] = useState(new Date());
   const [toastMessage, setToastMessage] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+
+  // Payout Settlement Modal States
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [payoutTargetRef, setPayoutTargetRef] = useState(null);
+  const [payoutMode, setPayoutMode] = useState('Bank Transfer');
+  const [payoutTxnRef, setPayoutTxnRef] = useState('');
+  const [payoutNotes, setPayoutNotes] = useState('');
+  const [processingPayout, setProcessingPayout] = useState(false);
+
+  const handleOpenPayoutForReferral = (refItem) => {
+    setPayoutTargetRef(refItem);
+    setPayoutTxnRef(`UTR${Date.now().toString().slice(-8)}`);
+    setPayoutNotes(`Incentive settlement for ${refItem.referralCode} (${refItem.category})`);
+    setShowPayoutModal(true);
+  };
+
+  const handleConfirmPayout = async (e) => {
+    e.preventDefault();
+    if (!payoutTargetRef) return;
+    if (!payoutTxnRef.trim()) {
+      alert('Transaction UTR / Receipt reference is required.');
+      return;
+    }
+
+    try {
+      setProcessingPayout(true);
+      const res = await processIncentivePayout({
+        referralId: payoutTargetRef._id,
+        incentiveIds: payoutTargetRef.incentiveRecord ? [payoutTargetRef.incentiveRecord] : [],
+        paymentMode: payoutMode,
+        transactionReference: payoutTxnRef.trim(),
+        notes: payoutNotes,
+      });
+
+      if (res?.data?.success) {
+        alert(res.data.message || `Payout of ₹${payoutTargetRef.incentiveAmount} processed successfully!`);
+        setShowPayoutModal(false);
+        setPayoutTargetRef(null);
+        fetchAllData();
+      }
+    } catch (err) {
+      alert('Error processing payout: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setProcessingPayout(false);
+    }
+  };
 
   const fetchAllData = async () => {
     try {
@@ -1074,18 +1120,32 @@ export default function PersonalReferrals() {
                             </td>
 
                             <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                              <button
-                                type="button"
-                                className="mgmt-btn-secondary"
-                                style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                onClick={() => {
-                                  setSelectedRef(r);
-                                  setShowDetailModal(true);
-                                }}
-                              >
-                                <Eye size={13} />
-                                <span>Audit</span>
-                              </button>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  className="mgmt-btn-secondary"
+                                  style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  onClick={() => {
+                                    setSelectedRef(r);
+                                    setShowDetailModal(true);
+                                  }}
+                                >
+                                  <Eye size={13} />
+                                  <span>Audit</span>
+                                </button>
+                                {r.incentiveStatus === 'Approved' && (
+                                  <button
+                                    type="button"
+                                    className="mgmt-btn-primary"
+                                    style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#059669', borderColor: '#059669', color: '#ffffff' }}
+                                    onClick={() => handleOpenPayoutForReferral(r)}
+                                    title={`Process payout for approved incentive of ₹${r.incentiveAmount}`}
+                                  >
+                                    <DollarSign size={13} />
+                                    <span>Pay ₹{r.incentiveAmount}</span>
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1443,17 +1503,43 @@ export default function PersonalReferrals() {
 
               {/* Incentive Settlement Details */}
               <div style={{ background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0', padding: '16px', marginBottom: '18px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
                     <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' }}>Incentive Settlement</div>
                     <div style={{ fontSize: '0.88rem', color: '#14532d', marginTop: '2px' }}>
-                      Status: <strong>{selectedRef.incentiveStatus || 'None'}</strong>
+                      Status: <strong style={{ color: selectedRef.incentiveStatus === 'Paid' ? '#059669' : '#d97706' }}>{selectedRef.incentiveStatus || 'None'}</strong>
                     </div>
                   </div>
                   <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#059669' }}>
                     {selectedRef.incentiveAmount > 0 ? `₹${selectedRef.incentiveAmount}` : 'Rule Pending'}
                   </div>
                 </div>
+
+                {selectedRef.incentiveStatus === 'Approved' && (
+                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ fontSize: '0.82rem', color: '#166534' }}>
+                      ✓ <strong>Incentive Approved:</strong> Eligible for institutional payout disbursement.
+                    </div>
+                    <button
+                      type="button"
+                      className="mgmt-btn-primary"
+                      style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#059669', borderColor: '#059669', color: '#ffffff' }}
+                      onClick={() => {
+                        setShowDetailModal(false);
+                        handleOpenPayoutForReferral(selectedRef);
+                      }}
+                    >
+                      <DollarSign size={14} />
+                      <span>Process Payout (₹{selectedRef.incentiveAmount})</span>
+                    </button>
+                  </div>
+                )}
+
+                {selectedRef.incentiveStatus === 'Paid' && (
+                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #bbf7d0', fontSize: '0.82rem', color: '#059669', fontWeight: 600 }}>
+                    ✓ Payout Settled & Disbursed to Referrer.
+                  </div>
+                )}
               </div>
 
               {/* Status History / Audit Trail */}
@@ -1498,6 +1584,93 @@ export default function PersonalReferrals() {
           fetchAllData();
         }}
       />
+
+      {/* ── PAYOUT DISBURSEMENT MODAL ── */}
+      {showPayoutModal && payoutTargetRef && (
+        <div className="ref-modal-overlay" onClick={() => setShowPayoutModal(false)}>
+          <div className="ref-modal-card" style={{ maxWidth: '520px', width: '92%' }} onClick={(e) => e.stopPropagation()}>
+            <div className="ref-modal-header">
+              <div className="ref-modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <DollarSign size={18} className="text-emerald-600" />
+                <span>Process Incentive Payout</span>
+              </div>
+              <button className="ref-modal-close" onClick={() => setShowPayoutModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleConfirmPayout}>
+              <div className="ref-modal-body">
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 600 }}>PAYOUT SUMMARY</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '4px' }}>
+                    <span style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: 700 }}>
+                      {payoutTargetRef.submitterName || 'Referrer'} ({payoutTargetRef.category})
+                    </span>
+                    <span style={{ fontSize: '1.35rem', color: '#059669', fontWeight: 900 }}>
+                      ₹{payoutTargetRef.incentiveAmount}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
+                    Referral Code: <strong>{payoutTargetRef.referralCode}</strong>
+                  </div>
+                </div>
+
+                <div className="ref-form-row">
+                  <div className="ref-form-group">
+                    <label className="ref-form-label">Payment Mode</label>
+                    <select
+                      className="ref-form-select"
+                      value={payoutMode}
+                      onChange={(e) => setPayoutMode(e.target.value)}
+                    >
+                      <option value="Bank Transfer">Bank Transfer (NEFT / RTGS)</option>
+                      <option value="UPI">UPI Payment</option>
+                      <option value="IMPS">IMPS Immediate</option>
+                      <option value="Cheque">Cheque</option>
+                      <option value="Cash">Cash Voucher</option>
+                    </select>
+                  </div>
+
+                  <div className="ref-form-group">
+                    <label className="ref-form-label">Transaction Reference / UTR *</label>
+                    <input
+                      type="text"
+                      className="ref-form-input"
+                      placeholder="e.g. UTR8912301948"
+                      value={payoutTxnRef}
+                      onChange={(e) => setPayoutTxnRef(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="ref-form-group">
+                  <label className="ref-form-label">Disbursement Notes (Optional)</label>
+                  <textarea
+                    className="ref-form-textarea"
+                    rows={2}
+                    placeholder="Reference for institutional accounting records..."
+                    value={payoutNotes}
+                    onChange={(e) => setPayoutNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="ref-modal-footer">
+                <button type="button" className="ref-btn-secondary" onClick={() => setShowPayoutModal(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="ref-btn-primary"
+                  style={{ background: '#059669', borderColor: '#059669' }}
+                  disabled={processingPayout}
+                >
+                  <Check size={16} />
+                  <span>{processingPayout ? 'Processing...' : `Confirm & Settle ₹${payoutTargetRef.incentiveAmount}`}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

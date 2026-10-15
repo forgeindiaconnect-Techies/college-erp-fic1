@@ -4,7 +4,8 @@ import {
   CreditCard, Shield, User, Building2, FileCheck, CheckCircle2,
   AlertCircle, Lock, ArrowRight, ArrowLeft, Copy, Check, Loader2, X
 } from 'lucide-react';
-import { submitReferral } from '../../api/index';
+import { submitReferral, getPublicReferralFormConfig } from '../../api/index';
+import DynamicFieldRenderer from './DynamicFieldRenderer';
 import './CreditCardReferralModal.css';
 
 export default function CreditCardReferralModal({
@@ -20,6 +21,8 @@ export default function CreditCardReferralModal({
   const [error, setError] = useState(null);
   const [successReferral, setSuccessReferral] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [formConfig, setFormConfig] = useState(null);
+  const [customFields, setCustomFields] = useState({});
 
   // Form State
   const [formData, setFormData] = useState({
@@ -28,9 +31,9 @@ export default function CreditCardReferralModal({
     applicantPhone: '',
     applicantEmail: '',
     city: '',
-    employmentType: 'Salaried',
 
-    // Step 2: Referral Details
+    // Step 2: Credit Card Details
+    cardCategory: 'Cashback & Rewards',
     bankName: 'HDFC Bank',
     cardProduct: 'Millennia Cashback Credit Card',
     referralSource: 'Direct Recommendation',
@@ -45,8 +48,8 @@ export default function CreditCardReferralModal({
 
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // Verified Bank Options & Approved Product Categories
-  const bankProductCatalog = {
+  // Verified Bank Options & Approved Product Categories (Default Fallback)
+  const defaultBankProductCatalog = {
     'HDFC Bank': [
       'Millennia Cashback Credit Card',
       'Regalia Gold Credit Card',
@@ -70,43 +73,80 @@ export default function CreditCardReferralModal({
       'My Zone Credit Card',
       'Flipkart Axis Bank Card',
       'ACE Cashback Credit Card'
+    ],
+    'Kotak Mahindra Bank': [
+      'Kotak League Platinum Card',
+      'Kotak Mojo Platinum Card',
+      'Kotak 811 #DreamDifferent Card',
+      'Kotak White Credit Card'
     ]
   };
 
+  const cardCategories = [
+    'Cashback & Rewards',
+    'Travel & Premium Lounge',
+    'Fuel & Utilities',
+    'Student & Lifetime Free',
+    'Business / Commercial'
+  ];
+
   const referralSources = [
+    'Direct Recommendation',
     'Campus Drive',
     'Alumni Referral',
     'Staff Reference',
     'Student Network',
-    'Direct Recommendation',
     'Other'
   ];
 
-  const employmentOptions = [
-    'Salaried',
-    'Self-Employed',
-    'Student',
-    'Professional',
-    'Other'
-  ];
+  const [bankProductCatalog, setBankProductCatalog] = useState(defaultBankProductCatalog);
+  const [configLoaded, setConfigLoaded] = useState(false);
 
   useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await getPublicReferralFormConfig('Credit Card');
+        if (res?.data?.success && res.data.data) {
+          setFormConfig(res.data.data);
+          if (res.data.data.partners) {
+            const liveCatalog = {};
+            res.data.data.partners.forEach((p) => {
+              if (p.isActive !== false) {
+                const activeProds = (p.products || [])
+                  .filter((prod) => prod.isActive !== false)
+                  .map((prod) => prod.name);
+                liveCatalog[p.name] = activeProds.length > 0 ? activeProds : ['Standard Variant'];
+              }
+            });
+            if (Object.keys(liveCatalog).length > 0) {
+              setBankProductCatalog(liveCatalog);
+              setConfigLoaded(true);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Using default credit card catalog:', e.message);
+      }
+    };
+
     if (isOpen) {
+      fetchConfig();
       setCurrentStep(1);
       setError(null);
       setFieldErrors({});
+      setCustomFields({});
       setSuccessReferral(null);
       setCopiedCode(false);
 
       const targetBank = defaultBank || 'HDFC Bank';
-      const availableProducts = bankProductCatalog[targetBank] || bankProductCatalog['HDFC Bank'];
+      const availableProducts = bankProductCatalog[targetBank] || Object.values(bankProductCatalog)[0] || ['Millennia Cashback Credit Card'];
 
       setFormData({
         applicantName: '',
         applicantPhone: '',
         applicantEmail: '',
         city: '',
-        employmentType: 'Salaried',
+        cardCategory: 'Cashback & Rewards',
         bankName: targetBank,
         cardProduct: availableProducts[0],
         referralSource: 'Direct Recommendation',
@@ -119,6 +159,22 @@ export default function CreditCardReferralModal({
     }
   }, [isOpen, defaultBank]);
 
+  useEffect(() => {
+    if (configLoaded && Object.keys(bankProductCatalog).length > 0) {
+      setFormData(prev => {
+        const currentBankValid = Boolean(bankProductCatalog[prev.bankName]);
+        const activeBank = currentBankValid ? prev.bankName : Object.keys(bankProductCatalog)[0];
+        const prods = bankProductCatalog[activeBank] || ['Standard Variant'];
+        const currentProdValid = prods.includes(prev.cardProduct);
+        return {
+          ...prev,
+          bankName: activeBank,
+          cardProduct: currentProdValid ? prev.cardProduct : prods[0]
+        };
+      });
+    }
+  }, [configLoaded, bankProductCatalog]);
+
   if (!isOpen) return null;
 
   const handleBankChange = (newBank) => {
@@ -130,77 +186,174 @@ export default function CreditCardReferralModal({
     }));
   };
 
-  const validateStep1 = () => {
+  const handleCustomFieldChange = (fieldKey, value) => {
+    setCustomFields(prev => ({ ...prev, [fieldKey]: value }));
+    if (fieldErrors[fieldKey]) {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      });
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+
+      if (name === 'bankName') {
+        const prods = bankProductCatalog[value] || ['Standard Variant'];
+        updated.cardProduct = prods[0];
+      }
+
+      return updated;
+    });
+
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: null }));
+    }
+  };
+
+  const validateStep = (stepNumber) => {
     const errors = {};
-    if (!formData.applicantName.trim()) {
-      errors.applicantName = 'Applicant full name is required.';
-    } else if (formData.applicantName.trim().length < 2) {
-      errors.applicantName = 'Name must be at least 2 characters.';
+
+    if (stepNumber === 1) {
+      if (!formData.applicantName || formData.applicantName.trim().length < 3) {
+        errors.applicantName = 'Enter the applicant’s legal full name (minimum 3 characters).';
+      }
+
+      const phoneRegex = /^[6-9]\d{9}$/;
+      const cleanedPhone = (formData.applicantPhone || '').replace(/\D/g, '');
+      if (!phoneRegex.test(cleanedPhone)) {
+        errors.applicantPhone = 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
+      }
+
+      if (formData.applicantEmail && formData.applicantEmail.trim() !== '') {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.applicantEmail.trim())) {
+          errors.applicantEmail = 'Enter a valid email address or leave it blank.';
+        }
+      }
+
+      if (!formData.city || formData.city.trim().length < 2) {
+        errors.city = 'Enter the applicant’s residential city or campus location.';
+      }
+
+      // Dynamic custom fields validation for Step 1
+      const step1Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
+      step1Custom.forEach(f => {
+        const val = customFields[f.fieldKey];
+        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
+        }
+      });
     }
 
-    const cleanPhone = formData.applicantPhone.replace(/\D/g, '');
-    if (!cleanPhone) {
-      errors.applicantPhone = 'Mobile number is required.';
-    } else if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
-      errors.applicantPhone = 'Enter a valid 10-digit Indian mobile number (e.g. 9876543210).';
+    if (stepNumber === 2) {
+      if (!formData.bankName) {
+        errors.bankName = 'Select a verified partner bank.';
+      }
+      if (!formData.cardProduct) {
+        errors.cardProduct = 'Select an approved card offering.';
+      }
+
+      // Dynamic custom fields validation for Step 2
+      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2);
+      step2Custom.forEach(f => {
+        const val = customFields[f.fieldKey];
+        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
+        }
+      });
     }
 
-    if (formData.applicantEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.applicantEmail.trim())) {
-      errors.applicantEmail = 'Enter a valid email address or leave blank.';
-    }
-
-    if (!formData.city.trim()) {
-      errors.city = 'City or campus location is required.';
+    if (stepNumber === 3) {
+      if (!formData.consentGiven) {
+        errors.consentGiven = 'Explicit consent is mandatory under RBI and DPDP guidelines.';
+      }
     }
 
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
-  };
-
-  const validateStep2 = () => {
-    const errors = {};
-    if (!formData.bankName) {
-      errors.bankName = 'Select a verified partner bank.';
-    }
-    if (!formData.cardProduct) {
-      errors.cardProduct = 'Select an approved card variant.';
-    }
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const validateStep3 = () => {
-    if (!formData.consentGiven) {
-      setError('Explicit applicant consent is required before proceeding to submission.');
-      return false;
-    }
-    setError(null);
-    return true;
   };
 
   const handleNext = () => {
-    setError(null);
-    if (currentStep === 1) {
-      if (validateStep1()) setCurrentStep(2);
-    } else if (currentStep === 2) {
-      if (validateStep2()) setCurrentStep(3);
-    } else if (currentStep === 3) {
-      if (validateStep3()) {
+    if (validateStep(currentStep)) {
+      if (currentStep === 3 && !formData.consentTimestamp) {
         setFormData(prev => ({ ...prev, consentTimestamp: new Date().toISOString() }));
-        setCurrentStep(4);
       }
+      setCurrentStep(prev => prev + 1);
     }
   };
 
-  const handlePrev = () => {
+  const handleBack = () => {
     setError(null);
-    if (currentStep > 1) setCurrentStep(prev => prev - 1);
+    setCurrentStep(prev => Math.max(1, prev - 1));
   };
 
-  const handleJumpToStep = (stepNumber) => {
-    if (stepNumber < currentStep) {
+  const handleSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!validateStep(1) || !validateStep(2) || !validateStep(3)) {
+      setError('Please resolve all validation errors before submitting.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
       setError(null);
-      setCurrentStep(stepNumber);
+
+      const cleanPhone = (formData.applicantPhone || '').replace(/\D/g, '');
+
+      const payload = {
+        category: 'Credit Card',
+        formVersion: formConfig?.version || 1,
+        partnerName: formData.bankName,
+        productName: formData.cardProduct,
+        notes: formData.notes ? formData.notes.trim() : '',
+        customFields: customFields,
+        formData: {
+          applicantName: formData.applicantName.trim(),
+          applicantPhone: cleanPhone,
+          applicantEmail: formData.applicantEmail ? formData.applicantEmail.trim() : '',
+          city: formData.city.trim(),
+          cardCategory: formData.cardCategory,
+          bankName: formData.bankName,
+          cardProduct: formData.cardProduct,
+          referralSource: formData.referralSource,
+          partnerReferenceNumber: formData.partnerReferenceNumber ? formData.partnerReferenceNumber.trim() : '',
+          ...customFields
+        },
+        creditCardDetails: {
+          bankName: formData.bankName,
+          cardProduct: formData.cardProduct,
+          cardCategory: formData.cardCategory,
+          applicantName: formData.applicantName.trim(),
+          applicantPhone: cleanPhone,
+          applicantEmail: formData.applicantEmail ? formData.applicantEmail.trim() : '',
+          city: formData.city.trim(),
+          referralSource: formData.referralSource,
+          partnerReferenceNumber: formData.partnerReferenceNumber ? formData.partnerReferenceNumber.trim() : '',
+          applicantConsentGiven: true,
+          consentTimestamp: formData.consentTimestamp || new Date().toISOString(),
+          consentNoticeVersion: formData.consentNoticeVersion,
+          notes: formData.notes ? formData.notes.trim() : '',
+        }
+      };
+
+      const res = await submitReferral(payload);
+
+      if (res && res.data && res.data.success) {
+        setSuccessReferral(res.data.data);
+        if (onSuccess) onSuccess(res.data.data);
+      } else {
+        throw new Error(res?.data?.message || 'Referral submission failed. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error submitting credit card referral:', err);
+      setError(err?.response?.data?.message || err.message || 'Server error occurred while submitting referral.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -208,59 +361,18 @@ export default function CreditCardReferralModal({
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(code);
       setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2500);
-    }
-  };
-
-  const handleSubmit = async () => {
-    setError(null);
-    setSubmitting(true);
-
-    try {
-      const cleanPhone = formData.applicantPhone.replace(/\D/g, '');
-
-      const payload = {
-        category: 'Credit Card',
-        creditCardDetails: {
-          bankName: formData.bankName,
-          cardProduct: formData.cardProduct,
-          applicantName: formData.applicantName.trim(),
-          applicantPhone: cleanPhone,
-          applicantEmail: formData.applicantEmail.trim(),
-          city: formData.city.trim(),
-          employmentType: formData.employmentType,
-          referralSource: formData.referralSource,
-          partnerReferenceNumber: formData.partnerReferenceNumber.trim(),
-          notes: formData.notes.trim(),
-          applicantConsentGiven: true,
-          consentNoticeVersion: formData.consentNoticeVersion,
-          consentTimestamp: formData.consentTimestamp || new Date().toISOString()
-        }
-      };
-
-      const res = await submitReferral(payload);
-
-      if (res && res.data && res.data.success && res.data.data) {
-        setSuccessReferral(res.data.data);
-        if (onSuccess) onSuccess(res.data.data);
-      } else {
-        throw new Error(res.data?.message || 'Failed to save referral to database.');
-      }
-    } catch (err) {
-      console.error('Submission error:', err);
-      setError(err.response?.data?.message || err.message || 'Error saving referral. Please check connection.');
-    } finally {
-      setSubmitting(false);
+      setTimeout(() => setCopiedCode(false), 2000);
     }
   };
 
   return (
     <div className="cc-modal-overlay" onClick={onClose}>
       <div className="cc-modal-dialog" onClick={(e) => e.stopPropagation()}>
-        {/* Modal Header */}
-        <div className="cc-modal-header">
+        
+        {/* Header */}
+        <div className="cc-modal-header" style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)' }}>
           <div className="cc-header-left">
-            <div className="cc-header-icon">
+            <div className="cc-header-icon" style={{ background: 'rgba(255, 255, 255, 0.2)' }}>
               <CreditCard size={24} />
             </div>
             <div>
@@ -277,23 +389,23 @@ export default function CreditCardReferralModal({
         {successReferral ? (
           <div className="cc-modal-body">
             <div className="cc-success-box">
-              <div className="cc-success-badge">
+              <div className="cc-success-badge" style={{ background: '#eff6ff', color: '#2563eb', borderColor: '#bfdbfe' }}>
                 <CheckCircle2 size={36} />
               </div>
               <h3 style={{ margin: '0 0 6px 0', fontSize: '1.3rem', color: '#0f172a', fontWeight: 800 }}>
-                Referral Successfully Recorded!
+                Credit Card Referral Successfully Recorded!
               </h3>
               <p style={{ margin: '0 0 16px 0', color: '#64748b', fontSize: '0.88rem' }}>
-                Your referral has been persisted to the database and queued for partner verification.
+                The referral has been securely saved to the database with verified applicant consent.
               </p>
 
               {/* Unique Referral Reference Code Display */}
-              <div className="cc-code-card">
+              <div className="cc-code-card" style={{ borderColor: '#bfdbfe' }}>
                 <div>
                   <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, display: 'block' }}>
                     Unique Referral Reference
                   </span>
-                  <span className="cc-code-text">{successReferral.referralCode}</span>
+                  <span className="cc-code-text" style={{ color: '#2563eb' }}>{successReferral.referralCode}</span>
                 </div>
                 <button
                   type="button"
@@ -305,77 +417,54 @@ export default function CreditCardReferralModal({
                 </button>
               </div>
 
-              {/* Processing Pipeline Next Steps */}
-              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', textAlign: 'left', margin: '20px auto', maxWidth: '520px', border: '1px solid #e2e8f0' }}>
-                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#1e293b', fontWeight: 800 }}>
-                  What happens next?
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem', color: '#475569' }}>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, flexShrink: 0 }}>1</span>
-                    <span><strong>Under Review:</strong> Verified by the institutional referral desk and routed to {successReferral.creditCardDetails?.bankName}.</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#e2e8f0', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, flexShrink: 0 }}>2</span>
-                    <span><strong>Bank KYC Contact:</strong> Bank representative connects directly with applicant for documentation.</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#e2e8f0', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, flexShrink: 0 }}>3</span>
-                    <span><strong>Milestone Verification:</strong> Card issuance/activation milestone recorded in institutional ledger.</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#e2e8f0', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, flexShrink: 0 }}>4</span>
-                    <span><strong>Incentive Settlement:</strong> Eligible rewards processed under approved institutional rules.</span>
-                  </div>
+              {/* Summary Details */}
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', textAlign: 'left', margin: '20px auto', maxWidth: '520px', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div><span style={{ color: '#64748b' }}>Applicant:</span> <strong>{successReferral.creditCardDetails?.applicantName || successReferral.formData?.applicantName}</strong></div>
+                  <div><span style={{ color: '#64748b' }}>Partner Bank:</span> <strong>{successReferral.creditCardDetails?.bankName || successReferral.partnerName}</strong></div>
+                  <div><span style={{ color: '#64748b' }}>Card Offering:</span> <strong>{successReferral.creditCardDetails?.cardProduct || successReferral.productName}</strong></div>
+                  <div><span style={{ color: '#64748b' }}>Status:</span> <strong style={{ color: '#2563eb' }}>Submitted</strong></div>
+                  <div style={{ gridColumn: 'span 2' }}><span style={{ color: '#64748b' }}>Referral Channel:</span> <strong>{successReferral.creditCardDetails?.referralSource || 'Direct Recommendation'}</strong></div>
+                  <div style={{ gridColumn: 'span 2' }}><span style={{ color: '#64748b' }}>Consent Notice:</span> <strong style={{ fontFamily: 'monospace' }}>{successReferral.creditCardDetails?.consentNoticeVersion || 'v2.4-FIC-CC-CONSENT'}</strong></div>
                 </div>
               </div>
-            </div>
 
-            <div className="cc-modal-footer">
-              <button
-                type="button"
-                className="cc-btn-sec"
-                onClick={() => {
-                  setSuccessReferral(null);
-                  setCurrentStep(1);
-                  setFormData(prev => ({
-                    ...prev,
-                    applicantName: '',
-                    applicantPhone: '',
-                    applicantEmail: '',
-                    city: '',
-                    notes: '',
-                    consentGiven: false
-                  }));
-                }}
-              >
-                Submit Another Referral
-              </button>
-              <button
-                type="button"
-                className="cc-btn-pri"
-                onClick={() => {
-                  onClose();
-                  navigate(`/${rootRole}/referrals`);
-                }}
-              >
-                <span>View in My Referrals →</span>
-              </button>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  className="cc-btn-sec"
+                  onClick={() => {
+                    setSuccessReferral(null);
+                    setCurrentStep(1);
+                  }}
+                >
+                  Submit Another Referral
+                </button>
+                <button
+                  type="button"
+                  className="cc-btn-pri"
+                  style={{ background: '#2563eb', borderColor: '#2563eb' }}
+                  onClick={() => {
+                    onClose();
+                    navigate(`/${rootRole}/referrals`);
+                  }}
+                >
+                  <span>View in My Referrals →</span>
+                </button>
+              </div>
             </div>
           </div>
         ) : (
           <>
-            {/* 4-Step Progress Indicator */}
+            {/* 4-Step Progress Indicator (Identical to Insurance Stepper Style) */}
             <div className="cc-stepper-wrap">
               <div className="cc-stepper">
                 {/* Step 1 */}
                 <div
                   className={`cc-step-item ${currentStep === 1 ? 'active' : ''} ${currentStep > 1 ? 'completed clickable' : ''}`}
-                  onClick={() => handleJumpToStep(1)}
+                  onClick={() => currentStep > 1 && setCurrentStep(1)}
                 >
-                  <div className="cc-step-bubble">
-                    {currentStep > 1 ? <Check size={14} /> : '1'}
-                  </div>
+                  <div className="cc-step-bubble">{currentStep > 1 ? <Check size={14} /> : '1'}</div>
                   <div className="cc-step-text">
                     <span className="cc-step-label">Step 1</span>
                     <span className="cc-step-title">Applicant</span>
@@ -387,14 +476,12 @@ export default function CreditCardReferralModal({
                 {/* Step 2 */}
                 <div
                   className={`cc-step-item ${currentStep === 2 ? 'active' : ''} ${currentStep > 2 ? 'completed clickable' : ''}`}
-                  onClick={() => handleJumpToStep(2)}
+                  onClick={() => currentStep > 2 && setCurrentStep(2)}
                 >
-                  <div className="cc-step-bubble">
-                    {currentStep > 2 ? <Check size={14} /> : '2'}
-                  </div>
+                  <div className="cc-step-bubble">{currentStep > 2 ? <Check size={14} /> : '2'}</div>
                   <div className="cc-step-text">
                     <span className="cc-step-label">Step 2</span>
-                    <span className="cc-step-title">Referral</span>
+                    <span className="cc-step-title">Card Details</span>
                   </div>
                 </div>
 
@@ -403,11 +490,9 @@ export default function CreditCardReferralModal({
                 {/* Step 3 */}
                 <div
                   className={`cc-step-item ${currentStep === 3 ? 'active' : ''} ${currentStep > 3 ? 'completed clickable' : ''}`}
-                  onClick={() => handleJumpToStep(3)}
+                  onClick={() => currentStep > 3 && setCurrentStep(3)}
                 >
-                  <div className="cc-step-bubble">
-                    {currentStep > 3 ? <Check size={14} /> : '3'}
-                  </div>
+                  <div className="cc-step-bubble">{currentStep > 3 ? <Check size={14} /> : '3'}</div>
                   <div className="cc-step-text">
                     <span className="cc-step-label">Step 3</span>
                     <span className="cc-step-title">Consent</span>
@@ -421,49 +506,47 @@ export default function CreditCardReferralModal({
                   <div className="cc-step-bubble">4</div>
                   <div className="cc-step-text">
                     <span className="cc-step-label">Step 4</span>
-                    <span className="cc-step-title">Review</span>
+                    <span className="cc-step-title">Review & Submit</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Error Banner */}
-            {error && (
-              <div style={{ margin: '14px 24px 0 24px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px', color: '#991b1b', fontSize: '0.85rem' }}>
-                <AlertCircle size={16} style={{ flexShrink: 0 }} />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Modal Body: Active Step */}
+            {/* Modal Body */}
             <div className="cc-modal-body">
-              {/* ── STEP 1: APPLICANT DETAILS ── */}
+              {error && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '12px 16px', borderRadius: '10px', fontSize: '0.85rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertCircle size={16} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Draft Status Banner */}
+              {formConfig && formConfig.status === 'draft' && (
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '12px 16px', borderRadius: '10px', fontSize: '0.85rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertCircle size={16} />
+                  <span>Notice: This Credit Card Referral Form is currently in Draft status. Submissions are paused.</span>
+                </div>
+              )}
+
+              {/* ── STEP 1: APPLICANT ── */}
               {currentStep === 1 && (
                 <div>
-                  <div style={{ marginBottom: '18px' }}>
-                    <h3 style={{ margin: '0 0 4px', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>
-                      Step 1: Applicant Information
-                    </h3>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-                      Provide basic contact details of the individual being referred for the card.
-                    </p>
-                  </div>
-
                   <div className="cc-form-group">
                     <label className="cc-form-label">
-                      Full Legal Name <span className="req">*</span>
+                      Applicant Legal Full Name <span className="req">*</span>
                     </label>
                     <input
                       type="text"
+                      name="applicantName"
                       className={`cc-input ${fieldErrors.applicantName ? 'error' : ''}`}
-                      placeholder="e.g. Rohan Sharma (as per official ID)"
+                      placeholder="e.g. Rohan Sharma"
                       value={formData.applicantName}
-                      onChange={(e) => setFormData({ ...formData, applicantName: e.target.value })}
+                      onChange={handleChange}
+                      autoFocus
                     />
                     {fieldErrors.applicantName && (
-                      <div className="cc-field-error">
-                        <AlertCircle size={12} /> {fieldErrors.applicantName}
-                      </div>
+                      <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.applicantName}</div>
                     )}
                   </div>
 
@@ -472,24 +555,20 @@ export default function CreditCardReferralModal({
                       <label className="cc-form-label">
                         10-Digit Mobile Number <span className="req">*</span>
                       </label>
-                      <div className={`cc-phone-input-wrap ${fieldErrors.applicantPhone ? 'error' : ''}`}>
+                      <div className="cc-phone-input-wrap">
                         <span className="cc-phone-prefix">+91</span>
                         <input
                           type="tel"
+                          name="applicantPhone"
                           maxLength={10}
                           className="cc-phone-input"
                           placeholder="9876543210"
                           value={formData.applicantPhone}
-                          onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                            setFormData({ ...formData, applicantPhone: val });
-                          }}
+                          onChange={handleChange}
                         />
                       </div>
                       {fieldErrors.applicantPhone && (
-                        <div className="cc-field-error">
-                          <AlertCircle size={12} /> {fieldErrors.applicantPhone}
-                        </div>
+                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.applicantPhone}</div>
                       )}
                     </div>
 
@@ -499,156 +578,170 @@ export default function CreditCardReferralModal({
                       </label>
                       <input
                         type="email"
+                        name="applicantEmail"
                         className={`cc-input ${fieldErrors.applicantEmail ? 'error' : ''}`}
                         placeholder="applicant@example.com"
                         value={formData.applicantEmail}
-                        onChange={(e) => setFormData({ ...formData, applicantEmail: e.target.value })}
+                        onChange={handleChange}
                       />
                       {fieldErrors.applicantEmail && (
-                        <div className="cc-field-error">
-                          <AlertCircle size={12} /> {fieldErrors.applicantEmail}
-                        </div>
+                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.applicantEmail}</div>
                       )}
                     </div>
                   </div>
 
+                  <div className="cc-form-group">
+                    <label className="cc-form-label">
+                      City / Campus Location <span className="req">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="city"
+                      className={`cc-input ${fieldErrors.city ? 'error' : ''}`}
+                      placeholder="e.g. Chennai, Bangalore, Coimbatore"
+                      value={formData.city}
+                      onChange={handleChange}
+                    />
+                    {fieldErrors.city && (
+                      <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.city}</div>
+                    )}
+                  </div>
+
+                  {/* Dynamic Step 1 Custom Fields */}
+                  {(formConfig?.fieldsConfig || [])
+                    .filter(f => !f.isSystem && (!f.step || f.step === 1))
+                    .map(f => (
+                      <DynamicFieldRenderer
+                        key={f.fieldKey}
+                        field={f}
+                        value={customFields[f.fieldKey]}
+                        onChange={handleCustomFieldChange}
+                        error={fieldErrors[f.fieldKey]}
+                      />
+                    ))}
+                </div>
+              )}
+
+              {/* ── STEP 2: CREDIT CARD DETAILS ── */}
+              {currentStep === 2 && (
+                <div>
                   <div className="cc-grid-2">
                     <div className="cc-form-group">
                       <label className="cc-form-label">
-                        City / Campus Location <span className="req">*</span>
+                        Card Category <span className="req">*</span>
                       </label>
-                      <input
-                        type="text"
-                        className={`cc-input ${fieldErrors.city ? 'error' : ''}`}
-                        placeholder="e.g. Bangalore / Main Campus"
-                        value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                      />
-                      {fieldErrors.city && (
-                        <div className="cc-field-error">
-                          <AlertCircle size={12} /> {fieldErrors.city}
-                        </div>
-                      )}
+                      <select
+                        name="cardCategory"
+                        className="cc-select"
+                        value={formData.cardCategory}
+                        onChange={handleChange}
+                      >
+                        {cardCategories.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
                     </div>
 
                     <div className="cc-form-group">
                       <label className="cc-form-label">
-                        Employment Type <span className="req">*</span>
+                        Approved Partner Bank <span className="req">*</span>
                       </label>
                       <select
-                        className="cc-input"
-                        value={formData.employmentType}
-                        onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
+                        name="bankName"
+                        className="cc-select"
+                        value={formData.bankName}
+                        onChange={handleChange}
                       >
-                        {employmentOptions.map(emp => (
-                          <option key={emp} value={emp}>{emp}</option>
+                        {Object.keys(bankProductCatalog).map(bank => (
+                          <option key={bank} value={bank}>{bank}</option>
                         ))}
                       </select>
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* ── STEP 2: REFERRAL DETAILS ── */}
-              {currentStep === 2 && (
-                <div>
-                  <div style={{ marginBottom: '18px' }}>
-                    <h3 style={{ margin: '0 0 4px', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>
-                      Step 2: Referral & Partner Bank Details
-                    </h3>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-                      Select the verified partner bank and approved card variant for this referral.
-                    </p>
-                  </div>
-
-                  {/* Partner Bank Selector */}
                   <div className="cc-form-group">
                     <label className="cc-form-label">
-                      Verified Partner Bank <span className="req">*</span>
-                    </label>
-                    <div className="cc-pills-grid">
-                      {Object.keys(bankProductCatalog).map((bank) => (
-                        <button
-                          key={bank}
-                          type="button"
-                          className={`cc-pill-btn ${formData.bankName === bank ? 'active' : ''}`}
-                          onClick={() => handleBankChange(bank)}
-                        >
-                          <Building2 size={14} style={{ marginRight: '6px' }} />
-                          <span>{bank}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Card Product Variant */}
-                  <div className="cc-form-group">
-                    <label className="cc-form-label">
-                      Approved Card / Product Category <span className="req">*</span>
+                      Selected Approved Card Offering <span className="req">*</span>
                     </label>
                     <select
-                      className="cc-input"
+                      name="cardProduct"
+                      className="cc-select"
                       value={formData.cardProduct}
-                      onChange={(e) => setFormData({ ...formData, cardProduct: e.target.value })}
+                      onChange={handleChange}
                     >
-                      {(bankProductCatalog[formData.bankName] || []).map((prod) => (
-                        <option key={prod} value={prod}>{prod}</option>
+                      {(bankProductCatalog[formData.bankName] || ['Standard Variant']).map(offering => (
+                        <option key={offering} value={offering}>{offering}</option>
                       ))}
                     </select>
                   </div>
 
                   <div className="cc-grid-2">
-                    {/* Referral Source */}
                     <div className="cc-form-group">
                       <label className="cc-form-label">
                         Referral Channel / Source <span className="req">*</span>
                       </label>
                       <select
-                        className="cc-input"
+                        name="referralSource"
+                        className="cc-select"
                         value={formData.referralSource}
-                        onChange={(e) => setFormData({ ...formData, referralSource: e.target.value })}
+                        onChange={handleChange}
                       >
-                        {referralSources.map((src) => (
-                          <option key={src} value={src}>{src}</option>
+                        {referralSources.map(source => (
+                          <option key={source} value={source}>{source}</option>
                         ))}
                       </select>
                     </div>
 
-                    {/* Optional Partner Reference Number */}
                     <div className="cc-form-group">
                       <label className="cc-form-label">
                         Partner Reference # <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
                       </label>
                       <input
                         type="text"
+                        name="partnerReferenceNumber"
                         className="cc-input"
-                        placeholder="e.g. Lead ID, Branch Employee Code"
+                        placeholder="e.g. CRD-REF-901"
                         value={formData.partnerReferenceNumber}
-                        onChange={(e) => setFormData({ ...formData, partnerReferenceNumber: e.target.value })}
+                        onChange={handleChange}
                       />
                     </div>
                   </div>
 
-                  {/* Notes / Special Remarks */}
                   <div className="cc-form-group">
                     <label className="cc-form-label">
-                      Referral Notes / Branch Preference <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
+                      Non-Sensitive Advisory Remarks <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
                     </label>
                     <textarea
+                      name="notes"
                       rows={2}
-                      className="cc-input"
-                      placeholder="Add any specific context or preferred branch for the applicant..."
+                      className="cc-textarea"
+                      placeholder="e.g. Preferred language, best time to call, branch preference."
                       value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      onChange={handleChange}
                     />
                   </div>
 
-                  {/* Partner Verification Safeguard Note */}
-                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 14px', fontSize: '0.78rem', color: '#64748b', display: 'flex', gap: '8px' }}>
-                    <Shield size={16} style={{ color: '#0284c7', flexShrink: 0, marginTop: '2px' }} />
-                    <span>
-                      <strong>Verified Institutional Partnership:</strong> Only approved partner banks are displayed. Card underwriting, credit limit, and issuance decisions remain solely with the issuing bank under RBI regulations.
-                    </span>
+                  {/* Dynamic Step 2 Custom Fields */}
+                  {(formConfig?.fieldsConfig || [])
+                    .filter(f => !f.isSystem && f.step === 2)
+                    .map(f => (
+                      <DynamicFieldRenderer
+                        key={f.fieldKey}
+                        field={f}
+                        value={customFields[f.fieldKey]}
+                        onChange={handleCustomFieldChange}
+                        error={fieldErrors[f.fieldKey]}
+                      />
+                    ))}
+
+                  <div className="cc-privacy-callout">
+                    <Shield size={20} className="cc-privacy-icon" />
+                    <div>
+                      <div className="cc-privacy-title">RBI Banking Underwriting Boundary</div>
+                      <div className="cc-privacy-desc">
+                        Do NOT record bank passwords, PINs, OTPs, CVVs, full card numbers, or upload financial paperwork in this referral form.
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -656,76 +749,62 @@ export default function CreditCardReferralModal({
               {/* ── STEP 3: CONSENT & PRIVACY ── */}
               {currentStep === 3 && (
                 <div>
-                  <div style={{ marginBottom: '18px' }}>
-                    <h3 style={{ margin: '0 0 4px', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>
-                      Step 3: Applicant Consent & Privacy Safeguards
-                    </h3>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-                      Review DPDP compliance and record explicit applicant consent before submission.
-                    </p>
-                  </div>
-
-                  {/* Privacy & Non-Sensitive Data Assurance Banner */}
-                  <div className="cc-privacy-callout">
-                    <Lock size={20} className="cc-privacy-icon" />
-                    <div>
-                      <h4 className="cc-privacy-title">Data Protection & Privacy Commitment</h4>
-                      <p className="cc-privacy-desc">
-                        College ERP strictly adheres to the Digital Personal Data Protection (DPDP) Act and RBI banking privacy norms. We <strong>never collect, store, or solicit</strong> passwords, PINs, OTPs, CVVs, full card numbers, or sensitive financial credentials.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Formal Consent Notice */}
                   <div className="cc-consent-box">
                     <div className="cc-consent-notice-title">
-                      <span>Institutional Referral Consent Notice</span>
+                      <span>Statutory Banking Privacy Notice</span>
                       <span className="cc-consent-ver">{formData.consentNoticeVersion}</span>
                     </div>
-                    <ul className="cc-consent-points">
-                      <li>
-                        The applicant has been fully informed about the {formData.bankName} credit card program and has authorized this referral.
-                      </li>
-                      <li>
-                        The applicant explicitly consents to receive authorized communications from {formData.bankName} regarding this application.
-                      </li>
-                      <li>
-                        No sensitive financial credentials have been requested or documented in this system.
-                      </li>
-                      <li>
-                        This referral will be timestamped and attributed to your verified institution account for accountability.
-                      </li>
-                    </ul>
+                    {formConfig?.generalSettings?.consentText ? (
+                      <p style={{ margin: '8px 0', fontSize: '0.84rem', color: '#334155', lineHeight: 1.5 }}>
+                        {formConfig.generalSettings.consentText}
+                      </p>
+                    ) : (
+                      <ul className="cc-consent-points">
+                        <li><strong>Purpose of Processing:</strong> Contact information is collected strictly to enable authorized partner banks ({formData.bankName}) to provide card advisory and application facilitation for {formData.cardProduct}.</li>
+                        <li><strong>Zero Sensitive Financial Data:</strong> No passwords, PINs, OTPs, CVVs, or full card numbers are collected or stored in this ERP system.</li>
+                        <li><strong>Referrer Verification:</strong> Institutional incentive eligibility is calculated strictly upon genuine card issuance and verified milestones.</li>
+                      </ul>
+                    )}
                   </div>
 
-                  {/* Mandatory Explicit Consent Checkbox */}
                   <label className="cc-checkbox-label">
                     <input
                       type="checkbox"
+                      name="consentGiven"
                       className="cc-checkbox"
                       checked={formData.consentGiven}
-                      onChange={(e) => setFormData({ ...formData, consentGiven: e.target.checked })}
+                      onChange={(e) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          consentGiven: e.target.checked,
+                          consentTimestamp: e.target.checked ? new Date().toISOString() : null
+                        }));
+                        if (fieldErrors.consentGiven) {
+                          setFieldErrors(prev => ({ ...prev, consentGiven: null }));
+                        }
+                      }}
                     />
                     <span className="cc-checkbox-text">
-                      I confirm and certify that I have explained the terms to the applicant, and they have provided explicit consent to be contacted by {formData.bankName} for credit card evaluation. <span style={{ color: '#ef4444' }}>*</span>
+                      I confirm that the applicant has explicitly consented to share their name, contact details, and card interest with {formData.bankName} for institutional credit card assistance.
                     </span>
                   </label>
+                  {fieldErrors.consentGiven && (
+                    <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.consentGiven}</div>
+                  )}
+
+                  {formData.consentTimestamp && (
+                    <div style={{ marginTop: '10px', fontSize: '0.78rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Check size={14} />
+                      <span>Consent timestamp recorded: {new Date(formData.consentTimestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* ── STEP 4: REVIEW & SUBMIT ── */}
               {currentStep === 4 && (
                 <div>
-                  <div style={{ marginBottom: '18px' }}>
-                    <h3 style={{ margin: '0 0 4px', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>
-                      Step 4: Review Details & Confirm Submission
-                    </h3>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-                      Verify all information below. You can click "Edit" on any section to make corrections.
-                    </p>
-                  </div>
-
-                  {/* Card 1: Applicant Details */}
+                  {/* Review Applicant */}
                   <div className="cc-review-card">
                     <div className="cc-review-header">
                       <div className="cc-review-title">
@@ -738,34 +817,30 @@ export default function CreditCardReferralModal({
                     </div>
                     <div className="cc-review-grid">
                       <div className="cc-review-item">
-                        <span>Full Legal Name</span>
+                        <span>Legal Name</span>
                         <strong>{formData.applicantName}</strong>
                       </div>
                       <div className="cc-review-item">
-                        <span>Mobile Phone</span>
+                        <span>Contact Mobile</span>
                         <strong>+91 {formData.applicantPhone}</strong>
                       </div>
                       <div className="cc-review-item">
-                        <span>Email Address</span>
-                        <strong>{formData.applicantEmail || 'Not Provided'}</strong>
+                        <span>Email</span>
+                        <strong>{formData.applicantEmail || '—'}</strong>
                       </div>
                       <div className="cc-review-item">
                         <span>City / Campus</span>
                         <strong>{formData.city}</strong>
                       </div>
-                      <div className="cc-review-item">
-                        <span>Employment Type</span>
-                        <strong>{formData.employmentType}</strong>
-                      </div>
                     </div>
                   </div>
 
-                  {/* Card 2: Referral Details */}
+                  {/* Review Credit Card Details */}
                   <div className="cc-review-card">
                     <div className="cc-review-header">
                       <div className="cc-review-title">
-                        <CreditCard size={15} className="text-indigo-600" />
-                        <span>Referral & Product Specifications</span>
+                        <CreditCard size={15} className="text-blue-600" />
+                        <span>Credit Card Details</span>
                       </div>
                       <button type="button" className="cc-edit-btn" onClick={() => setCurrentStep(2)}>
                         Edit
@@ -773,70 +848,97 @@ export default function CreditCardReferralModal({
                     </div>
                     <div className="cc-review-grid">
                       <div className="cc-review-item">
+                        <span>Category</span>
+                        <strong>{formData.cardCategory}</strong>
+                      </div>
+                      <div className="cc-review-item">
                         <span>Partner Bank</span>
                         <strong>{formData.bankName}</strong>
                       </div>
-                      <div className="cc-review-item">
-                        <span>Card Variant / Tier</span>
+                      <div className="cc-review-item" style={{ gridColumn: 'span 2' }}>
+                        <span>Selected Offering</span>
                         <strong>{formData.cardProduct}</strong>
                       </div>
                       <div className="cc-review-item">
                         <span>Referral Source</span>
                         <strong>{formData.referralSource}</strong>
                       </div>
-                      {formData.partnerReferenceNumber && (
-                        <div className="cc-review-item">
-                          <span>Partner Ref #</span>
-                          <strong>{formData.partnerReferenceNumber}</strong>
-                        </div>
-                      )}
+                      <div className="cc-review-item">
+                        <span>Partner Reference</span>
+                        <strong style={{ fontFamily: 'monospace' }}>{formData.partnerReferenceNumber || '—'}</strong>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Card 3: Consent & Authorization */}
-                  <div className="cc-review-card" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
-                    <div className="cc-review-header" style={{ borderColor: '#dcfce7' }}>
-                      <div className="cc-review-title" style={{ color: '#166534' }}>
-                        <FileCheck size={15} style={{ color: '#16a34a' }} />
-                        <span>Consent & Compliance Status</span>
+                  {/* Review Consent */}
+                  <div className="cc-review-card">
+                    <div className="cc-review-header">
+                      <div className="cc-review-title">
+                        <Lock size={15} className="text-purple-600" />
+                        <span>Applicant Consent Record</span>
                       </div>
-                      <button type="button" className="cc-edit-btn" style={{ color: '#16a34a' }} onClick={() => setCurrentStep(3)}>
+                      <button type="button" className="cc-edit-btn" onClick={() => setCurrentStep(3)}>
                         Edit
                       </button>
                     </div>
                     <div className="cc-review-grid">
                       <div className="cc-review-item">
-                        <span style={{ color: '#166534' }}>Consent Verification</span>
-                        <strong style={{ color: '#14532d', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <CheckCircle2 size={13} style={{ color: '#16a34a' }} /> Explicitly Recorded
+                        <span>Consent Status</span>
+                        <strong style={{ color: '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Check size={14} /> Explicit Consent Recorded
                         </strong>
                       </div>
                       <div className="cc-review-item">
-                        <span style={{ color: '#166534' }}>Notice Version</span>
-                        <strong style={{ color: '#14532d' }}>{formData.consentNoticeVersion}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span style={{ color: '#166534' }}>Timestamp Recorded</span>
-                        <strong style={{ color: '#14532d' }}>
-                          {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, Today
-                        </strong>
+                        <span>Notice Version</span>
+                        <strong style={{ fontFamily: 'monospace' }}>{formData.consentNoticeVersion}</strong>
                       </div>
                     </div>
                   </div>
+
+                  {/* Dynamic Custom Details Review */}
+                  {Object.keys(customFields).length > 0 && (
+                    <div className="cc-review-card">
+                      <div className="cc-review-header">
+                        <div className="cc-review-title">
+                          <FileCheck size={15} className="text-purple-600" />
+                          <span>Additional Custom Details</span>
+                        </div>
+                      </div>
+                      <div className="cc-review-grid">
+                        {(formConfig?.fieldsConfig || [])
+                          .filter(f => !f.isSystem && customFields[f.fieldKey] !== undefined && customFields[f.fieldKey] !== '')
+                          .map(f => (
+                            <div key={f.fieldKey} className="cc-review-item">
+                              <span>{f.label}</span>
+                              <strong>{Array.isArray(customFields[f.fieldKey]) ? customFields[f.fieldKey].join(', ') : String(customFields[f.fieldKey])}</strong>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Modal Navigation Footer */}
+            {/* Modal Footer */}
             <div className="cc-modal-footer">
-              {currentStep === 1 ? (
-                <button type="button" className="cc-btn-sec" onClick={onClose}>
-                  Cancel
+              {currentStep > 1 ? (
+                <button
+                  type="button"
+                  className="cc-btn-sec"
+                  onClick={handleBack}
+                  disabled={submitting}
+                >
+                  <ArrowLeft size={16} /> Back
                 </button>
               ) : (
-                <button type="button" className="cc-btn-sec" onClick={handlePrev} disabled={submitting}>
-                  <ArrowLeft size={15} style={{ marginRight: '4px' }} />
-                  Back
+                <button
+                  type="button"
+                  className="cc-btn-sec"
+                  onClick={onClose}
+                  disabled={submitting}
+                >
+                  Cancel
                 </button>
               )}
 
@@ -844,29 +946,29 @@ export default function CreditCardReferralModal({
                 <button
                   type="button"
                   className="cc-btn-pri"
+                  style={{ background: '#2563eb', borderColor: '#2563eb' }}
                   onClick={handleNext}
-                  disabled={currentStep === 3 && !formData.consentGiven}
                 >
                   <span>Continue</span>
-                  <ArrowRight size={15} style={{ marginLeft: '4px' }} />
+                  <ArrowRight size={16} />
                 </button>
               ) : (
                 <button
                   type="button"
                   className="cc-btn-pri"
+                  style={{ background: '#2563eb', borderColor: '#2563eb' }}
                   onClick={handleSubmit}
                   disabled={submitting}
-                  style={{ background: '#059669', borderColor: '#059669' }}
                 >
                   {submitting ? (
                     <>
-                      <Loader2 size={16} className="spin" />
+                      <Loader2 size={16} className="cc-spin" />
                       <span>Saving Referral...</span>
                     </>
                   ) : (
                     <>
-                      <Check size={16} />
-                      <span>Confirm & Submit Referral</span>
+                      <CheckCircle2 size={16} />
+                      <span>Submit Credit Card Referral</span>
                     </>
                   )}
                 </button>

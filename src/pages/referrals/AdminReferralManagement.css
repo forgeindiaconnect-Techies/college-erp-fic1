@@ -1167,24 +1167,17 @@
 }
 
 /* ── OPPORTUNITY PUBLISHING MODULE STYLES ── */
-.opp-module-tabs {
+.opp-module-tabs,
+.opp-modules-tabs-bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   background: #f1f5f9;
   padding: 6px;
   border-radius: 14px;
   margin-bottom: 22px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
   border: 1px solid #e2e8f0;
-}
-
-.opp-module-tabs::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
 }
 
 .opp-module-tab {
@@ -1746,12 +1739,21 @@
   color: #ffffff !important;
 }
 
-/* ── Sleek Custom Scrollbar for Tables (Zero Windows Grey Scrollbar) ── */
+/* ── Sleek Custom Scrollbar for Tables ── */
+.mgmt-table-wrapper,
+.ref-table-wrapper,
+.ref-table-scroll {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
 .mgmt-table-wrapper::-webkit-scrollbar,
 .ref-table-wrapper::-webkit-scrollbar,
 .ref-table-scroll::-webkit-scrollbar {
-  height: 6px !important;
-  width: 6px !important;
+  height: 8px !important;
+  width: 8px !important;
 }
 
 .mgmt-table-wrapper::-webkit-scrollbar-track,
@@ -1764,14 +1766,14 @@
 .mgmt-table-wrapper::-webkit-scrollbar-thumb,
 .ref-table-wrapper::-webkit-scrollbar-thumb,
 .ref-table-scroll::-webkit-scrollbar-thumb {
-  background: #cbd5e1 !important;
+  background: #94a3b8 !important;
   border-radius: 4px !important;
 }
 
 .mgmt-table-wrapper::-webkit-scrollbar-thumb:hover,
 .ref-table-wrapper::-webkit-scrollbar-thumb:hover,
 .ref-table-scroll::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8 !important;
+  background: #64748b !important;
 }
 
 

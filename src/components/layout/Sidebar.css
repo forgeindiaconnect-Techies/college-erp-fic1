@@ -132,32 +132,59 @@
   background: rgba(255, 255, 255, 0.13);
 }
 
-.nav-link.active,
-.nav-group-header.active {
+/* Top-level standalone nav link active */
+.nav-link.active {
   color: #ffffff;
   background: #2b506c;
   border-left: 3px solid #7dd3fc;
   border-radius: 4px;
   box-shadow: none;
+  font-weight: 600;
+}
+
+/* Accordion group header active state (subtle highlight, NO left border duplicate) */
+.nav-group-header.active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  border-left: none !important;
+  box-shadow: none;
+  font-weight: 600;
 }
 
 /* Collapsible submenu */
 .nav-group-items {
   display: none !important;
-  margin: 2px 0 6px !important;
+  margin: 3px 0 6px !important;
   padding: 0 !important;
 }
 
 .nav-group-items.expanded {
   display: flex !important;
   flex-direction: column;
+  gap: 2px;
 }
 
 .nav-group-items .nav-link {
   min-height: 38px;
   padding: 8px 12px 8px 36px !important;
   font-size: 13px;
-  color: #d2dfE9;
+  color: #d2dfe9;
+  border-radius: 4px;
+  border-left: 3px solid transparent;
+  background: transparent;
+}
+
+.nav-group-items .nav-link:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-group-items .nav-link.active {
+  color: #ffffff;
+  background: #25445d;
+  border-left: 3px solid #7dd3fc !important;
+  border-radius: 4px;
+  font-weight: 600;
 }
 
 .nav-group-items .nav-link svg {
