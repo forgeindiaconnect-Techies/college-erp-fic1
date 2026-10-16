@@ -112,5 +112,5 @@ const referralFormConfigSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export const ReferralFormConfig = mongoose.model('ReferralFormConfig', referralFormConfigSchema);
+export const ReferralFormConfig = mongoose.models.ReferralFormConfig || mongoose.model('ReferralFormConfig', referralFormConfigSchema);
 export default ReferralFormConfig;

@@ -76,4 +76,4 @@ const collegeSchema = new mongoose.Schema({
   collegeId: { type: String } 
 }, { timestamps: true });
 
-export default mongoose.model('College', collegeSchema);
+export default mongoose.models.College || mongoose.model('College', collegeSchema);

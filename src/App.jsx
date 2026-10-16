@@ -61,8 +61,10 @@ import SystemAnalytics from './pages/analytics/SystemAnalytics';
 import LibraryManagement from './pages/library/LibraryManagement';
 import LibrarianManagement from './pages/library/LibrarianManagement';
 import TransportManagement from './pages/transport/TransportManagement';
+import AdminBusTrackingPage from './pages/transport/AdminBusTrackingPage';
 import DriverManagement from './pages/admin/DriverManagement';
 import AdminWatchmanManagement from './pages/watchman/AdminWatchmanManagement';
+import AdminWatchmanTracking from './pages/watchman/AdminWatchmanTracking';
 import HostelManagement from './pages/hostel/HostelManagement';
 import HostelDashboard from './pages/hostel/HostelDashboard';
 import HostelLayout from './hostel/components/HostelLayout';
@@ -166,6 +168,8 @@ import StaffPayroll from './staff/pages/StaffPayroll';
 import StaffPlacements from './staff/pages/StaffPlacements';
 import StaffLibrary from './staff/pages/StaffLibrary';
 import StaffSupport from './staff/pages/StaffSupport';
+import StaffDeliveryParcelPage from './staff/pages/StaffDeliveryParcelPage';
+import AdminDeliveryParcelManagement from './pages/admin/AdminDeliveryParcelManagement';
 
 // Student Layout & Pages
 import StudentLayout from './student/components/StudentLayout';
@@ -248,6 +252,7 @@ import QrVerificationPage from './watchman/pages/QrVerificationPage';
 import PreRegisteredVisitorsPage from './watchman/pages/PreRegisteredVisitorsPage';
 import DeliveryParcelPage from './watchman/pages/DeliveryParcelPage';
 import VehicleRegisterPage from './watchman/pages/VehicleRegisterPage';
+import BusEntryTrackingPage from './watchman/pages/BusEntryTrackingPage';
 import StudentRegisterPage from './watchman/pages/StudentRegisterPage';
 import StaffRegisterPage from './watchman/pages/StaffRegisterPage';
 import AttendanceShiftPage from './watchman/pages/AttendanceShiftPage';
@@ -349,9 +354,9 @@ const HostelGuard = ({ children }) => {
 };
 
 const WatchmanGuard = ({ children }) => {
-  const session = sessionStorage.getItem('watchman_session');
+  const session = sessionStorage.getItem('watchman_session') || sessionStorage.getItem('admin_session') || sessionStorage.getItem('superadmin_session');
   if (session) return children;
-  if (hasAnyOtherSession('watchman_session')) return <Navigate to="/unauthorized" replace />;
+  if (hasAnyOtherSession('watchman_session') && !sessionStorage.getItem('admin_session') && !sessionStorage.getItem('superadmin_session')) return <Navigate to="/unauthorized" replace />;
   return <Navigate to="/login" replace />;
 };
 
@@ -443,7 +448,7 @@ function App() {
             <Route path="/unauthorized" element={<Unauthorized />} />
             <Route path="/upgrade-plan" element={<AdminGuard><UpgradePlan /></AdminGuard>} />
             <Route path="/register" element={<GetAccess />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+
 
             {/* Redirect old login pages to unified login */}
             <Route path="/admin/login" element={<Navigate to="/login" replace />} />
@@ -525,6 +530,8 @@ function App() {
               <Route path="library"       element={<LibraryManagement />} />
               <Route path="librarian-management" element={<LibrarianManagement />} />
               <Route path="transport"     element={<TransportManagement />} />
+              <Route path="bus-tracking"  element={<AdminBusTrackingPage />} />
+              <Route path="buses"         element={<AdminBusTrackingPage />} />
               <Route path="drivers"       element={<DriverManagement />} />
               <Route path="hostel"        element={<HostelDashboard />} />
               <Route path="hostel-dashboard" element={<HostelDashboard />} />
@@ -533,7 +540,19 @@ function App() {
               <Route path="placement-management" element={<PlacementOfficerManagement />} />
               <Route path="assignments"   element={<AdminAssignments />} />
               <Route path="accounts-management" element={<AccountsOfficerManagement />} />
+              <Route path="watchman" element={<AdminWatchmanManagement />} />
               <Route path="watchman-management" element={<AdminWatchmanManagement />} />
+              <Route path="watchman-tracking" element={<AdminWatchmanTracking />} />
+              <Route path="student-entry-management" element={<AdminWatchmanTracking />} />
+              <Route path="parcels" element={<AdminDeliveryParcelManagement />} />
+              <Route path="parcel" element={<AdminDeliveryParcelManagement />} />
+              <Route path="deliveries" element={<AdminDeliveryParcelManagement />} />
+              <Route path="delivery" element={<AdminDeliveryParcelManagement />} />
+              <Route path="delivery-dashboard" element={<AdminDeliveryParcelManagement />} />
+              <Route path="delivery-parcels" element={<AdminDeliveryParcelManagement />} />
+              <Route path="delivery-and-parcels" element={<AdminDeliveryParcelManagement />} />
+              <Route path="parcel-management" element={<AdminDeliveryParcelManagement />} />
+              <Route path="delivery-management" element={<AdminDeliveryParcelManagement />} />
               <Route path="ai"            element={<AIAssistant />} />
               <Route path="announcements" element={<AnnouncementsManagement />} />
               <Route path="permissions"   element={<RolePermissions />} />
@@ -636,6 +655,8 @@ function App() {
               <Route path="placements" element={<StaffPlacements />} />
               <Route path="library"    element={<StaffLibrary />} />
               <Route path="support"    element={<StaffSupport />} />
+              <Route path="parcels"    element={<StaffDeliveryParcelPage />} />
+              <Route path="deliveries" element={<StaffDeliveryParcelPage />} />
               <Route path="referrals"  element={<PersonalReferrals />} />
               <Route path="business-referral" element={<BusinessReferralLanding />} />
               <Route path="business-referral/incentives" element={<BusinessReferralIncentives />} />
@@ -823,18 +844,38 @@ function App() {
               <Route path="qr-verification" element={<QrVerificationPage />} />
               <Route path="pre-registered" element={<PreRegisteredVisitorsPage />} />
               <Route path="parcels" element={<DeliveryParcelPage />} />
+              <Route path="parcel" element={<DeliveryParcelPage />} />
+              <Route path="deliveries" element={<DeliveryParcelPage />} />
+              <Route path="delivery" element={<DeliveryParcelPage />} />
+              <Route path="delivery-parcels" element={<DeliveryParcelPage />} />
+              <Route path="delivery-dashboard" element={<DeliveryParcelPage />} />
               <Route path="vehicle-register" element={<VehicleRegisterPage />} />
               <Route path="vehicles" element={<VehicleRegisterPage />} />
+              <Route path="bus-tracking" element={<BusEntryTrackingPage />} />
+              <Route path="buses" element={<BusEntryTrackingPage />} />
               <Route path="student-register" element={<StudentRegisterPage />} />
               <Route path="staff-register" element={<StaffRegisterPage />} />
               <Route path="attendance-shift" element={<AttendanceShiftPage />} />
               <Route path="attendance" element={<AttendanceShiftPage />} />
               <Route path="incidents" element={<IncidentReportsPage />} />
               <Route path="visitor-history" element={<VisitorHistoryPage />} />
+              <Route path="verify" element={<QrVerificationPage />} />
               <Route path="notifications" element={<WatchmanNotificationsPage />} />
               <Route path="profile" element={<WatchmanProfilePage />} />
               <Route path="change-password" element={<WatchmanChangePasswordPage />} />
             </Route>
+
+            {/* Direct Verification Route for Mobile Camera / Google Lens Scans */}
+            <Route path="/verify-gate-pass" element={<QrVerificationPage />} />
+            <Route path="/watchman/verify" element={<QrVerificationPage />} />
+
+            {/* Convenience Aliases */}
+            <Route path="/delivery-dashboard" element={<Navigate to="/admin/parcels" replace />} />
+            <Route path="/parcels" element={<Navigate to="/admin/parcels" replace />} />
+            <Route path="/deliveries" element={<Navigate to="/admin/parcels" replace />} />
+
+            {/* Catch-all Wildcard Route: Placed at the very end so all role and public routes resolve first */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
         </ThemeContext.Provider>

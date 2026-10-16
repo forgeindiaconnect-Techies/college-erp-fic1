@@ -2517,7 +2517,7 @@ export default function BusinessReferralSettings() {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="brs-modal-grid-2">
                   <div className="brs-form-group">
                     <label>Annual Fee / CTC / Deposit</label>
                     <input
@@ -2576,7 +2576,7 @@ export default function BusinessReferralSettings() {
 
             <form onSubmit={handleSaveFieldForm}>
               <div className="brs-modal-body">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="brs-modal-grid-2">
                   <div className="brs-form-group">
                     <label>Field Display Label *</label>
                     <input
@@ -2609,7 +2609,7 @@ export default function BusinessReferralSettings() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="brs-modal-grid-2">
                   <div className="brs-form-group">
                     <label>Input Field Type *</label>
                     <select
@@ -2675,7 +2675,7 @@ export default function BusinessReferralSettings() {
                   </div>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="brs-modal-grid-2">
                   <div className="brs-form-group">
                     <label>Validation Rule</label>
                     <select
@@ -2718,21 +2718,40 @@ export default function BusinessReferralSettings() {
                 </div>
               </div>
 
-              <div className="brs-modal-footer">
-                <button
-                  type="button"
-                  className="mgmt-btn-secondary"
-                  onClick={() => setShowEditFieldModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="mgmt-btn-primary"
-                  disabled={saving}
-                >
-                  {saving ? 'Saving...' : (editingField ? 'Update Field' : 'Create Field')}
-                </button>
+              <div className="brs-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  {editingField && !editingField.isSystem && (
+                    <button
+                      type="button"
+                      className="mgmt-btn-secondary"
+                      style={{ color: '#dc2626', borderColor: '#fca5a5', background: '#fef2f2', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      onClick={async () => {
+                        const catName = activeTab === 'fields' ? fieldCategoryFilter : currentCategoryName;
+                        setShowEditFieldModal(false);
+                        await handleDeleteField(catName, editingField.fieldKey);
+                      }}
+                    >
+                      <Trash2 size={15} />
+                      <span>Delete This Field</span>
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    className="mgmt-btn-secondary"
+                    onClick={() => setShowEditFieldModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="mgmt-btn-primary"
+                    disabled={saving}
+                  >
+                    {saving ? 'Saving...' : (editingField ? 'Update Field' : 'Create Field')}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -2775,7 +2794,7 @@ export default function BusinessReferralSettings() {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="brs-modal-grid-2">
                   <div className="brs-form-group">
                     <label>Referral Category *</label>
                     <select
@@ -2803,7 +2822,7 @@ export default function BusinessReferralSettings() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="brs-modal-grid-2">
                   <div className="brs-form-group">
                     <label>Applicable Partner (Optional)</label>
                     <input
@@ -2846,7 +2865,7 @@ export default function BusinessReferralSettings() {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="brs-modal-grid-2">
                   <div className="brs-form-group">
                     <label>Effective From Date</label>
                     <input

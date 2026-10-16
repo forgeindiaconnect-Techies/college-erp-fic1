@@ -6,12 +6,30 @@ const parcelLogSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  type: {
+    type: String,
+    enum: ['Delivery', 'Parcel'],
+    default: 'Parcel'
+  },
   deliveryCompany: {
     type: String,
-    required: true,
-    enum: ['Amazon', 'Flipkart', 'Blue Dart', 'DTDC', 'India Post / Speed Post', 'Delhivery', 'FedEx', 'Swiggy / Zomato', 'Courier', 'Other']
+    required: true
+  },
+  senderName: {
+    type: String,
+    default: ''
   },
   otherCompany: {
+    type: String,
+    default: ''
+  },
+  // Unique staff database reference
+  recipientId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  staffId: {
     type: String,
     default: ''
   },
@@ -19,13 +37,17 @@ const parcelLogSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  recipientEmail: {
+    type: String,
+    default: ''
+  },
   recipientPhone: {
     type: String,
     default: ''
   },
   recipientType: {
     type: String,
-    enum: ['Student', 'Faculty', 'Staff', 'Department', 'Hostel Warden', 'Principal / Admin', 'Other'],
+    enum: ['Staff', 'Faculty', 'Department', 'Student', 'Hostel Warden', 'Principal / Admin', 'Other'],
     default: 'Staff'
   },
   department: {
@@ -46,8 +68,21 @@ const parcelLogSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Received at Gate', 'Handed Over', 'Returned / Dispatched'],
-    default: 'Received at Gate'
+    enum: ['Received', 'Pending Collection', 'Collected', 'Received at Gate', 'Handed Over', 'Returned / Dispatched'],
+    default: 'Received'
+  },
+  collectedAt: {
+    type: Date,
+    default: null
+  },
+  collectedBy: {
+    type: String,
+    default: ''
+  },
+  collectedById: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
   },
   handedOverAt: {
     type: Date,
@@ -65,6 +100,11 @@ const parcelLogSchema = new mongoose.Schema({
     type: String,
     default: 'Security Gate Staff'
   },
+  watchmanId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   notes: {
     type: String,
     default: ''
@@ -78,5 +118,10 @@ const parcelLogSchema = new mongoose.Schema({
     default: 'COL001'
   }
 }, { timestamps: true });
+
+// Ensure fast lookup by recipient and status
+parcelLogSchema.index({ recipientId: 1, status: 1 });
+parcelLogSchema.index({ staffId: 1, status: 1 });
+parcelLogSchema.index({ tenantId: 1, receivedAt: -1 });
 
 export default mongoose.models.ParcelLog || mongoose.model('ParcelLog', parcelLogSchema);

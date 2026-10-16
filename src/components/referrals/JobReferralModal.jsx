@@ -264,9 +264,15 @@ export default function JobReferralModal({
         errors.candidateName = 'Enter the candidate’s full legal name (minimum 3 characters).';
       }
 
+      const rawPhone = (formData.candidatePhone || '').replace(/\D/g, '');
+      let normPhone = rawPhone;
+      if (normPhone.startsWith('91') && normPhone.length === 12) {
+        normPhone = normPhone.slice(2);
+      } else if (normPhone.startsWith('0') && normPhone.length === 11) {
+        normPhone = normPhone.slice(1);
+      }
       const phoneRegex = /^[6-9]\d{9}$/;
-      const cleanedPhone = (formData.candidatePhone || '').replace(/\D/g, '');
-      if (!phoneRegex.test(cleanedPhone)) {
+      if (!phoneRegex.test(normPhone)) {
         errors.candidatePhone = 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
       }
 
@@ -282,8 +288,28 @@ export default function JobReferralModal({
       // Dynamic custom fields validation for Step 1
       const step1Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
       step1Custom.forEach(f => {
-        const val = customFields[f.fieldKey];
-        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+        let val = customFields[f.fieldKey];
+        const keyLower = (f.fieldKey || '').toLowerCase();
+        const labelLower = (f.label || '').toLowerCase();
+
+        // Fallback for standard attributes that may be configured as dynamic keys
+        if (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '')) {
+          if (keyLower.includes('city') || keyLower.includes('location') || labelLower.includes('city') || labelLower.includes('location')) {
+            val = formData.candidateCity ? formData.candidateCity.trim() : '';
+          } else if (keyLower.includes('name') || labelLower.includes('name')) {
+            val = formData.candidateName ? formData.candidateName.trim() : '';
+          } else if (keyLower.includes('phone') || keyLower.includes('mobile') || labelLower.includes('phone') || labelLower.includes('mobile')) {
+            val = formData.candidatePhone ? formData.candidatePhone.trim() : '';
+          } else if (keyLower.includes('email') || labelLower.includes('email')) {
+            val = formData.candidateEmail ? formData.candidateEmail.trim() : '';
+          } else if (keyLower.includes('experience') || labelLower.includes('experience')) {
+            val = formData.experienceLevel ? formData.experienceLevel : 'Fresher (0-1 yr)';
+          } else if (keyLower.includes('qualification') || labelLower.includes('qualification')) {
+            val = formData.highestQualification || 'B.E. / B.Tech';
+          }
+        }
+
+        if (f.isRequired && (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0))) {
           errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
         }
       });
@@ -303,8 +329,31 @@ export default function JobReferralModal({
       // Dynamic custom fields validation for Step 2
       const step2Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2);
       step2Custom.forEach(f => {
-        const val = customFields[f.fieldKey];
-        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+        let val = customFields[f.fieldKey];
+        const keyLower = (f.fieldKey || '').toLowerCase();
+        const labelLower = (f.label || '').toLowerCase();
+
+        if (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '')) {
+          if (keyLower.includes('company') || labelLower.includes('company') || keyLower.includes('partner') || labelLower.includes('partner')) {
+            val = formData.companyName || '';
+          } else if (keyLower.includes('role') || labelLower.includes('role')) {
+            val = formData.jobRole || '';
+          } else if (keyLower.includes('ref') || labelLower.includes('ref')) {
+            val = formData.jobReferenceId || '';
+          } else if (keyLower.includes('location') || labelLower.includes('location')) {
+            val = formData.jobLocation || '';
+          } else if (keyLower.includes('relationship') || labelLower.includes('relationship')) {
+            val = formData.referrerRelationship || '';
+          } else if (keyLower.includes('category') || labelLower.includes('category') || keyLower.includes('sector') || labelLower.includes('sector')) {
+            val = formData.sector || '';
+          } else if (keyLower.includes('resume') || labelLower.includes('resume')) {
+            val = 'optional';
+          } else if (keyLower.includes('notes') || labelLower.includes('notes')) {
+            val = 'optional';
+          }
+        }
+
+        if (f.isRequired && (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0))) {
           errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
         }
       });
@@ -325,7 +374,10 @@ export default function JobReferralModal({
       if (currentStep === 3 && !formData.consentTimestamp) {
         setFormData(prev => ({ ...prev, consentTimestamp: new Date().toISOString() }));
       }
+      setError(null);
       setCurrentStep(prev => prev + 1);
+    } else {
+      setError('Please fill in all required fields marked with * before continuing.');
     }
   };
 
@@ -671,7 +723,15 @@ export default function JobReferralModal({
 
                   {/* Dynamic Step 1 Custom Fields */}
                   <DynamicFieldRenderer
-                    fields={(formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1))}
+                    fields={(formConfig?.fieldsConfig || []).filter(f => {
+                      if (f.isSystem) return false;
+                      const k = (f.fieldKey || '').toLowerCase();
+                      const l = (f.label || '').toLowerCase();
+                      if (k.includes('name') || k.includes('phone') || k.includes('mobile') || k.includes('email') || k.includes('city') || k.includes('location') || k.includes('experience') || k.includes('qualification')) {
+                        return false;
+                      }
+                      return !f.step || f.step === 1;
+                    })}
                     values={customFields}
                     onChange={handleCustomFieldChange}
                     errors={fieldErrors}
@@ -815,7 +875,14 @@ export default function JobReferralModal({
 
                   {/* Dynamic Step 2 Custom Fields */}
                   <DynamicFieldRenderer
-                    fields={(formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2)}
+                    fields={(formConfig?.fieldsConfig || []).filter(f => {
+                      if (f.isSystem) return false;
+                      const k = (f.fieldKey || '').toLowerCase();
+                      if (k.includes('company') || k.includes('partner') || k.includes('role') || k.includes('category') || k.includes('sector') || k.includes('notes') || k.includes('resume')) {
+                        return false;
+                      }
+                      return f.step === 2;
+                    })}
                     values={customFields}
                     onChange={handleCustomFieldChange}
                     errors={fieldErrors}

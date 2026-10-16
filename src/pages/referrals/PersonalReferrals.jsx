@@ -809,30 +809,50 @@ export default function PersonalReferrals() {
           if (categoryFilter !== 'All' && r.category !== categoryFilter) return false;
           if (statusFilter !== 'All' && r.status !== statusFilter) return false;
           if (referralSearch) {
-            const q = referralSearch.toLowerCase();
+            const q = referralSearch.toLowerCase().trim();
             const applicantName = (
+              r.applicantName ||
+              r.formData?.applicantName ||
               r.insuranceDetails?.applicantName ||
               r.creditCardDetails?.applicantName ||
               r.bankAccountDetails?.applicantName ||
               r.jobDetails?.candidateName ||
+              r.leadName ||
+              r.fullName ||
               ''
             ).toLowerCase();
             const phone = (
+              r.applicantPhone ||
+              r.formData?.applicantPhone ||
               r.insuranceDetails?.applicantPhone ||
               r.creditCardDetails?.applicantPhone ||
               r.bankAccountDetails?.applicantPhone ||
               r.jobDetails?.candidatePhone ||
+              r.phone ||
               ''
-            );
+            ).toLowerCase();
             const code = (r.referralCode || '').toLowerCase();
-            if (!applicantName.includes(q) && !phone.includes(q) && !code.includes(q)) return false;
+            const partner = (r.partnerName || r.creditCardDetails?.partnerBank || '').toLowerCase();
+            const product = (r.productName || r.creditCardDetails?.cardName || '').toLowerCase();
+            const cat = (r.category || '').toLowerCase();
+
+            if (
+              !applicantName.includes(q) &&
+              !phone.includes(q) &&
+              !code.includes(q) &&
+              !partner.includes(q) &&
+              !product.includes(q) &&
+              !cat.includes(q)
+            ) {
+              return false;
+            }
           }
           return true;
         });
 
         return (
           <div style={{ padding: '20px' }}>
-            {/* Header with Quick Actions */}
+            {/* Header with Quick Action */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
@@ -846,55 +866,12 @@ export default function PersonalReferrals() {
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <button
                   type="button"
-                  className="mgmt-btn-secondary"
-                  onClick={() => {
-                    setSubmitCategory('Credit Card');
-                    setShowSubmitModal(true);
-                  }}
-                  title="Submit Credit Card Referral"
-                >
-                  💳 + Credit Card
-                </button>
-                <button
-                  type="button"
-                  className="mgmt-btn-secondary"
-                  onClick={() => {
-                    setSubmitCategory('Insurance');
-                    setShowSubmitModal(true);
-                  }}
-                  title="Submit Insurance Referral"
-                >
-                  🛡️ + Insurance
-                </button>
-                <button
-                  type="button"
-                  className="mgmt-btn-secondary"
-                  onClick={() => {
-                    setSubmitCategory('Bank Account');
-                    setShowSubmitModal(true);
-                  }}
-                  title="Submit Bank Account Referral"
-                >
-                  🏛️ + Bank Account
-                </button>
-                <button
-                  type="button"
-                  className="mgmt-btn-secondary"
-                  onClick={() => {
-                    setSubmitCategory('Job');
-                    setShowSubmitModal(true);
-                  }}
-                  title="Submit Job Opening Referral"
-                >
-                  💼 + Job Opening
-                </button>
-                <button
-                  type="button"
                   className="mgmt-btn-primary"
                   onClick={() => {
-                    setSubmitCategory('Credit Card');
+                    setSubmitCategory(categoryFilter !== 'All' ? categoryFilter : 'Credit Card');
                     setShowSubmitModal(true);
                   }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', fontWeight: 600, borderRadius: '8px' }}
                 >
                   <Plus size={16} />
                   <span>Submit New Referral</span>

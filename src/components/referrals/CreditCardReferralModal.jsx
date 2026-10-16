@@ -241,10 +241,25 @@ export default function CreditCardReferralModal({
       }
 
       // Dynamic custom fields validation for Step 1
-      const step1Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
+      const step1Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1) && !['applicantName', 'applicantEmail', 'applicantPhone', 'city', 'email', 'phone', 'location'].includes(f.fieldKey) && !['email address', 'city / campus location'].includes((f.label || '').toLowerCase().trim()));
       step1Custom.forEach(f => {
-        const val = customFields[f.fieldKey];
-        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+        let val = customFields[f.fieldKey];
+        const keyLower = (f.fieldKey || '').toLowerCase();
+        const labelLower = (f.label || '').toLowerCase();
+
+        if (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '')) {
+          if (keyLower.includes('city') || keyLower.includes('location') || labelLower.includes('city') || labelLower.includes('location')) {
+            val = formData.city ? formData.city.trim() : '';
+          } else if (keyLower.includes('name') || labelLower.includes('name')) {
+            val = formData.applicantName ? formData.applicantName.trim() : '';
+          } else if (keyLower.includes('phone') || keyLower.includes('mobile') || labelLower.includes('phone') || labelLower.includes('mobile')) {
+            val = formData.applicantPhone ? formData.applicantPhone.trim() : '';
+          } else if (keyLower.includes('email') || labelLower.includes('email')) {
+            val = formData.applicantEmail ? formData.applicantEmail.trim() : '';
+          }
+        }
+
+        if (f.isRequired && (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0))) {
           errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
         }
       });
@@ -259,9 +274,22 @@ export default function CreditCardReferralModal({
       }
 
       // Dynamic custom fields validation for Step 2
-      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2);
+      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => 
+        !f.isSystem && 
+        f.step === 2 && 
+        !['bankname', 'cardproduct', 'partnerreferencenumber', 'notes'].includes((f.fieldKey || '').toLowerCase())
+      );
       step2Custom.forEach(f => {
-        const val = customFields[f.fieldKey];
+        let val = customFields[f.fieldKey];
+        const keyLower = (f.fieldKey || '').toLowerCase();
+        if (keyLower.includes('source') || keyLower.includes('channel')) {
+          val = val || 'Campus Drive';
+        } else if (keyLower.includes('partner') || keyLower.includes('ref')) {
+          val = formData.partnerReferenceNumber || 'optional';
+        } else if (keyLower.includes('note') || keyLower.includes('remark')) {
+          val = formData.notes || 'optional';
+        }
+
         if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
           errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
         }
@@ -280,10 +308,13 @@ export default function CreditCardReferralModal({
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
+      setError(null);
       if (currentStep === 3 && !formData.consentTimestamp) {
         setFormData(prev => ({ ...prev, consentTimestamp: new Date().toISOString() }));
       }
       setCurrentStep(prev => prev + 1);
+    } else {
+      setError('Please fill in all required fields marked with * before continuing.');
     }
   };
 
@@ -305,13 +336,19 @@ export default function CreditCardReferralModal({
 
       const cleanPhone = (formData.applicantPhone || '').replace(/\D/g, '');
 
+      const summaryText = `${formData.applicantName.trim()} - ${formData.bankName} (${formData.cardProduct})`;
+
       const payload = {
         category: 'Credit Card',
         formVersion: formConfig?.version || 1,
         partnerName: formData.bankName,
         productName: formData.cardProduct,
         notes: formData.notes ? formData.notes.trim() : '',
-        customFields: customFields,
+        summary: summaryText,
+        customFields: {
+          summary: summaryText,
+          ...customFields
+        },
         formData: {
           applicantName: formData.applicantName.trim(),
           applicantPhone: cleanPhone,
@@ -322,6 +359,7 @@ export default function CreditCardReferralModal({
           cardProduct: formData.cardProduct,
           referralSource: formData.referralSource,
           partnerReferenceNumber: formData.partnerReferenceNumber ? formData.partnerReferenceNumber.trim() : '',
+          summary: summaryText,
           ...customFields
         },
         creditCardDetails: {
@@ -607,9 +645,9 @@ export default function CreditCardReferralModal({
                     )}
                   </div>
 
-                  {/* Dynamic Step 1 Custom Fields */}
+                  {/* Dynamic Step 1 Custom Fields (Excludes duplicate base fields) */}
                   {(formConfig?.fieldsConfig || [])
-                    .filter(f => !f.isSystem && (!f.step || f.step === 1))
+                    .filter(f => !f.isSystem && (!f.step || f.step === 1) && !['applicantName', 'applicantEmail', 'applicantPhone', 'city', 'email', 'phone', 'location'].includes(f.fieldKey) && !['email address', 'city / campus location'].includes((f.label || '').toLowerCase().trim()))
                     .map(f => (
                       <DynamicFieldRenderer
                         key={f.fieldKey}
@@ -723,7 +761,11 @@ export default function CreditCardReferralModal({
 
                   {/* Dynamic Step 2 Custom Fields */}
                   {(formConfig?.fieldsConfig || [])
-                    .filter(f => !f.isSystem && f.step === 2)
+                    .filter(f => 
+                      !f.isSystem && 
+                      f.step === 2 && 
+                      !['bankname', 'cardproduct', 'partnerreferencenumber', 'notes'].includes((f.fieldKey || '').toLowerCase())
+                    )
                     .map(f => (
                       <DynamicFieldRenderer
                         key={f.fieldKey}

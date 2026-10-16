@@ -10,4 +10,6 @@ const transportRouteSchema = new mongoose.Schema({
   points: [{ type: String }]
 , collegeId: { type: String } }, { timestamps: true });
 
-export default mongoose.model('TransportRoute', transportRouteSchema);
+const TransportRoute = mongoose.models.TransportRoute || mongoose.model('TransportRoute', transportRouteSchema);
+
+export default TransportRoute;

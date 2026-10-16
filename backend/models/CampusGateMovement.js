@@ -23,15 +23,22 @@ const campusGateMovementSchema = new mongoose.Schema({
     type: String,
     default: 'General'
   },
+  semester: {
+    type: String,
+    default: ''
+  },
+  designation: {
+    type: String,
+    default: ''
+  },
   direction: {
     type: String,
     required: true,
-    enum: ['In', 'Out']
+    default: 'In'
   },
   reason: {
     type: String,
-    required: true,
-    enum: ['Regular Campus Entry / Exit', 'Hostel Gate Pass / Outing', 'Official College Duty', 'Medical / Emergency', 'Day Scholar Departure', 'Special Permission']
+    default: 'Regular Campus Entry / Exit'
   },
   gatePassId: {
     type: String,

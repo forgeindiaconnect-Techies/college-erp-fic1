@@ -728,6 +728,29 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
             Manage college fleets, routes, student allocations, and track buses in real-time.
           </p>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            onClick={() => window.location.href = '/admin/bus-tracking'}
+            style={{
+              background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '10px 18px',
+              fontSize: '0.88rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 12px rgba(37,99,235,0.3)'
+            }}
+          >
+            <Bus size={18} />
+            <span>Live Gate Tracking & Fleet</span>
+          </button>
+        </div>
       </div>
 
       <div className="tm-erp-tabs">

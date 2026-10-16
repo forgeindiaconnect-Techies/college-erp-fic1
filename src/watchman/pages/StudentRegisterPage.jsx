@@ -258,25 +258,24 @@ const StudentRegisterPage = () => {
               <button className="wm-close-btn" onClick={() => setShowModal(false)}>×</button>
             </div>
 
-            {error && (
-              <div style={{
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                color: '#991b1b',
-                padding: '10px 14px',
-                borderRadius: 8,
-                marginBottom: 16,
-                fontSize: '0.85rem',
-                display: 'flex',
-                gap: 8,
-                alignItems: 'center'
-              }}>
-                <AlertCircle size={16} />
-                {error}
-              </div>
-            )}
-
-            <form onSubmit={handleCreate}>
+            <form onSubmit={handleCreate} style={{ padding: '20px 24px' }}>
+              {error && (
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#991b1b',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  marginBottom: 16,
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  gap: 8,
+                  alignItems: 'center'
+                }}>
+                  <AlertCircle size={16} />
+                  {error}
+                </div>
+              )}
               <div className="wm-grid-2" style={{ gap: 12 }}>
                 <div className="wm-form-group">
                   <label className="wm-label">Student ID / Roll No *</label>

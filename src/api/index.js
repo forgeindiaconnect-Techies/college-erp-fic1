@@ -3,9 +3,9 @@ import axios from 'axios';
 // In production (Vercel), use the Render backend URL.
 // In local dev, use localhost via the Vite proxy.
 const getBaseURL = () => {
-  // In local dev, always talk to the local backend on localhost:5000
+  // In local dev, connect to IPv4 127.0.0.1:5000 to prevent Windows IPv6 [::1] connection refusal
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://localhost:5000/api';
+    return 'http://127.0.0.1:5000/api';
   }
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
@@ -54,6 +54,8 @@ api.interceptors.request.use(
         token = sessionStorage.getItem('librarian_token');
       } else if (path.startsWith('/placement')) {
         token = sessionStorage.getItem('placement_token');
+      } else if (path.startsWith('/watchman')) {
+        token = sessionStorage.getItem('watchman_token') || sessionStorage.getItem('admin_token') || sessionStorage.getItem('superadmin_token');
       } else {
         // Fallback: Check all in priority
         token = sessionStorage.getItem('superadmin_token')
@@ -69,6 +71,7 @@ api.interceptors.request.use(
           || sessionStorage.getItem('hostel_token')
           || sessionStorage.getItem('librarian_token')
           || sessionStorage.getItem('placement_token')
+          || sessionStorage.getItem('watchman_token')
           || sessionStorage.getItem('token');
       }
     } catch (e) {
@@ -848,6 +851,8 @@ export const updateWatchman = (id, data) => api.put(`/watchman/${id}`, data);
 export const toggleWatchmanStatus = (id) => api.patch(`/watchman/${id}/status`);
 export const resetWatchmanPassword = (id, newPassword) => api.post(`/watchman/${id}/reset-password`, { newPassword });
 export const deleteWatchman = (id) => api.delete(`/watchman/${id}`);
+export const getWatchmanActivities = (params = {}) => api.get('/watchman/admin/activities', { params });
+export const getWatchmanDailyReport = (params = {}) => api.get('/watchman/admin/daily-report', { params });
 
 // Watchman Dashboard Operations
 export const getWatchmanProfile = () => api.get('/watchman/me');
@@ -860,13 +865,20 @@ export const recordVisitorEntry = (data) => api.post('/watchman/visitors/entry',
 export const recordVisitorExit = (id, data = {}) => api.post(`/watchman/visitors/${id}/exit`, data);
 export const verifyVisitorPass = (query) => api.get(`/watchman/visitors/verify/${encodeURIComponent(query)}`);
 export const getPreRegisteredVisitors = () => api.get('/watchman/visitors/pre-registered');
+export const preRegisterVisitor = (data) => api.post('/watchman/visitors/pre-register', data);
+export const updateVisitorApproval = (id, data) => api.patch(`/watchman/visitors/${id}/approval`, data);
 export const admitPreRegisteredVisitor = (id, data = {}) => api.post(`/watchman/visitors/${id}/admit`, data);
 export const getVisitorHistory = (params = {}) => api.get('/watchman/visitors/history', { params });
 
 // Delivery & Parcel Operations
-export const getParcels = (params = {}) => api.get('/watchman/parcels', { params });
-export const logParcel = (data) => api.post('/watchman/parcels', data);
-export const handoverParcel = (id, data = {}) => api.patch(`/watchman/parcels/${id}/handover`, data);
+export const getParcels = (params = {}) => api.get('/parcels', { params });
+export const getParcelById = (id) => api.get(`/parcels/${id}`);
+export const logParcel = (data) => api.post('/parcels', data);
+export const updateParcel = (id, data) => api.patch(`/parcels/${id}`, data);
+export const handoverParcel = (id, data = {}) => api.patch(`/parcels/${id}/handover`, data);
+export const collectParcel = (id, data = {}) => api.patch(`/parcels/${id}/collect`, data);
+export const deleteParcel = (id) => api.delete(`/parcels/${id}`);
+export const getStaffDirectory = (params = {}) => api.get('/parcels/staff-directory', { params });
 
 // Vehicle Operations
 export const getVehicles = (params = {}) => api.get('/watchman/vehicles', { params });
@@ -891,4 +903,25 @@ export const updateSecurityIncident = (id, data) => api.patch(`/watchman/inciden
 
 // Notifications
 export const getWatchmanNotifications = () => api.get('/watchman/notifications');
+
+// Student QR Code & Automatic Attendance Tracking
+export const lookupStudentQr = (code) => api.get(`/watchman/student-qr/${encodeURIComponent(code)}`);
+export const recordStudentCheckin = (data) => api.post('/watchman/student-checkin', data);
+export const recordStudentCheckout = (data) => api.post('/watchman/student-checkout', data);
+export const getStudentTracking = (params = {}) => api.get('/watchman/student-tracking', { params });
+export const getStudentTodayScans = () => api.get('/watchman/student-today-scans');
+export const getStudentDailyReport = (params = {}) => api.get('/watchman/student-daily-report', { params });
+export const getStudentQrDirectory = (params = {}) => api.get('/watchman/student-qr-directory', { params });
+
+// ── Real-Time College Bus Entry & Exit Tracking APIs ──────────────────────────
+export const getCollegeBuses = (params = {}) => api.get('/buses', { params });
+export const getCollegeBusById = (id) => api.get(`/buses/${id}`);
+export const createCollegeBus = (data) => api.post('/buses', data);
+export const updateCollegeBus = (id, data) => api.put(`/buses/${id}`, data);
+export const deleteCollegeBus = (id) => api.delete(`/buses/${id}`);
+export const recordBusEntry = (id, data = {}) => api.post(`/buses/${id}/entry`, data);
+export const recordBusExit = (id, data = {}) => api.post(`/buses/${id}/exit`, data);
+export const getBusMovementLogs = (params = {}) => api.get('/buses/logs', { params });
+export const getBusTrackingStats = (params = {}) => api.get('/buses/stats', { params });
+
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { AlertCircle, Calendar, Hash, Mail, Phone, Type, AlignLeft, CheckSquare, CircleDot, ChevronDown } from 'lucide-react';
 import './DynamicFieldRenderer.css';
 
-export default function DynamicFieldRenderer({
+function SingleDynamicField({
   field,
   value,
   onChange,
@@ -221,3 +221,49 @@ export default function DynamicFieldRenderer({
     </div>
   );
 }
+
+export default function DynamicFieldRenderer({
+  field,
+  fields,
+  value,
+  values,
+  onChange,
+  error = null,
+  errors = {},
+  disabled = false
+}) {
+  // If plural `fields` array is passed, map through and render each one
+  if (Array.isArray(fields)) {
+    if (fields.length === 0) return null;
+    return (
+      <div className="dfr-fields-container">
+        {fields.map((f, idx) => (
+          <SingleDynamicField
+            key={f.fieldKey || f.id || idx}
+            field={f}
+            value={values && values[f.fieldKey] !== undefined ? values[f.fieldKey] : (f.defaultValue ?? '')}
+            onChange={onChange}
+            error={errors ? errors[f.fieldKey] : null}
+            disabled={disabled}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  // Singular field
+  if (field) {
+    return (
+      <SingleDynamicField
+        field={field}
+        value={value}
+        onChange={onChange}
+        error={error}
+        disabled={disabled}
+      />
+    );
+  }
+
+  return null;
+}
+

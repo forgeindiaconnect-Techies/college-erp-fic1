@@ -4,7 +4,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, CalendarCheck, BookOpenCheck,
   ClipboardList, Calendar, LogOut, ChevronRight, ChevronDown, FileText, Megaphone, GraduationCap, IndianRupee, Briefcase, Library, LifeBuoy, X, Award, Network,
-  CreditCard, ShieldCheck, Layers, Building, FileCheck
+  CreditCard, ShieldCheck, Layers, Building, FileCheck, Package
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -37,10 +37,10 @@ const StaffSidebar = ({ isOpen, onClose }) => {
 
   const staffBusinessReferralItems = [
     { name: 'All Categories', path: '/staff/business-referral', exact: true, icon: <Layers size={16} /> },
-    { name: 'Credit Card Referral', path: '/staff/business-referral/credit-card', icon: <CreditCard size={16} /> },
-    { name: 'Insurance Referral', path: '/staff/business-referral/insurance', icon: <ShieldCheck size={16} /> },
-    { name: 'Job Referral', path: '/staff/business-referral/job-referral', icon: <Briefcase size={16} /> },
-    { name: 'Bank Account Referral', path: '/staff/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Credit Cards', path: '/staff/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance', path: '/staff/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Job Openings', path: '/staff/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Bank Accounts', path: '/staff/business-referral/account-opening', icon: <Building size={16} /> },
     { name: 'Incentives & Rules', path: '/staff/business-referral/incentives', icon: <Award size={16} /> },
     { name: 'My Submissions', path: '/staff/referrals', icon: <FileCheck size={16} /> }
   ];
@@ -75,7 +75,8 @@ const StaffSidebar = ({ isOpen, onClose }) => {
       icon: <Library size={20} />,
       items: [
         { name: 'Library', path: '/staff/library', icon: <Library size={20} /> },
-        { name: 'Placement', path: '/staff/placement', icon: <Briefcase size={20} /> }
+        { name: 'Placement', path: '/staff/placement', icon: <Briefcase size={20} /> },
+        { name: 'My Deliveries & Parcels', path: '/staff/parcels', icon: <Package size={20} /> }
       ]
     },
     {

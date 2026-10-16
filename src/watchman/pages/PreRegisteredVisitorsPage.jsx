@@ -1,11 +1,28 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   CalendarCheck, Search, CheckCircle2, Clock, MapPin,
-  AlertTriangle, XCircle, RefreshCw, UserCheck, Phone, X
+  AlertTriangle, XCircle, RefreshCw, UserCheck, Phone, X,
+  Plus, UserPlus, Mail, Building, Car, Shield, FileText, QrCode
 } from 'lucide-react';
-import { getPreRegisteredVisitors, admitPreRegisteredVisitor } from '../../api/index';
+import { getPreRegisteredVisitors, admitPreRegisteredVisitor, preRegisterVisitor } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import '../watchman.css';
+
+const INITIAL_PREBOOK_FORM = {
+  name: '',
+  phone: '',
+  email: '',
+  purpose: 'Official Meeting',
+  personToMeet: '',
+  department: 'Administration',
+  expectedDate: new Date().toISOString().split('T')[0],
+  expectedTime: '10:00 AM',
+  vehicleNumber: '',
+  idProofType: 'Aadhaar Card',
+  idProofNumber: '',
+  gate: 'Gate 1 (Main Entrance)',
+  notes: ''
+};
 
 const PreRegisteredVisitorsPage = () => {
   const [visitors, setVisitors] = useState([]);
@@ -15,6 +32,13 @@ const PreRegisteredVisitorsPage = () => {
   const [admitForm, setAdmitForm] = useState({ vehicleNumber: '', gate: 'Gate 1 (Main Entrance)', idProofNumber: '' });
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  // Pre-Book Visitor State
+  const [showPreBookModal, setShowPreBookModal] = useState(false);
+  const [preBookForm, setPreBookForm] = useState(INITIAL_PREBOOK_FORM);
+  const [preBookLoading, setPreBookLoading] = useState(false);
+  const [createdPassModal, setCreatedPassModal] = useState(null);
+  const [passQrMode, setPassQrMode] = useState('raw'); // 'raw' | 'url'
 
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -60,6 +84,30 @@ const PreRegisteredVisitorsPage = () => {
     }
   };
 
+  const handlePreBookSubmit = async (e) => {
+    e.preventDefault();
+    if (!preBookForm.name || !preBookForm.phone || !preBookForm.personToMeet) {
+      showToast('Please provide visitor name, phone number, and host to meet.', 'error');
+      return;
+    }
+
+    try {
+      setPreBookLoading(true);
+      const res = await preRegisterVisitor(preBookForm);
+      if (res.data?.success) {
+        showToast('Visitor appointment registered! Awaiting Admin approval before gate pass is active.', 'success');
+        setCreatedPassModal(null);
+        setShowPreBookModal(false);
+        setPreBookForm(INITIAL_PREBOOK_FORM);
+        fetchPreRegistered();
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to pre-register visitor', 'error');
+    } finally {
+      setPreBookLoading(false);
+    }
+  };
+
   const filtered = (Array.isArray(visitors) ? visitors : []).filter(v =>
     v.name?.toLowerCase().includes(search.toLowerCase()) ||
     v.phone?.toLowerCase().includes(search.toLowerCase()) ||
@@ -96,15 +144,36 @@ const PreRegisteredVisitorsPage = () => {
           <p>Verify appointments, check statutory host approvals, and record scheduled arrival clearance</p>
         </div>
 
-        <button
-          type="button"
-          className="wmn-btn-sec"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-          onClick={fetchPreRegistered}
-        >
-          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-          <span>Refresh</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="wmn-btn-primary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+              padding: '9px 18px',
+              borderRadius: '9px',
+              fontWeight: 700,
+              boxShadow: '0 4px 12px rgba(124, 58, 237, 0.25)'
+            }}
+            onClick={() => setShowPreBookModal(true)}
+          >
+            <Plus size={16} />
+            <span>Pre-Book Visitor</span>
+          </button>
+
+          <button
+            type="button"
+            className="wmn-btn-sec"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            onClick={fetchPreRegistered}
+          >
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -151,30 +220,54 @@ const PreRegisteredVisitorsPage = () => {
                 <th>Host / Department</th>
                 <th>Scheduled Time</th>
                 <th>Approval Status</th>
+                <th>QR Gate Pass</th>
                 <th style={{ textAlign: 'right' }}>Arrival Clearance</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '36px' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '36px' }}>
                     <RefreshCw size={20} className="animate-spin" style={{ margin: '0 auto 8px auto', color: '#7c3aed' }} />
                     <p style={{ margin: 0, color: '#64748b' }}>Loading expected visitors...</p>
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
-                    <CalendarCheck size={36} style={{ color: '#cbd5e1', margin: '0 auto 10px auto' }} />
-                    <h4 style={{ margin: '0 0 4px 0', color: '#0f172a' }}>No Expected Visitors</h4>
-                    <p style={{ margin: 0, fontSize: '0.84rem' }}>
-                      {search ? 'No visitor matches your active search.' : 'There are no pending pre-registered appointments for today.'}
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '44px 16px', color: '#64748b' }}>
+                    <CalendarCheck size={40} style={{ color: '#cbd5e1', margin: '0 auto 12px auto' }} />
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontSize: '1.05rem', fontWeight: 800 }}>No Expected Visitors</h4>
+                    <p style={{ margin: '0 auto 16px', fontSize: '0.84rem', maxWidth: '380px', color: '#64748b' }}>
+                      {search ? 'No visitor matches your active search.' : 'There are no scheduled pre-registered appointments for today.'}
                     </p>
+                    {!search && (
+                      <button
+                        type="button"
+                        className="wmn-btn-primary"
+                        style={{
+                          background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                          padding: '8px 18px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          borderRadius: '8px'
+                        }}
+                        onClick={() => setShowPreBookModal(true)}
+                      >
+                        <Plus size={15} />
+                        <span>Pre-Book Visitor Now</span>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
                 filtered.map(v => {
                   const isApproved = v.approvalStatus === 'Approved' || v.approvalStatus === 'Not Required';
+                  const isPending = v.approvalStatus === 'Pending';
+                  const isRejected = v.approvalStatus === 'Rejected';
+
                   return (
                     <tr key={v._id}>
                       <td>
@@ -205,12 +298,45 @@ const PreRegisteredVisitorsPage = () => {
                           borderRadius: '20px',
                           fontSize: '0.75rem',
                           fontWeight: 700,
-                          background: isApproved ? '#dcfce7' : (v.approvalStatus === 'Rejected' ? '#fee2e2' : '#fef3c7'),
-                          color: isApproved ? '#166534' : (v.approvalStatus === 'Rejected' ? '#991b1b' : '#92400e')
+                          background: isApproved ? '#dcfce7' : (isRejected ? '#fee2e2' : '#fef3c7'),
+                          color: isApproved ? '#166534' : (isRejected ? '#991b1b' : '#92400e'),
+                          border: `1px solid ${isApproved ? '#bbf7d0' : (isRejected ? '#fca5a5' : '#fde68a')}`
                         }}>
-                          {isApproved ? <CheckCircle2 size={12} /> : (v.approvalStatus === 'Rejected' ? <XCircle size={12} /> : <AlertTriangle size={12} />)}
-                          <span>{v.approvalStatus}</span>
+                          {isApproved ? <CheckCircle2 size={12} /> : (isRejected ? <XCircle size={12} /> : <AlertTriangle size={12} />)}
+                          <span>{v.approvalStatus || 'Pending'}</span>
                         </span>
+                        {v.approvedBy && isApproved && (
+                          <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+                            By: {v.approvedBy}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {isApproved ? (
+                          <button
+                            type="button"
+                            className="wmn-btn-sec"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '4px 10px',
+                              fontSize: '0.76rem',
+                              fontWeight: 700,
+                              borderRadius: '6px',
+                              cursor: 'pointer'
+                            }}
+                            onClick={() => setCreatedPassModal(v)}
+                            title="Click to view and print official QR Gate Pass"
+                          >
+                            <QrCode size={13} style={{ color: '#7c3aed' }} />
+                            <span>View QR Pass</span>
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                            {isPending ? '🔒 Locked (Awaiting Approval)' : '✕ Inactive'}
+                          </span>
+                        )}
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         {isApproved ? (
@@ -231,9 +357,31 @@ const PreRegisteredVisitorsPage = () => {
                             <UserCheck size={14} />
                             <span>Admit Visitor</span>
                           </button>
+                        ) : isPending ? (
+                          <span style={{
+                            display: 'inline-block',
+                            background: '#fef3c7',
+                            color: '#92400e',
+                            border: '1px solid #fde68a',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.76rem',
+                            fontWeight: 700
+                          }}>
+                            ⏳ Awaiting Admin Approval
+                          </span>
                         ) : (
-                          <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                            Approval Required
+                          <span style={{
+                            display: 'inline-block',
+                            background: '#fee2e2',
+                            color: '#991b1b',
+                            border: '1px solid #fca5a5',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.76rem',
+                            fontWeight: 700
+                          }}>
+                            ✕ Entry Denied
                           </span>
                         )}
                       </td>
@@ -331,6 +479,314 @@ const PreRegisteredVisitorsPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ── Pre-Book Visitor Modal ── */}
+      {showPreBookModal && (
+        <div className="wmn-modal-backdrop" onClick={() => !preBookLoading && setShowPreBookModal(false)}>
+          <div className="wmn-modal-card" style={{ maxWidth: 600 }} onClick={(e) => e.stopPropagation()}>
+            <div className="wmn-modal-header" style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#ffffff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <CalendarCheck size={20} />
+                <h3 style={{ margin: 0, color: '#ffffff', fontSize: '1.05rem', fontWeight: 800 }}>
+                  Pre-Book Visitor Appointment
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="wmn-modal-close"
+                style={{ color: '#ffffff' }}
+                onClick={() => !preBookLoading && setShowPreBookModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handlePreBookSubmit}>
+              <div className="wmn-modal-body" style={{ maxHeight: '72vh', overflowY: 'auto', padding: '20px' }}>
+                <div className="wmn-form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div className="wmn-form-group">
+                    <label className="wmn-form-label">Visitor Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      className="wmn-form-input"
+                      placeholder="e.g. Ramesh Kumar"
+                      value={preBookForm.name}
+                      onChange={(e) => setPreBookForm({ ...preBookForm, name: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="wmn-form-group">
+                    <label className="wmn-form-label">Mobile Number *</label>
+                    <input
+                      type="tel"
+                      required
+                      className="wmn-form-input"
+                      placeholder="10-digit mobile number"
+                      value={preBookForm.phone}
+                      onChange={(e) => setPreBookForm({ ...preBookForm, phone: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="wmn-form-group">
+                    <label className="wmn-form-label">Email Address (Optional)</label>
+                    <input
+                      type="email"
+                      className="wmn-form-input"
+                      placeholder="visitor@example.com"
+                      value={preBookForm.email}
+                      onChange={(e) => setPreBookForm({ ...preBookForm, email: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="wmn-form-group">
+                    <label className="wmn-form-label">Host / Person to Meet *</label>
+                    <input
+                      type="text"
+                      required
+                      className="wmn-form-input"
+                      placeholder="e.g. Principal / Dr. Sundaram"
+                      value={preBookForm.personToMeet}
+                      onChange={(e) => setPreBookForm({ ...preBookForm, personToMeet: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="wmn-form-group">
+                    <label className="wmn-form-label">Host Department *</label>
+                    <select
+                      className="wmn-form-select"
+                      value={preBookForm.department}
+                      onChange={(e) => setPreBookForm({ ...preBookForm, department: e.target.value })}
+                    >
+                      <option value="Administration">Administration</option>
+                      <option value="Principal Office">Principal Office</option>
+                      <option value="Computer Science">Computer Science</option>
+                      <option value="Commerce">Commerce</option>
+                      <option value="Mathematics">Mathematics</option>
+                      <option value="Accounts Department">Accounts Department</option>
+                      <option value="Placement Cell">Placement Cell</option>
+                      <option value="Examinations Office">Examinations Office</option>
+                    </select>
+                  </div>
+
+                  <div className="wmn-form-group">
+                    <label className="wmn-form-label">Purpose of Visit *</label>
+                    <select
+                      className="wmn-form-select"
+                      value={preBookForm.purpose}
+                      onChange={(e) => setPreBookForm({ ...preBookForm, purpose: e.target.value })}
+                    >
+                      <option value="Official Meeting">Official Meeting</option>
+                      <option value="Admissions Enquiry">Admissions Enquiry</option>
+                      <option value="Guest Lecture / Seminar">Guest Lecture / Seminar</option>
+                      <option value="Vendor / Maintenance">Vendor / Maintenance</option>
+                      <option value="Parent Meeting">Parent Meeting</option>
+                      <option value="Campus Interview / Placement">Campus Interview / Placement</option>
+                      <option value="Inspection / Statutory">Inspection / Statutory</option>
+                    </select>
+                  </div>
+
+                  <div className="wmn-form-group">
+                    <label className="wmn-form-label">Scheduled Date *</label>
+                    <input
+                      type="date"
+                      required
+                      className="wmn-form-input"
+                      value={preBookForm.expectedDate}
+                      onChange={(e) => setPreBookForm({ ...preBookForm, expectedDate: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="wmn-form-group">
+                    <label className="wmn-form-label">Scheduled Time *</label>
+                    <input
+                      type="text"
+                      className="wmn-form-input"
+                      placeholder="e.g. 10:30 AM"
+                      value={preBookForm.expectedTime}
+                      onChange={(e) => setPreBookForm({ ...preBookForm, expectedTime: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="wmn-form-group">
+                    <label className="wmn-form-label">Vehicle Registration (Optional)</label>
+                    <input
+                      type="text"
+                      className="wmn-form-input"
+                      placeholder="e.g. TN-24-AX-1234"
+                      value={preBookForm.vehicleNumber}
+                      onChange={(e) => setPreBookForm({ ...preBookForm, vehicleNumber: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="wmn-form-group">
+                    <label className="wmn-form-label">Designated Entry Gate</label>
+                    <select
+                      className="wmn-form-select"
+                      value={preBookForm.gate}
+                      onChange={(e) => setPreBookForm({ ...preBookForm, gate: e.target.value })}
+                    >
+                      <option value="Gate 1 (Main Entrance)">Gate 1 (Main Entrance)</option>
+                      <option value="Gate 2 (North Gate)">Gate 2 (North Gate)</option>
+                      <option value="Gate 3 (Hostel Gate)">Gate 3 (Hostel Gate)</option>
+                      <option value="Gate 4 (Sports Complex Gate)">Gate 4 (Sports Complex Gate)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="wmn-form-group" style={{ marginTop: '14px' }}>
+                  <label className="wmn-form-label">Security Clearance / Notes (Optional)</label>
+                  <textarea
+                    rows={2}
+                    className="wmn-form-input"
+                    placeholder="Any special host approval instructions or security notes..."
+                    value={preBookForm.notes}
+                    onChange={(e) => setPreBookForm({ ...preBookForm, notes: e.target.value })}
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+              </div>
+
+              <div className="wmn-modal-footer">
+                <button
+                  type="button"
+                  className="wmn-btn-sec"
+                  onClick={() => setShowPreBookModal(false)}
+                  disabled={preBookLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="wmn-btn-primary"
+                  style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}
+                  disabled={preBookLoading}
+                >
+                  {preBookLoading ? 'Scheduling...' : 'Confirm & Generate Pass'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Generated Pass Confirmation Modal ── */}
+      {createdPassModal && (
+        <div className="wmn-modal-backdrop" onClick={() => setCreatedPassModal(null)}>
+          <div className="wmn-modal-card" style={{ maxWidth: 440, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+            <div className="wmn-modal-header" style={{ background: '#059669', color: '#ffffff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle2 size={20} />
+                <h3 style={{ margin: 0, color: '#ffffff', fontSize: '1rem', fontWeight: 800 }}>
+                  Visitor Pass Pre-Registered!
+                </h3>
+              </div>
+              <button type="button" className="wmn-modal-close" style={{ color: '#ffffff' }} onClick={() => setCreatedPassModal(null)}>✕</button>
+            </div>
+
+            <div style={{ padding: '24px 20px' }}>
+              {/* QR Mode Switcher */}
+              <div style={{
+                display: 'flex',
+                background: '#f1f5f9',
+                padding: '3px',
+                borderRadius: '8px',
+                maxWidth: '320px',
+                margin: '0 auto 12px auto',
+                border: '1px solid #e2e8f0'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setPassQrMode('raw')}
+                  style={{
+                    flex: 1,
+                    padding: '5px 8px',
+                    fontSize: '0.74rem',
+                    fontWeight: passQrMode === 'raw' ? 800 : 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: passQrMode === 'raw' ? '#ffffff' : 'transparent',
+                    color: passQrMode === 'raw' ? '#0f172a' : '#64748b',
+                    boxShadow: passQrMode === 'raw' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Direct Code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPassQrMode('url')}
+                  style={{
+                    flex: 1,
+                    padding: '5px 8px',
+                    fontSize: '0.74rem',
+                    fontWeight: passQrMode === 'url' ? 800 : 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: passQrMode === 'url' ? '#ffffff' : 'transparent',
+                    color: passQrMode === 'url' ? '#0f172a' : '#64748b',
+                    boxShadow: passQrMode === 'url' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Mobile Web Pass (Wi-Fi)
+                </button>
+              </div>
+
+              {(() => {
+                const rawQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(createdPassModal.passNumber)}`;
+                const activeQr = passQrMode === 'raw' ? rawQrUrl : (createdPassModal.qrUrl || rawQrUrl);
+
+                return (
+                  <div style={{ display: 'inline-block', padding: '10px', background: '#f8fafc', border: '2px dashed #cbd5e1', borderRadius: '12px', marginBottom: '14px' }}>
+                    <img src={activeQr} alt="Pass QR" style={{ width: 170, height: 170, display: 'block', margin: '0 auto' }} />
+                    <strong style={{ display: 'block', marginTop: '6px', fontFamily: 'monospace', color: '#7c3aed', fontSize: '0.95rem' }}>
+                      {createdPassModal.passNumber}
+                    </strong>
+                    <div style={{
+                      marginTop: '6px',
+                      fontSize: '0.72rem',
+                      color: passQrMode === 'raw' ? '#166534' : '#1e40af',
+                      background: passQrMode === 'raw' ? '#f0fdf4' : '#eff6ff',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      border: '1px solid',
+                      borderColor: passQrMode === 'raw' ? '#bbf7d0' : '#bfdbfe',
+                      maxWidth: '280px',
+                      margin: '6px auto 0 auto'
+                    }}>
+                      {passQrMode === 'raw' ? (
+                        <span>✅ Universal: Scans as text with any phone camera or gate scanner.</span>
+                      ) : (
+                        <span>📶 Web: Connect phone to same Wi-Fi / Hotspot to open live pass.</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <h4 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#0f172a' }}>{createdPassModal.name}</h4>
+              <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: '#64748b' }}>
+                📞 {createdPassModal.phone} • Meeting {createdPassModal.personToMeet} ({createdPassModal.department})
+              </p>
+
+              <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600 }}>
+                Scheduled for {new Date(createdPassModal.expectedDate).toLocaleDateString()} at {createdPassModal.expectedTime}
+              </div>
+            </div>
+
+            <div className="wmn-modal-footer" style={{ justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="wmn-btn-primary"
+                style={{ background: '#059669', width: '100%', padding: '10px 0' }}
+                onClick={() => setCreatedPassModal(null)}
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

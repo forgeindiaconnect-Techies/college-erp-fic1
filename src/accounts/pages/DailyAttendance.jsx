@@ -34,10 +34,10 @@ const getEmployeeClassification = (item) => {
   }
 
   // 2. Check Non-Teaching keywords & roles
-  const nonTeachingRoles = ['admin', 'accounts', 'accountant', 'librarian', 'hostel', 'warden', 'clerk', 'office staff', 'sub admin', 'subadmin', 'super admin', 'superadmin'];
+  const nonTeachingRoles = ['admin', 'accounts', 'accountant', 'librarian', 'hostel', 'warden', 'clerk', 'office staff', 'sub admin', 'subadmin', 'super admin', 'superadmin', 'watchman', 'security'];
   const nonTeachingKeywords = [
     'account', 'admin', 'librar', 'hostel', 'warden', 'clerk', 'office',
-    'security', 'peon', 'attender', 'technician', 'electrician', 'plumber',
+    'security', 'watchman', 'guard', 'peon', 'attender', 'technician', 'electrician', 'plumber',
     'mechanic', 'gardener', 'sweeper', 'non-teaching', 'non teaching', 'lab assistant',
     'placement', 'selvi', 'sundar'
   ];
@@ -49,7 +49,8 @@ const getEmployeeClassification = (item) => {
   if (isExplicitNonTeaching || hasNonTeachingRole || hasNonTeachingWord) {
     let designation = emp.designation || item.designation;
     if (!designation || designation === 'Faculty' || designation === 'Professor' || designation === 'Staff') {
-      if (role === 'accounts' || name.includes('account') || email.includes('account') || name.includes('selvi')) designation = 'Accounts Officer';
+      if (role === 'watchman' || role === 'security' || name.includes('watchman') || name.includes('security') || name.includes('natrajan') || name.includes('ramesh')) designation = 'Security Officer';
+      else if (role === 'accounts' || name.includes('account') || email.includes('account') || name.includes('selvi')) designation = 'Accounts Officer';
       else if (role === 'admin' || name.includes('dhanush')) designation = 'System Admin';
       else if (name.includes('hostel') || email.includes('hostel') || role === 'hostel') designation = 'Hostel Warden';
       else if (name.includes('sundar') || email.includes('sundar') || role === 'librarian') designation = 'Librarian';

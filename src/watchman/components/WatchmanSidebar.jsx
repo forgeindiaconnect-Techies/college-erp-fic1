@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { SettingsContext } from '../../App';
 import {
   LayoutDashboard, UserPlus, LogOut as ExitIcon, QrCode,
-  CalendarCheck, Package, Truck, Users, UserCheck,
+  CalendarCheck, Package, Truck, Bus, Users, UserCheck,
   Clock, AlertTriangle, History, Bell, User, Key,
   LogOut, Shield, ChevronRight, X
 } from 'lucide-react';
@@ -40,30 +40,41 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
 
   const menuSections = [
     {
-      title: 'Gate Operations',
+      title: 'Command Center',
       items: [
-        { name: 'Dashboard', path: '/watchman/dashboard', icon: <LayoutDashboard size={19} /> },
-        { name: 'Visitor Entry', path: '/watchman/visitor-entry', icon: <UserPlus size={19} /> },
-        { name: 'Visitor Exit', path: '/watchman/visitor-exit', icon: <ExitIcon size={19} /> },
-        { name: 'Visitor Pass / QR Verification', path: '/watchman/qr-verification', icon: <QrCode size={19} /> },
-        { name: 'Pre-Registered Visitors', path: '/watchman/pre-registered', icon: <CalendarCheck size={19} /> }
+        { name: 'Gate Dashboard', path: '/watchman/dashboard', icon: <LayoutDashboard size={19} /> }
       ]
     },
     {
-      title: 'Campus Logistics',
+      title: 'Student Gate Operations',
       items: [
-        { name: 'Delivery & Parcel Log', path: '/watchman/parcels', icon: <Package size={19} /> },
-        { name: 'Vehicle Entry & Exit', path: '/watchman/vehicles', icon: <Truck size={19} /> },
-        { name: 'Student In/Out Register', path: '/watchman/student-register', icon: <Users size={19} /> },
+        { name: 'Student QR Scanner', path: '/watchman/qr-verification', icon: <QrCode size={19} /> },
+        { name: 'Student Movement Register', path: '/watchman/student-register', icon: <Users size={19} /> }
+      ]
+    },
+    {
+      title: 'Staff Gate Operations',
+      items: [
         { name: 'Staff Entry Register', path: '/watchman/staff-register', icon: <UserCheck size={19} /> }
       ]
     },
     {
-      title: 'Security & Duty',
+      title: 'Visitor Management',
       items: [
-        { name: 'Attendance & Shift', path: '/watchman/attendance', icon: <Clock size={19} /> },
-        { name: 'Emergency / Incident Reports', path: '/watchman/incidents', icon: <AlertTriangle size={19} /> },
-        { name: 'Visitor History', path: '/watchman/visitor-history', icon: <History size={19} /> }
+        { name: 'New Visitor Entry', path: '/watchman/visitor-entry', icon: <UserPlus size={19} /> },
+        { name: 'Active Visitors & Exit', path: '/watchman/visitor-exit', icon: <ExitIcon size={19} /> },
+        { name: 'Pre-Registered Visitors', path: '/watchman/pre-registered', icon: <CalendarCheck size={19} /> },
+        { name: 'Visitor History Logs', path: '/watchman/visitor-history', icon: <History size={19} /> }
+      ]
+    },
+    {
+      title: 'Campus Logistics & Duty',
+      items: [
+        { name: 'Bus Entry & Exit Tracking', path: '/watchman/bus-tracking', icon: <Bus size={19} /> },
+        { name: 'Vehicle Gate Movements', path: '/watchman/vehicles', icon: <Truck size={19} /> },
+        { name: 'Delivery & Parcel Log', path: '/watchman/parcels', icon: <Package size={19} /> },
+        { name: 'Guard Shift Attendance', path: '/watchman/attendance', icon: <Clock size={19} /> },
+        { name: 'Emergency Incidents', path: '/watchman/incidents', icon: <AlertTriangle size={19} /> }
       ]
     },
     {

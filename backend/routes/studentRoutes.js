@@ -194,6 +194,41 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
   const autoStudentEmail = (req.body.email && req.body.email.trim()) || `${autoStudentId.toLowerCase().replace(/[^a-z0-9]/g, '')}@student.college.edu`;
   const autoStudentDept = req.body.dept || req.body.department || 'General';
   const autoStudentSem = String(req.body.sem || req.body.semester || 'Sem 1');
+
+  // Mobile number validation and duplicate check
+  const rawPhone = (req.body.phone || req.body.mobile || req.body.contactNumber || '').trim();
+  let cleanPhone = rawPhone.replace(/\D/g, '');
+  let phone10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
+
+  if (rawPhone) {
+    if (cleanPhone.length < 10 || cleanPhone.length > 13) {
+      return res.status(400).json({ message: 'Invalid mobile number. Please enter a valid 10-digit mobile number.' });
+    }
+
+    // Check duplicate mobile number
+    const duplicatePhoneStudent = await Student.findOne({
+      $or: [
+        { phone: phone10 },
+        { phone: `+91${phone10}` },
+        { phone: `+91 ${phone10}` },
+        { phone: rawPhone },
+        { phone: cleanPhone },
+        { mobile: phone10 },
+        { mobile: cleanPhone }
+      ],
+      ...(collegeId && collegeId !== 'unassigned_college' ? { $or: [{ collegeId }, { tenantId: collegeId }] } : {})
+    });
+
+    if (duplicatePhoneStudent) {
+      return res.status(400).json({
+        message: `Mobile number "${rawPhone}" is already registered to student ${duplicatePhoneStudent.name} (ID: ${duplicatePhoneStudent.id}). Duplicate mobile numbers are not allowed.`
+      });
+    }
+  }
+
+  // Generate and permanently associate unique QR code
+  const autoQrCode = req.body.qrCode || `STU-QR-${autoStudentId}`;
+
   const cleanBody = { ...req.body };
   delete cleanBody._id;
 
@@ -203,6 +238,9 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
     admissionNo: autoStudentId,
     name: autoStudentName,
     email: autoStudentEmail,
+    phone: rawPhone || phone10,
+    mobile: rawPhone || phone10,
+    qrCode: autoQrCode,
     dept: autoStudentDept,
     department: autoStudentDept,
     sem: autoStudentSem,
@@ -746,6 +784,41 @@ router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 
           { $or: [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }] }
         ]
       };
+    }
+
+    // If mobile number is provided/updated, validate format and uniqueness
+    const rawPhone = (req.body.phone || req.body.mobile || req.body.contactNumber || '').trim();
+    if (rawPhone) {
+      const cleanPhone = rawPhone.replace(/\D/g, '');
+      const phone10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
+      if (cleanPhone.length < 10 || cleanPhone.length > 13) {
+        return res.status(400).json({ message: 'Invalid mobile number. Please enter a valid 10-digit mobile number.' });
+      }
+
+      // Check if another student has this mobile number
+      const duplicatePhoneStudent = await Student.findOne({
+        id: { $ne: studentId },
+        _id: { $ne: mongoose.Types.ObjectId.isValid(studentId) ? studentId : new mongoose.Types.ObjectId() },
+        $or: [
+          { phone: phone10 },
+          { phone: `+91${phone10}` },
+          { phone: `+91 ${phone10}` },
+          { phone: rawPhone },
+          { phone: cleanPhone },
+          { mobile: phone10 },
+          { mobile: cleanPhone }
+        ],
+        ...(targetCollegeId && targetCollegeId !== 'system' && targetCollegeId !== 'unassigned_college' ? { $or: [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }] } : {})
+      });
+
+      if (duplicatePhoneStudent) {
+        return res.status(400).json({
+          message: `Mobile number "${rawPhone}" is already registered to student ${duplicatePhoneStudent.name} (ID: ${duplicatePhoneStudent.id}). Duplicate mobile numbers are not allowed.`
+        });
+      }
+
+      req.body.phone = rawPhone;
+      req.body.mobile = rawPhone;
     }
 
     const updatedStudent = await Student.findOneAndUpdate(

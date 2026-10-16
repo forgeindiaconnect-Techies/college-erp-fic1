@@ -18,7 +18,14 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
-  GraduationCap
+  GraduationCap,
+  Eye,
+  EyeOff,
+  Activity,
+  Server,
+  Award,
+  Globe,
+  Check
 } from 'lucide-react';
 import { registerCollege, createRegistrationOrder } from '../api';
 import './GetAccess.css';
@@ -122,6 +129,8 @@ const GetAccess = () => {
   });
 
   const [showPrincipalFields, setShowPrincipalFields] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPrincipalPassword, setShowPrincipalPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
   // Step 2: Subscription Plan Selection
@@ -347,13 +356,13 @@ const GetAccess = () => {
     <div className="client-reg-page">
       {/* Top Navigation */}
       <header className="client-reg-navbar">
-        <div className="client-reg-logo-box" onClick={() => navigate('/')}>
-          <div className="erp-brand-logo-box">
-            <GraduationCap size={22} />
+        <div className="client-reg-brand-cluster">
+          <div className="client-reg-logo-box" onClick={() => navigate('/')}>
+            <img src="/logo_dark.svg" alt="ERPSYS Logo" className="reg-navbar-logo" />
           </div>
-          <div className="erp-brand-info">
-            <span className="erp-brand-title">College ERP</span>
-            <span className="erp-brand-subtitle">Smart Education Management</span>
+          <div className="erp-navbar-live-status">
+            <span className="live-status-dot"></span>
+            <span className="live-status-text">ERP Cloud 4.0 • Live</span>
           </div>
         </div>
 
@@ -385,7 +394,7 @@ const GetAccess = () => {
           <div className={`stepper-step ${currentStep >= 1 ? 'active' : ''} ${currentStep > 1 ? 'completed' : ''}`}>
             <div className="step-circle">{currentStep > 1 ? <CheckCircle2 size={18} /> : '1'}</div>
             <span className="step-label">
-              <span className="desktop-step-text">Institution Details</span>
+              <span className="desktop-step-text">01. Institution Details</span>
               <span className="mobile-step-text">Details</span>
             </span>
           </div>
@@ -393,15 +402,15 @@ const GetAccess = () => {
           <div className={`stepper-step ${currentStep >= 2 ? 'active' : ''} ${currentStep > 2 ? 'completed' : ''}`}>
             <div className="step-circle">{currentStep > 2 ? <CheckCircle2 size={18} /> : '2'}</div>
             <span className="step-label">
-              <span className="desktop-step-text">Subscription Plan</span>
+              <span className="desktop-step-text">02. Subscription Plan</span>
               <span className="mobile-step-text">Plans</span>
             </span>
           </div>
 
           <div className={`stepper-step ${currentStep === 3 ? 'active completed' : ''}`}>
-            <div className="step-circle">3</div>
+            <div className="step-circle">{currentStep === 3 ? <CheckCircle2 size={18} /> : '3'}</div>
             <span className="step-label">
-              <span className="desktop-step-text">Confirmation</span>
+              <span className="desktop-step-text">03. Confirmation</span>
               <span className="mobile-step-text">Confirm</span>
             </span>
           </div>
@@ -417,226 +426,359 @@ const GetAccess = () => {
 
         {/* ── STEP 1: INSTITUTION & ADMIN DETAILS ────────────────── */}
         {currentStep === 1 && (
-          <div className="client-reg-card" style={{ maxWidth: '780px', margin: '0 auto' }}>
-            <div className="client-reg-card-header">
-              <h1 className="client-reg-card-title">Register Your Institution</h1>
-              <p className="client-reg-card-subtitle">
-                Enter your college details to set up your dedicated ERP tenant. All client accounts are securely provisioned under enterprise role isolation.
-              </p>
+          <div className="erp-register-layout">
+            {/* Left Showcase Panel: Real-Time ERP Capabilities & Campus Visual */}
+            <div className="erp-showcase-panel">
+              {/* Featured Campus Visual Card */}
+              <div className="erp-showcase-hero-card">
+                <img
+                  src="/college_campus_hero.jpg"
+                  alt="Modern College Campus"
+                  className="erp-showcase-img"
+                />
+                <div className="erp-showcase-overlay">
+                  <div className="erp-live-badge">
+                    <span className="live-pulse-dot"></span>
+                    <span>LIVE ERP CLOUD 4.0</span>
+                  </div>
+                  <div className="erp-hero-caption">
+                    <h3>Enterprise Campus OS</h3>
+                    <p>Unified digital ecosystem for academic, administrative &amp; financial operations.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Real-time ERP Feature Matrix */}
+              <div className="erp-highlights-card">
+                <h4 className="erp-highlights-title">
+                  <Sparkles size={16} color="#2563eb" />
+                  <span>Real-Time Enterprise Capabilities</span>
+                </h4>
+
+                <div className="erp-modules-list">
+                  <div className="erp-module-item">
+                    <div className="module-icon-wrap blue">
+                      <Zap size={18} />
+                    </div>
+                    <div className="module-info">
+                      <strong>Smart Attendance &amp; RFID</strong>
+                      <p>Biometric facial sync with automated SMS &amp; WhatsApp parent alerts.</p>
+                    </div>
+                  </div>
+
+                  <div className="erp-module-item">
+                    <div className="module-icon-wrap emerald">
+                      <GraduationCap size={18} />
+                    </div>
+                    <div className="module-info">
+                      <strong>Autonomous Exam &amp; CGPA Engine</strong>
+                      <p>Semester marks, instant hall ticket issuing &amp; NEP 2020 gradebooks.</p>
+                    </div>
+                  </div>
+
+                  <div className="erp-module-item">
+                    <div className="module-icon-wrap indigo">
+                      <CreditCard size={18} />
+                    </div>
+                    <div className="module-info">
+                      <strong>Online Fees &amp; Reconciliation</strong>
+                      <p>Automated receipts, UPI/Razorpay &amp; instant ledger sync.</p>
+                    </div>
+                  </div>
+
+                  <div className="erp-module-item">
+                    <div className="module-icon-wrap purple">
+                      <ShieldCheck size={18} />
+                    </div>
+                    <div className="module-info">
+                      <strong>Enterprise Multi-Tenant Security</strong>
+                      <p>Dedicated database tenant with 256-bit SSL bank-grade encryption.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Real-Time Live Stats Bar */}
+                <div className="erp-live-stats-bar">
+                  <div className="erp-stat-box">
+                    <span className="erp-stat-val">500+</span>
+                    <span className="erp-stat-lbl">Institutions</span>
+                  </div>
+                  <div className="erp-stat-divider"></div>
+                  <div className="erp-stat-box">
+                    <span className="erp-stat-val">99.98%</span>
+                    <span className="erp-stat-lbl">Uptime SLA</span>
+                  </div>
+                  <div className="erp-stat-divider"></div>
+                  <div className="erp-stat-box">
+                    <span className="erp-stat-val">NAAC / NBA</span>
+                    <span className="erp-stat-lbl">Audit-Ready</span>
+                  </div>
+                </div>
+
+                {/* Trust Badges */}
+                <div className="erp-trust-row">
+                  <div className="erp-trust-badge">
+                    <Award size={14} color="#059669" />
+                    <span>ISO 27001 Certified</span>
+                  </div>
+                  <div className="erp-trust-badge">
+                    <ShieldCheck size={14} color="#2563eb" />
+                    <span>256-Bit SSL Protection</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <form onSubmit={handleNextToPlans}>
-              <div className="reg-form-grid">
-                {/* College / Institution Name */}
-                <div className="reg-form-group reg-field-full">
-                  <label>
-                    <Building2 size={16} /> College / Institution Name *
-                  </label>
-                  <div className="reg-input-wrap">
-                    <Building2 size={18} className="reg-input-icon" />
-                    <input
-                      type="text"
-                      name="collegeName"
-                      className="reg-input"
-                      placeholder="e.g. Oxford Institute of Technology & Sciences"
-                      value={formData.collegeName}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                  {formErrors.collegeName && <span className="reg-error-text">{formErrors.collegeName}</span>}
+            {/* Right Column: Registration Form Card */}
+            <div className="client-reg-card erp-form-card">
+              <div className="client-reg-card-header">
+                <div className="card-badge-pill">
+                  <Server size={14} />
+                  <span>Tenant Provisioning</span>
                 </div>
-
-                {/* Administrator Name */}
-                <div className="reg-form-group">
-                  <label>
-                    <User size={16} /> Administrator Full Name *
-                  </label>
-                  <div className="reg-input-wrap">
-                    <User size={18} className="reg-input-icon" />
-                    <input
-                      type="text"
-                      name="adminName"
-                      className="reg-input"
-                      placeholder="e.g. Dr. Ramesh Kumar"
-                      value={formData.adminName}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                  {formErrors.adminName && <span className="reg-error-text">{formErrors.adminName}</span>}
-                </div>
-
-                {/* Admin Email */}
-                <div className="reg-form-group">
-                  <label>
-                    <Mail size={16} /> Official Admin Email *
-                  </label>
-                  <div className="reg-input-wrap">
-                    <Mail size={18} className="reg-input-icon" />
-                    <input
-                      type="email"
-                      name="email"
-                      className="reg-input"
-                      placeholder="admin@institution.edu"
-                      value={formData.email}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                  {formErrors.email && <span className="reg-error-text">{formErrors.email}</span>}
-                </div>
-
-                {/* Mobile Number */}
-                <div className="reg-form-group">
-                  <label>
-                    <Phone size={16} /> Contact Mobile Number *
-                  </label>
-                  <div className="reg-input-wrap">
-                    <Phone size={18} className="reg-input-icon" />
-                    <input
-                      type="tel"
-                      name="phone"
-                      className="reg-input"
-                      placeholder="e.g. 9876543210"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                  {formErrors.phone && <span className="reg-error-text">{formErrors.phone}</span>}
-                </div>
-
-                {/* Admin Password */}
-                <div className="reg-form-group">
-                  <label>
-                    <Lock size={16} /> Admin Password *
-                  </label>
-                  <div className="reg-input-wrap">
-                    <Lock size={18} className="reg-input-icon" />
-                    <input
-                      type="password"
-                      name="password"
-                      className="reg-input"
-                      placeholder="Create a secure password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      required
-                      minLength={6}
-                    />
-                  </div>
-                  {formData.password && (
-                    <div className="pwd-strength-container">
-                      <div className="pwd-strength-bars">
-                        <div className={`pwd-bar ${pwdStrength.score >= 1 ? pwdStrength.class : ''}`}></div>
-                        <div className={`pwd-bar ${pwdStrength.score >= 2 ? pwdStrength.class : ''}`}></div>
-                        <div className={`pwd-bar ${pwdStrength.score >= 3 ? pwdStrength.class : ''}`}></div>
-                      </div>
-                      <span className="pwd-strength-label">Password Strength: {pwdStrength.text}</span>
-                    </div>
-                  )}
-                  {formErrors.password && <span className="reg-error-text">{formErrors.password}</span>}
-                </div>
-
-                {/* Optional Principal Account Toggle */}
-                <div className="reg-field-full">
-                  <div
-                    className="optional-principal-toggle"
-                    onClick={() => setShowPrincipalFields(!showPrincipalFields)}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div className="principal-toggle-icon">
-                        <Crown size={18} />
-                      </div>
-                      <div>
-                        <strong className="toggle-title">
-                          Add Principal Console Account (Optional)
-                        </strong>
-                        <p className="toggle-subtitle">
-                          Pre-configure principal login credentials during registration
-                        </p>
-                      </div>
-                    </div>
-                    {showPrincipalFields ? <ChevronUp size={18} color="#64748b" /> : <ChevronDown size={18} color="#64748b" />}
-                  </div>
-
-                  {showPrincipalFields && (
-                    <div className="optional-principal-box">
-                      <div className="reg-form-grid">
-                        <div className="reg-form-group">
-                          <label>
-                            <User size={15} /> Principal Full Name
-                          </label>
-                          <div className="reg-input-wrap">
-                            <User size={18} className="reg-input-icon" />
-                            <input
-                              type="text"
-                              name="principalName"
-                              className="reg-input"
-                              placeholder="e.g. Dr. S. Ramanathan"
-                              value={formData.principalName}
-                              onChange={handleChange}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="reg-form-group">
-                          <label>
-                            <Mail size={15} /> Principal Email
-                          </label>
-                          <div className="reg-input-wrap">
-                            <Mail size={18} className="reg-input-icon" />
-                            <input
-                              type="email"
-                              name="principalEmail"
-                              className="reg-input"
-                              placeholder="principal@institution.edu"
-                              value={formData.principalEmail}
-                              onChange={handleChange}
-                            />
-                          </div>
-                          {formErrors.principalEmail && (
-                            <span className="reg-error-text">{formErrors.principalEmail}</span>
-                          )}
-                        </div>
-
-                        <div className="reg-form-group reg-field-full">
-                          <label>
-                            <Lock size={15} /> Principal Password
-                          </label>
-                          <div className="reg-input-wrap">
-                            <Lock size={18} className="reg-input-icon" />
-                            <input
-                              type="password"
-                              name="principalPassword"
-                              className="reg-input"
-                              placeholder="Create principal login password (min 6 characters)"
-                              value={formData.principalPassword}
-                              onChange={handleChange}
-                              minLength={6}
-                            />
-                          </div>
-                          {formErrors.principalPassword && (
-                            <span className="reg-error-text">{formErrors.principalPassword}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <h1 className="client-reg-card-title">Register Your Institution</h1>
+                <p className="client-reg-card-subtitle">
+                  Configure your college administrative credentials. Your dedicated ERP tenant will be spun up under enterprise role isolation.
+                </p>
               </div>
 
-              {/* Action Buttons */}
-              <div className="reg-actions-row">
-                <button type="button" className="btn-reg-secondary" onClick={() => navigate('/login')}>
-                  Already Registered? Login
-                </button>
-                <button type="submit" className="btn-reg-primary">
-                  <span>Select Subscription Plan</span>
-                  <ArrowRight size={18} />
-                </button>
-              </div>
-            </form>
+              <form onSubmit={handleNextToPlans}>
+                <div className="reg-form-grid">
+                  {/* College / Institution Name */}
+                  <div className="reg-form-group reg-field-full">
+                    <label>
+                      <Building2 size={16} /> College / Institution Name *
+                    </label>
+                    <div className="reg-input-wrap">
+                      <Building2 size={18} className="reg-input-icon" />
+                      <input
+                        type="text"
+                        name="collegeName"
+                        className="reg-input"
+                        placeholder="e.g. Oxford Institute of Technology & Sciences"
+                        value={formData.collegeName}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+                    {formErrors.collegeName && <span className="reg-error-text">{formErrors.collegeName}</span>}
+                  </div>
+
+                  {/* Administrator Name */}
+                  <div className="reg-form-group">
+                    <label>
+                      <User size={16} /> Administrator Full Name *
+                    </label>
+                    <div className="reg-input-wrap">
+                      <User size={18} className="reg-input-icon" />
+                      <input
+                        type="text"
+                        name="adminName"
+                        className="reg-input"
+                        placeholder="e.g. Dr. Ramesh Kumar"
+                        value={formData.adminName}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+                    {formErrors.adminName && <span className="reg-error-text">{formErrors.adminName}</span>}
+                  </div>
+
+                  {/* Admin Email */}
+                  <div className="reg-form-group">
+                    <label>
+                      <Mail size={16} /> Official Admin Email *
+                    </label>
+                    <div className="reg-input-wrap">
+                      <Mail size={18} className="reg-input-icon" />
+                      <input
+                        type="email"
+                        name="email"
+                        className="reg-input"
+                        placeholder="admin@institution.edu"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+                    {formErrors.email && <span className="reg-error-text">{formErrors.email}</span>}
+                  </div>
+
+                  {/* Mobile Number */}
+                  <div className="reg-form-group">
+                    <label>
+                      <Phone size={16} /> Contact Mobile Number *
+                    </label>
+                    <div className="reg-input-wrap">
+                      <Phone size={18} className="reg-input-icon" />
+                      <input
+                        type="tel"
+                        name="phone"
+                        className="reg-input"
+                        placeholder="e.g. 9876543210"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+                    {formErrors.phone && <span className="reg-error-text">{formErrors.phone}</span>}
+                  </div>
+
+                  {/* Admin Password */}
+                  <div className="reg-form-group">
+                    <label>
+                      <Lock size={16} /> Admin Password *
+                    </label>
+                    <div className="reg-input-wrap">
+                      <Lock size={18} className="reg-input-icon" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        name="password"
+                        className="reg-input has-toggle-btn"
+                        placeholder="Create a secure password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        required
+                        minLength={6}
+                      />
+                      <button
+                        type="button"
+                        className="reg-pwd-toggle-btn"
+                        onClick={() => setShowPassword(!showPassword)}
+                        tabIndex={-1}
+                        aria-label="Toggle password visibility"
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                    {formData.password && (
+                      <div className="pwd-strength-container">
+                        <div className="pwd-strength-bars">
+                          <div className={`pwd-bar ${pwdStrength.score >= 1 ? pwdStrength.class : ''}`}></div>
+                          <div className={`pwd-bar ${pwdStrength.score >= 2 ? pwdStrength.class : ''}`}></div>
+                          <div className={`pwd-bar ${pwdStrength.score >= 3 ? pwdStrength.class : ''}`}></div>
+                        </div>
+                        <span className="pwd-strength-label">Password Strength: {pwdStrength.text}</span>
+                      </div>
+                    )}
+                    {formErrors.password && <span className="reg-error-text">{formErrors.password}</span>}
+                  </div>
+
+                  {/* Optional Principal Account Toggle */}
+                  <div className="reg-field-full">
+                    <div
+                      className="optional-principal-toggle"
+                      onClick={() => setShowPrincipalFields(!showPrincipalFields)}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div className="principal-toggle-icon">
+                          <Crown size={18} />
+                        </div>
+                        <div>
+                          <strong className="toggle-title">
+                            Add Principal Console Account (Optional)
+                          </strong>
+                          <p className="toggle-subtitle">
+                            Pre-configure principal login credentials during registration
+                          </p>
+                        </div>
+                      </div>
+                      {showPrincipalFields ? <ChevronUp size={18} color="#64748b" /> : <ChevronDown size={18} color="#64748b" />}
+                    </div>
+
+                    {showPrincipalFields && (
+                      <div className="optional-principal-box">
+                        <div className="reg-form-grid">
+                          <div className="reg-form-group">
+                            <label>
+                              <User size={15} /> Principal Full Name
+                            </label>
+                            <div className="reg-input-wrap">
+                              <User size={18} className="reg-input-icon" />
+                              <input
+                                type="text"
+                                name="principalName"
+                                className="reg-input"
+                                placeholder="e.g. Dr. S. Ramanathan"
+                                value={formData.principalName}
+                                onChange={handleChange}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="reg-form-group">
+                            <label>
+                              <Mail size={15} /> Principal Email
+                            </label>
+                            <div className="reg-input-wrap">
+                              <Mail size={18} className="reg-input-icon" />
+                              <input
+                                type="email"
+                                name="principalEmail"
+                                className="reg-input"
+                                placeholder="principal@institution.edu"
+                                value={formData.principalEmail}
+                                onChange={handleChange}
+                              />
+                            </div>
+                            {formErrors.principalEmail && (
+                              <span className="reg-error-text">{formErrors.principalEmail}</span>
+                            )}
+                          </div>
+
+                          <div className="reg-form-group reg-field-full">
+                            <label>
+                              <Lock size={15} /> Principal Password
+                            </label>
+                            <div className="reg-input-wrap">
+                              <Lock size={18} className="reg-input-icon" />
+                              <input
+                                type={showPrincipalPassword ? 'text' : 'password'}
+                                name="principalPassword"
+                                className="reg-input has-toggle-btn"
+                                placeholder="Create principal login password (min 6 characters)"
+                                value={formData.principalPassword}
+                                onChange={handleChange}
+                                minLength={6}
+                              />
+                              <button
+                                type="button"
+                                className="reg-pwd-toggle-btn"
+                                onClick={() => setShowPrincipalPassword(!showPrincipalPassword)}
+                                tabIndex={-1}
+                                aria-label="Toggle password visibility"
+                              >
+                                {showPrincipalPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                              </button>
+                            </div>
+                            {formErrors.principalPassword && (
+                              <span className="reg-error-text">{formErrors.principalPassword}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="reg-actions-row">
+                  <button type="button" className="btn-reg-secondary" onClick={() => navigate('/login')}>
+                    Already Registered? Login
+                  </button>
+                  <button type="submit" className="btn-reg-primary">
+                    <span>Select Subscription Plan</span>
+                    <ArrowRight size={18} />
+                  </button>
+                </div>
+
+                {/* Dedicated Tenant footnote */}
+                <div className="reg-security-footnote">
+                  <ShieldCheck size={15} color="#059669" />
+                  <span>Each institution receives an isolated database tenant with dedicated credentials.</span>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 

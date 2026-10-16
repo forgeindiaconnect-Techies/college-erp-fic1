@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Package, Plus, Search, CheckCircle2, Clock, Truck,
-  User, Check, RefreshCw, X, AlertCircle
+  User, Check, RefreshCw, X, AlertCircle, ShieldCheck
 } from 'lucide-react';
-import { getParcels, logParcel, handoverParcel } from '../../api/index';
+import { getParcels, logParcel, handoverParcel, getStaffDirectory } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import '../watchman.css';
 
@@ -20,13 +20,24 @@ const COMPANIES = [
   'Other'
 ];
 
-const RECIPIENT_TYPES = ['Faculty', 'Student', 'Staff', 'Department', 'Hostel Warden', 'Principal / Admin', 'Other'];
+const GATES = [
+  'Gate 1 (Main Entrance)',
+  'Gate 2 (North Gate)',
+  'Gate 3 (Hostel Gate)',
+  'Security Checkpost'
+];
 
 const DeliveryParcelPage = () => {
   const [parcels, setParcels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [typeFilter, setTypeFilter] = useState('All');
+
+  // Staff directory for verified DB lookup
+  const [staffList, setStaffList] = useState([]);
+  const [staffSearchQuery, setStaffSearchQuery] = useState('');
+  const [showStaffDropdown, setShowStaffDropdown] = useState(false);
 
   // Modals
   const [logModalOpen, setLogModalOpen] = useState(false);
@@ -36,16 +47,23 @@ const DeliveryParcelPage = () => {
 
   // Form
   const [form, setForm] = useState({
-    deliveryCompany: COMPANIES[0],
+    type: 'Parcel', // Delivery or Parcel
+    recipientId: '',
+    staffId: '',
     recipientName: '',
+    recipientEmail: '',
     recipientPhone: '',
-    recipientType: RECIPIENT_TYPES[0],
-    department: 'General',
+    recipientType: 'Staff',
+    department: '',
+    deliveryCompany: COMPANIES[0],
+    senderName: '',
     trackingNumber: '',
-    parcelDetails: 'Standard Package',
-    gate: 'Gate 1 (Main Entrance)',
+    parcelDetails: 'Standard package / envelope',
+    gate: GATES[0],
+    receivedAt: new Date().toISOString().slice(0, 16),
     notes: ''
   });
+
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
@@ -54,10 +72,24 @@ const DeliveryParcelPage = () => {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
+  // Fetch staff directory from DB
+  const loadStaffDirectory = async () => {
+    try {
+      const res = await getStaffDirectory();
+      const list = Array.isArray(res.data?.data) ? res.data.data : [];
+      setStaffList(list);
+    } catch (err) {
+      console.error('Failed to load staff directory:', err);
+    }
+  };
+
   const fetchParcels = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await getParcels({ status: statusFilter });
+      const res = await getParcels({
+        status: statusFilter !== 'All' ? statusFilter : undefined,
+        type: typeFilter !== 'All' ? typeFilter : undefined
+      });
       const list = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
       setParcels(list);
     } catch (err) {
@@ -66,42 +98,82 @@ const DeliveryParcelPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, typeFilter]);
 
   useRealtimeSync(fetchParcels, ['parcel']);
 
   useEffect(() => {
     fetchParcels();
+    loadStaffDirectory();
   }, [fetchParcels]);
+
+  // Filter staff by query
+  const filteredStaff = useMemo(() => {
+    if (!staffSearchQuery.trim()) return staffList.slice(0, 8);
+    const q = staffSearchQuery.toLowerCase();
+    return staffList.filter(s =>
+      s.name?.toLowerCase().includes(q) ||
+      s.staffId?.toLowerCase().includes(q) ||
+      s.email?.toLowerCase().includes(q) ||
+      s.department?.toLowerCase().includes(q)
+    ).slice(0, 10);
+  }, [staffList, staffSearchQuery]);
+
+  const selectStaff = (staff) => {
+    setForm(prev => ({
+      ...prev,
+      recipientId: staff._id,
+      staffId: staff.staffId || '',
+      recipientName: staff.name,
+      recipientEmail: staff.email || '',
+      recipientPhone: staff.phone || prev.recipientPhone,
+      department: staff.department || prev.department,
+      recipientType: staff.role || 'Staff'
+    }));
+    setStaffSearchQuery(`${staff.name} (${staff.staffId || staff.email})`);
+    setShowStaffDropdown(false);
+  };
 
   const handleLogSubmit = async (e) => {
     e.preventDefault();
     if (!form.recipientName.trim()) {
-      showToast('Recipient name is required', 'error');
+      showToast('Recipient name is required. Please select a staff member.', 'error');
       return;
     }
 
     try {
       setSubmitting(true);
-      const res = await logParcel(form);
+      const payload = {
+        ...form,
+        receivedAt: new Date(form.receivedAt).toISOString()
+      };
+      const res = await logParcel(payload);
       if (res.data?.success) {
-        showToast('Parcel logged successfully at gate post!');
+        showToast(`${form.type} logged successfully for ${form.recipientName}!`);
         setLogModalOpen(false);
         setForm({
-          deliveryCompany: COMPANIES[0],
+          type: 'Parcel',
+          recipientId: '',
+          staffId: '',
           recipientName: '',
+          recipientEmail: '',
           recipientPhone: '',
-          recipientType: RECIPIENT_TYPES[0],
-          department: 'General',
+          recipientType: 'Staff',
+          department: '',
+          deliveryCompany: COMPANIES[0],
+          senderName: '',
           trackingNumber: '',
-          parcelDetails: 'Standard Package',
-          gate: 'Gate 1 (Main Entrance)',
+          parcelDetails: 'Standard package / envelope',
+          gate: GATES[0],
+          receivedAt: new Date().toISOString().slice(0, 16),
           notes: ''
         });
+        setStaffSearchQuery('');
+        setShowStaffDropdown(false);
         fetchParcels();
       }
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to log parcel', 'error');
+      showToast(err.response?.data?.message || 'Failed to log parcel/delivery', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -115,7 +187,7 @@ const DeliveryParcelPage = () => {
       setSubmitting(true);
       const res = await handoverParcel(selectedParcel._id, { handedOverTo });
       if (res.data?.success) {
-        showToast(`Parcel marked as Handed Over to ${handedOverTo || selectedParcel.recipientName}!`);
+        showToast(`Item marked as Handed Over to ${handedOverTo || selectedParcel.recipientName}!`);
         setHandoverModalOpen(false);
         setSelectedParcel(null);
         fetchParcels();
@@ -127,12 +199,18 @@ const DeliveryParcelPage = () => {
     }
   };
 
-  const filtered = (Array.isArray(parcels) ? parcels : []).filter(p =>
-    p.recipientName?.toLowerCase().includes(search.toLowerCase()) ||
-    p.trackingNumber?.toLowerCase().includes(search.toLowerCase()) ||
-    p.parcelId?.toLowerCase().includes(search.toLowerCase()) ||
-    p.deliveryCompany?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = (Array.isArray(parcels) ? parcels : []).filter(p => {
+    const q = search.toLowerCase();
+    const matchSearch = !search || (
+      p.recipientName?.toLowerCase().includes(q) ||
+      p.staffId?.toLowerCase().includes(q) ||
+      p.trackingNumber?.toLowerCase().includes(q) ||
+      p.parcelId?.toLowerCase().includes(q) ||
+      p.deliveryCompany?.toLowerCase().includes(q) ||
+      p.department?.toLowerCase().includes(q)
+    );
+    return matchSearch;
+  });
 
   return (
     <div className="wmn-page-container">
@@ -160,17 +238,21 @@ const DeliveryParcelPage = () => {
             <Package size={24} style={{ color: '#d97706' }} />
             <span>Delivery & Campus Parcel Register</span>
           </h2>
-          <p>Log received courier parcels, track gate custody, and record recipient handover acknowledgements</p>
+          <p>Register incoming staff packages, track gate custody, and record recipient handover acknowledgements</p>
         </div>
 
         <button
           type="button"
           className="wmn-btn-primary"
           style={{ background: '#d97706' }}
-          onClick={() => setLogModalOpen(true)}
+          onClick={() => {
+            setStaffSearchQuery('');
+            setShowStaffDropdown(false);
+            setLogModalOpen(true);
+          }}
         >
           <Plus size={16} />
-          <span>Log Incoming Parcel</span>
+          <span>Log Incoming Item</span>
         </button>
       </div>
 
@@ -181,7 +263,7 @@ const DeliveryParcelPage = () => {
           <input
             type="text"
             className="wmn-search-input"
-            placeholder="Search by recipient name, tracking #, courier company..."
+            placeholder="Search by recipient name, staff ID, tracking #, courier company..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -199,12 +281,22 @@ const DeliveryParcelPage = () => {
         <div className="wmn-filter-group">
           <select
             className="wmn-select"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
+            <option value="All">All Types</option>
+            <option value="Delivery">Delivery Only</option>
+            <option value="Parcel">Parcel Only</option>
+          </select>
+
+          <select
+            className="wmn-select"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="All">All Statuses</option>
-            <option value="Received at Gate">Received at Gate (Pending Handover)</option>
-            <option value="Handed Over">Handed Over (Completed)</option>
+            <option value="Received at Gate">Pending Collection</option>
+            <option value="Handed Over">Handed Over / Collected</option>
           </select>
 
           <button
@@ -225,10 +317,9 @@ const DeliveryParcelPage = () => {
           <table className="wmn-table">
             <thead>
               <tr>
-                <th>Parcel ID</th>
-                <th>Courier / Company</th>
-                <th>Recipient Name & Type</th>
-                <th>Department / Unit</th>
+                <th>ID & Type</th>
+                <th>Staff Recipient</th>
+                <th>Courier / Sender</th>
                 <th>Tracking #</th>
                 <th>Received Time</th>
                 <th>Status</th>
@@ -238,107 +329,133 @@ const DeliveryParcelPage = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '36px' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '36px' }}>
                     <RefreshCw size={20} className="animate-spin" style={{ margin: '0 auto 8px auto', color: '#d97706' }} />
-                    <p style={{ margin: 0, color: '#64748b' }}>Loading parcel logs...</p>
+                    <p style={{ margin: 0, color: '#64748b' }}>Loading records...</p>
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
                     <Package size={36} style={{ color: '#cbd5e1', margin: '0 auto 10px auto' }} />
-                    <h4 style={{ margin: '0 0 4px 0', color: '#0f172a' }}>No Parcels Found</h4>
+                    <h4 style={{ margin: '0 0 4px 0', color: '#0f172a' }}>No Deliveries or Parcels Found</h4>
                     <p style={{ margin: 0, fontSize: '0.84rem' }}>
-                      {search ? 'No parcel matches your active search.' : 'There are no parcel records under this filter.'}
+                      {search ? 'No item matches your active search.' : 'There are no records under this filter.'}
                     </p>
                   </td>
                 </tr>
               ) : (
-                filtered.map(p => (
-                  <tr key={p._id}>
-                    <td>
-                      <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#d97706', background: '#fffbeb', padding: '3px 8px', borderRadius: '4px' }}>
-                        {p.parcelId}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{p.deliveryCompany}</div>
-                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>{p.parcelDetails}</span>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{p.recipientName}</div>
-                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Role: {p.recipientType}</span>
-                    </td>
-                    <td>
-                      <span style={{ fontSize: '0.82rem', color: '#334155' }}>{p.department}</span>
-                    </td>
-                    <td>
-                      <span style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{p.trackingNumber || '—'}</span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', color: '#334155' }}>
-                        <Clock size={12} style={{ color: '#64748b' }} />
-                        <span>{new Date(p.receivedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} • {new Date(p.receivedAt).toLocaleDateString()}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        background: p.status === 'Handed Over' ? '#dcfce7' : '#fef3c7',
-                        color: p.status === 'Handed Over' ? '#166534' : '#92400e'
-                      }}>
-                        {p.status === 'Handed Over' ? <CheckCircle2 size={12} /> : <Clock size={12} />}
-                        <span>{p.status}</span>
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {p.status === 'Received at Gate' ? (
-                        <button
-                          type="button"
-                          className="wmn-btn-primary"
-                          style={{
-                            background: '#059669',
-                            boxShadow: 'none',
-                            padding: '6px 12px',
-                            fontSize: '0.78rem'
-                          }}
-                          onClick={() => {
-                            setSelectedParcel(p);
-                            setHandedOverTo(p.recipientName);
-                            setHandoverModalOpen(true);
-                          }}
-                        >
-                          <Check size={14} />
-                          <span>Hand Over</span>
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                          Handed to: <strong>{p.handedOverTo || p.recipientName}</strong>
+                filtered.map(p => {
+                  const isPending = p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received';
+                  const isDelivery = p.type === 'Delivery';
+
+                  return (
+                    <tr key={p._id}>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#d97706', background: '#fffbeb', padding: '2px 6px', borderRadius: '4px', width: 'fit-content' }}>
+                            {p.parcelId || '—'}
+                          </span>
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            width: 'fit-content',
+                            background: isDelivery ? '#eff6ff' : '#fef3c7',
+                            color: isDelivery ? '#1d4ed8' : '#b45309'
+                          }}>
+                            {p.type || 'Parcel'}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{p.recipientName}</div>
+                        <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', gap: '6px' }}>
+                          {p.staffId && <span style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: '3px', fontWeight: 600 }}>ID: {p.staffId}</span>}
+                          {p.department && <span>{p.department}</span>}
+                        </div>
+                      </td>
+
+                      <td>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{p.deliveryCompany}</div>
+                        <span style={{ fontSize: '0.74rem', color: '#64748b' }}>{p.parcelDetails || 'Standard Package'}</span>
+                      </td>
+
+                      <td>
+                        <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', background: '#f8fafc', padding: '2px 5px', borderRadius: '4px' }}>
+                          {p.trackingNumber || '—'}
                         </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                      </td>
+
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', color: '#334155' }}>
+                          <Clock size={12} style={{ color: '#64748b' }} />
+                          <span>{new Date(p.receivedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} • {new Date(p.receivedAt).toLocaleDateString()}</span>
+                        </div>
+                      </td>
+
+                      <td>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          background: !isPending ? '#dcfce7' : '#fef3c7',
+                          color: !isPending ? '#166534' : '#92400e'
+                        }}>
+                          {!isPending ? <CheckCircle2 size={12} /> : <Clock size={12} />}
+                          <span>{p.status}</span>
+                        </span>
+                      </td>
+
+                      <td style={{ textAlign: 'right' }}>
+                        {isPending ? (
+                          <button
+                            type="button"
+                            className="wmn-btn-primary"
+                            style={{
+                              background: '#059669',
+                              boxShadow: 'none',
+                              padding: '6px 12px',
+                              fontSize: '0.78rem'
+                            }}
+                            onClick={() => {
+                              setSelectedParcel(p);
+                              setHandedOverTo(p.recipientName);
+                              setHandoverModalOpen(true);
+                            }}
+                          >
+                            <Check size={14} />
+                            <span>Hand Over</span>
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                            Handed to: <strong>{p.handedOverTo || p.collectedBy || p.recipientName}</strong>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal 1: Log Parcel */}
+      {/* Modal 1: Log Parcel / Delivery */}
       {logModalOpen && (
         <div className="wmn-modal-overlay">
-          <div className="wmn-modal-card" style={{ maxWidth: '520px' }}>
+          <div className="wmn-modal-card" style={{ maxWidth: '540px' }}>
             <div className="wmn-modal-header">
               <div className="wmn-modal-title">
                 <Package size={20} style={{ color: '#d97706' }} />
-                <h3>Log Incoming Campus Parcel</h3>
+                <h3>Log Incoming Delivery or Parcel</h3>
               </div>
               <button
                 type="button"
@@ -351,6 +468,139 @@ const DeliveryParcelPage = () => {
 
             <form onSubmit={handleLogSubmit}>
               <div className="wmn-modal-body">
+                {/* Type toggle */}
+                <div className="wmn-form-group" style={{ marginBottom: '12px' }}>
+                  <label className="wmn-form-label">Type <span className="req">*</span></label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <button
+                      type="button"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        border: form.type === 'Parcel' ? '2px solid #d97706' : '1px solid #cbd5e1',
+                        background: form.type === 'Parcel' ? '#fffbeb' : '#ffffff',
+                        color: form.type === 'Parcel' ? '#92400e' : '#475569',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setForm({ ...form, type: 'Parcel' })}
+                    >
+                      <Package size={16} />
+                      <span>Parcel</span>
+                    </button>
+                    <button
+                      type="button"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        border: form.type === 'Delivery' ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                        background: form.type === 'Delivery' ? '#eff6ff' : '#ffffff',
+                        color: form.type === 'Delivery' ? '#1d4ed8' : '#475569',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setForm({ ...form, type: 'Delivery' })}
+                    >
+                      <Truck size={16} />
+                      <span>Delivery</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Staff Database Lookup */}
+                <div className="wmn-form-group" style={{ position: 'relative', marginBottom: '12px' }}>
+                  <label className="wmn-form-label">
+                    Select Staff Member from Database <span className="req">*</span>
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      className="wmn-form-input"
+                      placeholder="Type staff name or staff ID to search..."
+                      value={staffSearchQuery}
+                      onChange={(e) => {
+                        setStaffSearchQuery(e.target.value);
+                        setShowStaffDropdown(true);
+                      }}
+                      onFocus={() => setShowStaffDropdown(true)}
+                      required
+                    />
+                  </div>
+
+                  {showStaffDropdown && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                      maxHeight: '180px',
+                      overflowY: 'auto',
+                      zIndex: 1000,
+                      marginTop: '4px'
+                    }}>
+                      {filteredStaff.length === 0 ? (
+                        <div style={{ padding: '10px', fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center' }}>
+                          No staff member matches "{staffSearchQuery}"
+                        </div>
+                      ) : (
+                        filteredStaff.map(s => (
+                          <div
+                            key={s._id}
+                            style={{
+                              padding: '8px 12px',
+                              borderBottom: '1px solid #f1f5f9',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              transition: 'background 0.15s'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = '#fef3c7'}
+                            onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
+                            onClick={() => selectStaff(s)}
+                          >
+                            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>
+                              {s.name} {s.staffId && <span style={{ color: '#d97706', fontSize: '0.78rem' }}>[{s.staffId}]</span>}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                              {s.department || 'Staff'} • {s.email}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {form.recipientId && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginTop: '6px',
+                      padding: '5px 8px',
+                      background: '#ecfdf5',
+                      border: '1px solid #a7f3d0',
+                      borderRadius: '6px',
+                      fontSize: '0.78rem',
+                      color: '#065f46'
+                    }}>
+                      <ShieldCheck size={14} />
+                      <span>Linked Staff: <strong>{form.recipientName}</strong> (ID: {form.staffId || 'Verified'})</span>
+                    </div>
+                  )}
+                </div>
+
                 <div className="wmn-form-grid-2">
                   <div className="wmn-form-group">
                     <label className="wmn-form-label">Delivery Company <span className="req">*</span></label>
@@ -377,50 +627,25 @@ const DeliveryParcelPage = () => {
 
                 <div className="wmn-form-grid-2">
                   <div className="wmn-form-group">
-                    <label className="wmn-form-label">Recipient Name <span className="req">*</span></label>
+                    <label className="wmn-form-label">Sender Name (Optional)</label>
                     <input
                       type="text"
                       className="wmn-form-input"
-                      placeholder="e.g. Dr. Ananya Rao"
-                      value={form.recipientName}
-                      onChange={(e) => setForm({ ...form, recipientName: e.target.value })}
-                      required
+                      placeholder="e.g. Oxford Press"
+                      value={form.senderName}
+                      onChange={(e) => setForm({ ...form, senderName: e.target.value })}
                     />
                   </div>
 
                   <div className="wmn-form-group">
-                    <label className="wmn-form-label">Recipient Category</label>
+                    <label className="wmn-form-label">Campus Gate Post</label>
                     <select
                       className="wmn-form-select"
-                      value={form.recipientType}
-                      onChange={(e) => setForm({ ...form, recipientType: e.target.value })}
+                      value={form.gate}
+                      onChange={(e) => setForm({ ...form, gate: e.target.value })}
                     >
-                      {RECIPIENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      {GATES.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
-                  </div>
-                </div>
-
-                <div className="wmn-form-grid-2">
-                  <div className="wmn-form-group">
-                    <label className="wmn-form-label">Department / Hostel Block</label>
-                    <input
-                      type="text"
-                      className="wmn-form-input"
-                      placeholder="e.g. Computer Science / Girls Block A"
-                      value={form.department}
-                      onChange={(e) => setForm({ ...form, department: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="wmn-form-group">
-                    <label className="wmn-form-label">Recipient Phone #</label>
-                    <input
-                      type="tel"
-                      className="wmn-form-input"
-                      placeholder="10-digit mobile"
-                      value={form.recipientPhone}
-                      onChange={(e) => setForm({ ...form, recipientPhone: e.target.value })}
-                    />
                   </div>
                 </div>
 
@@ -429,9 +654,19 @@ const DeliveryParcelPage = () => {
                   <input
                     type="text"
                     className="wmn-form-input"
-                    placeholder="e.g. Cardboard box, envelope, lab equipment"
+                    placeholder="e.g. Cardboard box, envelope, books"
                     value={form.parcelDetails}
                     onChange={(e) => setForm({ ...form, parcelDetails: e.target.value })}
+                  />
+                </div>
+
+                <div className="wmn-form-group">
+                  <label className="wmn-form-label">Received Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    className="wmn-form-input"
+                    value={form.receivedAt}
+                    onChange={(e) => setForm({ ...form, receivedAt: e.target.value })}
                   />
                 </div>
               </div>
@@ -451,7 +686,7 @@ const DeliveryParcelPage = () => {
                   style={{ background: '#d97706' }}
                   disabled={submitting}
                 >
-                  {submitting ? 'Logging...' : 'Confirm Parcel Receipt'}
+                  {submitting ? 'Logging...' : 'Confirm Item Receipt'}
                 </button>
               </div>
             </form>
@@ -466,7 +701,7 @@ const DeliveryParcelPage = () => {
             <div className="wmn-modal-header">
               <div className="wmn-modal-title">
                 <CheckCircle2 size={20} style={{ color: '#059669' }} />
-                <h3>Acknowledge Parcel Handover</h3>
+                <h3>Acknowledge Item Handover</h3>
               </div>
               <button
                 type="button"
@@ -480,7 +715,7 @@ const DeliveryParcelPage = () => {
             <form onSubmit={handleHandoverSubmit}>
               <div className="wmn-modal-body">
                 <p style={{ margin: '0 0 16px 0', fontSize: '0.86rem', color: '#64748b' }}>
-                  Confirming handover of parcel <strong>{selectedParcel.parcelId}</strong> ({selectedParcel.deliveryCompany})
+                  Confirming handover of {selectedParcel.type || 'parcel'} <strong>{selectedParcel.parcelId}</strong> ({selectedParcel.deliveryCompany}) to recipient <strong>{selectedParcel.recipientName}</strong>
                 </p>
 
                 <div className="wmn-form-group">

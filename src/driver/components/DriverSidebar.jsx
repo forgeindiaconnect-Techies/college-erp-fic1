@@ -26,10 +26,10 @@ const DriverSidebar = ({ isOpen, onClose }) => {
 
   const driverBusinessReferralItems = [
     { name: 'All Categories', path: '/driver/business-referral', exact: true, icon: <Layers size={16} /> },
-    { name: 'Credit Card Referral', path: '/driver/business-referral/credit-card', icon: <CreditCard size={16} /> },
-    { name: 'Insurance Referral', path: '/driver/business-referral/insurance', icon: <ShieldCheck size={16} /> },
-    { name: 'Job Referral', path: '/driver/business-referral/job-referral', icon: <Briefcase size={16} /> },
-    { name: 'Bank Account Referral', path: '/driver/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Credit Cards', path: '/driver/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance', path: '/driver/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Job Openings', path: '/driver/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Bank Accounts', path: '/driver/business-referral/account-opening', icon: <Building size={16} /> },
     { name: 'Incentives & Rules', path: '/driver/business-referral/incentives', icon: <Award size={16} /> },
     { name: 'My Submissions', path: '/driver/referrals', icon: <FileCheck size={16} /> }
   ];

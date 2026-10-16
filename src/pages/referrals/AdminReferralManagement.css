@@ -1776,5 +1776,40 @@
   background: #64748b !important;
 }
 
+@media (max-width: 640px) {
+  .ref-modal-overlay {
+    padding: 0.5rem !important;
+    align-items: center !important;
+  }
+
+  .ref-modal-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 14px !important;
+    max-height: 92vh !important;
+    overflow-x: hidden !important;
+  }
+
+  .ref-modal-header {
+    padding: 1rem 1.15rem !important;
+  }
+
+  .ref-modal-body {
+    padding: 1rem 1.15rem !important;
+    overflow-x: hidden !important;
+  }
+
+  .ref-modal-footer {
+    padding: 0.85rem 1rem !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .ref-modal-footer button {
+    flex: 1 1 120px !important;
+    justify-content: center !important;
+  }
+}
+
 
 

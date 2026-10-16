@@ -131,7 +131,12 @@ const StudentManagement = () => {
     .filter(s => {
       const q = (search || '').toLowerCase();
       return (
-        ((s.name?.toLowerCase() || '').includes(q) || (s.id?.toLowerCase() || '').includes(q) || (s.email?.toLowerCase() || '').includes(q)) &&
+        ((s.name?.toLowerCase() || '').includes(q) ||
+         (s.id?.toLowerCase() || '').includes(q) ||
+         (s.email?.toLowerCase() || '').includes(q) ||
+         (s.phone?.toLowerCase() || '').includes(q) ||
+         (s.mobile?.toLowerCase() || '').includes(q) ||
+         (s.qrCode?.toLowerCase() || '').includes(q)) &&
         (deptFilter === 'All' || s.dept === deptFilter) &&
         (semFilter  === 'All' || s.sem  === semFilter)  &&
         (feeFilter  === 'All' || s.feeStatus === feeFilter) &&
@@ -299,7 +304,7 @@ const StudentManagement = () => {
           <div className="search-box">
             <Search size={17} className="text-muted" />
             <input
-              type="text" placeholder="Search by name, register no, or email..."
+              type="text" placeholder="Search by name, student ID, mobile number, or QR..."
               value={search} onChange={e => setSearch(e.target.value)}
             />
             {search && <button className="clear-btn" onClick={() => setSearch('')}><X size={14} /></button>}
@@ -379,7 +384,9 @@ const StudentManagement = () => {
                             </div>
                             <div>
                               <p className="name-primary" style={{ margin: 0, fontWeight: 700, color: 'var(--text-main)' }}>{s.name}</p>
-                              <p className="name-sub" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>{s.email}</p>
+                              <p className="name-sub" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                {s.email} {s.phone ? `• 📞 ${s.phone}` : ''}
+                              </p>
                             </div>
                           </div>
                         </td>

@@ -105,5 +105,5 @@ const incentiveRuleSchema = new mongoose.Schema(
 
 incentiveRuleSchema.index({ tenantId: 1, category: 1, isActive: 1 });
 
-const IncentiveRule = mongoose.model('IncentiveRule', incentiveRuleSchema);
+const IncentiveRule = mongoose.models.IncentiveRule || mongoose.model('IncentiveRule', incentiveRuleSchema);
 export default IncentiveRule;

@@ -160,6 +160,7 @@ const studentSchema = new mongoose.Schema({
     promotedTo: String,
     status: { type: String, default: 'Passed' }
   }],
+  qrCode: { type: String, unique: true, sparse: true },
   collegeId: { type: String },
   tenantId: { type: String }
 }, { timestamps: true, strict: false });

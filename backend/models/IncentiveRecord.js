@@ -185,5 +185,5 @@ const incentiveRecordSchema = new mongoose.Schema(
 incentiveRecordSchema.index({ tenantId: 1, earnedBy: 1, status: 1 });
 incentiveRecordSchema.index({ tenantId: 1, category: 1, status: 1 });
 
-const IncentiveRecord = mongoose.model('IncentiveRecord', incentiveRecordSchema);
+const IncentiveRecord = mongoose.models.IncentiveRecord || mongoose.model('IncentiveRecord', incentiveRecordSchema);
 export default IncentiveRecord;

@@ -25,6 +25,7 @@ export const protect = async (req, res, next) => {
         else if (token.includes('-driver')) role = 'Driver';
         else if (token.includes('-placement')) role = 'Placement';
         else if (token.includes('-librarian')) role = 'Librarian';
+        else if (token.includes('-watchman')) role = 'Watchman';
         
         let referenceId = null;
         if (token.includes('-dynamic-')) {

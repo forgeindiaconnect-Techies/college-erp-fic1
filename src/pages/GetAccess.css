@@ -37,6 +37,41 @@
   padding: 0 2rem;
 }
 
+.client-reg-brand-cluster {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.erp-navbar-live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  padding: 0.28rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.live-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: liveDotPulse 2s infinite;
+}
+
+@keyframes liveDotPulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
 .client-reg-logo-box {
   display: flex;
   align-items: center;
@@ -44,6 +79,12 @@
   cursor: pointer;
   text-decoration: none;
   user-select: none;
+}
+
+.reg-navbar-logo {
+  height: 28px;
+  width: auto;
+  display: block;
 }
 
 .client-reg-logo-box .erp-brand-logo-box {
@@ -129,10 +170,10 @@
   position: relative;
   z-index: 5;
   flex: 1;
-  max-width: 1200px;
+  max-width: 1300px;
   width: 100%;
   margin: 0 auto;
-  padding: 2.5rem 1.5rem 4rem;
+  padding: 1.75rem 1.5rem 4rem;
 }
 
 /* Stepper Progress Bar */
@@ -140,9 +181,10 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  max-width: 650px;
-  margin: 0 auto 2.5rem;
+  max-width: 680px;
+  margin: 0 auto 2.25rem;
   position: relative;
+  padding: 0 1rem;
 }
 
 .stepper-track-bg {
@@ -223,42 +265,286 @@
   color: #059669;
 }
 
+/* ── Real-Time ERP Registration 2-Column Split Layout ── */
+.erp-register-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.16fr;
+  gap: 2rem;
+  align-items: start;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* Left Showcase Panel: Campus Visual & Capabilities */
+.erp-showcase-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.erp-showcase-hero-card {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.16);
+  border: 1px solid #cbd5e1;
+  aspect-ratio: 16 / 9;
+  max-height: 240px;
+  background: #0f172a;
+}
+
+.erp-showcase-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.erp-showcase-hero-card:hover .erp-showcase-img {
+  transform: scale(1.04);
+}
+
+.erp-showcase-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.15) 0%, rgba(15, 23, 42, 0.88) 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.25rem 1.4rem;
+  color: #ffffff;
+}
+
+.erp-live-badge {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 0.32rem 0.8rem;
+  border-radius: 9999px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.live-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 8px #34d399;
+  animation: liveDotPulse 2s infinite;
+}
+
+.erp-hero-caption h3 {
+  margin: 0 0 4px;
+  font-size: 1.22rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.erp-hero-caption p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+/* Feature Matrix & Highlights */
+.erp-highlights-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 1.5rem;
+  box-shadow: 0 10px 25px -10px rgba(15, 23, 42, 0.06);
+}
+
+.erp-highlights-title {
+  margin: 0 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #0f172a;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.erp-modules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.erp-module-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0.7rem 0.85rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
+  transition: all 0.2s ease;
+}
+
+.erp-module-item:hover {
+  background: #f0f7ff;
+  border-color: #bfdbfe;
+  transform: translateX(3px);
+}
+
+.module-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.module-icon-wrap.blue { background: #eff6ff; color: #2563eb; }
+.module-icon-wrap.emerald { background: #ecfdf5; color: #059669; }
+.module-icon-wrap.indigo { background: #eef2ff; color: #4f46e5; }
+.module-icon-wrap.purple { background: #faf5ff; color: #9333ea; }
+
+.module-info strong {
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 2px;
+}
+
+.module-info p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+/* Real-Time Live Stats Bar */
+.erp-live-stats-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.85rem 0.5rem;
+  margin-top: 1.15rem;
+}
+
+.erp-stat-box {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.erp-stat-val {
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: #2563eb;
+  line-height: 1.1;
+}
+
+.erp-stat-lbl {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.erp-stat-divider {
+  width: 1px;
+  height: 26px;
+  background: #cbd5e1;
+}
+
+.erp-trust-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.erp-trust-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #475569;
+}
+
 /* Card Wrappers */
 .client-reg-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
-  padding: 2.5rem;
+  border-radius: 20px;
+  box-shadow: 0 20px 45px -15px rgba(15, 23, 42, 0.07), 0 0 0 1px rgba(15, 23, 42, 0.02);
+  padding: 2.5rem 2.25rem;
   transition: transform 0.3s ease, border-color 0.3s ease;
 }
 
+.client-reg-card.erp-form-card {
+  padding: 2.25rem 2.25rem;
+}
+
 .client-reg-card-header {
-  text-align: center;
-  margin-bottom: 2rem;
+  text-align: left;
+  margin-bottom: 1.75rem;
+}
+
+.card-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  margin-bottom: 0.75rem;
 }
 
 .client-reg-card-title {
-  font-size: 1.85rem;
+  font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -0.02em;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
   color: #0f172a;
 }
 
 .client-reg-card-subtitle {
   color: #64748b;
-  font-size: 0.95rem;
-  max-width: 560px;
-  margin: 0 auto;
-  line-height: 1.5;
+  font-size: 0.92rem;
+  max-width: 600px;
+  line-height: 1.45;
 }
 
 /* Form Grid */
 .reg-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
+  gap: 1.15rem;
 }
 
 .reg-form-grid.single-col {
@@ -278,7 +564,7 @@
 }
 
 .reg-form-group label {
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   font-weight: 700;
   color: #1e293b;
   display: flex;
@@ -295,27 +581,64 @@
 .reg-input-icon {
   position: absolute;
   left: 14px;
-  color: #64748b;
+  color: #2563eb;
   pointer-events: none;
+  opacity: 0.85;
 }
 
 .reg-input {
   width: 100%;
-  padding: 0.82rem 1rem 0.82rem 2.65rem;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
+  height: 44px;
+  padding: 0 1rem 0 2.65rem;
+  background: #f0f7ff;
+  border: 1.5px solid #cbd5e1;
   border-radius: 10px;
   color: #0f172a;
-  font-size: 0.95rem;
+  font-size: 0.94rem;
   font-weight: 500;
   transition: all 0.2s ease;
   outline: none;
+  box-sizing: border-box;
 }
 
 .reg-input:focus {
   border-color: #2563eb;
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.15);
+}
+
+.reg-input.has-toggle-btn {
+  padding-right: 2.75rem;
+}
+
+.reg-pwd-toggle-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.reg-pwd-toggle-btn:hover {
+  color: #2563eb;
+}
+
+/* Chrome / Edge / Safari Autofill Override so inputs never turn ugly bright blue */
+.reg-input:-webkit-autofill,
+.reg-input:-webkit-autofill:hover, 
+.reg-input:-webkit-autofill:focus,
+.reg-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #f0f7ff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 .reg-input::placeholder {
@@ -328,6 +651,18 @@
   color: #dc2626;
   margin-top: 4px;
   font-weight: 600;
+}
+
+.reg-security-footnote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 1.25rem;
+  font-size: 0.78rem;
+  color: #64748b;
+  font-weight: 500;
+  text-align: center;
 }
 
 /* Password strength */
@@ -875,6 +1210,71 @@
   color: #15803d;
 }
 
+/* Action Buttons */
+.reg-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.btn-reg-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  padding: 0.85rem 1.85rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+  transition: all 0.2s ease;
+}
+
+.btn-reg-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.38);
+  transform: translateY(-1px);
+}
+
+.btn-reg-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-reg-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.btn-reg-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #ffffff;
+  color: #475569;
+  padding: 0.85rem 1.4rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  border: 1.5px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-reg-secondary:hover {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
 /* Responsive adjustments */
 .desktop-only-text {
   display: inline;
@@ -889,10 +1289,29 @@
   display: none;
 }
 
+@media (max-width: 1024px) {
+  .erp-register-layout {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+  }
+  
+  .erp-showcase-panel {
+    order: 2;
+  }
+  
+  .erp-form-card {
+    order: 1;
+  }
+}
+
 @media (max-width: 768px) {
   .client-reg-navbar {
     padding: 0.85rem 1.25rem;
     height: 66px;
+  }
+  
+  .erp-navbar-live-status {
+    display: none;
   }
   
   .client-reg-main-content {

@@ -188,47 +188,48 @@ const AttendanceShiftPage = ({ embedded = false }) => {
       </div>
 
       {/* Shift Details Info Cards */}
-      <div className="wm-grid-3" style={{ marginBottom: 24 }}>
-        <div className="wm-card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 10, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
-            <Clock size={22} />
+      <div className="wm-grid-3" style={{ marginBottom: 20 }}>
+        <div className="wm-card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', background: '#ffffff', borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ width: 42, height: 42, borderRadius: 10, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', flexShrink: 0 }}>
+            <Clock size={20} />
           </div>
-          <div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>Assigned Shift</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>
-              {watchmanInfo.shift || 'Morning Shift'}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Assigned Shift</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {watchmanInfo.shift || 'Morning'}
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
               {watchmanInfo.shift === 'Morning' && '06:00 AM – 02:00 PM'}
               {watchmanInfo.shift === 'Evening' && '02:00 PM – 10:00 PM'}
               {watchmanInfo.shift === 'Night' && '10:00 PM – 06:00 AM'}
+              {!['Morning', 'Evening', 'Night'].includes(watchmanInfo.shift) && 'Standard Gate Shift'}
             </div>
           </div>
         </div>
 
-        <div className="wm-card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 10, background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c3aed' }}>
-            <MapPin size={22} />
+        <div className="wm-card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', background: '#ffffff', borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ width: 42, height: 42, borderRadius: 10, background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c3aed', flexShrink: 0 }}>
+            <MapPin size={20} />
           </div>
-          <div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>Assigned Gate</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>
-              {watchmanInfo.assignedGate || 'Main Gate 1'}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Assigned Gate</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {watchmanInfo.assignedGate || 'Gate 1 (Main Entrance)'}
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Designated Security Post</div>
+            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>Designated Security Post</div>
           </div>
         </div>
 
-        <div className="wm-card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 10, background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
-            <Shield size={22} />
+        <div className="wm-card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', background: '#ffffff', borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ width: 42, height: 42, borderRadius: 10, background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669', flexShrink: 0 }}>
+            <Shield size={20} />
           </div>
-          <div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>Officer ID</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>
-              {watchmanInfo.employeeId || 'WCH-1001'}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Officer ID</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {watchmanInfo.employeeId || 'WMN-7430'}
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{watchmanInfo.name || 'Security Personnel'}</div>
+            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>{watchmanInfo.name || 'Natrajan'}</div>
           </div>
         </div>
       </div>

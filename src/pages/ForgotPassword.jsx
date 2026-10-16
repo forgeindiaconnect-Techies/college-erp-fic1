@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { GraduationCap, Mail, ArrowRight, ArrowLeft, CheckCircle2, ShieldAlert } from 'lucide-react';
+import {
+  GraduationCap, Mail, ArrowRight, ArrowLeft,
+  CheckCircle2, AlertCircle, Users, Shield, Headphones
+} from 'lucide-react';
 import { forgotPassword } from '../api/index';
-import './Login.css'; // Reuse premium login layout CSS for absolute consistency!
+import './Login.css';
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -19,123 +22,160 @@ const ForgotPassword = () => {
 
     try {
       const res = await forgotPassword(email);
-      setSuccessMsg(res.data.message || 'Reset link successfully sent.');
+      setSuccessMsg(res.data?.message || 'Password reset link successfully sent to your email.');
       setEmail('');
       setLoading(false);
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || 'Failed to request password reset. Please try again.');
+      setErrorMsg(err.response?.data?.message || 'Failed to request password reset. Please verify your email.');
       setLoading(false);
     }
   };
 
   return (
     <div className="unified-login-container">
-      <div className="login-visual-section">
-        <div className="visual-overlay"></div>
-        <div className="visual-content">
-          <div className="logo-badge">
-            <GraduationCap size={48} className="logo-icon" />
-          </div>
-          <h1 className="brand-headline">Apex ERP Portal</h1>
-          <p className="brand-description">
-            Experience next-generation multi-role college operations, academic metrics, and real-time management.
-          </p>
-          <div className="feature-indicator-list">
-            <div className="feat-ind">
-              <span className="feat-dot green"></span>
-              <span>Fully Secure Password Reset</span>
+      <div className="login-wrapper-card">
+        {/* LEFT PANEL: Vibrant, sunny campus visual */}
+        <div className="login-visual-section">
+          <div className="visual-image-bg"></div>
+          <div className="visual-top-scrim"></div>
+          
+          <div className="visual-content">
+            <div className="visual-brand-header">
+              <img src="/logo.svg" alt="ERPSYS Logo" className="visual-logo-img" />
             </div>
-            <div className="feat-ind">
-              <span className="feat-dot blue"></span>
-              <span>Automated Recovery Dispatch</span>
+
+            <div className="visual-hero-text">
+              <h1 className="brand-headline">
+                Smart Campus,<br />
+                Smarter Management
+              </h1>
+              <div className="headline-accent-bar"></div>
+              <p className="brand-description">
+                Secure self-service account recovery and credential management for your institution portal.
+              </p>
             </div>
-            <div className="feat-ind">
-              <span className="feat-dot purple"></span>
-              <span>Encrypted Session Management</span>
+
+            <div className="glass-role-pills">
+              <div className="glass-pill-item">
+                <GraduationCap size={20} className="pill-icon" />
+                <span>Students</span>
+              </div>
+              <div className="glass-pill-divider"></div>
+              <div className="glass-pill-item">
+                <Users size={20} className="pill-icon" />
+                <span>Faculty</span>
+              </div>
+              <div className="glass-pill-divider"></div>
+              <div className="glass-pill-item">
+                <Shield size={20} className="pill-icon" />
+                <span>Administration</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="login-form-section">
-        <div className="login-card-container">
-          <div style={{ marginBottom: '24px' }}>
-            <Link 
-              to="/login" 
-              style={{ 
-                display: 'inline-flex', 
-                alignItems: 'center', 
-                gap: '8px', 
-                color: '#6366f1', 
-                textDecoration: 'none', 
-                fontSize: '14px', 
-                fontWeight: '600',
-                transition: 'color 0.2s'
-              }}
-              onMouseOver={(e) => e.target.style.color = '#818cf8'}
-              onMouseOut={(e) => e.target.style.color = '#6366f1'}
-            >
-              <ArrowLeft size={16} /> Back to Sign In
-            </Link>
-          </div>
+        {/* RIGHT PANEL: Clean white recovery form */}
+        <div className="login-form-section">
+          <div className="corner-decor top-right"></div>
+          <div className="corner-decor bottom-right"></div>
 
-          <div className="login-card-header">
-            <h2>Reset Password</h2>
-            <p>Enter your registered email address to recover access to your portal</p>
-          </div>
-
-          {successMsg ? (
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              gap: '16px', 
-              padding: '24px', 
-              background: 'rgba(16, 185, 129, 0.1)', 
-              border: '1px solid rgba(16, 185, 129, 0.2)', 
-              borderRadius: '16px',
-              textAlign: 'center',
-              animation: 'cardFadeIn 0.4s ease-out'
-            }}>
-              <CheckCircle2 size={48} color="#10b981" />
-              <h4 style={{ color: '#ffffff', fontSize: '18px', fontWeight: '700', margin: 0 }}>Dispatch Successful</h4>
-              <p style={{ color: '#a7f3d0', fontSize: '14px', margin: 0, lineHeight: '1.6' }}>{successMsg}</p>
-              <button 
-                onClick={() => navigate('/login')} 
-                className="login-submit-btn" 
-                style={{ width: '100%', marginTop: '8px' }}
+          <div className="login-card-container">
+            <div style={{ marginBottom: '16px' }}>
+              <Link 
+                to="/login" 
+                style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  color: '#2563eb', 
+                  textDecoration: 'none', 
+                  fontSize: '13px', 
+                  fontWeight: '600'
+                }}
               >
-                Return to Login
-              </button>
+                <ArrowLeft size={16} /> Back to Sign In
+              </Link>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="unified-form">
-              <div className="input-group">
-                <label>Email Address</label>
-                <div className="input-wrapper">
-                  <Mail size={18} className="form-icon" />
-                  <input
-                    type="email"
-                    placeholder="Enter your registered email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
+
+            <div className="login-card-header">
+              <div className="login-logo-wrap">
+                <img src="/logo_dark.svg" alt="ERPSYS Logo" className="login-right-logo" />
               </div>
+              <h2 className="login-title">Reset Password</h2>
+              <p className="login-subtitle">Enter your registered email to receive recovery instructions</p>
+            </div>
 
-              {errorMsg && (
-                <div className="login-error-msg" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                  <ShieldAlert size={16} />
-                  <span>{errorMsg}</span>
+            {successMsg ? (
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                gap: '12px', 
+                padding: '24px', 
+                background: '#ecfdf5', 
+                border: '1px solid #a7f3d0', 
+                borderRadius: '12px',
+                textAlign: 'center'
+              }}>
+                <CheckCircle2 size={40} color="#059669" />
+                <h4 style={{ color: '#065f46', fontSize: '16px', fontWeight: '700', margin: 0 }}>Recovery Link Sent</h4>
+                <p style={{ color: '#047857', fontSize: '13px', margin: 0, lineHeight: '1.5' }}>{successMsg}</p>
+                <button 
+                  onClick={() => navigate('/login')} 
+                  className="login-submit-btn" 
+                  style={{ width: '100%', marginTop: '8px' }}
+                >
+                  Return to Sign In
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="unified-form" autoComplete="off">
+                <div className="input-group">
+                  <label htmlFor="recovery-email">Registered Email Address</label>
+                  <div className="input-wrapper">
+                    <Mail size={18} className="form-icon" />
+                    <input
+                      id="recovery-email"
+                      type="email"
+                      placeholder="Enter your registered email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
-              )}
 
-              <button type="submit" className="login-submit-btn" disabled={loading}>
-                {loading ? 'Processing Dispatch...' : <>Send Recovery Link <ArrowRight size={18} /></>}
-              </button>
-            </form>
-          )}
+                {errorMsg && (
+                  <div className="login-error-msg" role="alert">
+                    <AlertCircle size={16} className="error-icon" />
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+
+                <button type="submit" className="login-submit-btn" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <span className="login-spinner"></span>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Send Recovery Link</span>
+                      <ArrowRight size={18} />
+                    </>
+                  )}
+                </button>
+
+                <div className="login-help-footer">
+                  <Headphones size={22} className="help-icon" />
+                  <div className="help-text">
+                    <span className="help-title">Need help signing in?</span>
+                    <span className="help-sub">Contact your administrator</span>
+                  </div>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </div>

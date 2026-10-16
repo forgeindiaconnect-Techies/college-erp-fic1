@@ -87,10 +87,10 @@ const PlacementSidebar = ({ isOpen, onClose }) => {
 
   const placementBusinessReferralItems = [
     { name: 'All Categories', path: '/placement/business-referral', exact: true, icon: <Layers size={16} /> },
-    { name: 'Credit Card Referral', path: '/placement/business-referral/credit-card', icon: <CreditCard size={16} /> },
-    { name: 'Insurance Referral', path: '/placement/business-referral/insurance', icon: <ShieldCheck size={16} /> },
-    { name: 'Job Referral', path: '/placement/business-referral/job-referral', icon: <Briefcase size={16} /> },
-    { name: 'Bank Account Referral', path: '/placement/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Credit Cards', path: '/placement/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance', path: '/placement/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Job Openings', path: '/placement/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Bank Accounts', path: '/placement/business-referral/account-opening', icon: <Building size={16} /> },
     { name: 'Incentives & Rules', path: '/placement/business-referral/incentives', icon: <Award size={16} /> },
     { name: 'My Submissions', path: '/placement/referrals', icon: <FileCheck size={16} /> }
   ];

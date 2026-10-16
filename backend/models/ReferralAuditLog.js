@@ -72,5 +72,5 @@ const referralAuditLogSchema = new mongoose.Schema(
 referralAuditLogSchema.index({ referralId: 1, timestamp: -1 });
 referralAuditLogSchema.index({ tenantId: 1, action: 1 });
 
-const ReferralAuditLog = mongoose.model('ReferralAuditLog', referralAuditLogSchema);
+const ReferralAuditLog = mongoose.models.ReferralAuditLog || mongoose.model('ReferralAuditLog', referralAuditLogSchema);
 export default ReferralAuditLog;

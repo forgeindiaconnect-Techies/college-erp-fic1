@@ -93,5 +93,5 @@ const payoutRecordSchema = new mongoose.Schema(
 
 payoutRecordSchema.index({ tenantId: 1, recipient: 1, status: 1 });
 
-const PayoutRecord = mongoose.model('PayoutRecord', payoutRecordSchema);
+const PayoutRecord = mongoose.models.PayoutRecord || mongoose.model('PayoutRecord', payoutRecordSchema);
 export default PayoutRecord;

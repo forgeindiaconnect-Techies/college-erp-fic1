@@ -53,6 +53,10 @@ const securityVehicleLogSchema = new mongoose.Schema({
     type: String,
     default: 'Security Gate Staff'
   },
+  exitWatchmanName: {
+    type: String,
+    default: ''
+  },
   notes: {
     type: String,
     default: ''

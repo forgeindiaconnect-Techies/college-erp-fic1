@@ -4,6 +4,8 @@ import User from '../models/User.js';
 import Staff from '../models/Staff.js';
 import TransportDriver from '../models/TransportDriver.js';
 import TransportDriverAttendance from '../models/TransportDriverAttendance.js';
+import Watchman from '../models/Watchman.js';
+import WatchmanAttendance from '../models/WatchmanAttendance.js';
 import { protect, collegeScope, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -24,13 +26,13 @@ const getEmployeeClassification = (item) => {
     return { category: 'Driver', designation: 'Driver' };
   }
 
-  // 2. Check Non-Teaching keywords & roles
-  const nonTeachingRoles = ['admin', 'accounts', 'accountant', 'librarian', 'hostel', 'warden', 'clerk', 'office staff', 'sub admin', 'subadmin', 'super admin', 'superadmin'];
+  // 2. Check Non-Teaching keywords & roles (includes Security & Watchman)
+  const nonTeachingRoles = ['admin', 'accounts', 'accountant', 'librarian', 'hostel', 'warden', 'clerk', 'office staff', 'sub admin', 'subadmin', 'super admin', 'superadmin', 'watchman', 'security'];
   const nonTeachingKeywords = [
     'account', 'admin', 'librar', 'hostel', 'warden', 'clerk', 'office',
-    'security', 'peon', 'attender', 'technician', 'electrician', 'plumber',
+    'security', 'watchman', 'guard', 'peon', 'attender', 'technician', 'electrician', 'plumber',
     'mechanic', 'gardener', 'sweeper', 'non-teaching', 'non teaching', 'lab assistant',
-    'placement', 'selvi', 'sundar'
+    'placement', 'selvi', 'sundar', 'natrajan'
   ];
 
   const isExplicitNonTeaching = explicitCat === 'non-teaching' || explicitCat === 'nonteaching';
@@ -158,6 +160,43 @@ router.post('/checkin', protect, collegeScope, async (req, res) => {
       }
     }
 
+    // Also sync WatchmanAttendance if watchman
+    if (req.user.role === 'Watchman') {
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const watchman = await Watchman.findOne({ $or: [{ user: req.user._id }, { name: req.user.name }] });
+        const shift = req.body?.shift || watchman?.shift || 'Morning';
+        const gate = req.body?.gate || watchman?.assignedGate || 'Gate 1 (Main Entrance)';
+
+        await WatchmanAttendance.findOneAndUpdate(
+          {
+            $or: [
+              { watchmanId: req.user._id, date: todayStr },
+              { watchman: watchman?._id, dutyDate: todayStr }
+            ]
+          },
+          {
+            watchman: watchman?._id,
+            watchmanId: req.user._id,
+            watchmanName: req.user.name,
+            employeeId: req.user.referenceId || watchman?.employeeId || 'WMN-7430',
+            date: todayStr,
+            dutyDate: todayStr,
+            shift,
+            gate,
+            clockInTime: checkInTime,
+            status: 'Active',
+            notes: req.body?.remarks || 'Duty Check-In (Present)',
+            collegeId: req.collegeId || req.user.collegeId || 'COL001',
+            tenantId: req.collegeId || req.user.tenantId || 'COL001'
+          },
+          { upsert: true, new: true }
+        );
+      } catch (err) {
+        console.error('Watchman attendance sync on checkin error:', err);
+      }
+    }
+
     // Emit real-time synchronization update to all portals
     req.app.get('io')?.emit('dataUpdated', {
       module: 'employee-attendance',
@@ -168,6 +207,11 @@ router.post('/checkin', protect, collegeScope, async (req, res) => {
     req.app.get('io')?.emit('dataUpdated', {
       module: 'transport-attendance',
       action: 'checkin',
+      employeeId: req.user._id
+    });
+    req.app.get('io')?.emit('dataUpdated', {
+      module: 'watchman',
+      action: 'clock_in',
       employeeId: req.user._id
     });
 
@@ -229,6 +273,30 @@ router.put('/checkout', protect, collegeScope, async (req, res) => {
     record.checkOut = new Date();
     await record.save();
 
+    // Also sync WatchmanAttendance if watchman
+    if (req.user.role === 'Watchman') {
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const clockOutTime = record.checkOut || new Date();
+        await WatchmanAttendance.updateMany(
+          {
+            $or: [
+              { watchmanId: req.user._id, date: todayStr },
+              { employeeId: req.user.referenceId, dutyDate: todayStr }
+            ]
+          },
+          {
+            $set: {
+              clockOutTime,
+              status: 'Completed'
+            }
+          }
+        );
+      } catch (err) {
+        console.error('Watchman attendance sync on checkout error:', err);
+      }
+    }
+
     req.app.get('io')?.emit('dataUpdated', {
       module: 'employee-attendance',
       action: 'checkout',
@@ -237,6 +305,11 @@ router.put('/checkout', protect, collegeScope, async (req, res) => {
     req.app.get('io')?.emit('dataUpdated', {
       module: 'transport-attendance',
       action: 'checkout',
+      employeeId: req.user._id
+    });
+    req.app.get('io')?.emit('dataUpdated', {
+      module: 'watchman',
+      action: 'clock_out',
       employeeId: req.user._id
     });
 
@@ -511,10 +584,11 @@ router.get('/admin/reports', protect, authorize('Admin', 'Principal', 'Sub Admin
 
     const collegeScopeFilter = req.collegeId ? { $or: [{ collegeId: req.collegeId }, { tenantId: req.collegeId }] } : {};
 
-    // 1. Fetch Staff and Drivers from college
-    const [staffRecords, driverRecords] = await Promise.all([
+    // 1. Fetch Staff, Drivers, and Watchmen from college
+    const [staffRecords, driverRecords, watchmanRecords] = await Promise.all([
       Staff.find(collegeScopeFilter).lean().catch(() => []),
-      TransportDriver.find(collegeScopeFilter).lean().catch(() => [])
+      TransportDriver.find(collegeScopeFilter).lean().catch(() => []),
+      Watchman.find(collegeScopeFilter).lean().catch(() => [])
     ]);
 
     // 2. Synchronize Staff to User login accounts
@@ -570,6 +644,35 @@ router.get('/admin/reports', protect, authorize('Admin', 'Principal', 'Sub Admin
                 role: 'Driver',
                 tenantId: req.collegeId || 'mock_college_id',
                 collegeId: req.collegeId || 'mock_college_id'
+              }
+            },
+            upsert: true
+          }
+        }))
+      ).catch(() => {});
+    }
+
+    // 3B. Synchronize Watchmen to User collection for Accounts & HR attendance
+    if (watchmanRecords.length > 0) {
+      await User.bulkWrite(
+        watchmanRecords.map(w => ({
+          updateOne: {
+            filter: {
+              $or: [
+                { referenceId: w.employeeId },
+                { email: w.email || `watchman_${w.employeeId.toLowerCase()}@college.edu` }
+              ]
+            },
+            update: {
+              $set: {
+                name: w.name,
+                department: 'Campus Security',
+                designation: 'Security Officer',
+                referenceId: w.employeeId,
+                category: 'Non-Teaching',
+                role: 'Watchman',
+                tenantId: w.tenantId || req.collegeId || 'COL001',
+                collegeId: w.collegeId || req.collegeId || 'COL001'
               }
             },
             upsert: true

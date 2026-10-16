@@ -6,7 +6,7 @@ import {
   Calendar, CalendarCheck, FileSpreadsheet, BookOpenCheck, Inbox, FileBarChart, 
   ClipboardList, Megaphone, ShieldCheck, Shield, Settings, ChevronRight, ChevronDown, 
   Wallet, Activity, PieChart, LogOut, Library, Bus, Building, Briefcase, Bot, Layers, Clock, Award, Network,
-  CreditCard
+  CreditCard, ScanLine, Package
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -27,10 +27,10 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const adminBusinessReferralItems = [
     { name: 'All Categories', path: '/admin/business-referral', exact: true, icon: <Layers size={16} /> },
-    { name: 'Credit Card Referral', path: '/admin/business-referral/credit-card', icon: <CreditCard size={16} /> },
-    { name: 'Insurance Referral', path: '/admin/business-referral/insurance', icon: <ShieldCheck size={16} /> },
-    { name: 'Job Referral', path: '/admin/business-referral/job-referral', icon: <Briefcase size={16} /> },
-    { name: 'Bank Account Referral', path: '/admin/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Credit Cards', path: '/admin/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance', path: '/admin/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Job Openings', path: '/admin/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Bank Accounts', path: '/admin/business-referral/account-opening', icon: <Building size={16} /> },
     { name: 'Incentives & Rules', path: '/admin/business-referral/incentives', icon: <Award size={16} /> },
     { name: 'Management Console', path: '/admin/business-referrals', icon: <FileBarChart size={16} /> }
   ];
@@ -103,9 +103,12 @@ const Sidebar = ({ isOpen, onClose }) => {
       items: [
         { name: 'Library', path: '/admin/library', icon: <Library size={20} />, flag: 'libraryEnabled' },
         { name: 'Transport', path: '/admin/transport', icon: <Bus size={20} />, flag: 'transportEnabled' },
+        { name: 'Bus Gate Tracking', path: '/admin/bus-tracking', icon: <Bus size={20} />, flag: 'transportEnabled' },
         { name: 'Hostel', path: '/admin/hostel', icon: <Building size={20} />, flag: 'hostelEnabled' },
-        { name: 'Placement', path: '/admin/placement', icon: <Briefcase size={20} />, flag: 'placementEnabled' }
-      ].filter(item => !collegeSettings || collegeSettings[item.flag] !== false)
+        { name: 'Placement', path: '/admin/placement', icon: <Briefcase size={20} />, flag: 'placementEnabled' },
+        { name: 'Watchman Tracking', path: '/admin/watchman-tracking', icon: <ScanLine size={20} /> },
+        { name: 'Delivery & Parcels', path: '/admin/parcels', icon: <Package size={20} /> }
+      ].filter(item => !item.flag || !collegeSettings || collegeSettings[item.flag] !== false)
     },
     {
       name: 'Communication',
@@ -184,6 +187,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <span>Dashboard</span>
               </NavLink>
             </li>
+
 
             <li style={{ marginBottom: '0.5rem' }}>
               <div 

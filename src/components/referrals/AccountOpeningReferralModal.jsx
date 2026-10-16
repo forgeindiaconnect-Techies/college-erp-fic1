@@ -185,7 +185,11 @@ export default function AccountOpeningReferralModal({
   if (!isOpen) return null;
 
   const step1CustomFields = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
-  const step2CustomFields = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2);
+  const step2CustomFields = (formConfig?.fieldsConfig || []).filter(f => 
+    !f.isSystem && 
+    f.step === 2 && 
+    !['bankname', 'accounttype', 'accountproduct', 'partnerreferencenumber', 'notes'].includes((f.fieldKey || '').toLowerCase())
+  );
 
   const handleCustomFieldChange = (fieldKey, value) => {
     setCustomFields(prev => ({ ...prev, [fieldKey]: value }));
@@ -244,8 +248,23 @@ export default function AccountOpeningReferralModal({
       // Dynamic custom fields validation for Step 1
       const step1Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
       step1Custom.forEach(f => {
-        const val = customFields[f.fieldKey];
-        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+        let val = customFields[f.fieldKey];
+        const keyLower = (f.fieldKey || '').toLowerCase();
+        const labelLower = (f.label || '').toLowerCase();
+
+        if (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '')) {
+          if (keyLower.includes('city') || keyLower.includes('location') || labelLower.includes('city') || labelLower.includes('location')) {
+            val = formData.city ? formData.city.trim() : '';
+          } else if (keyLower.includes('name') || labelLower.includes('name')) {
+            val = formData.applicantName ? formData.applicantName.trim() : '';
+          } else if (keyLower.includes('phone') || keyLower.includes('mobile') || labelLower.includes('phone') || labelLower.includes('mobile')) {
+            val = formData.applicantPhone ? formData.applicantPhone.trim() : '';
+          } else if (keyLower.includes('email') || labelLower.includes('email')) {
+            val = formData.applicantEmail ? formData.applicantEmail.trim() : '';
+          }
+        }
+
+        if (f.isRequired && (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0))) {
           errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
         }
       });
@@ -260,9 +279,22 @@ export default function AccountOpeningReferralModal({
       }
 
       // Dynamic custom fields validation for Step 2
-      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2);
+      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => 
+        !f.isSystem && 
+        f.step === 2 && 
+        !['bankname', 'accounttype', 'accountproduct', 'partnerreferencenumber', 'notes'].includes((f.fieldKey || '').toLowerCase())
+      );
       step2Custom.forEach(f => {
-        const val = customFields[f.fieldKey];
+        let val = customFields[f.fieldKey];
+        const keyLower = (f.fieldKey || '').toLowerCase();
+        if (keyLower.includes('source') || keyLower.includes('channel')) {
+          val = val || 'Direct Recommendation';
+        } else if (keyLower.includes('partner') || keyLower.includes('ref')) {
+          val = formData.partnerReferenceNumber || 'optional';
+        } else if (keyLower.includes('note') || keyLower.includes('remark')) {
+          val = formData.notes || 'optional';
+        }
+
         if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
           errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
         }
@@ -281,10 +313,13 @@ export default function AccountOpeningReferralModal({
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
+      setError(null);
       if (currentStep === 3 && !formData.consentTimestamp) {
         setFormData(prev => ({ ...prev, consentTimestamp: new Date().toISOString() }));
       }
       setCurrentStep(prev => prev + 1);
+    } else {
+      setError('Please fill in all required fields marked with * before continuing.');
     }
   };
 
@@ -320,6 +355,7 @@ export default function AccountOpeningReferralModal({
           bankName: formData.bankName,
           accountType: formData.accountType,
           accountProduct: formData.accountProduct,
+          referralSource: customFields.referralSource || 'Direct Recommendation',
           partnerReferenceNumber: formData.partnerReferenceNumber ? formData.partnerReferenceNumber.trim() : '',
           ...customFields
         },
@@ -327,6 +363,7 @@ export default function AccountOpeningReferralModal({
           bankName: formData.bankName,
           accountProduct: formData.accountProduct,
           accountType: formData.accountType,
+          referralSource: customFields.referralSource || 'Direct Recommendation',
           applicantName: formData.applicantName.trim(),
           applicantPhone: formData.applicantPhone.trim().replace(/\D/g, ''),
           applicantEmail: formData.applicantEmail ? formData.applicantEmail.trim() : '',

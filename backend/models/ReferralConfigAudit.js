@@ -42,5 +42,5 @@ const referralConfigAuditSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export const ReferralConfigAudit = mongoose.model('ReferralConfigAudit', referralConfigAuditSchema);
+export const ReferralConfigAudit = mongoose.models.ReferralConfigAudit || mongoose.model('ReferralConfigAudit', referralConfigAuditSchema);
 export default ReferralConfigAudit;

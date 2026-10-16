@@ -204,8 +204,24 @@ export default function InsuranceReferralModal({
       return updated;
     });
 
-    if (fieldErrors[name]) {
-      setFieldErrors(prev => ({ ...prev, [name]: null }));
+    if (name === 'city') {
+      setCustomFields(prev => ({
+        ...prev,
+        city: value,
+        residentialLocation: value,
+        cityLocation: value,
+        location: value
+      }));
+    }
+
+    if (fieldErrors[name] || fieldErrors.city || fieldErrors.residentialLocation || fieldErrors.cityLocation) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [name]: null,
+        city: null,
+        residentialLocation: null,
+        cityLocation: null
+      }));
     }
   };
 
@@ -237,8 +253,24 @@ export default function InsuranceReferralModal({
       // Dynamic custom fields validation for Step 1
       const step1Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
       step1Custom.forEach(f => {
-        const val = customFields[f.fieldKey];
-        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
+        let val = customFields[f.fieldKey];
+        const keyLower = (f.fieldKey || '').toLowerCase();
+        const labelLower = (f.label || '').toLowerCase();
+
+        // If the dynamic field represents city / location, fallback to formData.city
+        if (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '')) {
+          if (keyLower.includes('city') || keyLower.includes('location') || labelLower.includes('city') || labelLower.includes('location')) {
+            val = formData.city ? formData.city.trim() : '';
+          } else if (keyLower.includes('name') || labelLower.includes('name')) {
+            val = formData.applicantName ? formData.applicantName.trim() : '';
+          } else if (keyLower.includes('phone') || keyLower.includes('mobile') || labelLower.includes('phone') || labelLower.includes('mobile')) {
+            val = formData.applicantPhone ? formData.applicantPhone.trim() : '';
+          } else if (keyLower.includes('email') || labelLower.includes('email')) {
+            val = formData.applicantEmail ? formData.applicantEmail.trim() : '';
+          }
+        }
+
+        if (f.isRequired && (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0))) {
           errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
         }
       });
@@ -253,9 +285,24 @@ export default function InsuranceReferralModal({
       }
 
       // Dynamic custom fields validation for Step 2
-      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2);
+      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => 
+        !f.isSystem && 
+        f.step === 2 && 
+        !['insurancecategory', 'insurername', 'provider', 'productname', 'selectedoffering', 'suminsured', 'suminsuredtier', 'partnerreferencenumber', 'notes'].includes((f.fieldKey || '').toLowerCase())
+      );
       step2Custom.forEach(f => {
-        const val = customFields[f.fieldKey];
+        let val = customFields[f.fieldKey];
+        const keyLower = (f.fieldKey || '').toLowerCase();
+        if (keyLower.includes('sum') || keyLower.includes('tier')) {
+          val = formData.sumInsuredTier;
+        } else if (keyLower.includes('source') || keyLower.includes('channel')) {
+          val = val || 'Direct Staff Reference';
+        } else if (keyLower.includes('partner') || keyLower.includes('ref')) {
+          val = formData.partnerReferenceNumber || 'optional';
+        } else if (keyLower.includes('note') || keyLower.includes('remark')) {
+          val = formData.notes || 'optional';
+        }
+
         if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
           errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
         }
@@ -274,10 +321,13 @@ export default function InsuranceReferralModal({
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
+      setError(null);
       if (currentStep === 3 && !formData.consentTimestamp) {
         setFormData(prev => ({ ...prev, consentTimestamp: new Date().toISOString() }));
       }
       setCurrentStep(prev => prev + 1);
+    } else {
+      setError('Please fill in all required fields marked with * before continuing.');
     }
   };
 
@@ -315,6 +365,8 @@ export default function InsuranceReferralModal({
           insuranceCategory: formData.insuranceCategory,
           selectedOffering: formData.selectedOffering,
           sumInsuredTier: formData.sumInsuredTier,
+          sumInsured: formData.sumInsuredTier,
+          referralSource: customFields.referralSource || 'Direct Staff Reference',
           partnerReferenceNumber: formData.partnerReferenceNumber ? formData.partnerReferenceNumber.trim() : '',
           ...customFields
         },
@@ -324,6 +376,8 @@ export default function InsuranceReferralModal({
           productType: formData.insuranceCategory === 'Motor' ? 'Motor / Vehicle' : formData.insuranceCategory === 'Life' ? 'Term Life' : formData.insuranceCategory,
           selectedOffering: formData.selectedOffering,
           sumInsuredTier: formData.sumInsuredTier,
+          sumInsured: formData.sumInsuredTier,
+          referralSource: customFields.referralSource || 'Direct Staff Reference',
           estimatedSumInsured: numericTier,
           applicantName: formData.applicantName.trim(),
           applicantPhone: formData.applicantPhone.trim().replace(/\D/g, ''),
@@ -585,7 +639,7 @@ export default function InsuranceReferralModal({
                       )}
                     </div>
                   </div>
-
+ 
                   <div className="cc-form-group">
                     <label className="cc-form-label">
                       City / Campus Location <span className="req">*</span>
@@ -605,7 +659,14 @@ export default function InsuranceReferralModal({
 
                   {/* Dynamic Step 1 Custom Fields */}
                   <DynamicFieldRenderer
-                    fields={(formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1))}
+                    fields={(formConfig?.fieldsConfig || []).filter(f => 
+                      !f.isSystem && 
+                      (!f.step || f.step === 1) && 
+                      !f.fieldKey?.toLowerCase().includes('city') && 
+                      !f.label?.toLowerCase().includes('city') &&
+                      !f.fieldKey?.toLowerCase().includes('location') &&
+                      !f.label?.toLowerCase().includes('location')
+                    )}
                     values={customFields}
                     onChange={handleCustomFieldChange}
                     errors={fieldErrors}
@@ -715,7 +776,11 @@ export default function InsuranceReferralModal({
 
                   {/* Dynamic Step 2 Custom Fields */}
                   <DynamicFieldRenderer
-                    fields={(formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2)}
+                    fields={(formConfig?.fieldsConfig || []).filter(f => 
+                      !f.isSystem && 
+                      f.step === 2 && 
+                      !['suminsured', 'suminsuredtier', 'notes', 'partnerreferencenumber', 'insurancecategory', 'insurername', 'provider', 'productname', 'selectedoffering'].includes((f.fieldKey || '').toLowerCase())
+                    )}
                     values={customFields}
                     onChange={handleCustomFieldChange}
                     errors={fieldErrors}

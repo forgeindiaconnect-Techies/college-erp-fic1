@@ -30,10 +30,10 @@ const HostelSidebar = ({ isOpen, onClose }) => {
 
   const hostelBusinessReferralItems = [
     { name: 'All Categories', path: '/hostel/business-referral', exact: true, icon: <Layers size={16} /> },
-    { name: 'Credit Card Referral', path: '/hostel/business-referral/credit-card', icon: <CreditCard size={16} /> },
-    { name: 'Insurance Referral', path: '/hostel/business-referral/insurance', icon: <ShieldCheck size={16} /> },
-    { name: 'Job Referral', path: '/hostel/business-referral/job-referral', icon: <Briefcase size={16} /> },
-    { name: 'Bank Account Referral', path: '/hostel/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Credit Cards', path: '/hostel/business-referral/credit-card', icon: <CreditCard size={16} /> },
+    { name: 'Insurance', path: '/hostel/business-referral/insurance', icon: <ShieldCheck size={16} /> },
+    { name: 'Job Openings', path: '/hostel/business-referral/job-referral', icon: <Briefcase size={16} /> },
+    { name: 'Bank Accounts', path: '/hostel/business-referral/account-opening', icon: <Building size={16} /> },
     { name: 'Incentives & Rules', path: '/hostel/business-referral/incentives', icon: <Award size={16} /> },
     { name: 'My Submissions', path: '/hostel/referrals', icon: <FileCheck size={16} /> }
   ];

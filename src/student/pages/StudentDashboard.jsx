@@ -8,7 +8,7 @@ import {
   ClipboardList, BookOpen, AlertCircle, FileText,
   Percent, Calendar, ShieldAlert, Clock, MapPin, Play, CheckCircle2, Download, ExternalLink,
   GraduationCap, CreditCard, Sparkles, RefreshCw, ChevronRight, Award, UserCheck, Inbox,
-  Briefcase, Building, Bus
+  Briefcase, Building, Bus, QrCode, Printer, X
 } from 'lucide-react';
 import { 
   getStudentById, getAttendanceByStudent, 
@@ -26,6 +26,7 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState(new Date());
+  const [showQrModal, setShowQrModal] = useState(false);
 
   // Student specific dynamic data
   const [studentSession, setStudentSession] = useState(null);
@@ -429,6 +430,27 @@ const StudentDashboard = () => {
               <span>REG NO:</span>
               <strong style={{ letterSpacing: '0.04em' }}>{studentDetails.id}</strong>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setShowQrModal(true)}
+              style={{
+                background: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                padding: '7px 14px',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              <QrCode size={15} />
+              <span>Campus QR Pass</span>
+            </button>
 
             <button 
               type="button" 
@@ -1016,6 +1038,130 @@ const StudentDashboard = () => {
         </div>
 
       </div>
+
+      {/* ── DIGITAL CAMPUS QR PASS MODAL ── */}
+      {showQrModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}
+          onClick={() => setShowQrModal(false)}
+        >
+          <div 
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '440px',
+              overflow: 'hidden',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <QrCode size={20} style={{ color: '#2563eb' }} />
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>My Campus QR Pass</h3>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowQrModal(false)} 
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+              <div style={{ border: '2px dashed #cbd5e1', borderRadius: '14px', padding: '1.5rem', background: '#ffffff', marginBottom: '1.25rem' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#2563eb', letterSpacing: '0.08em', marginBottom: '8px' }}>
+                  Student Institutional Gate Pass
+                </div>
+
+                <div style={{ margin: '0 auto 10px auto', width: '60px', height: '60px', borderRadius: '50%', overflow: 'hidden', border: '3px solid #2563eb', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {studentDetails.photoUrl ? (
+                    <img src={studentDetails.photoUrl} alt={studentDetails.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#2563eb' }}>
+                      {studentDetails.name?.charAt(0)?.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+
+                <h3 style={{ margin: '0 0 2px 0', fontSize: '1.2rem', color: '#0f172a' }}>{studentDetails.name}</h3>
+                <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#475569', fontSize: '0.85rem', marginBottom: '6px' }}>
+                  {studentDetails.id}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '14px' }}>
+                  {studentDetails.dept} • {studentDetails.sem}
+                </div>
+
+                <div style={{ width: '180px', height: '180px', margin: '0 auto 12px auto', padding: '6px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#ffffff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(studentDetails.qrCode || `STU-QR-${studentDetails.id}`)}`}
+                    alt="My Student QR Pass"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+
+                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  Present this QR code to the Watchman at the college gate for automatic entry & exit check-in.
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 12px', fontFamily: 'monospace', fontSize: '0.82rem', color: '#334155', marginTop: '10px' }}>
+                  {studentDetails.qrCode || `STU-QR-${studentDetails.id}`}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Printer size={16} /> Print Pass
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowQrModal(false)}
+                  style={{
+                    background: '#f1f5f9',
+                    color: '#334155',
+                    border: '1px solid #cbd5e1',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -303,5 +303,5 @@ referralSchema.index({ 'creditCardDetails.applicantPhone': 1, tenantId: 1 });
 referralSchema.index({ 'bankAccountDetails.applicantPhone': 1, tenantId: 1 });
 referralSchema.index({ 'jobDetails.candidatePhone': 1, tenantId: 1 });
 
-const Referral = mongoose.model('Referral', referralSchema);
+const Referral = mongoose.models.Referral || mongoose.model('Referral', referralSchema);
 export default Referral;

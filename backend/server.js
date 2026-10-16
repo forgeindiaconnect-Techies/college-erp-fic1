@@ -96,6 +96,8 @@ import referralRoutes from './routes/referralRoutes.js';
 import referralConfigRoutes, { ensureAllDefaultConfigs } from './routes/referralConfigRoutes.js';
 import opportunityRoutes, { autoSeedOpportunitiesIfEmpty } from './routes/opportunityRoutes.js';
 import watchmanRoutes from './routes/watchmanRoutes.js';
+import busTrackingRoutes from './routes/busTrackingRoutes.js';
+import parcelRoutes from './routes/parcelRoutes.js';
 import { verifyCloudinaryConnection } from './config/cloudinary.js';
 
 // Import Cron Jobs
@@ -1020,7 +1022,11 @@ app.use('/api/documents', documentsRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/referrals/config', referralConfigRoutes);
 app.use('/api/opportunities', opportunityRoutes);
+app.use('/api/watchman/parcels', parcelRoutes);
+app.use('/api/parcels', parcelRoutes);
 app.use('/api/watchman', watchmanRoutes);
+app.use('/api/buses', busTrackingRoutes);
+app.use('/api/watchman/buses', busTrackingRoutes);
 
 app.get('/api/cloudinary/status', async (_req, res) => {
   const status = await verifyCloudinaryConnection();
@@ -1218,202 +1224,7 @@ const startServer = async () => {
           tenantId: 'COL001'
         });
 
-        const visitorCount = await VisitorLog.countDocuments();
-        if (visitorCount === 0) {
-          await VisitorLog.insertMany([
-            {
-              visitorId: 'VIS-20261015-0001',
-              passNumber: 'PASS-892341',
-              name: 'Anitha Sundaram',
-              phone: '9840123456',
-              email: 'anitha.sundaram@gmail.com',
-              purpose: 'Admissions Enquiry (B.Tech CSE)',
-              personToMeet: 'Admission Officer / Dean',
-              department: 'Admissions Office',
-              vehicleNumber: 'TN 09 AB 4567',
-              idProofType: 'Aadhaar Card',
-              idProofNumber: 'XXXX-XXXX-8912',
-              entryTime: new Date(Date.now() - 45 * 60 * 1000),
-              status: 'Inside',
-              isPreRegistered: false,
-              approvalStatus: 'Approved',
-              gate: 'Gate 1 (Main Entrance)',
-              watchmanName: 'Ramesh Kumar (Chief Watchman)',
-              notes: 'Accompanied by applicant daughter',
-              collegeId: 'COL001',
-              tenantId: 'COL001'
-            },
-            {
-              visitorId: 'VIS-20261015-0002',
-              passNumber: 'PASS-554129',
-              name: 'Dr. Rajesh Verma',
-              phone: '9820567890',
-              email: 'rajesh.verma@techcorp.in',
-              purpose: 'Guest Lecture on Cloud & AI',
-              personToMeet: 'Dr. Agila (HOD IT)',
-              department: 'Information Technology',
-              vehicleNumber: 'KA 03 MN 9921',
-              idProofType: 'PAN Card',
-              idProofNumber: 'ABCDE1234F',
-              entryTime: new Date(Date.now() - 90 * 60 * 1000),
-              status: 'Inside',
-              isPreRegistered: true,
-              approvalStatus: 'Approved',
-              gate: 'Gate 1 (Main Entrance)',
-              watchmanName: 'Ramesh Kumar (Chief Watchman)',
-              notes: 'Keynote Speaker for Tech Symposium',
-              collegeId: 'COL001',
-              tenantId: 'COL001'
-            },
-            {
-              visitorId: 'VIS-20261015-0003',
-              passNumber: 'PASS-310492',
-              name: 'Vignesh Pillai',
-              phone: '9811223344',
-              email: 'vignesh.p@consulting.com',
-              purpose: 'Auditing Vendor Invoice Verification',
-              personToMeet: 'Accounts Officer',
-              department: 'Accounts',
-              vehicleNumber: '',
-              idProofType: 'Driving License',
-              idProofNumber: 'DL-TN-07-2019-1234',
-              entryTime: new Date(Date.now() - 180 * 60 * 1000),
-              exitTime: new Date(Date.now() - 30 * 60 * 1000),
-              status: 'Checked Out',
-              isPreRegistered: false,
-              approvalStatus: 'Approved',
-              gate: 'Gate 1 (Main Entrance)',
-              watchmanName: 'Ramesh Kumar (Chief Watchman)',
-              exitWatchmanName: 'Ramesh Kumar (Chief Watchman)',
-              notes: 'Audit documents reviewed',
-              collegeId: 'COL001',
-              tenantId: 'COL001'
-            },
-            {
-              visitorId: 'VIS-20261015-0004',
-              passNumber: 'PASS-772910',
-              name: 'Dr. Meenakshi Raman',
-              phone: '9845781290',
-              email: 'm.raman@univ.edu',
-              purpose: 'External PhD Viva Examiner',
-              personToMeet: 'Principal',
-              department: 'Dean Academics',
-              vehicleNumber: 'TN 02 BC 3344',
-              idProofType: 'College ID',
-              idProofNumber: 'EX-UNIV-992',
-              entryTime: new Date(),
-              status: 'Pre-Registered',
-              isPreRegistered: true,
-              expectedDate: new Date(),
-              expectedTime: '14:30',
-              approvalStatus: 'Approved',
-              gate: 'Gate 1 (Main Entrance)',
-              watchmanName: 'System',
-              notes: 'Scheduled Afternoon Session',
-              collegeId: 'COL001',
-              tenantId: 'COL001'
-            }
-          ]);
-        }
-
-        const parcelCount = await ParcelLog.countDocuments();
-        if (parcelCount === 0) {
-          await ParcelLog.insertMany([
-            {
-              parcelId: 'PCL-20261015-001',
-              deliveryCompany: 'Amazon',
-              recipientName: 'Dr. Ananya Rao',
-              recipientPhone: '9876543210',
-              recipientType: 'Faculty',
-              department: 'Computer Science',
-              trackingNumber: 'AMZ-IN-889123049',
-              parcelDetails: 'Book package & Lab supplies',
-              receivedAt: new Date(Date.now() - 60 * 60 * 1000),
-              status: 'Received at Gate',
-              gate: 'Gate 1 (Main Entrance)',
-              watchmanName: 'Ramesh Kumar (Chief Watchman)',
-              collegeId: 'COL001',
-              tenantId: 'COL001'
-            },
-            {
-              parcelId: 'PCL-20261015-002',
-              deliveryCompany: 'Blue Dart',
-              recipientName: 'Dr. Agila (HOD)',
-              recipientPhone: '9900000001',
-              recipientType: 'Faculty',
-              department: 'Information Technology',
-              trackingNumber: 'BD-EXP-7721094',
-              parcelDetails: 'Confidential Exam Question Paper Packets',
-              receivedAt: new Date(Date.now() - 120 * 60 * 1000),
-              status: 'Handed Over',
-              handedOverAt: new Date(Date.now() - 30 * 60 * 1000),
-              handedOverTo: 'Dr. Agila in person',
-              gate: 'Gate 1 (Main Entrance)',
-              watchmanName: 'Ramesh Kumar (Chief Watchman)',
-              collegeId: 'COL001',
-              tenantId: 'COL001'
-            }
-          ]);
-        }
-
-        const vehicleCount = await SecurityVehicleLog.countDocuments();
-        if (vehicleCount === 0) {
-          await SecurityVehicleLog.insertMany([
-            {
-              vehicleLogId: 'VEH-20261015-001',
-              vehicleNumber: 'TN 09 AB 4567',
-              vehicleType: 'Four Wheeler (Car/SUV)',
-              driverName: 'Anitha Sundaram',
-              driverPhone: '9840123456',
-              purpose: 'Visitor Entry',
-              destination: 'Admin Block Visitor Bay 2',
-              entryTime: new Date(Date.now() - 45 * 60 * 1000),
-              status: 'Inside',
-              gate: 'Gate 1 (Main Entrance)',
-              watchmanName: 'Ramesh Kumar (Chief Watchman)',
-              collegeId: 'COL001',
-              tenantId: 'COL001'
-            },
-            {
-              vehicleLogId: 'VEH-20261015-002',
-              vehicleNumber: 'TN 07 CD 8912',
-              vehicleType: 'Two Wheeler',
-              driverName: 'Prof. Karthik S.',
-              driverPhone: '9823456789',
-              purpose: 'Staff Parking',
-              destination: 'Faculty Parking Lot A',
-              entryTime: new Date(Date.now() - 240 * 60 * 1000),
-              status: 'Inside',
-              gate: 'Gate 1 (Main Entrance)',
-              watchmanName: 'Ramesh Kumar (Chief Watchman)',
-              collegeId: 'COL001',
-              tenantId: 'COL001'
-            }
-          ]);
-        }
-
-        const incidentCount = await SecurityIncident.countDocuments();
-        if (incidentCount === 0) {
-          await SecurityIncident.create({
-            incidentId: 'INC-20261015-001',
-            title: 'Unauthorized Delivery Van Parked in Emergency Lane',
-            category: 'Traffic / Speeding Violation',
-            severity: 'Medium',
-            description: 'Unattended delivery vehicle blocked the ambulance turning path at North Gate. Driver traced and moved vehicle.',
-            location: 'Gate 2 (North Gate)',
-            incidentTime: new Date(Date.now() - 75 * 60 * 1000),
-            status: 'Resolved',
-            reportedBy: 'Murugan Selvam (Security Guard)',
-            actionTaken: 'Driver contacted via contact card on dashboard; vehicle relocated to loading bay.',
-            resolutionNotes: 'Cleared within 15 minutes. Warning issued.',
-            resolvedAt: new Date(Date.now() - 60 * 60 * 1000),
-            resolvedBy: 'Murugan Selvam',
-            gate: 'Gate 2 (North Gate)',
-            collegeId: 'COL001',
-            tenantId: 'COL001'
-          });
-        }
-        console.log('✅ Watchmen & Security seed complete.');
+        console.log('✅ Watchmen & Security accounts ready (no mock data).');
       }
     } catch (e) {
       console.warn('Watchman seed error:', e.message);
@@ -1427,7 +1238,7 @@ const startServer = async () => {
   await seedWatchmanDataIfEmpty();
 
   const listenOnPort = (portToTry) => {
-    const srv = server.listen(portToTry, () => {
+    const srv = server.listen(portToTry, '0.0.0.0', () => {
       console.log(`🚀 Server is running on port ${portToTry}`);
       console.log(`🌐 API ready at http://localhost:${portToTry}`);
       console.log(`⚡ WebSocket server is active`);

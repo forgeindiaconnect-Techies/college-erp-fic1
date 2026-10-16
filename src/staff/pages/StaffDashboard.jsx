@@ -4,7 +4,7 @@ import {
   BookOpen, Users, CalendarCheck, CheckCircle, Clock,
   ArrowRight, Activity, Plus, AlertCircle, GraduationCap, Play, CheckCircle2,
   Calendar, FileText, Bookmark, Sparkles, Award, ShieldAlert, Zap,
-  TrendingUp, RefreshCw, ChevronRight, Bell, Briefcase
+  TrendingUp, RefreshCw, ChevronRight, Bell, Briefcase, Package, Truck
 } from 'lucide-react';
 import {
   getStudents,
@@ -19,7 +19,8 @@ import {
   getAssignments,
   getMyFacultyAllocations,
   getSubjects,
-  getPlacementJobs
+  getPlacementJobs,
+  getParcels
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import LiveClassModal from '../components/LiveClassModal';
@@ -68,6 +69,7 @@ const StaffDashboard = () => {
   const [notifications, setNotifications] = useState([]);
   const [advisingClass, setAdvisingClass] = useState(null);
   const [placementJobs, setPlacementJobs] = useState([]);
+  const [parcels, setParcels] = useState([]);
 
   // Day filter for schedule hub
   const currentDayIndex = new Date().getDay();
@@ -102,7 +104,8 @@ const StaffDashboard = () => {
         assignmentRes,
         allocationRes,
         subjectRes,
-        jobsRes
+        jobsRes,
+        parcelsRes
       ] = await Promise.all([
         getStudents().catch(() => ({ data: [] })),
         getAllMarks().catch(() => ({ data: [] })),
@@ -115,8 +118,12 @@ const StaffDashboard = () => {
         getAssignments().catch(() => ({ data: [] })),
         getMyFacultyAllocations().catch(() => ({ data: [] })),
         getSubjects().catch(() => ({ data: [] })),
-        getPlacementJobs().catch(() => ({ data: [] }))
+        getPlacementJobs().catch(() => ({ data: [] })),
+        getParcels().catch(() => ({ data: [] }))
       ]);
+
+      const parcelList = Array.isArray(parcelsRes?.data?.data) ? parcelsRes.data.data : (Array.isArray(parcelsRes?.data) ? parcelsRes.data : []);
+      setParcels(parcelList);
 
       // Multi-key placement jobs loader (strictly this tenant)
       const sessionObj = JSON.parse(sessionStorage.getItem('staff_session') || sessionStorage.getItem('user_session') || '{}');
@@ -249,7 +256,7 @@ const StaffDashboard = () => {
     };
   }, [loadDashboardData, navigate]);
 
-  useRealtimeSync(loadDashboardData, ['timetable', 'attendance', 'substitutions', 'assignments', 'marks']);
+  useRealtimeSync(loadDashboardData, ['timetable', 'attendance', 'substitutions', 'assignments', 'marks', 'parcel']);
 
   const staffName = staffSession.name || 'Faculty Member';
   const staffDept = staffSession.dept || staffSession.department || 'Computer Science Engineering';
@@ -595,7 +602,79 @@ const StaffDashboard = () => {
             <span style={{ color: '#10B981', fontWeight: 700 }}>Drives →</span>
           </div>
         </div>
+
+        <div 
+          onClick={() => navigate('/staff/parcels')}
+          style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #D97706', padding: '18px 20px', borderRadius: '14px', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Gate Deliveries & Parcels</span>
+              <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                {parcels.filter(p => p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received').length} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#d97706' }}>Pending</span>
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(217, 119, 6, 0.1)', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Package size={22} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#d97706', fontWeight: 600 }}>{parcels.length} Total Deliveries</span>
+            <span style={{ color: '#D97706', fontWeight: 700 }}>Pickup Details →</span>
+          </div>
+        </div>
       </div>
+
+      {/* Pending Deliveries & Parcels Banner */}
+      {parcels.some(p => p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received') && (
+        <div style={{
+          marginTop: '1.25rem',
+          background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+          border: '1px solid #fde68a',
+          borderRadius: '14px',
+          padding: '16px 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px',
+          boxShadow: '0 2px 10px rgba(217,119,6,0.08)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: 42, height: 42, borderRadius: '10px', background: '#d97706', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Package size={22} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#92400e' }}>
+                You have {parcels.filter(p => p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received').length} package(s) awaiting collection at the campus gate
+              </h4>
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#b45309' }}>
+                Recent arrival: {parcels.filter(p => p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received')[0]?.deliveryCompany} ({parcels.filter(p => p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received')[0]?.parcelDetails || 'Package'})
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/staff/parcels')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 16px',
+              background: '#d97706',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: 700,
+              fontSize: '0.84rem',
+              cursor: 'pointer'
+            }}
+          >
+            <span>View Deliveries & Collect</span>
+            <ArrowRight size={15} />
+          </button>
+        </div>
+      )}
 
       {/* ── Document Tracker & Compliance Widget for Staff ── */}
       <div style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>

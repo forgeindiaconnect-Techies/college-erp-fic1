@@ -541,6 +541,12 @@ input:checked + .brs-slider:before {
   border-radius: 0 0 18px 18px;
 }
 
+.brs-modal-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 .brs-form-group {
   display: flex;
   flex-direction: column;
@@ -1157,4 +1163,109 @@ input:checked + .brs-slider:before {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════ */
+/* RESPONSIVE MOBILE VIEW (MAX-WIDTH: 640px)                             */
+/* ══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .brs-modal-overlay {
+    padding: 0.5rem;
+    align-items: center;
+  }
+
+  .brs-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 14px;
+    max-height: 92vh;
+    overflow-x: hidden;
+  }
+
+  .brs-modal-header {
+    padding: 1rem 1.15rem;
+  }
+
+  .brs-modal-header h3 {
+    font-size: 1.05rem;
+  }
+
+  .brs-modal-body {
+    padding: 1rem 1.15rem;
+    gap: 1rem;
+    overflow-x: hidden;
+  }
+
+  .brs-modal-grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
+
+  .brs-form-group {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .brs-form-group input,
+  .brs-form-group select,
+  .brs-form-group textarea {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    font-size: 0.92rem;
+  }
+
+  .brs-modal-footer {
+    padding: 1rem 1.15rem;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .brs-modal-footer button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .brs-category-subnav {
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .brs-subnav-btn {
+    padding: 6px 12px;
+    font-size: 0.78rem;
+  }
+
+  .brs-fb-control-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .brs-fb-btn-group {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .brs-fb-btn-group button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .brs-field-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .brs-field-item-actions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 8px;
+    border-top: 1px dashed #e2e8f0;
+  }
 }
