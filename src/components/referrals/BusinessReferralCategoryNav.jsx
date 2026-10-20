@@ -7,7 +7,9 @@ import {
 import './BusinessReferralCategoryNav.css';
 
 export default function BusinessReferralCategoryNav({ activeCategory }) {
-  return null;
+  const navigate = useNavigate();
+  const location = useLocation();
+  const rootRole = location.pathname.split('/')[1] || 'admin';
 
   const categoryTabs = [
     {
@@ -84,13 +86,18 @@ export default function BusinessReferralCategoryNav({ activeCategory }) {
 
         {utilityTabs.map((tab) => {
           const isActive = activeCategory === tab.id;
+          const activeStyle = isActive
+            ? (tab.id === 'incentives'
+                ? { background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderColor: '#d97706', color: '#ffffff' }
+                : { background: '#0284c7', borderColor: '#0284c7', color: '#ffffff' })
+            : {};
           return (
             <button
               key={tab.id}
               type="button"
               className={`br-cat-tab-btn ${isActive ? 'active' : ''}`}
               onClick={() => navigate(tab.path)}
-              style={isActive ? { background: '#0284c7', borderColor: '#0284c7' } : {}}
+              style={activeStyle}
             >
               <span className="br-cat-tab-icon">{tab.icon}</span>
               <span>{tab.label}</span>

@@ -383,7 +383,7 @@ const HodManagement = () => {
                   <input 
                     type="email"
                     required 
-                    placeholder="e.g. poojasree@gmail.com" 
+                    placeholder="e.g. hod.civil@institution.edu" 
                     value={form.email || ''} 
                     onChange={e => {
                       const val = e.target.value;

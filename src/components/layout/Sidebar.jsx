@@ -106,7 +106,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         { name: 'Bus Gate Tracking', path: '/admin/bus-tracking', icon: <Bus size={20} />, flag: 'transportEnabled' },
         { name: 'Hostel', path: '/admin/hostel', icon: <Building size={20} />, flag: 'hostelEnabled' },
         { name: 'Placement', path: '/admin/placement', icon: <Briefcase size={20} />, flag: 'placementEnabled' },
-        { name: 'Watchman Tracking', path: '/admin/watchman-tracking', icon: <ScanLine size={20} /> },
         { name: 'Delivery & Parcels', path: '/admin/parcels', icon: <Package size={20} /> }
       ].filter(item => !item.flag || !collegeSettings || collegeSettings[item.flag] !== false)
     },

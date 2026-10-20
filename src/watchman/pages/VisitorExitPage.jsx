@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   LogOut as ExitIcon, Search, CheckCircle2, Clock, MapPin,
-  Phone, User, Car, AlertTriangle, RefreshCw, X
+  Phone, User, Car, AlertTriangle, RefreshCw, X, QrCode, UserPlus
 } from 'lucide-react';
 import { getActiveVisitors, recordVisitorExit } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import '../watchman.css';
 
 const VisitorExitPage = () => {
+  const navigate = useNavigate();
   const [activeVisitors, setActiveVisitors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -98,15 +100,37 @@ const VisitorExitPage = () => {
           <p>Locate active campus visitors and register official exit departure timestamp</p>
         </div>
 
-        <button
-          type="button"
-          className="wmn-btn-sec"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-          onClick={fetchActive}
-        >
-          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-          <span>Refresh</span>
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="wmn-btn-sec"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            onClick={() => navigate('/watchman/qr-verification?type=visitor')}
+            title="Scan QR pass with camera or barcode gun"
+          >
+            <QrCode size={15} style={{ color: '#2563eb' }} />
+            <span>Open Pass Scanner</span>
+          </button>
+          <button
+            type="button"
+            className="wmn-btn-sec"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            onClick={() => navigate('/watchman/visitor-entry')}
+            title="Register a new visitor"
+          >
+            <UserPlus size={15} style={{ color: '#059669' }} />
+            <span>New Visitor Entry</span>
+          </button>
+          <button
+            type="button"
+            className="wmn-btn-sec"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            onClick={fetchActive}
+          >
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -204,23 +228,41 @@ const VisitorExitPage = () => {
                       </div>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <button
-                        type="button"
-                        className="wmn-btn-primary"
-                        style={{
-                          background: '#dc2626',
-                          boxShadow: 'none',
-                          padding: '6px 12px',
-                          fontSize: '0.8rem'
-                        }}
-                        onClick={() => {
-                          setSelectedVisitor(v);
-                          setExitNotes('');
-                        }}
-                      >
-                        <ExitIcon size={14} />
-                        <span>Record Exit</span>
-                      </button>
+                      <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="wmn-btn-sec"
+                          style={{
+                            padding: '6px 10px',
+                            fontSize: '0.8rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          onClick={() => navigate(`/watchman/qr-verification?type=visitor&code=${encodeURIComponent(v.passNumber)}`)}
+                          title="Open visitor pass in Gate QR Scanner"
+                        >
+                          <QrCode size={13} style={{ color: '#2563eb' }} />
+                          <span>Scan</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="wmn-btn-primary"
+                          style={{
+                            background: '#dc2626',
+                            boxShadow: 'none',
+                            padding: '6px 12px',
+                            fontSize: '0.8rem'
+                          }}
+                          onClick={() => {
+                            setSelectedVisitor(v);
+                            setExitNotes('');
+                          }}
+                        >
+                          <ExitIcon size={14} />
+                          <span>Record Exit</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

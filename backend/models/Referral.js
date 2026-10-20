@@ -68,7 +68,7 @@ const referralSchema = new mongoose.Schema(
       },
       productType: {
         type: String,
-        enum: ['Health', 'Term Life', 'Motor / Vehicle', 'Personal Accident', 'Travel', 'Property', 'Other'],
+        enum: ['Health', 'Term Life', 'Motor / Vehicle', 'Personal Accident', 'Travel', 'Property', 'Other', 'Life', 'Motor'],
       },
       selectedOffering: { type: String, trim: true },
       sumInsuredTier: { type: String, trim: true },
@@ -117,7 +117,7 @@ const referralSchema = new mongoose.Schema(
       accountProduct: { type: String, trim: true },
       accountType: {
         type: String,
-        enum: ['Savings Account', 'Student Zero-Balance', 'Salary Account', 'Current Account', 'Fixed Deposit Linked'],
+        enum: ['Savings Account', 'Student Zero-Balance', 'Salary Account', 'Current Account', 'Fixed Deposit Linked', 'Regular Savings', 'Corporate Salary'],
         default: 'Savings Account',
       },
       applicantType: {
@@ -149,7 +149,7 @@ const referralSchema = new mongoose.Schema(
     jobDetails: {
       sector: {
         type: String,
-        enum: ['IT / Software', 'Non-IT / Core Engineering', 'Banking / Finance', 'Healthcare / Pharma', 'EdTech / Education', 'BPO / Operations', 'Other'],
+        enum: ['IT / Software', 'Non-IT / Core Engineering', 'Banking / Finance', 'Healthcare / Pharma', 'EdTech / Education', 'BPO / Operations', 'Other', 'IT & Software', 'Core Engineering', 'Banking & Finance'],
         default: 'IT / Software',
       },
       companyName: { type: String, trim: true },

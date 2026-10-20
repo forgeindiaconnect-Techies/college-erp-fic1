@@ -343,8 +343,8 @@ const UnifiedLogin = () => {
                   <input
                     id="login-username"
                     type="text"
-                    name="user_email_address_input"
-                    autoComplete="username"
+                    name="login_username"
+                    autoComplete="off"
                     placeholder="Enter your email or username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -360,8 +360,8 @@ const UnifiedLogin = () => {
                   <input
                     id="login-password"
                     type={showPwd ? 'text' : 'password'}
-                    name="user_password_secret_input"
-                    autoComplete="current-password"
+                    name="login_password"
+                    autoComplete="new-password"
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

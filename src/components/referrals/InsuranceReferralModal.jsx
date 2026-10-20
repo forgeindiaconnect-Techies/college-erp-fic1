@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Shield, Heart, Car, UserCheck, Building2, User, FileCheck, CheckCircle2,
@@ -38,6 +38,7 @@ export default function InsuranceReferralModal({
     provider: 'Star Health & Allied Insurance',
     selectedOffering: 'Comprehensive Family Floater Plan',
     sumInsuredTier: '₹5,00,000 (5 Lakhs)',
+    referralSource: 'Direct Staff Reference',
     partnerReferenceNumber: '',
     notes: '',
 
@@ -169,6 +170,7 @@ export default function InsuranceReferralModal({
         provider: defaultProvider || 'Star Health & Allied Insurance',
         selectedOffering: availableOfferings[0],
         sumInsuredTier: '₹5,00,000 (5 Lakhs)',
+        referralSource: 'Direct Staff Reference',
         partnerReferenceNumber: '',
         notes: '',
         consentGiven: false,
@@ -180,8 +182,107 @@ export default function InsuranceReferralModal({
 
   if (!isOpen) return null;
 
-  const handleCustomFieldChange = (fieldKey, value) => {
+  const defaultInsuranceFields = useMemo(() => [
+    { fieldKey: 'applicantName', label: 'Applicant / Policyholder Name', fieldType: 'text', step: 1, isRequired: true, isVisible: true, placeholder: 'Full Name as per PAN', sortOrder: 1 },
+    { fieldKey: 'applicantPhone', label: 'Mobile Number', fieldType: 'phone', step: 1, isRequired: true, isVisible: true, placeholder: '10-digit mobile number', validationRule: 'phone', sortOrder: 2 },
+    { fieldKey: 'applicantEmail', label: 'Email Address', fieldType: 'email', step: 1, isRequired: false, isVisible: true, placeholder: 'name@example.com', validationRule: 'email', sortOrder: 3 },
+    { fieldKey: 'city', label: 'City / Residential Location', fieldType: 'text', step: 1, isRequired: true, isVisible: true, placeholder: 'e.g. Mumbai, Pune', sortOrder: 4 },
+    { fieldKey: 'insuranceCategory', label: 'Insurance Product Category', fieldType: 'dropdown', step: 2, isRequired: true, isVisible: true, options: ['Health', 'Motor', 'Life', 'Property'], sortOrder: 5 },
+    { fieldKey: 'insurerName', label: 'Preferred Underwriter / Insurer', fieldType: 'dropdown', step: 2, isRequired: true, isVisible: true, sortOrder: 6 },
+    { fieldKey: 'productName', label: 'Insurance Policy Plan', fieldType: 'dropdown', step: 2, isRequired: true, isVisible: true, sortOrder: 7 },
+    { fieldKey: 'sumInsured', label: 'Requested Sum Insured Tier', fieldType: 'dropdown', step: 2, isRequired: true, isVisible: true, options: sumInsuredTiers, sortOrder: 8 },
+    { fieldKey: 'referralSource', label: 'Referral Channel', fieldType: 'dropdown', step: 2, isRequired: true, isVisible: true, options: ['Direct Staff Reference', 'Campus Drive', 'Alumni Network', 'Student Inquiry', 'Other'], sortOrder: 9 },
+    { fieldKey: 'partnerReferenceNumber', label: 'Partner Reference # (Optional)', fieldType: 'text', step: 2, isRequired: false, isVisible: true, placeholder: 'e.g. INS-REF-901', sortOrder: 10 },
+    { fieldKey: 'notes', label: 'Advisory Notes / Coverage Details', fieldType: 'textarea', step: 2, isRequired: false, isVisible: true, placeholder: 'Add family details, vehicle number, or special coverage notes...', sortOrder: 11 }
+  ], []);
+
+  const allConfiguredFields = useMemo(() => {
+    const rawList = (formConfig?.fieldsConfig && formConfig.fieldsConfig.length > 0)
+      ? formConfig.fieldsConfig
+      : defaultInsuranceFields;
+    const seenKeys = new Set();
+    const seenLabels = new Set();
+    const uniqueList = [];
+    for (const f of rawList) {
+      const normKey = (f.fieldKey || '').trim().toLowerCase();
+      const normLabel = (f.label || '').trim().toLowerCase();
+      if (!normKey || seenKeys.has(normKey) || (normLabel && seenLabels.has(normLabel))) continue;
+      seenKeys.add(normKey);
+      if (normLabel) seenLabels.add(normLabel);
+      uniqueList.push(f);
+    }
+    return uniqueList.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  }, [formConfig, defaultInsuranceFields]);
+
+  const step1Fields = useMemo(() => {
+    return allConfiguredFields.filter(f => (!f.step || f.step === 1) && f.isVisible !== false);
+  }, [allConfiguredFields]);
+
+  const step2Fields = useMemo(() => {
+    return allConfiguredFields.filter(f => f.step === 2 && f.isVisible !== false);
+  }, [allConfiguredFields]);
+
+  const resolveField = (f) => {
+    const key = (f.fieldKey || '').toLowerCase();
+    let options = Array.isArray(f.options) && f.options.length > 0 ? f.options : null;
+
+    if (key.includes('category') || key === 'insurancecategory') {
+      if (!options || options.length === 0) {
+        options = formConfig?.categoriesList?.length > 0 ? formConfig.categoriesList : ['Health', 'Motor', 'Life', 'Property'];
+      }
+    } else if (key.includes('insurer') || key === 'provider') {
+      if (!options || options.length === 0) {
+        options = approvedInsurers;
+      }
+    } else if (key.includes('product') || key === 'offering') {
+      const currentCat = formData.insuranceCategory || 'Health';
+      const availableOfferings = offeringsByCategory[currentCat] || offeringsByCategory.Health || [];
+      if (!options || options.length === 0) {
+        options = availableOfferings;
+      }
+    } else if (key.includes('sum') || key.includes('tier')) {
+      if (!options || options.length === 0) {
+        options = sumInsuredTiers;
+      }
+    } else if (key.includes('source') || key.includes('channel')) {
+      if (!options || options.length === 0) {
+        options = ['Direct Staff Reference', 'Campus Drive', 'Alumni Network', 'Student Inquiry', 'Other'];
+      }
+    }
+
+    return {
+      ...f,
+      options: options || []
+    };
+  };
+
+  const handleFieldChange = (fieldKey, value) => {
+    setFormData(prev => {
+      const next = { ...prev, [fieldKey]: value };
+
+      if (fieldKey === 'applicantName') next.name = value;
+      if (fieldKey === 'applicantPhone') next.phone = value;
+      if (fieldKey === 'applicantEmail') next.email = value;
+      if (fieldKey === 'city') next.applicantCity = value;
+      if (fieldKey === 'insurerName') next.provider = value;
+      if (fieldKey === 'provider') next.insurerName = value;
+      if (fieldKey === 'productName') next.selectedOffering = value;
+      if (fieldKey === 'selectedOffering') next.productName = value;
+      if (fieldKey === 'sumInsured') next.sumInsuredTier = value;
+      if (fieldKey === 'sumInsuredTier') next.sumInsured = value;
+
+      if (fieldKey === 'insuranceCategory') {
+        const prods = offeringsByCategory[value] || offeringsByCategory.Health || [];
+        if (prods.length > 0) {
+          next.productName = prods[0];
+          next.selectedOffering = prods[0];
+        }
+      }
+      return next;
+    });
+
     setCustomFields(prev => ({ ...prev, [fieldKey]: value }));
+
     if (fieldErrors[fieldKey]) {
       setFieldErrors(prev => {
         const next = { ...prev };
@@ -193,121 +294,69 @@ export default function InsuranceReferralModal({
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => {
-      const updated = { ...prev, [name]: value };
+    handleFieldChange(name, value);
+  };
 
-      if (name === 'insuranceCategory') {
-        const offerings = offeringsByCategory[value] || offeringsByCategory.Health;
-        updated.selectedOffering = offerings[0];
-      }
-
-      return updated;
-    });
-
-    if (name === 'city') {
-      setCustomFields(prev => ({
-        ...prev,
-        city: value,
-        residentialLocation: value,
-        cityLocation: value,
-        location: value
-      }));
-    }
-
-    if (fieldErrors[name] || fieldErrors.city || fieldErrors.residentialLocation || fieldErrors.cityLocation) {
-      setFieldErrors(prev => ({
-        ...prev,
-        [name]: null,
-        city: null,
-        residentialLocation: null,
-        cityLocation: null
-      }));
-    }
+  const handleCustomFieldChange = (fieldKey, value) => {
+    handleFieldChange(fieldKey, value);
   };
 
   const validateStep = (stepNumber) => {
+    const targetFields = stepNumber === 1 ? step1Fields : step2Fields;
     const errors = {};
 
-    if (stepNumber === 1) {
-      if (!formData.applicantName || formData.applicantName.trim().length < 3) {
-        errors.applicantName = 'Enter the applicant’s legal full name (minimum 3 characters).';
+    targetFields.forEach(f => {
+      if (f.isVisible === false) return;
+      const key = f.fieldKey;
+      let val = formData[key];
+
+      if (val === undefined || val === null || val === '') {
+        if (key === 'applicantName') val = formData.name;
+        else if (key === 'applicantPhone') val = formData.phone;
+        else if (key === 'applicantEmail') val = formData.email;
+        else if (key === 'city') val = formData.applicantCity;
+        else if (key === 'insurerName') val = formData.provider;
+        else if (key === 'provider') val = formData.insurerName;
+        else if (key === 'productName') val = formData.selectedOffering;
+        else if (key === 'selectedOffering') val = formData.productName;
+        else if (key === 'sumInsured') val = formData.sumInsuredTier;
+        else if (key === 'sumInsuredTier') val = formData.sumInsured;
       }
 
-      const phoneRegex = /^[6-9]\d{9}$/;
-      const cleanedPhone = (formData.applicantPhone || '').replace(/\D/g, '');
-      if (!phoneRegex.test(cleanedPhone)) {
-        errors.applicantPhone = 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
+      const isEmpty = val === undefined || val === null || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0);
+
+      if (f.isRequired && isEmpty) {
+        errors[key] = f.errorMessage || `${f.label} is required.`;
+        return;
       }
 
-      if (formData.applicantEmail && formData.applicantEmail.trim() !== '') {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(formData.applicantEmail.trim())) {
-          errors.applicantEmail = 'Enter a valid email address or leave it blank.';
-        }
-      }
-
-      if (!formData.city || formData.city.trim().length < 2) {
-        errors.city = 'Enter the applicant’s residential city or campus location.';
-      }
-
-      // Dynamic custom fields validation for Step 1
-      const step1Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
-      step1Custom.forEach(f => {
-        let val = customFields[f.fieldKey];
-        const keyLower = (f.fieldKey || '').toLowerCase();
-        const labelLower = (f.label || '').toLowerCase();
-
-        // If the dynamic field represents city / location, fallback to formData.city
-        if (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '')) {
-          if (keyLower.includes('city') || keyLower.includes('location') || labelLower.includes('city') || labelLower.includes('location')) {
-            val = formData.city ? formData.city.trim() : '';
-          } else if (keyLower.includes('name') || labelLower.includes('name')) {
-            val = formData.applicantName ? formData.applicantName.trim() : '';
-          } else if (keyLower.includes('phone') || keyLower.includes('mobile') || labelLower.includes('phone') || labelLower.includes('mobile')) {
-            val = formData.applicantPhone ? formData.applicantPhone.trim() : '';
-          } else if (keyLower.includes('email') || labelLower.includes('email')) {
-            val = formData.applicantEmail ? formData.applicantEmail.trim() : '';
+      if (!isEmpty && typeof val === 'string' && val.trim()) {
+        const trimmed = val.trim();
+        const rule = f.validationRule || f.fieldType;
+        if (rule === 'phone' || key.toLowerCase().includes('phone') || key.toLowerCase().includes('mobile')) {
+          const cleaned = trimmed.replace(/\D/g, '');
+          if (!/^[6-9]\d{9}$/.test(cleaned)) {
+            errors[key] = f.errorMessage || 'Enter a valid 10-digit Indian mobile number.';
+          }
+        } else if (rule === 'email' || key.toLowerCase().includes('email')) {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+            errors[key] = f.errorMessage || 'Enter a valid email address.';
+          }
+        } else if (rule === 'pan') {
+          if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i.test(trimmed)) {
+            errors[key] = f.errorMessage || 'Enter a valid PAN format (ABCDE1234F).';
+          }
+        } else if (rule === 'aadhaar') {
+          if (!/^\d{12}$/.test(trimmed.replace(/\D/g, ''))) {
+            errors[key] = f.errorMessage || 'Enter a valid 12-digit Aadhaar number.';
+          }
+        } else if (rule === 'pincode') {
+          if (!/^\d{6}$/.test(trimmed.replace(/\D/g, ''))) {
+            errors[key] = f.errorMessage || 'Enter a valid 6-digit PIN.';
           }
         }
-
-        if (f.isRequired && (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0))) {
-          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
-        }
-      });
-    }
-
-    if (stepNumber === 2) {
-      if (!formData.provider) {
-        errors.provider = 'Select an approved partner insurer.';
       }
-      if (!formData.selectedOffering) {
-        errors.selectedOffering = 'Select an approved insurance offering.';
-      }
-
-      // Dynamic custom fields validation for Step 2
-      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => 
-        !f.isSystem && 
-        f.step === 2 && 
-        !['insurancecategory', 'insurername', 'provider', 'productname', 'selectedoffering', 'suminsured', 'suminsuredtier', 'partnerreferencenumber', 'notes'].includes((f.fieldKey || '').toLowerCase())
-      );
-      step2Custom.forEach(f => {
-        let val = customFields[f.fieldKey];
-        const keyLower = (f.fieldKey || '').toLowerCase();
-        if (keyLower.includes('sum') || keyLower.includes('tier')) {
-          val = formData.sumInsuredTier;
-        } else if (keyLower.includes('source') || keyLower.includes('channel')) {
-          val = val || 'Direct Staff Reference';
-        } else if (keyLower.includes('partner') || keyLower.includes('ref')) {
-          val = formData.partnerReferenceNumber || 'optional';
-        } else if (keyLower.includes('note') || keyLower.includes('remark')) {
-          val = formData.notes || 'optional';
-        }
-
-        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
-          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
-        }
-      });
-    }
+    });
 
     if (stepNumber === 3) {
       if (!formData.consentGiven) {
@@ -348,6 +397,8 @@ export default function InsuranceReferralModal({
       setError(null);
 
       const numericTier = parseInt((formData.sumInsuredTier || '').replace(/\D/g, ''), 10) || 500000;
+      const cleanPhone = (formData.applicantPhone || '').replace(/\D/g, '');
+      const summaryText = `${formData.applicantName.trim()} - ${formData.provider} (${formData.selectedOffering})`;
 
       const payload = {
         category: 'Insurance',
@@ -355,10 +406,21 @@ export default function InsuranceReferralModal({
         partnerName: formData.provider,
         productName: formData.selectedOffering,
         notes: formData.notes ? formData.notes.trim() : '',
-        customFields: customFields,
+        summary: summaryText,
+        customFields: {
+          summary: summaryText,
+          s: summaryText,
+          sumInsured: formData.sumInsuredTier,
+          sumInsuredTier: formData.sumInsuredTier,
+          referralSource: formData.referralSource,
+          city: formData.city.trim(),
+          applicantName: formData.applicantName.trim(),
+          applicantPhone: cleanPhone,
+          ...customFields
+        },
         formData: {
           applicantName: formData.applicantName.trim(),
-          applicantPhone: formData.applicantPhone.trim().replace(/\D/g, ''),
+          applicantPhone: cleanPhone,
           applicantEmail: formData.applicantEmail ? formData.applicantEmail.trim() : '',
           city: formData.city.trim(),
           provider: formData.provider,
@@ -366,8 +428,10 @@ export default function InsuranceReferralModal({
           selectedOffering: formData.selectedOffering,
           sumInsuredTier: formData.sumInsuredTier,
           sumInsured: formData.sumInsuredTier,
-          referralSource: customFields.referralSource || 'Direct Staff Reference',
+          referralSource: formData.referralSource,
           partnerReferenceNumber: formData.partnerReferenceNumber ? formData.partnerReferenceNumber.trim() : '',
+          summary: summaryText,
+          s: summaryText,
           ...customFields
         },
         insuranceDetails: {
@@ -377,10 +441,10 @@ export default function InsuranceReferralModal({
           selectedOffering: formData.selectedOffering,
           sumInsuredTier: formData.sumInsuredTier,
           sumInsured: formData.sumInsuredTier,
-          referralSource: customFields.referralSource || 'Direct Staff Reference',
+          referralSource: formData.referralSource,
           estimatedSumInsured: numericTier,
           applicantName: formData.applicantName.trim(),
-          applicantPhone: formData.applicantPhone.trim().replace(/\D/g, ''),
+          applicantPhone: cleanPhone,
           applicantEmail: formData.applicantEmail ? formData.applicantEmail.trim() : '',
           applicantCity: formData.city.trim(),
           partnerReferenceNumber: formData.partnerReferenceNumber ? formData.partnerReferenceNumber.trim() : '',
@@ -579,214 +643,59 @@ export default function InsuranceReferralModal({
                 </div>
               )}
 
-              {/* ── STEP 1: APPLICANT ── */}
+              {/* ── STEP 1: APPLICANT INFORMATION ── */}
               {currentStep === 1 && (
-                <div>
-                  <div className="cc-form-group">
-                    <label className="cc-form-label">
-                      Applicant Legal Full Name <span className="req">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="applicantName"
-                      className={`cc-input ${fieldErrors.applicantName ? 'error' : ''}`}
-                      placeholder="e.g. Ramesh Kumar"
-                      value={formData.applicantName}
-                      onChange={handleChange}
-                      autoFocus
-                    />
-                    {fieldErrors.applicantName && (
-                      <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.applicantName}</div>
-                    )}
-                  </div>
-
-                  <div className="cc-grid-2">
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        10-Digit Mobile Number <span className="req">*</span>
-                      </label>
-                      <div className="cc-phone-input-wrap">
-                        <span className="cc-phone-prefix">+91</span>
-                        <input
-                          type="tel"
-                          name="applicantPhone"
-                          maxLength={10}
-                          className="cc-phone-input"
-                          placeholder="9876543210"
-                          value={formData.applicantPhone}
-                          onChange={handleChange}
-                        />
-                      </div>
-                      {fieldErrors.applicantPhone && (
-                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.applicantPhone}</div>
-                      )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {step1Fields.length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', background: '#f8fafc', borderRadius: '10px', color: '#64748b' }}>
+                      No fields configured for Step 1.
                     </div>
-
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Email Address <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
-                      </label>
-                      <input
-                        type="email"
-                        name="applicantEmail"
-                        className={`cc-input ${fieldErrors.applicantEmail ? 'error' : ''}`}
-                        placeholder="applicant@example.com"
-                        value={formData.applicantEmail}
-                        onChange={handleChange}
-                      />
-                      {fieldErrors.applicantEmail && (
-                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.applicantEmail}</div>
-                      )}
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+                      {step1Fields.map(f => {
+                        const resolvedField = resolveField(f);
+                        const fieldVal = formData[f.fieldKey] !== undefined ? formData[f.fieldKey] : (f.defaultValue ?? '');
+                        return (
+                          <DynamicFieldRenderer
+                            key={f.fieldKey}
+                            field={resolvedField}
+                            value={fieldVal}
+                            onChange={handleFieldChange}
+                            error={fieldErrors[f.fieldKey]}
+                          />
+                        );
+                      })}
                     </div>
-                  </div>
- 
-                  <div className="cc-form-group">
-                    <label className="cc-form-label">
-                      City / Campus Location <span className="req">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="city"
-                      className={`cc-input ${fieldErrors.city ? 'error' : ''}`}
-                      placeholder="e.g. Chennai, Bangalore, Coimbatore"
-                      value={formData.city}
-                      onChange={handleChange}
-                    />
-                    {fieldErrors.city && (
-                      <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.city}</div>
-                    )}
-                  </div>
-
-                  {/* Dynamic Step 1 Custom Fields */}
-                  <DynamicFieldRenderer
-                    fields={(formConfig?.fieldsConfig || []).filter(f => 
-                      !f.isSystem && 
-                      (!f.step || f.step === 1) && 
-                      !f.fieldKey?.toLowerCase().includes('city') && 
-                      !f.label?.toLowerCase().includes('city') &&
-                      !f.fieldKey?.toLowerCase().includes('location') &&
-                      !f.label?.toLowerCase().includes('location')
-                    )}
-                    values={customFields}
-                    onChange={handleCustomFieldChange}
-                    errors={fieldErrors}
-                  />
+                  )}
                 </div>
               )}
 
               {/* ── STEP 2: INSURANCE DETAILS ── */}
               {currentStep === 2 && (
-                <div>
-                  <div className="cc-grid-2">
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Insurance Category <span className="req">*</span>
-                      </label>
-                      <select
-                        name="insuranceCategory"
-                        className="cc-select"
-                        value={formData.insuranceCategory}
-                        onChange={handleChange}
-                      >
-                        <option value="Health">Health Insurance</option>
-                        <option value="Motor">Motor Insurance</option>
-                        <option value="Life">Life Insurance</option>
-                        <option value="Property">Property Insurance</option>
-                      </select>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {step2Fields.length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', background: '#f8fafc', borderRadius: '10px', color: '#64748b' }}>
+                      No fields configured for Step 2.
                     </div>
-
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Approved Partner Insurer <span className="req">*</span>
-                      </label>
-                      <select
-                        name="provider"
-                        className="cc-select"
-                        value={formData.provider}
-                        onChange={handleChange}
-                      >
-                        {approvedInsurers.map(ins => (
-                          <option key={ins} value={ins}>{ins}</option>
-                        ))}
-                      </select>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+                      {step2Fields.map(f => {
+                        const resolvedField = resolveField(f);
+                        const fieldVal = formData[f.fieldKey] !== undefined ? formData[f.fieldKey] : (f.defaultValue ?? '');
+                        return (
+                          <DynamicFieldRenderer
+                            key={f.fieldKey}
+                            field={resolvedField}
+                            value={fieldVal}
+                            onChange={handleFieldChange}
+                            error={fieldErrors[f.fieldKey]}
+                          />
+                        );
+                      })}
                     </div>
-                  </div>
+                  )}
 
-                  <div className="cc-form-group">
-                    <label className="cc-form-label">
-                      Selected Approved Offering <span className="req">*</span>
-                    </label>
-                    <select
-                      name="selectedOffering"
-                      className="cc-select"
-                      value={formData.selectedOffering}
-                      onChange={handleChange}
-                    >
-                      {(offeringsByCategory[formData.insuranceCategory] || []).map(off => (
-                        <option key={off} value={off}>{off}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="cc-grid-2">
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Coverage Tier / Sum Insured
-                      </label>
-                      <select
-                        name="sumInsuredTier"
-                        className="cc-select"
-                        value={formData.sumInsuredTier}
-                        onChange={handleChange}
-                      >
-                        {sumInsuredTiers.map(tier => (
-                          <option key={tier} value={tier}>{tier}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Partner Reference # <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="partnerReferenceNumber"
-                        className="cc-input"
-                        placeholder="e.g. INS-REF-901"
-                        value={formData.partnerReferenceNumber}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="cc-form-group">
-                    <label className="cc-form-label">
-                      Non-Sensitive Advisory Remarks <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
-                    </label>
-                    <textarea
-                      name="notes"
-                      rows={2}
-                      className="cc-textarea"
-                      placeholder="e.g. Preferred language Tamil/English, best time to call."
-                      value={formData.notes}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  {/* Dynamic Step 2 Custom Fields */}
-                  <DynamicFieldRenderer
-                    fields={(formConfig?.fieldsConfig || []).filter(f => 
-                      !f.isSystem && 
-                      f.step === 2 && 
-                      !['suminsured', 'suminsuredtier', 'notes', 'partnerreferencenumber', 'insurancecategory', 'insurername', 'provider', 'productname', 'selectedoffering'].includes((f.fieldKey || '').toLowerCase())
-                    )}
-                    values={customFields}
-                    onChange={handleCustomFieldChange}
-                    errors={fieldErrors}
-                  />
-
-                  <div className="cc-privacy-callout">
+                  <div className="cc-privacy-callout" style={{ marginTop: '8px' }}>
                     <Shield size={20} className="cc-privacy-icon" />
                     <div>
                       <div className="cc-privacy-title">IRDAI Underwriting Boundary</div>
@@ -861,29 +770,25 @@ export default function InsuranceReferralModal({
                     <div className="cc-review-header">
                       <div className="cc-review-title">
                         <User size={15} className="text-blue-600" />
-                        <span>Applicant Information</span>
+                        <span>Step 1: Applicant Information</span>
                       </div>
                       <button type="button" className="cc-edit-btn" onClick={() => setCurrentStep(1)}>
                         Edit
                       </button>
                     </div>
                     <div className="cc-review-grid">
-                      <div className="cc-review-item">
-                        <span>Legal Name</span>
-                        <strong>{formData.applicantName}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Contact Mobile</span>
-                        <strong>+91 {formData.applicantPhone}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Email</span>
-                        <strong>{formData.applicantEmail || '—'}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>City / Campus</span>
-                        <strong>{formData.city}</strong>
-                      </div>
+                      {step1Fields.map(f => {
+                        const val = formData[f.fieldKey];
+                        if (val === undefined || val === null || val === '') return null;
+                        return (
+                          <div key={f.fieldKey} className="cc-review-item">
+                            <span>{f.label}</span>
+                            <strong>
+                              {Array.isArray(val) ? val.join(', ') : (typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val))}
+                            </strong>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -892,33 +797,25 @@ export default function InsuranceReferralModal({
                     <div className="cc-review-header">
                       <div className="cc-review-title">
                         <Shield size={15} className="text-emerald-600" />
-                        <span>Insurance Details</span>
+                        <span>Step 2: Insurance Details</span>
                       </div>
                       <button type="button" className="cc-edit-btn" onClick={() => setCurrentStep(2)}>
                         Edit
                       </button>
                     </div>
                     <div className="cc-review-grid">
-                      <div className="cc-review-item">
-                        <span>Category</span>
-                        <strong>{formData.insuranceCategory} Insurance</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Partner Insurer</span>
-                        <strong>{formData.provider}</strong>
-                      </div>
-                      <div className="cc-review-item" style={{ gridColumn: 'span 2' }}>
-                        <span>Selected Offering</span>
-                        <strong>{formData.selectedOffering}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Sum Insured Tier</span>
-                        <strong>{formData.sumInsuredTier}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Partner Reference</span>
-                        <strong style={{ fontFamily: 'monospace' }}>{formData.partnerReferenceNumber || '—'}</strong>
-                      </div>
+                      {step2Fields.map(f => {
+                        const val = formData[f.fieldKey];
+                        if (val === undefined || val === null || val === '') return null;
+                        return (
+                          <div key={f.fieldKey} className="cc-review-item">
+                            <span>{f.label}</span>
+                            <strong>
+                              {Array.isArray(val) ? val.join(', ') : (typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val))}
+                            </strong>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -946,28 +843,6 @@ export default function InsuranceReferralModal({
                       </div>
                     </div>
                   </div>
-
-                  {/* Dynamic Custom Details Review */}
-                  {Object.keys(customFields).length > 0 && (
-                    <div className="cc-review-card">
-                      <div className="cc-review-header">
-                        <div className="cc-review-title">
-                          <FileCheck size={15} className="text-purple-600" />
-                          <span>Additional Custom Details</span>
-                        </div>
-                      </div>
-                      <div className="cc-review-grid">
-                        {(formConfig?.fieldsConfig || [])
-                          .filter(f => !f.isSystem && customFields[f.fieldKey] !== undefined && customFields[f.fieldKey] !== '')
-                          .map(f => (
-                            <div key={f.fieldKey} className="cc-review-item">
-                              <span>{f.label}</span>
-                              <strong>{Array.isArray(customFields[f.fieldKey]) ? customFields[f.fieldKey].join(', ') : String(customFields[f.fieldKey])}</strong>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>

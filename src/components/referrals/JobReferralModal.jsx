@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Briefcase, User, Building2, MapPin, FileCheck, CheckCircle2,
@@ -32,6 +32,7 @@ export default function JobReferralModal({
     candidatePhone: '',
     candidateEmail: '',
     candidateCity: '',
+    highestQualification: 'B.E. / B.Tech',
     experienceLevel: 'Fresher (0-1 yr)',
 
     // Step 2: Job Details
@@ -112,6 +113,17 @@ export default function JobReferralModal({
     'Junior (1-3 yrs)',
     'Mid-level (3-5 yrs)',
     'Senior (5+ yrs)'
+  ];
+
+  const qualificationList = [
+    'B.E. / B.Tech',
+    'M.E. / M.Tech',
+    'MCA / M.Sc CS',
+    'B.Sc / BCA',
+    'MBA / PGDM',
+    'B.Com / BBA',
+    'Diploma / Polytechnic',
+    'Other Graduate'
   ];
 
   const relationshipTypes = [
@@ -202,6 +214,7 @@ export default function JobReferralModal({
         candidatePhone: '',
         candidateEmail: '',
         candidateCity: '',
+        highestQualification: 'B.E. / B.Tech',
         experienceLevel: 'Fresher (0-1 yr)',
         sector: sec,
         companyName: defaultCompany || corporatePartners[0],
@@ -220,12 +233,92 @@ export default function JobReferralModal({
 
   if (!isOpen) return null;
 
+  const defaultJobFields = [
+    { fieldKey: 'candidateName', label: 'Candidate Full Name', fieldType: 'text', step: 1, isRequired: true, isVisible: true, isSystem: true, placeholder: 'e.g. Priya Sharma' },
+    { fieldKey: 'candidatePhone', label: 'Candidate Mobile Number', fieldType: 'phone', step: 1, isRequired: true, isVisible: true, isSystem: true, placeholder: '10-digit mobile number' },
+    { fieldKey: 'candidateEmail', label: 'Candidate Email Address', fieldType: 'email', step: 1, isRequired: true, isVisible: true, isSystem: true, placeholder: 'candidate@domain.com' },
+    { fieldKey: 'candidateCity', label: 'Current City / Location', fieldType: 'text', step: 1, isRequired: true, isVisible: true, isSystem: false, placeholder: 'e.g. Bangalore' },
+    { fieldKey: 'highestQualification', label: 'Highest Qualification', fieldType: 'dropdown', step: 1, isRequired: true, isVisible: true, isSystem: false, options: ['B.E. / B.Tech', 'M.E. / M.Tech', 'MCA / M.Sc CS', 'B.Sc / BCA', 'MBA / PGDM', 'B.Com / BBA', 'Diploma / Polytechnic', 'Other Graduate'] },
+    { fieldKey: 'experienceLevel', label: 'Experience Level', fieldType: 'dropdown', step: 1, isRequired: true, isVisible: true, isSystem: false, options: ['Fresher (0-1 yr)', 'Junior (1-3 yrs)', 'Mid-level (3-5 yrs)', 'Senior (5+ yrs)'] },
+    { fieldKey: 'companyName', label: 'Corporate Hiring Partner', fieldType: 'dropdown', step: 2, isRequired: true, isVisible: true, isSystem: true },
+    { fieldKey: 'sector', label: 'Job Sector / Department', fieldType: 'dropdown', step: 2, isRequired: true, isVisible: true, isSystem: true, options: ['IT / Software', 'Non-IT / Core Engineering', 'Banking / Finance', 'EdTech / Education', 'BPO / Operations', 'Healthcare / Pharma', 'Other'] },
+    { fieldKey: 'jobRole', label: 'Target Job Role / Opportunity', fieldType: 'dropdown', step: 2, isRequired: true, isVisible: true, isSystem: true },
+    { fieldKey: 'jobReferenceId', label: 'Job Requisition / Ref ID', fieldType: 'text', step: 2, isRequired: false, isVisible: true, isSystem: false, placeholder: 'e.g. REQ-2026-IT01' },
+    { fieldKey: 'jobLocation', label: 'Work Location / Base', fieldType: 'dropdown', step: 2, isRequired: false, isVisible: true, isSystem: false, options: ['Chennai', 'Bangalore', 'Hyderabad', 'Pune', 'Mumbai', 'Delhi NCR', 'Coimbatore', 'Remote / Hybrid'] },
+    { fieldKey: 'referrerRelationship', label: 'Referrer Relationship', fieldType: 'dropdown', step: 2, isRequired: false, isVisible: true, isSystem: false, options: ['Alumni', 'Colleague', 'Mentee', 'Academic Peer', 'Personal', 'Other'] },
+    { fieldKey: 'expectedCtc', label: 'Expected CTC', fieldType: 'text', step: 2, isRequired: false, isVisible: true, isSystem: false, placeholder: 'e.g. 6.5 LPA' },
+    { fieldKey: 'notes', label: 'Referrer Recommendation & Skills Summary', fieldType: 'textarea', step: 2, isRequired: false, isVisible: true, isSystem: false, placeholder: 'Key strengths, certifications, notice period, or college credentials...' }
+  ];
+
+  const allConfiguredFields = useMemo(() => {
+    const rawList = (formConfig?.fieldsConfig && formConfig.fieldsConfig.length > 0)
+      ? formConfig.fieldsConfig
+      : defaultJobFields;
+    const seenKeys = new Set();
+    const seenLabels = new Set();
+    const uniqueList = [];
+    for (const f of rawList) {
+      const normKey = (f.fieldKey || '').trim().toLowerCase();
+      const normLabel = (f.label || '').trim().toLowerCase();
+      if (!normKey || seenKeys.has(normKey) || (normLabel && seenLabels.has(normLabel))) continue;
+      seenKeys.add(normKey);
+      if (normLabel) seenLabels.add(normLabel);
+      uniqueList.push(f);
+    }
+    return uniqueList.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  }, [formConfig]);
+
+  const step1Fields = allConfiguredFields.filter(f => f.isVisible !== false && (!f.step || f.step === 1));
+  const step2Fields = allConfiguredFields.filter(f => f.isVisible !== false && f.step === 2);
+
+  const resolveField = (key) => allConfiguredFields.find(f => f.fieldKey === key) || null;
+
+  const mapFieldKeyToStateKey = (fieldKey) => {
+    if (fieldKey === 'currentLocation') return 'candidateCity';
+    if (fieldKey === 'targetCompany') return 'companyName';
+    if (fieldKey === 'jobCategory') return 'sector';
+    if (fieldKey === 'totalExperience') return 'experienceLevel';
+    return fieldKey;
+  };
+
+  const getFieldValue = (fieldKey) => {
+    const stateKey = mapFieldKeyToStateKey(fieldKey);
+    if (formData[stateKey] !== undefined) return formData[stateKey];
+    if (customFields[fieldKey] !== undefined) return customFields[fieldKey];
+    return '';
+  };
+
   const handleCustomFieldChange = (fieldKey, value) => {
-    setCustomFields(prev => ({ ...prev, [fieldKey]: value }));
-    if (fieldErrors[fieldKey]) {
+    handleFieldChange(fieldKey, value);
+  };
+
+  const handleFieldChange = (fieldKey, value) => {
+    const stateKey = mapFieldKeyToStateKey(fieldKey);
+    if (Object.prototype.hasOwnProperty.call(formData, stateKey)) {
+      setFormData(prev => {
+        const next = { ...prev, [stateKey]: value };
+        if (stateKey === 'sector') {
+          const available = rolesBySector[value] || rolesBySector['IT / Software'] || [];
+          if (available.length > 0) {
+            next.jobRole = available[0]?.role || '';
+            next.jobReferenceId = available[0]?.reqId || '';
+          }
+        }
+        if (stateKey === 'jobRole') {
+          const roles = rolesBySector[prev.sector] || [];
+          const matched = roles.find(r => r.role === value);
+          if (matched) next.jobReferenceId = matched.reqId;
+        }
+        return next;
+      });
+    } else {
+      setCustomFields(prev => ({ ...prev, [fieldKey]: value }));
+    }
+    if (fieldErrors[fieldKey] || fieldErrors[stateKey]) {
       setFieldErrors(prev => {
         const next = { ...prev };
         delete next[fieldKey];
+        delete next[stateKey];
         return next;
       });
     }
@@ -233,131 +326,37 @@ export default function JobReferralModal({
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => {
-      const updated = { ...prev, [name]: value };
-
-      if (name === 'sector') {
-        const available = rolesBySector[value] || rolesBySector['IT / Software'];
-        updated.jobRole = available[0]?.role || '';
-        updated.jobReferenceId = available[0]?.reqId || '';
-      }
-
-      if (name === 'jobRole') {
-        const roles = rolesBySector[prev.sector] || [];
-        const matched = roles.find(r => r.role === value);
-        if (matched) updated.jobReferenceId = matched.reqId;
-      }
-
-      return updated;
-    });
-
-    if (fieldErrors[name]) {
-      setFieldErrors(prev => ({ ...prev, [name]: null }));
-    }
+    handleFieldChange(name, value);
   };
 
   const validateStep = (stepNumber) => {
     const errors = {};
+    const fieldsToValidate = stepNumber === 1 ? step1Fields : (stepNumber === 2 ? step2Fields : []);
 
-    if (stepNumber === 1) {
-      if (!formData.candidateName || formData.candidateName.trim().length < 3) {
-        errors.candidateName = 'Enter the candidate’s full legal name (minimum 3 characters).';
+    fieldsToValidate.forEach(field => {
+      const val = getFieldValue(field.fieldKey);
+      const strVal = val !== undefined && val !== null ? String(val).trim() : '';
+
+      if (field.isRequired) {
+        if (!val || strVal === '' || (Array.isArray(val) && val.length === 0)) {
+          errors[field.fieldKey] = field.errorMessage || `${field.label} is required.`;
+          return;
+        }
       }
 
-      const rawPhone = (formData.candidatePhone || '').replace(/\D/g, '');
-      let normPhone = rawPhone;
-      if (normPhone.startsWith('91') && normPhone.length === 12) {
-        normPhone = normPhone.slice(2);
-      } else if (normPhone.startsWith('0') && normPhone.length === 11) {
-        normPhone = normPhone.slice(1);
-      }
-      const phoneRegex = /^[6-9]\d{9}$/;
-      if (!phoneRegex.test(normPhone)) {
-        errors.candidatePhone = 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
-      }
-
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!formData.candidateEmail || !emailRegex.test(formData.candidateEmail.trim())) {
-        errors.candidateEmail = 'Valid candidate email is required for interview scheduling.';
-      }
-
-      if (!formData.candidateCity || formData.candidateCity.trim().length < 2) {
-        errors.candidateCity = 'Enter the candidate’s current city of residence.';
-      }
-
-      // Dynamic custom fields validation for Step 1
-      const step1Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
-      step1Custom.forEach(f => {
-        let val = customFields[f.fieldKey];
-        const keyLower = (f.fieldKey || '').toLowerCase();
-        const labelLower = (f.label || '').toLowerCase();
-
-        // Fallback for standard attributes that may be configured as dynamic keys
-        if (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '')) {
-          if (keyLower.includes('city') || keyLower.includes('location') || labelLower.includes('city') || labelLower.includes('location')) {
-            val = formData.candidateCity ? formData.candidateCity.trim() : '';
-          } else if (keyLower.includes('name') || labelLower.includes('name')) {
-            val = formData.candidateName ? formData.candidateName.trim() : '';
-          } else if (keyLower.includes('phone') || keyLower.includes('mobile') || labelLower.includes('phone') || labelLower.includes('mobile')) {
-            val = formData.candidatePhone ? formData.candidatePhone.trim() : '';
-          } else if (keyLower.includes('email') || labelLower.includes('email')) {
-            val = formData.candidateEmail ? formData.candidateEmail.trim() : '';
-          } else if (keyLower.includes('experience') || labelLower.includes('experience')) {
-            val = formData.experienceLevel ? formData.experienceLevel : 'Fresher (0-1 yr)';
-          } else if (keyLower.includes('qualification') || labelLower.includes('qualification')) {
-            val = formData.highestQualification || 'B.E. / B.Tech';
+      if (strVal !== '') {
+        if (field.fieldType === 'phone' || field.fieldKey.toLowerCase().includes('phone') || field.fieldKey.toLowerCase().includes('mobile')) {
+          const clean = strVal.replace(/\D/g, '');
+          if (!/^[6-9]\d{9}$/.test(clean)) {
+            errors[field.fieldKey] = 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
+          }
+        } else if (field.fieldType === 'email' || field.fieldKey.toLowerCase().includes('email')) {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(strVal)) {
+            errors[field.fieldKey] = 'Enter a valid candidate email address.';
           }
         }
-
-        if (f.isRequired && (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0))) {
-          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
-        }
-      });
-    }
-
-    if (stepNumber === 2) {
-      if (!formData.companyName) {
-        errors.companyName = 'Select a verified partner employer.';
       }
-      if (!formData.jobRole) {
-        errors.jobRole = 'Select an active job role.';
-      }
-      if (!formData.jobReferenceId) {
-        errors.jobReferenceId = 'Job Reference ID is required to match genuine vacancies.';
-      }
-
-      // Dynamic custom fields validation for Step 2
-      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && f.step === 2);
-      step2Custom.forEach(f => {
-        let val = customFields[f.fieldKey];
-        const keyLower = (f.fieldKey || '').toLowerCase();
-        const labelLower = (f.label || '').toLowerCase();
-
-        if (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '')) {
-          if (keyLower.includes('company') || labelLower.includes('company') || keyLower.includes('partner') || labelLower.includes('partner')) {
-            val = formData.companyName || '';
-          } else if (keyLower.includes('role') || labelLower.includes('role')) {
-            val = formData.jobRole || '';
-          } else if (keyLower.includes('ref') || labelLower.includes('ref')) {
-            val = formData.jobReferenceId || '';
-          } else if (keyLower.includes('location') || labelLower.includes('location')) {
-            val = formData.jobLocation || '';
-          } else if (keyLower.includes('relationship') || labelLower.includes('relationship')) {
-            val = formData.referrerRelationship || '';
-          } else if (keyLower.includes('category') || labelLower.includes('category') || keyLower.includes('sector') || labelLower.includes('sector')) {
-            val = formData.sector || '';
-          } else if (keyLower.includes('resume') || labelLower.includes('resume')) {
-            val = 'optional';
-          } else if (keyLower.includes('notes') || labelLower.includes('notes')) {
-            val = 'optional';
-          }
-        }
-
-        if (f.isRequired && (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0))) {
-          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
-        }
-      });
-    }
+    });
 
     if (stepNumber === 3) {
       if (!formData.candidateConsentGiven) {
@@ -397,23 +396,45 @@ export default function JobReferralModal({
       setSubmitting(true);
       setError(null);
 
+      const cleanPhone = (formData.candidatePhone || '').replace(/\D/g, '');
+      const summaryText = `${formData.candidateName.trim()} - ${formData.companyName} (${formData.jobRole})`;
+
       const payload = {
         category: 'Job',
         formVersion: formConfig?.version || 1,
         partnerName: formData.companyName,
         productName: formData.jobRole,
         notes: formData.notes ? formData.notes.trim() : '',
-        customFields: customFields,
+        summary: summaryText,
+        customFields: {
+          summary: summaryText,
+          s: summaryText,
+          highestQualification: formData.highestQualification || 'B.E. / B.Tech',
+          experienceLevel: formData.experienceLevel,
+          sector: formData.sector,
+          companyName: formData.companyName,
+          jobRole: formData.jobRole,
+          city: formData.candidateCity.trim(),
+          applicantName: formData.candidateName.trim(),
+          applicantPhone: cleanPhone,
+          ...customFields
+        },
         formData: {
           applicantName: formData.candidateName.trim(),
-          applicantPhone: formData.candidatePhone.trim().replace(/\D/g, ''),
+          applicantPhone: cleanPhone,
           applicantEmail: formData.candidateEmail.trim(),
           city: formData.candidateCity.trim(),
+          highestQualification: formData.highestQualification || 'B.E. / B.Tech',
+          experienceLevel: formData.experienceLevel,
           companyName: formData.companyName,
           jobRole: formData.jobRole,
           sector: formData.sector,
           jobLocation: formData.jobLocation,
           jobReferenceId: formData.jobReferenceId.trim(),
+          referrerRelationship: formData.referrerRelationship,
+          expectedCtc: formData.expectedCtc ? formData.expectedCtc.trim() : '',
+          summary: summaryText,
+          s: summaryText,
           ...customFields
         },
         jobDetails: {
@@ -423,9 +444,10 @@ export default function JobReferralModal({
           jobReferenceId: formData.jobReferenceId.trim(),
           jobLocation: formData.jobLocation,
           candidateName: formData.candidateName.trim(),
-          candidatePhone: formData.candidatePhone.trim().replace(/\D/g, ''),
+          candidatePhone: cleanPhone,
           candidateEmail: formData.candidateEmail.trim(),
           candidateCity: formData.candidateCity.trim(),
+          highestQualification: formData.highestQualification || 'B.E. / B.Tech',
           experienceLevel: formData.experienceLevel,
           experienceYears: formData.experienceLevel,
           referrerRelationship: formData.referrerRelationship,
@@ -628,267 +650,61 @@ export default function JobReferralModal({
               {/* ── STEP 1: CANDIDATE ── */}
               {currentStep === 1 && (
                 <div>
-                  <div className="cc-form-group">
-                    <label className="cc-form-label">
-                      Candidate Full Legal Name <span className="req">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="candidateName"
-                      className={`cc-input ${fieldErrors.candidateName ? 'error' : ''}`}
-                      placeholder="e.g. Priyadarshini Srinivasan"
-                      value={formData.candidateName}
-                      onChange={handleChange}
-                      autoFocus
-                    />
-                    {fieldErrors.candidateName && (
-                      <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.candidateName}</div>
-                    )}
-                  </div>
-
-                  <div className="cc-grid-2">
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        10-Digit Mobile Number <span className="req">*</span>
-                      </label>
-                      <div className="cc-phone-input-wrap">
-                        <span className="cc-phone-prefix">+91</span>
-                        <input
-                          type="tel"
-                          name="candidatePhone"
-                          maxLength={10}
-                          className="cc-phone-input"
-                          placeholder="9876543210"
-                          value={formData.candidatePhone}
-                          onChange={handleChange}
-                        />
-                      </div>
-                      {fieldErrors.candidatePhone && (
-                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.candidatePhone}</div>
-                      )}
-                    </div>
-
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Candidate Email <span className="req">*</span>
-                      </label>
-                      <input
-                        type="email"
-                        name="candidateEmail"
-                        className={`cc-input ${fieldErrors.candidateEmail ? 'error' : ''}`}
-                        placeholder="candidate@gmail.com"
-                        value={formData.candidateEmail}
-                        onChange={handleChange}
-                      />
-                      {fieldErrors.candidateEmail && (
-                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.candidateEmail}</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="cc-grid-2">
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Current City / Location <span className="req">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="candidateCity"
-                        className={`cc-input ${fieldErrors.candidateCity ? 'error' : ''}`}
-                        placeholder="e.g. Bangalore, Chennai, Hyderabad"
-                        value={formData.candidateCity}
-                        onChange={handleChange}
-                      />
-                      {fieldErrors.candidateCity && (
-                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.candidateCity}</div>
-                      )}
-                    </div>
-
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Experience Level <span className="req">*</span>
-                      </label>
-                      <select
-                        name="experienceLevel"
-                        className="cc-select"
-                        value={formData.experienceLevel}
-                        onChange={handleChange}
-                      >
-                        {experienceLevels.map(lvl => (
-                          <option key={lvl} value={lvl}>{lvl}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Dynamic Step 1 Custom Fields */}
-                  <DynamicFieldRenderer
-                    fields={(formConfig?.fieldsConfig || []).filter(f => {
-                      if (f.isSystem) return false;
-                      const k = (f.fieldKey || '').toLowerCase();
-                      const l = (f.label || '').toLowerCase();
-                      if (k.includes('name') || k.includes('phone') || k.includes('mobile') || k.includes('email') || k.includes('city') || k.includes('location') || k.includes('experience') || k.includes('qualification')) {
-                        return false;
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                    {step1Fields.map(field => {
+                      let computedField = field;
+                      if ((field.fieldKey === 'highestQualification' || field.fieldKey === 'qualification') && (!field.options || field.options.length === 0)) {
+                        computedField = { ...field, options: qualificationList };
+                      } else if ((field.fieldKey === 'experienceLevel' || field.fieldKey === 'totalExperience') && (!field.options || field.options.length === 0)) {
+                        computedField = { ...field, options: experienceLevels };
                       }
-                      return !f.step || f.step === 1;
+                      return (
+                        <DynamicFieldRenderer
+                          key={field.fieldKey}
+                          field={computedField}
+                          value={getFieldValue(field.fieldKey)}
+                          onChange={(val) => handleFieldChange(field.fieldKey, val)}
+                          error={fieldErrors[field.fieldKey] || fieldErrors[mapFieldKeyToStateKey(field.fieldKey)]}
+                        />
+                      );
                     })}
-                    values={customFields}
-                    onChange={handleCustomFieldChange}
-                    errors={fieldErrors}
-                  />
+                  </div>
                 </div>
               )}
 
               {/* ── STEP 2: JOB DETAILS ── */}
               {currentStep === 2 && (
                 <div>
-                  <div className="cc-grid-2">
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Opportunity Sector <span className="req">*</span>
-                      </label>
-                      <select
-                        name="sector"
-                        className="cc-select"
-                        value={formData.sector}
-                        onChange={handleChange}
-                      >
-                        {Object.keys(rolesBySector).map(sec => (
-                          <option key={sec} value={sec}>{sec}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Corporate Partner <span className="req">*</span>
-                      </label>
-                      <select
-                        name="companyName"
-                        className="cc-select"
-                        value={formData.companyName}
-                        onChange={handleChange}
-                      >
-                        {corporatePartners.map(cmp => (
-                          <option key={cmp} value={cmp}>{cmp}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="cc-form-group">
-                    <label className="cc-form-label">
-                      Actual Available Job / Role <span className="req">*</span>
-                    </label>
-                    <select
-                      name="jobRole"
-                      className="cc-select"
-                      value={formData.jobRole}
-                      onChange={handleChange}
-                    >
-                      {(rolesBySector[formData.sector] || []).map(r => (
-                        <option key={r.role} value={r.role}>{r.role}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="cc-grid-2">
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Job Reference / Requisition ID <span className="req">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="jobReferenceId"
-                        className={`cc-input ${fieldErrors.jobReferenceId ? 'error' : ''}`}
-                        placeholder="e.g. REQ-2026-IT01"
-                        value={formData.jobReferenceId}
-                        onChange={handleChange}
-                      />
-                      {fieldErrors.jobReferenceId && (
-                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.jobReferenceId}</div>
-                      )}
-                    </div>
-
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Work Location <span className="req">*</span>
-                      </label>
-                      <select
-                        name="jobLocation"
-                        className="cc-select"
-                        value={formData.jobLocation}
-                        onChange={handleChange}
-                      >
-                        {locationsList.map(loc => (
-                          <option key={loc} value={loc}>{loc}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="cc-grid-2">
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Referrer Relationship <span className="req">*</span>
-                      </label>
-                      <select
-                        name="referrerRelationship"
-                        className="cc-select"
-                        value={formData.referrerRelationship}
-                        onChange={handleChange}
-                      >
-                        {relationshipTypes.map(rel => (
-                          <option key={rel} value={rel}>{rel}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Expected CTC <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="expectedCtc"
-                        className="cc-input"
-                        placeholder="e.g. 6.5 LPA"
-                        value={formData.expectedCtc}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="cc-form-group">
-                    <label className="cc-form-label">
-                      Technical Highlights / Recommendation Notes <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
-                    </label>
-                    <textarea
-                      name="notes"
-                      rows={2}
-                      className="cc-textarea"
-                      placeholder="e.g. React.js, Python, AWS certified, campus placement coordinator reference."
-                      value={formData.notes}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  {/* Dynamic Step 2 Custom Fields */}
-                  <DynamicFieldRenderer
-                    fields={(formConfig?.fieldsConfig || []).filter(f => {
-                      if (f.isSystem) return false;
-                      const k = (f.fieldKey || '').toLowerCase();
-                      if (k.includes('company') || k.includes('partner') || k.includes('role') || k.includes('category') || k.includes('sector') || k.includes('notes') || k.includes('resume')) {
-                        return false;
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                    {step2Fields.map(field => {
+                      let computedField = field;
+                      if ((field.fieldKey === 'companyName' || field.fieldKey === 'targetCompany') && (!field.options || field.options.length === 0)) {
+                        computedField = { ...field, options: corporatePartners };
+                      } else if ((field.fieldKey === 'sector' || field.fieldKey === 'jobCategory') && (!field.options || field.options.length === 0)) {
+                        computedField = { ...field, options: Object.keys(rolesBySector) };
+                      } else if (field.fieldKey === 'jobRole' && (!field.options || field.options.length === 0)) {
+                        computedField = {
+                          ...field,
+                          options: (rolesBySector[formData.sector] || []).map(r => r.role)
+                        };
+                      } else if (field.fieldKey === 'jobLocation' && (!field.options || field.options.length === 0)) {
+                        computedField = { ...field, options: locationsList };
+                      } else if (field.fieldKey === 'referrerRelationship' && (!field.options || field.options.length === 0)) {
+                        computedField = { ...field, options: relationshipTypes };
                       }
-                      return f.step === 2;
+                      return (
+                        <DynamicFieldRenderer
+                          key={field.fieldKey}
+                          field={computedField}
+                          value={getFieldValue(field.fieldKey)}
+                          onChange={(val) => handleFieldChange(field.fieldKey, val)}
+                          error={fieldErrors[field.fieldKey] || fieldErrors[mapFieldKeyToStateKey(field.fieldKey)]}
+                        />
+                      );
                     })}
-                    values={customFields}
-                    onChange={handleCustomFieldChange}
-                    errors={fieldErrors}
-                  />
+                  </div>
 
-                  <div className="cc-privacy-callout">
+                  <div className="cc-privacy-callout" style={{ marginTop: '16px' }}>
                     <Briefcase size={20} className="cc-privacy-icon" />
                     <div>
                       <div className="cc-privacy-title">Mandate Integrity</div>
@@ -970,22 +786,15 @@ export default function JobReferralModal({
                       </button>
                     </div>
                     <div className="cc-review-grid">
-                      <div className="cc-review-item">
-                        <span>Candidate Name</span>
-                        <strong>{formData.candidateName}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Mobile</span>
-                        <strong>+91 {formData.candidatePhone}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Email</span>
-                        <strong>{formData.candidateEmail}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>City & Experience</span>
-                        <strong>{formData.candidateCity} • {formData.experienceLevel}</strong>
-                      </div>
+                      {step1Fields.map(field => {
+                        const val = getFieldValue(field.fieldKey);
+                        return (
+                          <div key={field.fieldKey} className="cc-review-item">
+                            <span>{field.label}</span>
+                            <strong>{String(val || '—')}</strong>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -1001,26 +810,15 @@ export default function JobReferralModal({
                       </button>
                     </div>
                     <div className="cc-review-grid">
-                      <div className="cc-review-item">
-                        <span>Corporate Partner</span>
-                        <strong>{formData.companyName}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Sector</span>
-                        <strong>{formData.sector}</strong>
-                      </div>
-                      <div className="cc-review-item" style={{ gridColumn: 'span 2' }}>
-                        <span>Role & Requisition</span>
-                        <strong>{formData.jobRole} ({formData.jobReferenceId})</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Location</span>
-                        <strong>{formData.jobLocation}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Relationship</span>
-                        <strong>{formData.referrerRelationship}</strong>
-                      </div>
+                      {step2Fields.map(field => {
+                        const val = getFieldValue(field.fieldKey);
+                        return (
+                          <div key={field.fieldKey} className="cc-review-item">
+                            <span>{field.label}</span>
+                            <strong>{String(val || '—')}</strong>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 

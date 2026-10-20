@@ -176,31 +176,33 @@ const DriverPayroll = () => {
   const netPayable = selectedPayroll.netSalary || (totalEarnings - totalDeductions);
 
   return (
-    <div className="erp-payroll-page" style={{ padding: '1.25rem 1.5rem', maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
+    <div className="erp-payroll-page">
       {/* ── 1. Breadcrumb & ERP Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }} className="no-print">
+      <div className="erp-payroll-header no-print">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
+          <div className="erp-header-breadcrumb">
             <span>Operations & HR</span>
             <ChevronRight size={12} />
-            <span style={{ color: '#0f172a' }}>Driver Payroll & Salary Register</span>
+            <span className="current">Driver Payroll & Salary Register</span>
           </div>
-          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.01em' }}>
-            Driver Payroll & Payslip Register
-          </h1>
+          <div className="erp-header-title">
+            <h1>Driver Payroll & Payslip Register</h1>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="erp-header-actions">
           <button 
+            type="button"
             onClick={() => window.location.reload()}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.95rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+            className="erp-btn-secondary"
           >
             <RotateCw size={14} />
             Refresh Ledger
           </button>
           <button 
+            type="button"
             onClick={handlePrint}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid #1d4ed8', background: '#2563eb', color: '#ffffff', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(37,99,235,0.2)' }}
+            className="erp-btn-primary"
           >
             <Printer size={15} />
             Print / Download Payslip
@@ -208,30 +210,30 @@ const DriverPayroll = () => {
         </div>
       </div>
 
-      {/* ── 2. KPI Stat Row (Identical Sizing to Attendance Page) ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }} className="no-print">
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Net Disbursed Pay</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#166534', marginTop: '0.2rem' }}>₹{Number(netPayable).toLocaleString('en-IN')}</div>
-          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>● {selectedPayroll.status || 'Disbursed'}</div>
+      {/* ── 2. KPI Stat Row ── */}
+      <div className="erp-kpi-strip no-print">
+        <div className="erp-kpi-card">
+          <div className="erp-kpi-label">Net Disbursed Pay</div>
+          <div className="erp-kpi-value green">₹{Number(netPayable).toLocaleString('en-IN')}</div>
+          <div className="erp-kpi-sub green">● {selectedPayroll.status || 'Disbursed'}</div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Gross Earnings</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>₹{Number(totalEarnings).toLocaleString('en-IN')}</div>
-          <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, marginTop: '0.15rem' }}>Basic + Fixed Allowances</div>
+        <div className="erp-kpi-card">
+          <div className="erp-kpi-label">Gross Earnings</div>
+          <div className="erp-kpi-value">₹{Number(totalEarnings).toLocaleString('en-IN')}</div>
+          <div className="erp-kpi-sub blue">Basic + Fixed Allowances</div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Deductions</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#dc2626', marginTop: '0.2rem' }}>₹{Number(totalDeductions).toLocaleString('en-IN')}</div>
-          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '0.15rem' }}>PF, PT & Recoveries</div>
+        <div className="erp-kpi-card">
+          <div className="erp-kpi-label">Total Deductions</div>
+          <div className="erp-kpi-value red">₹{Number(totalDeductions).toLocaleString('en-IN')}</div>
+          <div className="erp-kpi-sub muted">PF, PT & Recoveries</div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Duty / Attendance</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>{presentDays} / {workingDays} Days</div>
-          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>{((presentDays / workingDays) * 100).toFixed(1)}% Attendance Rate</div>
+        <div className="erp-kpi-card">
+          <div className="erp-kpi-label">Duty / Attendance</div>
+          <div className="erp-kpi-value">{presentDays} / {workingDays} Days</div>
+          <div className="erp-kpi-sub green">{((presentDays / workingDays) * 100).toFixed(1)}% Attendance Rate</div>
         </div>
       </div>
 
@@ -303,12 +305,6 @@ const DriverPayroll = () => {
           {/* 4-Column Parameter Specification Grid */}
           <div className="erp-param-matrix-container">
             <table className="erp-param-matrix">
-              <colgroup>
-                <col style={{ width: '20%' }} />
-                <col style={{ width: '30%' }} />
-                <col style={{ width: '20%' }} />
-                <col style={{ width: '30%' }} />
-              </colgroup>
               <tbody>
                 <tr>
                   <th>Employee Name</th>

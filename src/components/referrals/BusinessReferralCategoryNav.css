@@ -13,15 +13,18 @@
   align-items: center;
   gap: 8px;
   overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  padding-bottom: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  padding-bottom: 4px;
 }
 
 .br-category-tabs-scroll::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
+  height: 4px;
+}
+
+.br-category-tabs-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 
 .br-cat-tab-btn {

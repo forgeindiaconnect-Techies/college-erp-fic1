@@ -29,8 +29,13 @@ const generateReferralCode = (category) => {
   return `${prefix}-${timeSlice}-${randomSuffix}`;
 };
 
+// Cache checked tenants in memory to prevent slow duplicate DB operations on every submission
+const seededTenants = new Set();
+
 // Auto-seed default realistic incentive rules if none exist for a tenant
 const ensureDefaultRules = async (tenantId) => {
+  if (!tenantId || seededTenants.has(tenantId)) return;
+  seededTenants.add(tenantId);
   try {
     const count = await IncentiveRule.countDocuments({ tenantId });
     if (count === 0) {
@@ -163,23 +168,50 @@ router.post('/', protect, collegeScope, async (req, res) => {
                 val = req.body.insuranceDetails?.sumInsuredTier || req.body.insuranceDetails?.sumInsured || req.body.formData?.sumInsuredTier || '₹5,00,000 (5 Lakhs)';
                 if (customFields) customFields[f.fieldKey] = val;
               } else if (kLower.includes('source') || kLower.includes('channel') || lLower.includes('source') || lLower.includes('channel')) {
-                val = req.body.formData?.referralSource || req.body.insuranceDetails?.referralSource || req.body.bankAccountDetails?.referralSource || 'Direct Staff Reference';
+                val = req.body.formData?.referralSource || req.body.creditCardDetails?.referralSource || req.body.insuranceDetails?.referralSource || req.body.bankAccountDetails?.referralSource || 'Direct Staff Reference';
                 if (customFields) customFields[f.fieldKey] = val;
               } else if (kLower.includes('city') || kLower.includes('location') || lLower.includes('city') || lLower.includes('location')) {
-                val = req.body.insuranceDetails?.applicantCity || req.body.creditCardDetails?.applicantCity || req.body.bankAccountDetails?.city || req.body.jobDetails?.currentLocation || req.body.formData?.city;
+                val = req.body.insuranceDetails?.applicantCity || req.body.creditCardDetails?.applicantCity || req.body.creditCardDetails?.city || req.body.bankAccountDetails?.city || req.body.jobDetails?.candidateCity || req.body.jobDetails?.currentLocation || req.body.formData?.city;
                 if (customFields) customFields[f.fieldKey] = val;
               } else if (kLower.includes('name') || lLower.includes('name')) {
-                val = req.body.insuranceDetails?.applicantName || req.body.creditCardDetails?.applicantName || req.body.bankAccountDetails?.applicantName || req.body.jobDetails?.candidateName || req.body.formData?.applicantName;
+                val = req.body.insuranceDetails?.applicantName || req.body.creditCardDetails?.applicantName || req.body.bankAccountDetails?.applicantName || req.body.jobDetails?.candidateName || req.body.formData?.applicantName || req.body.formData?.candidateName;
                 if (customFields) customFields[f.fieldKey] = val;
               } else if (kLower.includes('phone') || kLower.includes('mobile') || lLower.includes('phone') || lLower.includes('mobile')) {
-                val = req.body.insuranceDetails?.applicantPhone || req.body.creditCardDetails?.applicantPhone || req.body.bankAccountDetails?.applicantPhone || req.body.jobDetails?.candidatePhone || req.body.formData?.applicantPhone;
+                val = req.body.insuranceDetails?.applicantPhone || req.body.creditCardDetails?.applicantPhone || req.body.bankAccountDetails?.applicantPhone || req.body.jobDetails?.candidatePhone || req.body.formData?.applicantPhone || req.body.formData?.candidatePhone;
+                if (customFields) customFields[f.fieldKey] = val;
+              } else if (kLower.includes('employ') || lLower.includes('employ')) {
+                val = req.body.creditCardDetails?.employmentType || req.body.formData?.employmentType || 'Salaried';
+                if (customFields) customFields[f.fieldKey] = val;
+              } else if (kLower.includes('income') || lLower.includes('income')) {
+                val = req.body.creditCardDetails?.monthlyIncome || req.body.formData?.monthlyIncome || '₹25,000 - ₹50,000';
+                if (customFields) customFields[f.fieldKey] = val;
+              } else if (kLower.includes('applicanttype') || lLower.includes('applicant category') || lLower.includes('campus type')) {
+                val = req.body.bankAccountDetails?.applicantType || req.body.formData?.applicantType || 'Student';
+                if (customFields) customFields[f.fieldKey] = val;
+              } else if (kLower.includes('qualification') || lLower.includes('qualification')) {
+                val = req.body.jobDetails?.highestQualification || req.body.formData?.highestQualification || 'B.E. / B.Tech';
+                if (customFields) customFields[f.fieldKey] = val;
+              } else if (kLower.includes('experience') || lLower.includes('experience')) {
+                val = req.body.jobDetails?.experienceLevel || req.body.formData?.experienceLevel || req.body.formData?.totalExperience || 'Fresher (0-1 yr)';
+                if (customFields) customFields[f.fieldKey] = val;
+              } else if (kLower.includes('company') || lLower.includes('company') || kLower.includes('partner') || lLower.includes('partner')) {
+                val = req.body.jobDetails?.companyName || req.body.creditCardDetails?.bankName || req.body.insuranceDetails?.provider || req.body.bankAccountDetails?.bankName || req.body.formData?.companyName || req.body.formData?.bankName;
+                if (customFields) customFields[f.fieldKey] = val;
+              } else if (kLower.includes('sector') || lLower.includes('sector') || kLower.includes('jobcategory')) {
+                val = req.body.jobDetails?.sector || req.body.formData?.sector || 'IT / Software';
+                if (customFields) customFields[f.fieldKey] = val;
+              } else if (kLower.includes('role') || lLower.includes('role')) {
+                val = req.body.jobDetails?.jobRole || req.body.formData?.jobRole;
+                if (customFields) customFields[f.fieldKey] = val;
+              } else if (kLower.includes('accounttype') || lLower.includes('account type')) {
+                val = req.body.bankAccountDetails?.accountType || req.body.formData?.accountType || 'Savings Account';
                 if (customFields) customFields[f.fieldKey] = val;
               }
             }
 
-            // If the field is 'summary' or labeled 'Summary', auto-populate if missing so submission is never blocked
-            if ((f.fieldKey === 'summary' || String(f.label).toLowerCase() === 'summary') && (!val || !String(val).trim())) {
-              val = `${category} referral for ${req.body.creditCardDetails?.applicantName || req.body.formData?.applicantName || req.body.applicantName || 'Applicant'}`;
+            // If the field is 'summary' or 's' or labeled 'Summary', auto-populate if missing so submission is never blocked
+            if ((f.fieldKey === 'summary' || f.fieldKey === 's' || String(f.label).toLowerCase() === 'summary') && (!val || !String(val).trim())) {
+              val = `${category} referral for ${req.body.creditCardDetails?.applicantName || req.body.insuranceDetails?.applicantName || req.body.bankAccountDetails?.applicantName || req.body.jobDetails?.candidateName || req.body.formData?.applicantName || 'Applicant'}`;
               if (customFields) customFields[f.fieldKey] = val;
             }
 
@@ -356,6 +388,20 @@ router.post('/', protect, collegeScope, async (req, res) => {
       },
     ];
 
+    // Normalize details before saving
+    if (category === 'Insurance' && insuranceDetails) {
+      if (insuranceDetails.productType === 'Motor') insuranceDetails.productType = 'Motor / Vehicle';
+      if (insuranceDetails.productType === 'Life') insuranceDetails.productType = 'Term Life';
+      if (!insuranceDetails.insuranceCategory) insuranceDetails.insuranceCategory = 'Health';
+    } else if (category === 'Bank Account' && bankAccountDetails) {
+      if (bankAccountDetails.accountType === 'Regular Savings') bankAccountDetails.accountType = 'Savings Account';
+      if (bankAccountDetails.accountType === 'Corporate Salary') bankAccountDetails.accountType = 'Salary Account';
+    } else if (category === 'Job' && jobDetails) {
+      if (jobDetails.sector === 'IT & Software') jobDetails.sector = 'IT / Software';
+      if (jobDetails.sector === 'Core Engineering') jobDetails.sector = 'Non-IT / Core Engineering';
+      if (jobDetails.sector === 'Banking & Finance') jobDetails.sector = 'Banking / Finance';
+    }
+
     const submitterEmpId = req.user.referenceId || req.user.studentId || (req.user.phone ? `EMP-${req.user.phone.slice(-4)}` : `USR-${req.user._id.toString().slice(-4).toUpperCase()}`);
     const referralData = {
       referralCode,
@@ -388,57 +434,62 @@ router.post('/', protect, collegeScope, async (req, res) => {
     else if (category === 'Job') consentNotice = newReferral.jobDetails?.consentNoticeVersion || 'v1.2-FIC-JOB-CONSENT';
     else if (category === 'Bank Account') consentNotice = newReferral.bankAccountDetails?.consentNoticeVersion || 'v1.2-FIC-ACC-CONSENT';
 
-    // Create Audit Log
-    await ReferralAuditLog.create({
-      referralId: newReferral._id,
-      referralCode: newReferral.referralCode,
-      action: 'CREATED',
-      performedBy: req.user._id,
-      performedByName: req.user.name || 'User',
-      performedByRole: req.user.role || 'User',
-      toStatus: 'Submitted',
-      details: `New ${category} referral created by ${req.user.name} (${req.user.role}) with recorded applicant consent (${consentNotice})`,
-      tenantId,
-      collegeId: tenantId,
-    });
-
-    // Notify Admins
-    try {
-      await sendNotification(req, {
-        targetRoles: ['Admin', 'Super Admin'],
-        tenantId,
-        collegeId: tenantId,
-        title: `New ${category} Referral Submitted`,
-        message: `${req.user.name} (${req.user.role}) submitted a new ${category} referral (Ref: ${referralCode}).`,
-        category: 'system',
-        type: 'Info',
-        link: '/admin/business-referrals',
-      });
-    } catch (e) {
-      console.warn('Notification error on referral submission:', e.message);
-    }
-
-    // Real-Time Socket Emission
-    try {
-      const io = req.app.get('io');
-      if (io) {
-        io.emit('dataUpdated', {
-          module: 'referrals',
-          action: 'created',
-          data: newReferral,
-          message: `New ${category} referral submitted (${referralCode})`,
-        });
-        io.to('college:' + tenantId).emit('referralUpdated', { referral: newReferral, action: 'created' });
-      }
-    } catch (ioErr) {
-      console.warn('Socket emission error:', ioErr.message);
-    }
-
+    // Send prompt success response to client immediately
     res.status(201).json({
       success: true,
       message: `${category} referral submitted successfully!`,
       data: newReferral,
     });
+
+    // Run Audit Log & Notifications in background without blocking client response
+    (async () => {
+      try {
+        await ReferralAuditLog.create({
+          referralId: newReferral._id,
+          referralCode: newReferral.referralCode,
+          action: 'CREATED',
+          performedBy: req.user._id,
+          performedByName: req.user.name || 'User',
+          performedByRole: req.user.role || 'User',
+          toStatus: 'Submitted',
+          details: `New ${category} referral created by ${req.user.name} (${req.user.role}) with recorded applicant consent (${consentNotice})`,
+          tenantId,
+          collegeId: tenantId,
+        });
+      } catch (logErr) {
+        console.warn('Audit log write error:', logErr.message);
+      }
+
+      try {
+        await sendNotification(req, {
+          targetRoles: ['Admin', 'Super Admin'],
+          tenantId,
+          collegeId: tenantId,
+          title: `New ${category} Referral Submitted`,
+          message: `${req.user.name} (${req.user.role}) submitted a new ${category} referral (Ref: ${referralCode}).`,
+          category: 'system',
+          type: 'Info',
+          link: '/admin/business-referrals',
+        });
+      } catch (e) {
+        console.warn('Notification error on referral submission:', e.message);
+      }
+
+      try {
+        const io = req.app.get('io');
+        if (io) {
+          io.emit('dataUpdated', {
+            module: 'referrals',
+            action: 'created',
+            data: newReferral,
+            message: `New ${category} referral submitted (${referralCode})`,
+          });
+          io.to('college:' + tenantId).emit('referralUpdated', { referral: newReferral, action: 'created' });
+        }
+      } catch (ioErr) {
+        console.warn('Socket emission error:', ioErr.message);
+      }
+    })();
   } catch (err) {
     console.error('Error creating referral:', err);
     res.status(500).json({ success: false, message: err.message || 'Server error creating referral' });
@@ -448,12 +499,13 @@ router.post('/', protect, collegeScope, async (req, res) => {
 // ── 2. GET CURRENT USER'S PERSONAL REFERRALS (STRICT PRIVACY) ──────────────────
 router.get('/my-referrals', protect, collegeScope, async (req, res) => {
   try {
-    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
     const { category, status, search } = req.query;
 
     const query = {
-      submittedBy: req.user._id,
-      tenantId,
+      $or: [
+        { submittedBy: req.user._id },
+        { submitterEmail: req.user.email }
+      ]
     };
 
     if (category && category !== 'All') query.category = category;

@@ -261,6 +261,8 @@ import VisitorHistoryPage from './watchman/pages/VisitorHistoryPage';
 import WatchmanNotificationsPage from './watchman/pages/WatchmanNotificationsPage';
 import WatchmanProfilePage from './watchman/pages/WatchmanProfilePage';
 import WatchmanChangePasswordPage from './watchman/pages/WatchmanChangePasswordPage';
+import CampusInOutPage from './watchman/pages/CampusInOutPage';
+import RegisterPersonPage from './watchman/pages/RegisterPersonPage';
 
 import Unauthorized from './pages/Unauthorized';
 
@@ -838,6 +840,10 @@ function App() {
             <Route path="/watchman" element={<WatchmanGuard><GlobalLockdown><WatchmanLayout /></GlobalLockdown></WatchmanGuard>}>
               <Route index element={<Navigate to="/watchman/dashboard" replace />} />
               <Route path="dashboard" element={<WatchmanDashboard />} />
+              <Route path="campus-in-out" element={<CampusInOutPage />} />
+              <Route path="campus-movement" element={<CampusInOutPage />} />
+              <Route path="register-person" element={<RegisterPersonPage />} />
+              <Route path="register" element={<RegisterPersonPage />} />
               <Route path="visitor-entry" element={<VisitorEntryPage />} />
               <Route path="visitor-exit" element={<VisitorExitPage />} />
               <Route path="visitor-pass-verification" element={<QrVerificationPage />} />

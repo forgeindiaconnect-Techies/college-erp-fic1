@@ -285,6 +285,7 @@ export default function BusinessReferralLanding() {
         const merged = {
           ...cat,
           ...override,
+          id: cat.id, // Explicitly preserve category ID so overrides can never change it
           metrics: {
             ...cat.metrics,
             ...(override.metrics || {}),
@@ -557,9 +558,15 @@ export default function BusinessReferralLanding() {
                 type="button"
                 className="bus-card-btn-action"
                 style={{ background: cat.gradient }}
-                onClick={() => navigate(`${basePath}/${cat.id}`)}
+                onClick={() => {
+                  if (cat.id === 'incentives') {
+                    navigate(`/${rootRole}/business-referral/incentives`);
+                  } else {
+                    navigate(`${basePath}/${cat.id}`);
+                  }
+                }}
               >
-                <span>Explore Category</span>
+                <span>{cat.id === 'incentives' ? 'Explore Incentives & Rules' : 'Explore Category'}</span>
                 <ChevronRight size={15} />
               </button>
             </div>
@@ -776,9 +783,13 @@ export default function BusinessReferralLanding() {
                 className="bus-modal-btn-pri"
                 style={{ background: previewCategory.gradient }}
                 onClick={() => {
-                  const targetId = previewCategory.id;
+                  const isInc = previewCategory?.id === 'incentives';
                   setPreviewCategory(null);
-                  navigate(`${basePath}/${targetId}`);
+                  if (isInc) {
+                    navigate(`/${rootRole}/business-referral/incentives`);
+                  } else {
+                    navigate(`${basePath}/${previewCategory.id}`);
+                  }
                 }}
               >
                 <span>{previewCategory.id === 'incentives' ? 'Explore Incentives & Rewards Page' : `Open ${previewCategory.title} Page`}</span>

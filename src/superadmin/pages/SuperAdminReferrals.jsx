@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Building2, Award, DollarSign, TrendingUp, Users, CheckCircle2,
   Clock, ArrowRight, RefreshCw, Filter, Search, Globe, ChevronDown,
@@ -25,6 +25,7 @@ import '../../pages/referrals/AdminReferralManagement.css';
 import './SuperAdminDashboard.css';
 
 export default function SuperAdminReferrals() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialModule = searchParams.get('tab') === 'colleges' ? 'colleges' : 'Insurance';
   const [activeModule, setActiveModule] = useState(initialModule); // 'Insurance' | 'Credit Card' | 'Bank Account' | 'Job Referral' | 'colleges'
@@ -476,6 +477,27 @@ export default function SuperAdminReferrals() {
 
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
+            onClick={() => navigate('/superadmin/business-referral')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 16px',
+              background: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: '10px',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              color: '#1e293b',
+              cursor: 'pointer'
+            }}
+            title="Navigate to All Categories Referral Dashboard"
+          >
+            <Layers size={16} style={{ color: '#2563eb' }} />
+            <span>All Categories</span>
+          </button>
+
+          <button
             onClick={() => { fetchOverview(); fetchOpportunities(); }}
             disabled={refreshing}
             style={{
@@ -500,6 +522,15 @@ export default function SuperAdminReferrals() {
 
       {/* ── 5 SEPARATE MODULE NAVIGATION TABS ── */}
       <div className="opp-module-tabs">
+        <button
+          className="opp-module-tab"
+          onClick={() => navigate('/superadmin/business-referral')}
+          title="All Referral Categories Dashboard"
+        >
+          <Layers size={18} style={{ color: '#2563eb' }} />
+          <span>All Categories</span>
+        </button>
+
         <button
           className={`opp-module-tab ${activeModule === 'Insurance' ? 'active' : ''}`}
           onClick={() => handleSwitchModule('Insurance')}

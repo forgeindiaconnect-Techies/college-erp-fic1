@@ -9,15 +9,20 @@ const campusGateMovementSchema = new mongoose.Schema({
   personType: {
     type: String,
     required: true,
-    enum: ['Student', 'Staff']
+    enum: ['Student', 'Staff', 'HOD', 'Visitor', 'Contractor', 'Parent', 'Other', 'Guest'],
+    default: 'Other'
   },
   personId: {
     type: String,
-    required: true // Student Roll/Reg No or Staff Employee ID
+    required: true // Student Roll/Reg No, Staff Employee ID, or Person Pass ID
   },
   name: {
     type: String,
     required: true
+  },
+  phone: {
+    type: String,
+    default: ''
   },
   department: {
     type: String,
@@ -35,6 +40,18 @@ const campusGateMovementSchema = new mongoose.Schema({
     type: String,
     required: true,
     default: 'In'
+  },
+  checkOutTime: {
+    type: Date,
+    default: null
+  },
+  durationMinutes: {
+    type: Number,
+    default: 0
+  },
+  durationFormatted: {
+    type: String,
+    default: ''
   },
   reason: {
     type: String,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Landmark, User, Building2, Wallet, FileCheck, CheckCircle2,
@@ -38,6 +38,7 @@ export default function AccountOpeningReferralModal({
     bankName: 'HDFC Bank',
     accountProduct: 'Campus Zero-Balance Student Savings',
     accountType: 'Savings Account',
+    referralSource: 'Direct Recommendation',
     partnerReferenceNumber: '',
     notes: '',
 
@@ -173,6 +174,7 @@ export default function AccountOpeningReferralModal({
         bankName: defaultBank || 'HDFC Bank',
         accountType: targetType,
         accountProduct: availableProducts[0],
+        referralSource: 'Direct Recommendation',
         partnerReferenceNumber: '',
         notes: '',
         consentGiven: false,
@@ -184,15 +186,60 @@ export default function AccountOpeningReferralModal({
 
   if (!isOpen) return null;
 
-  const step1CustomFields = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
-  const step2CustomFields = (formConfig?.fieldsConfig || []).filter(f => 
-    !f.isSystem && 
-    f.step === 2 && 
-    !['bankname', 'accounttype', 'accountproduct', 'partnerreferencenumber', 'notes'].includes((f.fieldKey || '').toLowerCase())
-  );
+  const defaultAccountOpeningFields = [
+    { fieldKey: 'applicantName', label: 'Applicant Legal Name', fieldType: 'text', step: 1, isRequired: true, isVisible: true, isSystem: true, placeholder: 'Name exactly as printed on PAN' },
+    { fieldKey: 'applicantPhone', label: 'Mobile Number (Linked with Aadhaar)', fieldType: 'phone', step: 1, isRequired: true, isVisible: true, isSystem: true, placeholder: '10-digit mobile number' },
+    { fieldKey: 'applicantEmail', label: 'Email Address', fieldType: 'email', step: 1, isRequired: false, isVisible: true, isSystem: false, placeholder: 'name@example.com' },
+    { fieldKey: 'city', label: 'City / Campus Location', fieldType: 'text', step: 1, isRequired: true, isVisible: true, isSystem: false, placeholder: 'e.g. Pune, Delhi' },
+    { fieldKey: 'applicantType', label: 'Applicant Category', fieldType: 'dropdown', step: 1, isRequired: true, isVisible: true, isSystem: false, options: ['Student', 'Faculty / Staff', 'Research Scholar', 'Alumni', 'Campus Vendor', 'Other'] },
+    { fieldKey: 'bankName', label: 'Partner Bank', fieldType: 'dropdown', step: 2, isRequired: true, isVisible: true, isSystem: true },
+    { fieldKey: 'accountType', label: 'Account Type', fieldType: 'dropdown', step: 2, isRequired: true, isVisible: true, isSystem: true, options: ['Student Zero-Balance', 'Savings Account', 'Salary Account', 'Current Account'] },
+    { fieldKey: 'accountProduct', label: 'Specific Account Offering', fieldType: 'dropdown', step: 2, isRequired: true, isVisible: true, isSystem: true },
+    { fieldKey: 'referralSource', label: 'Referral Channel', fieldType: 'dropdown', step: 2, isRequired: true, isVisible: true, isSystem: false, options: ['Direct Recommendation', 'Campus Orientation', 'Alumni Network', 'Staff Advisory', 'Other'] },
+    { fieldKey: 'partnerReferenceNumber', label: 'Partner Reference #', fieldType: 'text', step: 2, isRequired: false, isVisible: true, isSystem: false, placeholder: 'e.g. HDFC-CAMPUS-901' },
+    { fieldKey: 'notes', label: 'Advisory Notes / Instructions', fieldType: 'textarea', step: 2, isRequired: false, isVisible: true, isSystem: false, placeholder: 'e.g. Hostel kit delivery requested, prefers morning KYC call.' }
+  ];
+
+  const allConfiguredFields = useMemo(() => {
+    const rawList = (formConfig?.fieldsConfig && formConfig.fieldsConfig.length > 0)
+      ? formConfig.fieldsConfig
+      : defaultAccountOpeningFields;
+    const seenKeys = new Set();
+    const seenLabels = new Set();
+    const uniqueList = [];
+    for (const f of rawList) {
+      const normKey = (f.fieldKey || '').trim().toLowerCase();
+      const normLabel = (f.label || '').trim().toLowerCase();
+      if (!normKey || seenKeys.has(normKey) || (normLabel && seenLabels.has(normLabel))) continue;
+      seenKeys.add(normKey);
+      if (normLabel) seenLabels.add(normLabel);
+      uniqueList.push(f);
+    }
+    return uniqueList.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  }, [formConfig]);
+
+  const step1Fields = allConfiguredFields.filter(f => f.isVisible !== false && (!f.step || f.step === 1));
+  const step2Fields = allConfiguredFields.filter(f => f.isVisible !== false && f.step === 2);
+
+  const resolveField = (key) => allConfiguredFields.find(f => f.fieldKey === key) || null;
 
   const handleCustomFieldChange = (fieldKey, value) => {
-    setCustomFields(prev => ({ ...prev, [fieldKey]: value }));
+    handleFieldChange(fieldKey, value);
+  };
+
+  const handleFieldChange = (fieldKey, value) => {
+    if (Object.prototype.hasOwnProperty.call(formData, fieldKey)) {
+      setFormData(prev => {
+        const next = { ...prev, [fieldKey]: value };
+        if (fieldKey === 'accountType') {
+          const prods = productsByAccountType[value] || productsByAccountType['Savings Account'] || [];
+          if (prods.length > 0) next.accountProduct = prods[0];
+        }
+        return next;
+      });
+    } else {
+      setCustomFields(prev => ({ ...prev, [fieldKey]: value }));
+    }
     if (fieldErrors[fieldKey]) {
       setFieldErrors(prev => {
         const next = { ...prev };
@@ -204,102 +251,37 @@ export default function AccountOpeningReferralModal({
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => {
-      const updated = { ...prev, [name]: value };
-
-      if (name === 'accountType') {
-        const products = productsByAccountType[value] || productsByAccountType['Savings Account'];
-        updated.accountProduct = products[0];
-      }
-
-      return updated;
-    });
-
-    if (fieldErrors[name]) {
-      setFieldErrors(prev => ({ ...prev, [name]: null }));
-    }
+    handleFieldChange(name, value);
   };
 
   const validateStep = (stepNumber) => {
     const errors = {};
+    const fieldsToValidate = stepNumber === 1 ? step1Fields : (stepNumber === 2 ? step2Fields : []);
 
-    if (stepNumber === 1) {
-      if (!formData.applicantName || formData.applicantName.trim().length < 3) {
-        errors.applicantName = 'Enter the applicant’s legal name as per Aadhaar/PAN (minimum 3 characters).';
-      }
+    fieldsToValidate.forEach(field => {
+      const val = formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : customFields[field.fieldKey];
+      const strVal = val !== undefined && val !== null ? String(val).trim() : '';
 
-      const phoneRegex = /^[6-9]\d{9}$/;
-      const cleanedPhone = (formData.applicantPhone || '').replace(/\D/g, '');
-      if (!phoneRegex.test(cleanedPhone)) {
-        errors.applicantPhone = 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
-      }
-
-      if (formData.applicantEmail && formData.applicantEmail.trim() !== '') {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(formData.applicantEmail.trim())) {
-          errors.applicantEmail = 'Enter a valid email address or leave it blank.';
+      if (field.isRequired) {
+        if (!val || strVal === '' || (Array.isArray(val) && val.length === 0)) {
+          errors[field.fieldKey] = field.errorMessage || `${field.label} is required.`;
+          return;
         }
       }
 
-      if (!formData.city || formData.city.trim().length < 2) {
-        errors.city = 'Enter the applicant’s campus location or city.';
-      }
-
-      // Dynamic custom fields validation for Step 1
-      const step1Custom = (formConfig?.fieldsConfig || []).filter(f => !f.isSystem && (!f.step || f.step === 1));
-      step1Custom.forEach(f => {
-        let val = customFields[f.fieldKey];
-        const keyLower = (f.fieldKey || '').toLowerCase();
-        const labelLower = (f.label || '').toLowerCase();
-
-        if (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '')) {
-          if (keyLower.includes('city') || keyLower.includes('location') || labelLower.includes('city') || labelLower.includes('location')) {
-            val = formData.city ? formData.city.trim() : '';
-          } else if (keyLower.includes('name') || labelLower.includes('name')) {
-            val = formData.applicantName ? formData.applicantName.trim() : '';
-          } else if (keyLower.includes('phone') || keyLower.includes('mobile') || labelLower.includes('phone') || labelLower.includes('mobile')) {
-            val = formData.applicantPhone ? formData.applicantPhone.trim() : '';
-          } else if (keyLower.includes('email') || labelLower.includes('email')) {
-            val = formData.applicantEmail ? formData.applicantEmail.trim() : '';
+      if (strVal !== '') {
+        if (field.fieldType === 'phone' || field.fieldKey.toLowerCase().includes('phone') || field.fieldKey.toLowerCase().includes('mobile')) {
+          const clean = strVal.replace(/\D/g, '');
+          if (!/^[6-9]\d{9}$/.test(clean)) {
+            errors[field.fieldKey] = 'Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.';
+          }
+        } else if (field.fieldType === 'email' || field.fieldKey.toLowerCase().includes('email')) {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(strVal)) {
+            errors[field.fieldKey] = 'Enter a valid email address.';
           }
         }
-
-        if (f.isRequired && (val === undefined || val === null || val === '' || (typeof val === 'string' && val.trim() === '') || (Array.isArray(val) && val.length === 0))) {
-          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
-        }
-      });
-    }
-
-    if (stepNumber === 2) {
-      if (!formData.bankName) {
-        errors.bankName = 'Select a participating partner bank.';
       }
-      if (!formData.accountProduct) {
-        errors.accountProduct = 'Select an approved account product.';
-      }
-
-      // Dynamic custom fields validation for Step 2
-      const step2Custom = (formConfig?.fieldsConfig || []).filter(f => 
-        !f.isSystem && 
-        f.step === 2 && 
-        !['bankname', 'accounttype', 'accountproduct', 'partnerreferencenumber', 'notes'].includes((f.fieldKey || '').toLowerCase())
-      );
-      step2Custom.forEach(f => {
-        let val = customFields[f.fieldKey];
-        const keyLower = (f.fieldKey || '').toLowerCase();
-        if (keyLower.includes('source') || keyLower.includes('channel')) {
-          val = val || 'Direct Recommendation';
-        } else if (keyLower.includes('partner') || keyLower.includes('ref')) {
-          val = formData.partnerReferenceNumber || 'optional';
-        } else if (keyLower.includes('note') || keyLower.includes('remark')) {
-          val = formData.notes || 'optional';
-        }
-
-        if (f.isRequired && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0))) {
-          errors[f.fieldKey] = f.errorMessage || `${f.label} is required.`;
-        }
-      });
-    }
+    });
 
     if (stepNumber === 3) {
       if (!formData.consentGiven) {
@@ -339,33 +321,51 @@ export default function AccountOpeningReferralModal({
       setSubmitting(true);
       setError(null);
 
+      const cleanPhone = (formData.applicantPhone || '').replace(/\D/g, '');
+      const summaryText = `${formData.applicantName.trim()} - ${formData.bankName} (${formData.accountProduct})`;
+
       const payload = {
         category: 'Bank Account',
         formVersion: formConfig?.version || 1,
         partnerName: formData.bankName,
         productName: formData.accountProduct,
         notes: formData.notes ? formData.notes.trim() : '',
-        customFields: customFields,
+        summary: summaryText,
+        customFields: {
+          summary: summaryText,
+          s: summaryText,
+          applicantType: formData.applicantType,
+          referralSource: formData.referralSource || 'Direct Recommendation',
+          city: formData.city.trim(),
+          branchCity: formData.city.trim(),
+          accountType: formData.accountType,
+          applicantName: formData.applicantName.trim(),
+          applicantPhone: cleanPhone,
+          ...customFields
+        },
         formData: {
           applicantName: formData.applicantName.trim(),
-          applicantPhone: formData.applicantPhone.trim().replace(/\D/g, ''),
+          applicantPhone: cleanPhone,
           applicantEmail: formData.applicantEmail ? formData.applicantEmail.trim() : '',
           applicantType: formData.applicantType,
           city: formData.city.trim(),
+          branchCity: formData.city.trim(),
           bankName: formData.bankName,
           accountType: formData.accountType,
           accountProduct: formData.accountProduct,
-          referralSource: customFields.referralSource || 'Direct Recommendation',
+          referralSource: formData.referralSource || 'Direct Recommendation',
           partnerReferenceNumber: formData.partnerReferenceNumber ? formData.partnerReferenceNumber.trim() : '',
+          summary: summaryText,
+          s: summaryText,
           ...customFields
         },
         bankAccountDetails: {
           bankName: formData.bankName,
           accountProduct: formData.accountProduct,
           accountType: formData.accountType,
-          referralSource: customFields.referralSource || 'Direct Recommendation',
+          referralSource: formData.referralSource || 'Direct Recommendation',
           applicantName: formData.applicantName.trim(),
-          applicantPhone: formData.applicantPhone.trim().replace(/\D/g, ''),
+          applicantPhone: cleanPhone,
           applicantEmail: formData.applicantEmail ? formData.applicantEmail.trim() : '',
           applicantType: formData.applicantType,
           city: formData.city.trim(),
@@ -568,207 +568,55 @@ export default function AccountOpeningReferralModal({
               {/* ── STEP 1: APPLICANT ── */}
               {currentStep === 1 && (
                 <div>
-                  <div className="cc-form-group">
-                    <label className="cc-form-label">
-                      Applicant Full Legal Name <span className="req">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="applicantName"
-                      className={`cc-input ${fieldErrors.applicantName ? 'error' : ''}`}
-                      placeholder="e.g. Ananya Sundaram"
-                      value={formData.applicantName}
-                      onChange={handleChange}
-                      autoFocus
-                    />
-                    {fieldErrors.applicantName && (
-                      <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.applicantName}</div>
-                    )}
-                  </div>
-
-                  <div className="cc-grid-2">
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        10-Digit Mobile Number <span className="req">*</span>
-                      </label>
-                      <div className="cc-phone-input-wrap">
-                        <span className="cc-phone-prefix">+91</span>
-                        <input
-                          type="tel"
-                          name="applicantPhone"
-                          maxLength={10}
-                          className="cc-phone-input"
-                          placeholder="9876543210"
-                          value={formData.applicantPhone}
-                          onChange={handleChange}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                    {step1Fields.map(field => {
+                      let computedField = field;
+                      if (field.fieldKey === 'applicantType' && (!field.options || field.options.length === 0)) {
+                        computedField = { ...field, options: applicantTypes };
+                      }
+                      return (
+                        <DynamicFieldRenderer
+                          key={field.fieldKey}
+                          field={computedField}
+                          value={formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : (customFields[field.fieldKey] || '')}
+                          onChange={(val) => handleFieldChange(field.fieldKey, val)}
+                          error={fieldErrors[field.fieldKey]}
                         />
-                      </div>
-                      {fieldErrors.applicantPhone && (
-                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.applicantPhone}</div>
-                      )}
-                    </div>
-
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Email Address <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
-                      </label>
-                      <input
-                        type="email"
-                        name="applicantEmail"
-                        className={`cc-input ${fieldErrors.applicantEmail ? 'error' : ''}`}
-                        placeholder="ananya@campus.edu"
-                        value={formData.applicantEmail}
-                        onChange={handleChange}
-                      />
-                      {fieldErrors.applicantEmail && (
-                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.applicantEmail}</div>
-                      )}
-                    </div>
+                      );
+                    })}
                   </div>
-
-                  <div className="cc-grid-2">
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        City / Campus Location <span className="req">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="city"
-                        className={`cc-input ${fieldErrors.city ? 'error' : ''}`}
-                        placeholder="e.g. Chennai, Bangalore, Trichy"
-                        value={formData.city}
-                        onChange={handleChange}
-                      />
-                      {fieldErrors.city && (
-                        <div className="cc-field-error"><AlertCircle size={13} /> {fieldErrors.city}</div>
-                      )}
-                    </div>
-
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Applicant Campus Type <span className="req">*</span>
-                      </label>
-                      <select
-                        name="applicantType"
-                        className="cc-select"
-                        value={formData.applicantType}
-                        onChange={handleChange}
-                      >
-                        {applicantTypes.map(t => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Dynamic Custom Fields configured by Admin for Step 1 */}
-                  {step1CustomFields.length > 0 && (
-                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0' }}>
-                      <DynamicFieldRenderer
-                        fields={step1CustomFields}
-                        values={customFields}
-                        errors={fieldErrors}
-                        onChange={handleCustomFieldChange}
-                      />
-                    </div>
-                  )}
                 </div>
               )}
 
               {/* ── STEP 2: ACCOUNT DETAILS ── */}
               {currentStep === 2 && (
                 <div>
-                  <div className="cc-grid-2">
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Participating Partner Bank <span className="req">*</span>
-                      </label>
-                      <select
-                        name="bankName"
-                        className="cc-select"
-                        value={formData.bankName}
-                        onChange={handleChange}
-                      >
-                        {participatingBanks.map(b => (
-                          <option key={b} value={b}>{b}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="cc-form-group">
-                      <label className="cc-form-label">
-                        Account Category <span className="req">*</span>
-                      </label>
-                      <select
-                        name="accountType"
-                        className="cc-select"
-                        value={formData.accountType}
-                        onChange={handleChange}
-                      >
-                        {accountTypesList.map(at => (
-                          <option key={at} value={at}>{at}</option>
-                        ))}
-                      </select>
-                    </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                    {step2Fields.map(field => {
+                      let computedField = field;
+                      if (field.fieldKey === 'bankName' && (!field.options || field.options.length === 0)) {
+                        computedField = { ...field, options: participatingBanks };
+                      } else if (field.fieldKey === 'accountType' && (!field.options || field.options.length === 0)) {
+                        computedField = { ...field, options: accountTypesList };
+                      } else if (field.fieldKey === 'accountProduct' && (!field.options || field.options.length === 0)) {
+                        computedField = {
+                          ...field,
+                          options: productsByAccountType[formData.accountType] || ['Standard Savings Account']
+                        };
+                      }
+                      return (
+                        <DynamicFieldRenderer
+                          key={field.fieldKey}
+                          field={computedField}
+                          value={formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : (customFields[field.fieldKey] || '')}
+                          onChange={(val) => handleFieldChange(field.fieldKey, val)}
+                          error={fieldErrors[field.fieldKey]}
+                        />
+                      );
+                    })}
                   </div>
 
-                  <div className="cc-form-group">
-                    <label className="cc-form-label">
-                      Approved Account Product <span className="req">*</span>
-                    </label>
-                    <select
-                      name="accountProduct"
-                      className="cc-select"
-                      value={formData.accountProduct}
-                      onChange={handleChange}
-                    >
-                      {(productsByAccountType[formData.accountType] || []).map(p => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="cc-form-group">
-                    <label className="cc-form-label">
-                      Partner / Branch Lead Reference <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="partnerReferenceNumber"
-                      className="cc-input"
-                      placeholder="e.g. HDFC-CAMPUS-901"
-                      value={formData.partnerReferenceNumber}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  <div className="cc-form-group">
-                    <label className="cc-form-label">
-                      Service Remarks / Special Instructions <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Optional)</span>
-                    </label>
-                    <textarea
-                      name="notes"
-                      rows={2}
-                      className="cc-textarea"
-                      placeholder="e.g. Hostel kit delivery requested, prefers morning KYC call."
-                      value={formData.notes}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  {/* Dynamic Custom Fields configured by Admin for Step 2 */}
-                  {step2CustomFields.length > 0 && (
-                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0', marginBottom: '16px' }}>
-                      <DynamicFieldRenderer
-                        fields={step2CustomFields}
-                        values={customFields}
-                        errors={fieldErrors}
-                        onChange={handleCustomFieldChange}
-                      />
-                    </div>
-                  )}
-
-                  <div className="cc-privacy-callout">
+                  <div className="cc-privacy-callout" style={{ marginTop: '16px' }}>
                     <ShieldAlert size={20} className="cc-privacy-icon" style={{ color: '#7e22ce' }} />
                     <div>
                       <div className="cc-privacy-title" style={{ color: '#581c87' }}>Banking Security Mandate</div>
@@ -846,22 +694,15 @@ export default function AccountOpeningReferralModal({
                       </button>
                     </div>
                     <div className="cc-review-grid">
-                      <div className="cc-review-item">
-                        <span>Legal Name</span>
-                        <strong>{formData.applicantName}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Contact Mobile</span>
-                        <strong>+91 {formData.applicantPhone}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Email</span>
-                        <strong>{formData.applicantEmail || '—'}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Campus Classification</span>
-                        <strong>{formData.applicantType} • {formData.city}</strong>
-                      </div>
+                      {step1Fields.map(field => {
+                        const val = formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : customFields[field.fieldKey];
+                        return (
+                          <div key={field.fieldKey} className="cc-review-item">
+                            <span>{field.label}</span>
+                            <strong>{String(val || '—')}</strong>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -877,22 +718,15 @@ export default function AccountOpeningReferralModal({
                       </button>
                     </div>
                     <div className="cc-review-grid">
-                      <div className="cc-review-item">
-                        <span>Partner Bank</span>
-                        <strong>{formData.bankName}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Category</span>
-                        <strong>{formData.accountType}</strong>
-                      </div>
-                      <div className="cc-review-item" style={{ gridColumn: 'span 2' }}>
-                        <span>Approved Product</span>
-                        <strong>{formData.accountProduct}</strong>
-                      </div>
-                      <div className="cc-review-item">
-                        <span>Partner Reference</span>
-                        <strong style={{ fontFamily: 'monospace' }}>{formData.partnerReferenceNumber || '—'}</strong>
-                      </div>
+                      {step2Fields.map(field => {
+                        const val = formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : customFields[field.fieldKey];
+                        return (
+                          <div key={field.fieldKey} className="cc-review-item">
+                            <span>{field.label}</span>
+                            <strong>{String(val || '—')}</strong>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -931,11 +765,11 @@ export default function AccountOpeningReferralModal({
                         </div>
                       </div>
                       <div className="cc-review-grid">
-                        {customFieldsConfig.map(fld => {
-                          const val = customFields[fld.fieldName];
+                        {(formConfig?.fieldsConfig || []).filter(f => !f.isSystem).map(fld => {
+                          const val = customFields[fld.fieldKey || fld.fieldName];
                           if (val === undefined || val === null || val === '') return null;
                           return (
-                            <div key={fld.fieldName} className="cc-review-item">
+                            <div key={fld.fieldKey || fld.fieldName} className="cc-review-item">
                               <span>{fld.label}</span>
                               <strong>{Array.isArray(val) ? val.join(', ') : (typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val))}</strong>
                             </div>

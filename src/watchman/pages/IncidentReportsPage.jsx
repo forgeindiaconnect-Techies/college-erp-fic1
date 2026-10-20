@@ -81,7 +81,8 @@ const IncidentReportsPage = () => {
       fetchIncidents();
       setTimeout(() => setSuccess(''), 4000);
     } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to submit incident report.');
+      const serverErr = err?.response?.data?.error || err?.response?.data?.message;
+      setError(serverErr || 'Failed to submit incident report. Please check required fields.');
     } finally {
       setSubmitting(false);
     }
@@ -240,9 +241,9 @@ const IncidentReportsPage = () => {
                           Action: {inc.actionTaken}
                         </div>
                       )}
-                      {inc.resolution && (
+                      {(inc.resolutionNotes || inc.resolution) && (
                         <div style={{ fontSize: '0.75rem', color: '#059669', marginTop: 4 }}>
-                          Resolution: {inc.resolution}
+                          Resolution: {inc.resolutionNotes || inc.resolution}
                         </div>
                       )}
                     </td>

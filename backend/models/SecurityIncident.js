@@ -13,17 +13,8 @@ const securityIncidentSchema = new mongoose.Schema({
   category: {
     type: String,
     required: true,
-    enum: [
-      'Unauthorized Entry',
-      'Theft / Missing Property',
-      'Disciplinary / Altercation',
-      'Traffic / Speeding Violation',
-      'Property Damage / Vandalism',
-      'Medical Emergency',
-      'Fire / Electrical Hazard',
-      'Suspicious Activity / Loitering',
-      'Other'
-    ]
+    default: 'Other',
+    trim: true
   },
   severity: {
     type: String,
@@ -33,11 +24,13 @@ const securityIncidentSchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   location: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   incidentTime: {
     type: Date,
@@ -53,8 +46,7 @@ const securityIncidentSchema = new mongoose.Schema({
     required: true
   },
   reportedById: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    type: mongoose.Schema.Types.Mixed,
     default: null
   },
   actionTaken: {

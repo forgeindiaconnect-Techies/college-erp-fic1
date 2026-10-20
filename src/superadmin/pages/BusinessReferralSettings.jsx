@@ -513,12 +513,8 @@ export default function BusinessReferralSettings() {
     const targetConfig = configs[catName];
     if (!targetConfig) return;
     const fieldToDelete = targetConfig.fieldsConfig?.find(f => f.fieldKey === fieldKey);
-    if (fieldToDelete?.isSystem) {
-      setFeedback({ type: 'warning', message: 'System core fields cannot be removed as they are required for applicant tracking.' });
-      return;
-    }
 
-    if (!window.confirm(`Delete form field "${fieldToDelete?.label || fieldKey}"?`)) {
+    if (!window.confirm(`Are you sure you want to delete form field "${fieldToDelete?.label || fieldKey}" from the ${catName} referral form?`)) {
       return;
     }
 
@@ -526,7 +522,7 @@ export default function BusinessReferralSettings() {
     try {
       setSaving(true);
       await updateReferralFormFields(catName, updatedFields);
-      setFeedback({ type: 'success', message: `Field "${fieldToDelete?.label}" deleted.` });
+      setFeedback({ type: 'success', message: `Field "${fieldToDelete?.label || fieldKey}" deleted successfully.` });
       await fetchConfigs();
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
@@ -595,8 +591,8 @@ export default function BusinessReferralSettings() {
             description: (fieldForm.description || '').trim(),
             step: Number(fieldForm.step),
             fieldType: fieldForm.fieldType,
-            isRequired: f.isSystem ? true : fieldForm.isRequired,
-            isVisible: f.isSystem ? true : fieldForm.isVisible,
+            isRequired: Boolean(fieldForm.isRequired),
+            isVisible: fieldForm.isVisible !== false,
             placeholder: (fieldForm.placeholder || '').trim(),
             helpText: (fieldForm.helpText || '').trim(),
             validationRule: fieldForm.validationRule,
@@ -661,10 +657,6 @@ export default function BusinessReferralSettings() {
     const targetConfig = configs[categoryName];
     if (!targetConfig) return;
     const targetField = targetConfig.fieldsConfig?.find((f) => f.fieldKey === fieldKey);
-    if (targetField?.isSystem) {
-      setFeedback({ type: 'warning', message: 'System fields are required for security and cannot be optional.' });
-      return;
-    }
 
     const updatedFields = (targetConfig.fieldsConfig || []).map((f) => {
       if (f.fieldKey === fieldKey) {
@@ -686,10 +678,6 @@ export default function BusinessReferralSettings() {
     const targetConfig = configs[categoryName];
     if (!targetConfig) return;
     const targetField = targetConfig.fieldsConfig?.find((f) => f.fieldKey === fieldKey);
-    if (targetField?.isSystem) {
-      setFeedback({ type: 'warning', message: 'System core fields cannot be hidden from the referral form.' });
-      return;
-    }
 
     const updatedFields = (targetConfig.fieldsConfig || []).map((f) => {
       if (f.fieldKey === fieldKey) {
@@ -920,6 +908,17 @@ export default function BusinessReferralSettings() {
             <button
               type="button"
               className="mgmt-btn-secondary"
+              style={{ background: '#f8fafc', color: '#1e293b', fontWeight: 600 }}
+              onClick={() => navigate('/superadmin/business-referral')}
+              title="Navigate to All Referral Categories Overview"
+            >
+              <Layers size={15} />
+              <span>All Categories</span>
+            </button>
+
+            <button
+              type="button"
+              className="mgmt-btn-secondary"
               onClick={() => navigate('/superadmin/business-referrals')}
               title="Open Referral Publishing & Applications Central"
             >
@@ -967,6 +966,16 @@ export default function BusinessReferralSettings() {
       {/* ── 9 Main Configuration Tabs ── */}
       <div className="brs-nav-wrapper">
         <div className="brs-tabs-scroll">
+          {/* Quick link to All Categories Dashboard */}
+          <button
+            className="brs-tab-btn central"
+            style={{ background: '#e0f2fe', borderColor: '#bae6fd', color: '#0369a1' }}
+            onClick={() => navigate('/superadmin/business-referral')}
+            title="Navigate to All Categories Referral Dashboard"
+          >
+            <Layers size={16} style={{ color: '#0284c7' }} />
+            <span style={{ fontWeight: 700 }}>All Categories</span>
+          </button>
           {/* Primary Form Category Tabs */}
           <button
             className={`brs-tab-btn ${activeTab === 'credit-card' ? 'active' : ''}`}
@@ -1321,17 +1330,15 @@ export default function BusinessReferralSettings() {
                               <span>Edit</span>
                             </button>
 
-                            {!field.isSystem && (
-                              <button
-                                type="button"
-                                className="mgmt-btn-secondary"
-                                style={{ padding: '6px 10px', fontSize: '0.8rem', color: '#dc2626', borderColor: '#fca5a5' }}
-                                onClick={() => handleDeleteField(currentCategoryName, field.fieldKey)}
-                                title="Delete field"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              className="mgmt-btn-secondary"
+                              style={{ padding: '6px 10px', fontSize: '0.8rem', color: '#dc2626', borderColor: '#fca5a5' }}
+                              onClick={() => handleDeleteField(currentCategoryName, field.fieldKey)}
+                              title="Delete field from form"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </div>
                       );
@@ -2703,16 +2710,26 @@ export default function BusinessReferralSettings() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '20px', padding: '10px 0', borderTop: '1px solid #f1f5f9', marginTop: '10px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: editingField?.isSystem ? 'not-allowed' : 'pointer' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', padding: '12px 0', borderTop: '1px solid #f1f5f9', marginTop: '10px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
-                      checked={fieldForm.isRequired}
-                      disabled={editingField?.isSystem}
+                      checked={Boolean(fieldForm.isRequired)}
                       onChange={(e) => setFieldForm({ ...fieldForm, isRequired: e.target.checked })}
                     />
                     <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
-                      Mark as Required Field {editingField?.isSystem ? '(System core fields are always required)' : ''}
+                      Mark as Required Field (Applicant must fill this)
+                    </span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={fieldForm.isVisible !== false}
+                      onChange={(e) => setFieldForm({ ...fieldForm, isVisible: e.target.checked })}
+                    />
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
+                      Visible in Live Referral Form
                     </span>
                   </label>
                 </div>
@@ -2720,7 +2737,7 @@ export default function BusinessReferralSettings() {
 
               <div className="brs-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  {editingField && !editingField.isSystem && (
+                  {editingField && (
                     <button
                       type="button"
                       className="mgmt-btn-secondary"

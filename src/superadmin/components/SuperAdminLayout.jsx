@@ -43,6 +43,8 @@ const SuperAdminSidebar = ({ isOpen, onClose }) => {
     : isBusinessReferralActive;
 
   const superAdminBusinessReferralItems = [
+    { name: 'All Categories', path: '/superadmin/business-referral', exact: true, icon: <Layers size={16} /> },
+    { name: 'Incentives & Rules', path: '/superadmin/business-referral/incentives', icon: <Award size={16} /> },
     { name: 'Credit Cards', path: '/superadmin/business-referral/credit-card', icon: <CreditCard size={16} /> },
     { name: 'Insurance', path: '/superadmin/business-referral/insurance', icon: <ShieldCheck size={16} /> },
     { name: 'Job Openings', path: '/superadmin/business-referral/job-referral', icon: <Briefcase size={16} /> },

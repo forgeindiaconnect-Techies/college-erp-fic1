@@ -863,7 +863,16 @@ export const getWatchmanStats = () => api.get('/watchman/stats');
 export const getActiveVisitors = () => api.get('/watchman/visitors/active');
 export const recordVisitorEntry = (data) => api.post('/watchman/visitors/entry', data);
 export const recordVisitorExit = (id, data = {}) => api.post(`/watchman/visitors/${id}/exit`, data);
-export const verifyVisitorPass = (query) => api.get(`/watchman/visitors/verify/${encodeURIComponent(query)}`);
+export const verifyVisitorPass = (query) => {
+  let cleanQuery = (query || '').toString().trim();
+  if (cleanQuery.includes('code=')) {
+    const match = cleanQuery.match(/[?&]code=([^&#]+)/);
+    if (match && match[1]) {
+      cleanQuery = decodeURIComponent(match[1]).trim();
+    }
+  }
+  return api.get('/watchman/visitors/verify', { params: { code: cleanQuery, query: cleanQuery } });
+};
 export const getPreRegisteredVisitors = () => api.get('/watchman/visitors/pre-registered');
 export const preRegisterVisitor = (data) => api.post('/watchman/visitors/pre-register', data);
 export const updateVisitorApproval = (id, data) => api.patch(`/watchman/visitors/${id}/approval`, data);
@@ -890,6 +899,8 @@ export const getStudentMovements = (params = {}) => api.get('/watchman/student-r
 export const recordStudentMovement = (data) => api.post('/watchman/student-register', data);
 export const getStaffMovements = (params = {}) => api.get('/watchman/staff-register', { params });
 export const recordStaffMovement = (data) => api.post('/watchman/staff-register', data);
+export const lookupStaffMember = (code) => api.get(`/watchman/staff-lookup/${encodeURIComponent(code)}`);
+export const getStaffWatchmanDirectory = (params = {}) => api.get('/watchman/staff-directory', { params });
 
 // Attendance & Shift Operations
 export const getWatchmanAttendance = () => api.get('/watchman/attendance');
@@ -923,5 +934,22 @@ export const recordBusEntry = (id, data = {}) => api.post(`/buses/${id}/entry`, 
 export const recordBusExit = (id, data = {}) => api.post(`/buses/${id}/exit`, data);
 export const getBusMovementLogs = (params = {}) => api.get('/buses/logs', { params });
 export const getBusTrackingStats = (params = {}) => api.get('/buses/stats', { params });
+
+// ── Campus In & Campus Out Movement APIs ──────────────────────────────────────
+export const getCampusPeople = (params = {}) => api.get('/watchman/campus-people', { params });
+export const registerCampusPerson = (data) => api.post('/watchman/campus-people', data);
+export const recordCampusIn = (data) => api.post('/watchman/campus-in', data);
+export const recordCampusOut = (data) => api.post('/watchman/campus-out', data);
+export const getCampusMovements = (params = {}) => api.get('/watchman/campus-movements', { params });
+export const getCampusMovementStats = (params = {}) => api.get('/watchman/campus-stats', { params });
+export const lookupCampusPerson = (query) => {
+  let cleanQuery = (query || '').toString().trim();
+  if (cleanQuery.includes('code=')) {
+    const match = cleanQuery.match(/[?&]code=([^&#]+)/);
+    if (match && match[1]) cleanQuery = decodeURIComponent(match[1]).trim();
+  }
+  return api.get('/watchman/campus-people/lookup', { params: { query: cleanQuery, code: cleanQuery } });
+};
+
 
 

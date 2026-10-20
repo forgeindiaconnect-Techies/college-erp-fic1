@@ -284,39 +284,41 @@ export default function BusinessReferralInsurance() {
               <span>All Categories</span>
             </button>
 
-            <button
-              type="button"
-              className="mgmt-btn-secondary"
-              style={{ background: '#ffffff', color: '#059669', borderColor: '#a7f3d0', fontWeight: 700 }}
-              onClick={() => handleOpenSubmit('Health', 'Star Health & Allied Insurance')}
-              title="Submit a student or faculty insurance referral"
-            >
-              <UserCheck size={16} />
-              <span>Submit Referral</span>
-            </button>
-
             {rootRole === 'superadmin' && (
-              <button
-                type="button"
-                className="mgmt-btn-secondary"
-                style={{ background: '#f0fdf4', color: '#15803d', borderColor: '#bbf7d0', fontWeight: 700 }}
-                onClick={() => navigate('/superadmin/referral-settings')}
-                title="Configure Insurance Underwriters, Products & Form Fields"
-              >
-                <Sliders size={15} />
-                <span>Form Settings</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="mgmt-btn-secondary"
+                  style={{ background: '#f0fdf4', color: '#15803d', borderColor: '#bbf7d0', fontWeight: 700 }}
+                  onClick={() => navigate('/superadmin/referral-settings')}
+                  title="Configure Insurance Underwriters, Products & Form Fields"
+                >
+                  <Sliders size={15} />
+                  <span>Form Settings</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="mgmt-btn-primary"
+                  style={{ background: '#059669', borderColor: '#059669' }}
+                  onClick={handleOpenCreateOpportunity}
+                  title="Publish a new Insurance Product or Policy Offering"
+                >
+                  <Plus size={16} />
+                  <span>Publish New Insurance Opportunity</span>
+                </button>
+              </>
             )}
 
             <button
               type="button"
               className="mgmt-btn-primary"
               style={{ background: '#059669', borderColor: '#059669' }}
-              onClick={handleOpenCreateOpportunity}
-              title="Publish a new Insurance Product or Policy Offering"
+              onClick={() => handleOpenSubmit('Health', 'Star Health & Allied Insurance')}
+              title="Submit a student or faculty insurance referral"
             >
               <Plus size={16} />
-              <span>Publish New Insurance Opportunity</span>
+              <span>Submit Insurance Referral</span>
             </button>
           </div>
         </div>

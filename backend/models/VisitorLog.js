@@ -41,7 +41,6 @@ const visitorLogSchema = new mongoose.Schema({
   },
   idProofType: {
     type: String,
-    enum: ['Aadhaar Card', 'Driving License', 'Voter ID', 'PAN Card', 'College ID', 'Passport', 'Other'],
     default: 'Aadhaar Card'
   },
   idProofNumber: {
@@ -87,8 +86,7 @@ const visitorLogSchema = new mongoose.Schema({
     default: 'Gate 1 (Main Entrance)'
   },
   watchmanId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    type: mongoose.Schema.Types.Mixed,
     default: null
   },
   watchmanName: {
@@ -96,8 +94,7 @@ const visitorLogSchema = new mongoose.Schema({
     default: 'Security Gate Staff'
   },
   exitWatchmanId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    type: mongoose.Schema.Types.Mixed,
     default: null
   },
   exitWatchmanName: {

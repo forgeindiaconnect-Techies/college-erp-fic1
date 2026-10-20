@@ -327,12 +327,14 @@ export default function BusinessReferralIncentives() {
                 rulesList.map((item, idx) => {
                   const catName = item.category || 'General';
                   const name = item.ruleName || `${catName} Incentive Rule`;
-                  const offering = item.offering || 'Standard Catalog Offerings';
+                  const offering = item.offering || (catName ? `${catName} Network Products` : 'Standard Catalog Offerings');
                   const reward = item.rewardValue
-                    ? item.rewardType === 'Percentage' ? `${item.rewardValue}% of Value` : `₹${Number(item.rewardValue).toLocaleString('en-IN')}`
-                    : item.structure || 'As per partner policy';
-                  const trigger = item.verificationTrigger || item.trigger || 'Partner Clearance';
-                  const cycle = item.cycle || 'Bi-Weekly Cycle';
+                    ? (item.rewardType === 'Percentage' ? `${item.rewardValue}% of Value` : `₹${Number(item.rewardValue).toLocaleString('en-IN')}`)
+                    : (typeof item.amount === 'number'
+                        ? (item.amountType === 'Percentage' ? `${item.amount}% (Percentage Calculation)` : `₹${Number(item.amount).toLocaleString('en-IN')} (Fixed Amount)`)
+                        : item.structure || 'As per partner policy');
+                  const trigger = item.milestone || item.verificationTrigger || item.trigger || 'Physical card dispatch / milestone verification';
+                  const cycle = item.disbursementCondition || item.cycle || 'Institutional settlement cycle';
                   const status = item.approvalStatus || item.status || 'Active';
 
                   return (
@@ -367,6 +369,14 @@ export default function BusinessReferralIncentives() {
                               (p.canonicalCategory && catName && catName.toLowerCase().includes(p.canonicalCategory.toLowerCase()))
                             ) || incentivePrograms[0];
 
+                            const formattedTerms = (item.eligibilityConditions || item.consentRequirement || item.disbursementCondition)
+                              ? [
+                                  item.eligibilityConditions ? `Eligibility: ${item.eligibilityConditions}` : null,
+                                  item.consentRequirement ? `Consent: ${item.consentRequirement}` : null,
+                                  item.disbursementCondition ? `Disbursement: ${item.disbursementCondition}` : null
+                                ].filter(Boolean)
+                              : (item.terms || item.eligibilityTerms || prog.eligibilityTerms || []);
+
                             setSelectedProgram({
                               ...prog,
                               ruleName: name,
@@ -376,7 +386,8 @@ export default function BusinessReferralIncentives() {
                               cycle,
                               status,
                               categoryName: catName,
-                              rawTerms: item.terms || item.eligibilityTerms || prog.eligibilityTerms || []
+                              overview: item.description || prog.overview,
+                              rawTerms: formattedTerms
                             });
                           }}
                         >

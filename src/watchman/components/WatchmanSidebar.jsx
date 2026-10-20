@@ -5,7 +5,7 @@ import {
   LayoutDashboard, UserPlus, LogOut as ExitIcon, QrCode,
   CalendarCheck, Package, Truck, Bus, Users, UserCheck,
   Clock, AlertTriangle, History, Bell, User, Key,
-  LogOut, Shield, ChevronRight, X
+  LogOut, Shield, ChevronRight, X, ArrowLeftRight
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -42,7 +42,10 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
     {
       title: 'Command Center',
       items: [
-        { name: 'Gate Dashboard', path: '/watchman/dashboard', icon: <LayoutDashboard size={19} /> }
+        { name: 'Gate Dashboard', path: '/watchman/dashboard', icon: <LayoutDashboard size={19} /> },
+        { name: 'Campus In / Out Control', path: '/watchman/campus-in-out', icon: <ArrowLeftRight size={19} /> },
+        { name: 'Register Student / Staff', path: '/watchman/register-person', icon: <UserCheck size={19} /> },
+        { name: 'Gate QR Scanner', path: '/watchman/qr-verification', icon: <QrCode size={19} /> }
       ]
     },
     {
@@ -63,6 +66,7 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
       items: [
         { name: 'New Visitor Entry', path: '/watchman/visitor-entry', icon: <UserPlus size={19} /> },
         { name: 'Active Visitors & Exit', path: '/watchman/visitor-exit', icon: <ExitIcon size={19} /> },
+        { name: 'Visitor Pass QR Scanner', path: '/watchman/qr-verification?type=visitor', icon: <QrCode size={19} /> },
         { name: 'Pre-Registered Visitors', path: '/watchman/pre-registered', icon: <CalendarCheck size={19} /> },
         { name: 'Visitor History Logs', path: '/watchman/visitor-history', icon: <History size={19} /> }
       ]
@@ -132,7 +136,15 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
                 <li key={item.path}>
                   <NavLink
                     to={item.path}
-                    className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                    className={({ isActive }) => {
+                      let active = isActive;
+                      if (item.path.includes('?')) {
+                        active = `${location.pathname}${location.search}` === item.path;
+                      } else if (location.search.includes('type=visitor') && item.path === '/watchman/qr-verification') {
+                        active = false;
+                      }
+                      return `nav-link ${active ? 'active' : ''}`;
+                    }}
                     onClick={handleNavClick}
                     end={item.path === '/watchman/dashboard'}
                   >

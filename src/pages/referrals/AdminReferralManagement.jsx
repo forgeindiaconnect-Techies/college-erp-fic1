@@ -2408,7 +2408,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
                     setShowSubmitModal(true);
                   }}
                 >
-                  <Plus size={16} /> <span>+ Register New Referral</span>
+                  <Plus size={16} /> <span>Register New Referral</span>
                 </button>
               </div>
 

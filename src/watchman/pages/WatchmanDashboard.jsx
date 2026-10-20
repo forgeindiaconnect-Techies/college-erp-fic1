@@ -6,7 +6,7 @@ import {
   Package, Search, RefreshCw, ChevronRight, Phone, Car,
   Shield, GraduationCap, ScanLine, ArrowRight, ArrowLeft,
   UserCheck, Briefcase, Eye, X, Check, Camera, Sparkles,
-  Filter, ExternalLink, Printer
+  Filter, ExternalLink, Printer, ArrowLeftRight, LogIn
 } from 'lucide-react';
 import {
   getWatchmanStats,
@@ -500,10 +500,71 @@ const WatchmanDashboard = () => {
         gap: '12px',
         marginBottom: '1.5rem'
       }}>
-        {/* Action 1: Student Gate Scanner */}
+        {/* Action: Campus In & Out Gate */}
         <button
           type="button"
-          onClick={() => { setScanModalOpen(true); setScanResult(null); setScanError(''); setScanSuccessMsg(''); }}
+          onClick={() => navigate('/watchman/campus-in-out')}
+          style={{
+            background: 'linear-gradient(135deg, #059669, #0d9488)',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '14px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(5,150,105,0.25)',
+            transition: 'transform 0.15s ease'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '8px' }}>
+              <ArrowLeftRight size={22} />
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Campus In & Out Gate</div>
+              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>1-Click entry & exit for registered people</div>
+            </div>
+          </div>
+          <ChevronRight size={18} />
+          
+        </button>
+
+        {/* Action: Register Student / Staff */}
+        <button
+          type="button"
+          onClick={() => navigate('/watchman/register-person?type=Student')}
+          style={{
+            background: 'linear-gradient(135deg, #0d9488, #14b8a6)',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '14px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(20,184,166,0.25)',
+            transition: 'transform 0.15s ease'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '8px' }}>
+              <UserCheck size={22} />
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Register Student / Staff</div>
+              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Students, Faculty & Staff + QR ID Pass</div>
+            </div>
+          </div>
+          <ChevronRight size={18} />
+        </button>
+
+        {/* Action: Gate QR Scanner */}
+        <button
+          type="button"
+          onClick={() => navigate('/watchman/qr-verification')}
           style={{
             background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
             color: '#ffffff',
@@ -523,8 +584,38 @@ const WatchmanDashboard = () => {
               <QrCode size={22} />
             </div>
             <div style={{ textAlign: 'left' }}>
-              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Student QR Scanner</div>
-              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Instant scan / check-in / check-out</div>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Gate QR Scanner</div>
+              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Webcam scan • Campus In & Out</div>
+            </div>
+          </div>
+          <ChevronRight size={18} />
+        </button>
+
+        {/* Action: Log Student Movement */}
+        <button
+          type="button"
+          onClick={() => navigate('/watchman/student-register')}
+          style={{
+            background: 'linear-gradient(135deg, #4338ca, #3b82f6)',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '14px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(59,130,246,0.25)',
+            transition: 'transform 0.15s ease'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '8px' }}>
+              <GraduationCap size={22} />
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Log Student Movement</div>
+              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Identify by Roll No & track In/Out</div>
             </div>
           </div>
           <ChevronRight size={18} />
@@ -584,7 +675,7 @@ const WatchmanDashboard = () => {
             </div>
             <div style={{ textAlign: 'left' }}>
               <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>New Visitor Entry</div>
-              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Issue QR badge & verify pass</div>
+              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Guest check-in, host meeting & Gate Pass</div>
             </div>
           </div>
           <ChevronRight size={18} />
@@ -792,6 +883,29 @@ const WatchmanDashboard = () => {
                 <Users size={16} />
                 <span>Visitors ({visitorSubTab === 'inside' ? activeVisitors.length : preRegisteredVisitors.length})</span>
               </button>
+
+              {/* Tab 4: Campus In / Out */}
+              <button
+                type="button"
+                onClick={() => navigate('/watchman/campus-in-out')}
+                style={{
+                  border: 'none',
+                  background: '#ecfdf5',
+                  color: '#059669',
+                  fontWeight: 700,
+                  fontSize: '0.84rem',
+                  padding: '6px 14px',
+                  borderRadius: '7px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  border: '1px solid #a7f3d0'
+                }}
+              >
+                <ArrowLeftRight size={16} />
+                <span>Campus In / Out Gate</span>
+              </button>
             </div>
 
             {/* Search Input */}
@@ -976,7 +1090,6 @@ const WatchmanDashboard = () => {
                   <tr>
                     <th>Student Name</th>
                     <th>Student ID / Roll #</th>
-                    <th>Department & Course</th>
                     <th>QR Code Pass</th>
                     <th>Campus Status</th>
                     <th style={{ textAlign: 'right' }}>Gate Action</th>
@@ -985,7 +1098,7 @@ const WatchmanDashboard = () => {
                 <tbody>
                   {filteredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '36px 16px', color: '#64748b' }}>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: '36px 16px', color: '#64748b' }}>
                         <GraduationCap size={36} style={{ color: '#3b82f6', margin: '0 auto 8px auto' }} />
                         <p style={{ margin: 0, fontWeight: 700, fontSize: '0.95rem' }}>
                           {studentSubTab === 'inside' ? 'No students currently on campus' : 'No registered students found'}
@@ -1054,7 +1167,7 @@ const WatchmanDashboard = () => {
                               </div>
                               <div>
                                 <div style={{ fontWeight: 700, color: '#0f172a' }}>{sName}</div>
-                                <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{s.email || `${sCourse} • Sem ${s.semester || s.sem || '1'}`}</div>
+                                <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{s.email || s.phone || 'Student'}</div>
                               </div>
                             </div>
                           </td>
@@ -1071,10 +1184,6 @@ const WatchmanDashboard = () => {
                             }}>
                               {sId}
                             </span>
-                          </td>
-                          <td>
-                            <div style={{ fontWeight: 600, color: '#334155', fontSize: '0.84rem' }}>{sDept}</div>
-                            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{sCourse}</div>
                           </td>
                           <td>
                             <button
@@ -1205,7 +1314,6 @@ const WatchmanDashboard = () => {
                   <tr>
                     <th>Staff Member</th>
                     <th>Staff ID / Code</th>
-                    <th>Department</th>
                     <th>Gate Entered</th>
                     <th>Entry Time</th>
                     <th style={{ textAlign: 'right' }}>Campus Exit</th>
@@ -1214,7 +1322,7 @@ const WatchmanDashboard = () => {
                 <tbody>
                   {filteredStaff.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '36px 16px', color: '#64748b' }}>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: '36px 16px', color: '#64748b' }}>
                         <UserCheck size={36} style={{ color: '#059669', margin: '0 auto 8px auto' }} />
                         <p style={{ margin: 0, fontWeight: 700, fontSize: '0.95rem' }}>No staff movements recorded yet today</p>
                         <span style={{ fontSize: '0.8rem' }}>Faculty and non-teaching staff entries will appear here.</span>
@@ -1270,9 +1378,6 @@ const WatchmanDashboard = () => {
                           }}>
                             {st.staffId || st.personId}
                           </span>
-                        </td>
-                        <td>
-                          <div style={{ fontWeight: 600, color: '#334155', fontSize: '0.84rem' }}>{st.department || 'Academic'}</div>
                         </td>
                         <td>
                           <div style={{ fontSize: '0.8rem', color: '#475569' }}>{st.gate || 'Gate 1'}</div>
