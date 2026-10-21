@@ -875,6 +875,17 @@ export const ensureAllDefaultConfigs = async () => {
             f.fieldType = seedFieldMap[f.fieldKey]?.fieldType || (f.options?.length > 0 ? 'dropdown' : (f.fieldKey.toLowerCase().includes('phone') ? 'phone' : (f.fieldKey.toLowerCase().includes('email') ? 'email' : (f.fieldKey.toLowerCase().includes('notes') ? 'textarea' : 'text'))));
             changed = true;
           }
+          // Fix empty dropdown options in existing database records
+          if (f.fieldType === 'dropdown' && (!f.options || f.options.length === 0)) {
+            const keyLower = (f.fieldKey || '').toLowerCase();
+            if (keyLower.includes('city') || keyLower.includes('location')) {
+              f.options = ['Bangalore', 'Chennai', 'Hyderabad', 'Mumbai', 'Delhi NCR', 'Pune', 'Coimbatore', 'Kolkata', 'Other'];
+              changed = true;
+            } else if (f.placeholder && f.placeholder.includes(',')) {
+              f.options = f.placeholder.replace(/^e\.g\.?\s*/i, '').split(',').map(s => s.trim()).filter(Boolean);
+              changed = true;
+            }
+          }
         });
       }
       if (changed) {

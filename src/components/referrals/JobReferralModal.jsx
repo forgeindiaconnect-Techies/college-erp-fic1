@@ -231,8 +231,6 @@ export default function JobReferralModal({
     }
   }, [isOpen, defaultSector, defaultCompany]);
 
-  if (!isOpen) return null;
-
   const defaultJobFields = [
     { fieldKey: 'candidateName', label: 'Candidate Full Name', fieldType: 'text', step: 1, isRequired: true, isVisible: true, isSystem: true, placeholder: 'e.g. Priya Sharma' },
     { fieldKey: 'candidatePhone', label: 'Candidate Mobile Number', fieldType: 'phone', step: 1, isRequired: true, isVisible: true, isSystem: true, placeholder: '10-digit mobile number' },
@@ -483,6 +481,8 @@ export default function JobReferralModal({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="cc-modal-overlay" onClick={onClose}>
       <div className="cc-modal-dialog" onClick={(e) => e.stopPropagation()}>
@@ -663,7 +663,7 @@ export default function JobReferralModal({
                           key={field.fieldKey}
                           field={computedField}
                           value={getFieldValue(field.fieldKey)}
-                          onChange={(val) => handleFieldChange(field.fieldKey, val)}
+                          onChange={handleFieldChange}
                           error={fieldErrors[field.fieldKey] || fieldErrors[mapFieldKeyToStateKey(field.fieldKey)]}
                         />
                       );
@@ -697,7 +697,7 @@ export default function JobReferralModal({
                           key={field.fieldKey}
                           field={computedField}
                           value={getFieldValue(field.fieldKey)}
-                          onChange={(val) => handleFieldChange(field.fieldKey, val)}
+                          onChange={handleFieldChange}
                           error={fieldErrors[field.fieldKey] || fieldErrors[mapFieldKeyToStateKey(field.fieldKey)]}
                         />
                       );

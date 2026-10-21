@@ -29,8 +29,8 @@
 /* Desktop: 260px sidebar spacing when sidebar-open, 100% when collapsed */
 @media (min-width: 769px) {
   .main-wrapper.sidebar-open {
-    margin-left: 260px;
-    width: calc(100% - 260px);
+    margin-left: 280px;
+    width: calc(100% - 280px);
   }
 
   .main-wrapper:not(.sidebar-open) {
@@ -100,16 +100,37 @@
     max-height: 100dvh;
     min-height: 0;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   .main-content {
     padding: 10px 10px 48px;
-    overflow-x: hidden;
+    overflow-x: hidden !important;
     overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch;
-    height: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
     flex: 1 1 0% !important;
     min-height: 0 !important;
+    height: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Prevent nested containers from locking vertical touch scroll on mobile */
+  .main-content .main-content,
+  .main-content .page-content,
+  .main-content .principal-page-container,
+  .page-content > div {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+    overflow-x: visible !important;
+    flex: none !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
     touch-action: pan-y;
   }
 }
@@ -118,12 +139,30 @@
 @media (max-width: 480px) {
   .main-content {
     padding: 8px 8px 48px;
-    overflow-x: hidden;
+    overflow-x: hidden !important;
     overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch;
-    height: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
     flex: 1 1 0% !important;
     min-height: 0 !important;
+    height: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .main-content .main-content,
+  .main-content .page-content,
+  .main-content .principal-page-container,
+  .page-content > div {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+    overflow-x: visible !important;
+    flex: none !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
     touch-action: pan-y;
   }
 }

@@ -5,8 +5,8 @@ import {
   Briefcase, GraduationCap, ShieldCheck, Sparkles, BookOpen
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from 'recharts';
-import { getStaff, getDepartments, createNotification } from '../../api/index';
-import useRealtimeSync from '../../hooks/useRealtimeSync';
+import { getStaff, getDepartments, getUsers, createNotification, createMeeting } from '../../api/index';
+import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
 import '../../pages/Dashboard.css';
 
 const radarKeys = ['Attendance', 'Pass Rate', 'Publications', 'Faculty Mgmt', 'Student Engagement'];
@@ -27,13 +27,87 @@ export default function PrincipalHodManagement() {
   const fetchPrincipalHods = useCallback(async () => {
     try {
       setRefreshing(true);
-      const [res, deptRes] = await Promise.all([
+      const [res, deptRes, usersRes] = await Promise.all([
         getStaff().catch(() => ({ data: [] })), 
-        getDepartments().catch(() => ({ data: [] }))
+        getDepartments().catch(() => ({ data: [] })),
+        getUsers().catch(() => ({ data: [] }))
       ]);
       
       const allStaff = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-      const allHods = allStaff.filter(s => s.role === 'HOD' || s.designation === 'HOD' || s.email?.includes('hod'));
+      const dbUsers = Array.isArray(usersRes?.data) ? usersRes.data : (Array.isArray(usersRes) ? usersRes : []);
+      const userHods = dbUsers.filter(u => u.role === 'HOD');
+      const staffHods = allStaff.filter(s => s.role === 'HOD' || s.designation === 'HOD' || s.email?.includes('hod'));
+
+      // Merge HODs from both Staff and User collections without duplicates
+      const hodMap = new Map();
+
+      // First add from User collection
+      userHods.forEach(u => {
+        const emailKey = (u.email || '').toLowerCase();
+        if (emailKey) {
+          hodMap.set(emailKey, {
+            id: u._id?.toString() || u.id,
+            _id: u._id?.toString() || u.id,
+            userId: u._id?.toString(),
+            name: u.name || 'HOD Faculty',
+            dept: u.department || 'General',
+            email: u.email,
+            phone: u.phone || 'N/A',
+            role: 'HOD',
+            status: 'Active',
+            attendance: 96,
+            passRate: 92,
+            faculty: allStaff.filter(s => (s.dept === u.department || s.department === u.department) && s.role !== 'HOD').length || 0,
+            students: 0,
+            rating: 4.8,
+            subjects: u.subjects?.length ? u.subjects : ['Department Core', 'Academic Planning'],
+            publications: 4
+          });
+        }
+      });
+
+      // Then merge/enrich with Staff collection
+      staffHods.forEach(s => {
+        const emailKey = (s.email || '').toLowerCase();
+        const existing = emailKey ? hodMap.get(emailKey) : null;
+        if (existing) {
+          hodMap.set(emailKey, {
+            ...existing,
+            ...s,
+            id: existing.id || s._id || s.id,
+            _id: existing._id || s._id,
+            userId: existing.userId || s._id?.toString(),
+            name: s.name || existing.name,
+            dept: s.dept || s.department || existing.dept,
+            email: s.email || existing.email,
+            attendance: s.attendance || existing.attendance,
+            passRate: s.passRate || existing.passRate,
+            publications: s.publications || existing.publications
+          });
+        } else {
+          const key = emailKey || s._id?.toString() || s.id;
+          hodMap.set(key, {
+            id: s._id?.toString() || s.id || s.staffId,
+            _id: s._id?.toString() || s.id,
+            userId: s._id?.toString(),
+            name: s.name || 'HOD Faculty',
+            dept: s.dept || s.department || 'General',
+            email: s.email || 'hod@college.edu',
+            phone: s.phone || 'N/A',
+            role: 'HOD',
+            status: s.status || 'Active',
+            attendance: s.attendance || 96,
+            passRate: s.passRate || 92,
+            faculty: allStaff.filter(st => (st.dept === s.dept || st.department === s.dept) && st.role !== 'HOD').length || 0,
+            students: s.students || 0,
+            rating: s.rating || 4.8,
+            subjects: Array.isArray(s.subjects) && s.subjects.length > 0 ? s.subjects : ['Department Core', 'Academic Planning'],
+            publications: s.publications || 4
+          });
+        }
+      });
+
+      const allMergedHods = Array.from(hodMap.values());
       const dbDepartments = Array.isArray(deptRes?.data) ? deptRes.data : [];
       setDepartments(dbDepartments);
 
@@ -42,36 +116,26 @@ export default function PrincipalHodManagement() {
         if (matched && matched.code) return matched.code;
         
         const mapping = {
-          'Computer Science Engineering': 'CSE', 'Information Technology': 'IT',
-          'Electronics & Communication Engineering': 'ECE', 'Electrical & Electronics Engineering': 'EEE',
-          'Mechanical Engineering': 'MECH', 'Civil Engineering': 'CIVIL',
+          'Computer Science Engineering': 'CSE', 'Computer Science': 'CSE', 'Information Technology': 'IT',
+          'Electronics & Communication Engineering': 'ECE', 'Electronics & Comm.': 'ECE',
+          'Electrical & Electronics Engineering': 'EEE', 'Electrical & Electronics': 'EEE',
+          'Mechanical Engineering': 'MECH', 'Mechanical Engg.': 'MECH', 'Civil Engineering': 'CIVIL',
           'Artificial Intelligence & Data Science': 'AIDS', 'Artificial Intelligence & Machine Learning': 'AIML',
           'Cyber Security': 'CYBER', 'Biomedical Engineering': 'BME',
           'Aeronautical Engineering': 'AERO', 'Automobile Engineering': 'AUTO',
-          'Robotics Engineering': 'ROBOTICS', 'Chemical Engineering': 'CHEM', 'Biotechnology Engineering': 'BIOTECH'
+          'Robotics Engineering': 'ROBOTICS', 'Chemical Engineering': 'CHEM', 'Biotechnology Engineering': 'BIOTECH',
+          'Bachelor of Computer App.': 'BCA', 'Master of Business Admin.': 'MBA'
         };
-        return mapping[deptName] || deptName.substring(0, 4).toUpperCase();
+        return mapping[deptName] || (deptName ? deptName.substring(0, 4).toUpperCase() : 'DEPT');
       };
 
-      const formatted = allHods.map((h, i) => {
+      const formatted = allMergedHods.map((h, i) => {
         const resolvedDept = h.dept || h.department || 'General';
         return {
-          id: h.id || h.staffId || h._id || i + 1,
-          _id: h._id,
-          name: h.name || 'HOD Faculty',
-          dept: resolvedDept,
+          ...h,
+          id: h.id || h._id || i + 1,
           code: h.code || h.deptCode || getCode(resolvedDept),
-          email: h.email || 'hod@college.edu',
-          phone: h.phone || 'N/A',
-          experience: h.experience || '8+ yrs',
-          attendance: typeof h.attendance === 'number' ? h.attendance : (h.attendance ? Number(h.attendance) : 96),
-          passRate: h.passRate || h.performance || 92,
-          faculty: h.faculty || allStaff.filter(s => (s.dept === resolvedDept || s.department === resolvedDept) && s.role !== 'HOD').length || 0,
-          students: h.students || 0,
-          status: h.status || 'Active',
-          rating: h.rating || 4.8,
-          subjects: Array.isArray(h.subjects) && h.subjects.length > 0 ? h.subjects : ['Department Core', 'Academic Planning'],
-          publications: h.publications || 4
+          experience: h.experience || '8+ yrs'
         };
       });
 
@@ -80,7 +144,7 @@ export default function PrincipalHodManagement() {
         setSelected(formatted[0]);
       }
     } catch (err) {
-      console.warn('API getStaff offline.', err);
+      console.warn('API getStaff/getUsers offline.', err);
       setHodList([]);
     } finally {
       setLoading(false);
@@ -100,22 +164,33 @@ export default function PrincipalHodManagement() {
     e.preventDefault();
     if (!selected) return;
     try {
-      await createNotification({
-        receiverId: selected.id,
-        email: selected.email,
-        targetName: selected.name,
-        targetRoles: [],
-        title: 'Meeting Scheduled by Principal',
-        message: `Executive meeting scheduled on ${meeting.date} at ${meeting.time}. Agenda: ${meeting.agenda}`,
-        type: 'Warning'
-      });
+      const payload = {
+        title: `Principal – ${selected.name} Review`,
+        type: 'HOD Review',
+        hodId: selected._id || selected.userId || selected.id || selected.email,
+        hodUserId: selected.userId || selected._id || selected.id,
+        hodName: selected.name,
+        hodEmail: selected.email,
+        hodDept: selected.dept,
+        date: meeting.date,
+        time: meeting.time,
+        agenda: meeting.agenda,
+        venue: 'Principal Office / Executive Conference Room',
+        status: 'Scheduled',
+        tenantId: sessionStorage.getItem('tenantId') || 'COL001'
+      };
+
+      await createMeeting(payload);
+
+      // Trigger cross-tab realtime sync
+      emitERPDataUpdate(['meetings', 'notifications'], 'created', payload);
+
       showToast(`Meeting successfully scheduled with ${selected.name}`);
       setMeeting({ date: '', time: '', agenda: '' });
       setModal(null);
     } catch (error) {
       console.error('Error scheduling meeting:', error);
-      showToast(`Meeting notification sent to ${selected.name}`);
-      setModal(null);
+      showToast(error.response?.data?.message || `Failed to schedule meeting.`);
     }
   };
 

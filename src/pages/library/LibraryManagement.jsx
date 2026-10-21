@@ -307,11 +307,19 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
       } catch (e) {
         console.warn('getStaff fallback', e);
       }
-      try {
-        const usersRes = await getUsers().catch(() => ({ data: [] }));
-        usrData = Array.isArray(usersRes.data) ? usersRes.data : (Array.isArray(usersRes.data?.users) ? usersRes.data.users : []);
-      } catch (e) {
-        console.warn('getUsers fallback', e);
+      // Only query /api/auth/users if the active session has Admin/Principal privileges to avoid 403 Forbidden
+      const hasAdminPrivilege = Boolean(
+        sessionStorage.getItem('admin_session') || 
+        sessionStorage.getItem('superadmin_session') ||
+        sessionStorage.getItem('principal_session')
+      );
+      if (hasAdminPrivilege) {
+        try {
+          const usersRes = await getUsers().catch(() => ({ data: [] }));
+          usrData = Array.isArray(usersRes.data) ? usersRes.data : (Array.isArray(usersRes.data?.users) ? usersRes.data.users : []);
+        } catch (e) {
+          console.warn('getUsers fallback', e);
+        }
       }
       try {
         const reservationsRes = await getLibraryReservations();

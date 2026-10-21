@@ -399,7 +399,7 @@ export default function PersonalReferrals() {
               onClick={() => setShowSubmitModal(true)}
             >
               <Plus size={16} />
-              <span>+ Submit Referral Lead</span>
+              <span>Submit Referral Lead</span>
             </button>
           </div>
         </div>

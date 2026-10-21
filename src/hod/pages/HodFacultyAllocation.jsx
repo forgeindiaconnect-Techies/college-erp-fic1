@@ -167,7 +167,7 @@ export default function HodFacultyAllocation() {
             onClick={() => setModalOpen(true)}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '0.85rem', fontWeight: 700, color: '#ffffff', background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', border: 'none', borderRadius: '10px', cursor: 'pointer', boxShadow: '0 2px 6px rgba(37,99,235,0.3)' }}
           >
-            <Plus size={16} /> + Allocate Faculty
+            <Plus size={16} /> Allocate Faculty
           </button>
         </div>
       </div>

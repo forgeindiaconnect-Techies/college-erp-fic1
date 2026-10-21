@@ -184,8 +184,6 @@ export default function AccountOpeningReferralModal({
     }
   }, [isOpen, defaultAccountType, defaultBank]);
 
-  if (!isOpen) return null;
-
   const defaultAccountOpeningFields = [
     { fieldKey: 'applicantName', label: 'Applicant Legal Name', fieldType: 'text', step: 1, isRequired: true, isVisible: true, isSystem: true, placeholder: 'Name exactly as printed on PAN' },
     { fieldKey: 'applicantPhone', label: 'Mobile Number (Linked with Aadhaar)', fieldType: 'phone', step: 1, isRequired: true, isVisible: true, isSystem: true, placeholder: '10-digit mobile number' },
@@ -402,6 +400,8 @@ export default function AccountOpeningReferralModal({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="cc-modal-overlay" onClick={onClose}>
       <div className="cc-modal-dialog" onClick={(e) => e.stopPropagation()}>
@@ -579,7 +579,7 @@ export default function AccountOpeningReferralModal({
                           key={field.fieldKey}
                           field={computedField}
                           value={formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : (customFields[field.fieldKey] || '')}
-                          onChange={(val) => handleFieldChange(field.fieldKey, val)}
+                          onChange={handleFieldChange}
                           error={fieldErrors[field.fieldKey]}
                         />
                       );
@@ -609,7 +609,7 @@ export default function AccountOpeningReferralModal({
                           key={field.fieldKey}
                           field={computedField}
                           value={formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : (customFields[field.fieldKey] || '')}
-                          onChange={(val) => handleFieldChange(field.fieldKey, val)}
+                          onChange={handleFieldChange}
                           error={fieldErrors[field.fieldKey]}
                         />
                       );

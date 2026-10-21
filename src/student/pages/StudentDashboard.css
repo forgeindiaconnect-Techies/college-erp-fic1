@@ -37,6 +37,50 @@
   justify-content: center;
 }
 
+/* Student Portal Header Typography */
+.student-portal-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--text-main, #0f172a);
+  margin: 0 0 0.35rem 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  line-height: 1.25;
+}
+
+.student-portal-sub {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748b);
+  line-height: 1.4;
+}
+
+/* Student KPI Typography */
+.student-kpi-lbl {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.student-kpi-val {
+  font-size: 1.35rem;
+  font-weight: 800;
+  margin: 2px 0 0;
+  line-height: 1.15;
+}
+
+.student-kpi-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted, #64748b);
+  margin: 4px 0 0;
+  line-height: 1.25;
+}
+
 .glass-card {
   background: var(--bg-card, #ffffff);
   border: 1px solid var(--border-color, #e2e8f0);
@@ -203,6 +247,126 @@
 
 /* ── Mobile & Tablet Responsiveness for Student Dashboard ── */
 @media (max-width: 768px) {
+  .student-dashboard {
+    padding: 0 !important;
+    gap: 12px !important;
+  }
+
+  /* Academic hero card on mobile */
+  .student-hero-banner {
+    padding: 12px 14px !important;
+    border-radius: 12px !important;
+  }
+
+  .student-hero-inner {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .student-sync-tag {
+    font-size: 0.66rem !important;
+    padding: 2px 7px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .student-portal-title {
+    font-size: 1.1rem !important;
+    gap: 6px !important;
+    line-height: 1.25 !important;
+    margin-bottom: 3px !important;
+  }
+
+  .student-portal-title svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  .student-portal-sub {
+    font-size: 0.76rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .student-hero-actions {
+    width: 100% !important;
+    gap: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+  }
+
+  .student-reg-tag {
+    padding: 4px 10px !important;
+    font-size: 0.74rem !important;
+    border-radius: 8px !important;
+  }
+
+  .student-qr-btn,
+  .student-sync-btn {
+    padding: 5px 11px !important;
+    font-size: 0.74rem !important;
+    border-radius: 8px !important;
+  }
+
+  /* 6-KPI strip on mobile */
+  .student-metrics-strip,
+  .student-metrics-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .hostel-kpi-card {
+    padding: 10px 11px !important;
+    border-radius: 12px !important;
+    min-height: 102px !important;
+    gap: 4px !important;
+  }
+
+  .hostel-kpi-top {
+    margin-bottom: 6px !important;
+  }
+
+  .hostel-kpi-icon {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 8px !important;
+  }
+
+  .hostel-kpi-icon svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .hostel-kpi-top span {
+    font-size: 0.62rem !important;
+    padding: 2px 6px !important;
+    border-radius: 6px !important;
+    font-weight: 700 !important;
+  }
+
+  .student-kpi-lbl {
+    font-size: 0.62rem !important;
+    letter-spacing: 0.02em !important;
+    margin-bottom: 2px !important;
+  }
+
+  .student-kpi-val {
+    font-size: 1.15rem !important;
+    line-height: 1.15 !important;
+    margin-top: 1px !important;
+  }
+
+  .student-kpi-sub {
+    font-size: 0.64rem !important;
+    line-height: 1.25 !important;
+    margin-top: 2px !important;
+  }
+
+  .doc-checklist-title {
+    font-size: 0.95rem !important;
+  }
+
   .student-welcome-banner {
     flex-direction: column;
     align-items: flex-start;
@@ -237,11 +401,13 @@
 }
 
 @media (max-width: 480px) {
-  .student-metrics-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.45rem;
+  .student-metrics-grid,
+  .student-metrics-strip {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.45rem !important;
   }
-  .student-metrics-grid > *:last-child:nth-child(odd) {
+  .student-metrics-grid > *:last-child:nth-child(odd),
+  .student-metrics-strip > *:last-child:nth-child(odd) {
     grid-column: span 2;
   }
 

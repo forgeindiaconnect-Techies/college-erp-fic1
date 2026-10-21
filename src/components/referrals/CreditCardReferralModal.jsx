@@ -164,10 +164,14 @@ export default function CreditCardReferralModal({
   }, [isOpen, defaultBank]);
 
   useEffect(() => {
-    if (configLoaded && Object.keys(bankProductCatalog).length > 0) {
+    if (configLoaded) {
+      const bankField = (formConfig?.fieldsConfig || []).find(f => (f.fieldKey || '').toLowerCase() === 'bankname');
+      const configuredBankOptions = Array.isArray(bankField?.options) && bankField.options.length > 0 ? bankField.options : null;
+      const validBanks = configuredBankOptions || (Object.keys(bankProductCatalog).length > 0 ? Object.keys(bankProductCatalog) : partnerBanks);
+
       setFormData(prev => {
-        const currentBankValid = Boolean(bankProductCatalog[prev.bankName]);
-        const activeBank = currentBankValid ? prev.bankName : Object.keys(bankProductCatalog)[0];
+        const currentBankValid = validBanks.includes(prev.bankName);
+        const activeBank = currentBankValid ? prev.bankName : (validBanks[0] || 'HDFC Bank');
         const prods = bankProductCatalog[activeBank] || ['Standard Variant'];
         const currentProdValid = prods.includes(prev.cardProduct);
         return {
@@ -177,9 +181,7 @@ export default function CreditCardReferralModal({
         };
       });
     }
-  }, [configLoaded, bankProductCatalog]);
-
-  if (!isOpen) return null;
+  }, [configLoaded, bankProductCatalog, formConfig]);
 
   const defaultCreditCardFields = useMemo(() => [
     { fieldKey: 'applicantName', label: 'Applicant Full Name', fieldType: 'text', step: 1, isRequired: true, isVisible: true, placeholder: 'e.g. Ramesh Kumar', sortOrder: 1 },
@@ -252,6 +254,18 @@ export default function CreditCardReferralModal({
       if (!options || options.length === 0) {
         options = referralSources;
       }
+    } else if (key.includes('city') || key === 'location') {
+      if (!options || options.length === 0) {
+        if (f.placeholder && f.placeholder.includes(',')) {
+          options = f.placeholder.replace(/^e\.g\.?\s*/i, '').split(',').map(s => s.trim()).filter(Boolean);
+        } else {
+          options = ['Bangalore', 'Chennai', 'Hyderabad', 'Mumbai', 'Delhi NCR', 'Pune', 'Coimbatore', 'Kolkata', 'Other'];
+        }
+      }
+    }
+
+    if (f.fieldType === 'dropdown' && (!options || options.length === 0) && f.placeholder && f.placeholder.includes(',')) {
+      options = f.placeholder.replace(/^e\.g\.?\s*/i, '').split(',').map(s => s.trim()).filter(Boolean);
     }
 
     return {
@@ -467,6 +481,8 @@ export default function CreditCardReferralModal({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="cc-modal-overlay" onClick={onClose}>
       <div className="cc-modal-dialog" onClick={(e) => e.stopPropagation()}>
@@ -642,7 +658,7 @@ export default function CreditCardReferralModal({
                           key={field.fieldKey}
                           field={resolvedField}
                           value={formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : (customFields[field.fieldKey] || '')}
-                          onChange={(val) => handleFieldChange(field.fieldKey, val)}
+                          onChange={handleFieldChange}
                           error={fieldErrors[field.fieldKey]}
                         />
                       );
@@ -662,7 +678,7 @@ export default function CreditCardReferralModal({
                           key={field.fieldKey}
                           field={resolvedField}
                           value={formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : (customFields[field.fieldKey] || '')}
-                          onChange={(val) => handleFieldChange(field.fieldKey, val)}
+                          onChange={handleFieldChange}
                           error={fieldErrors[field.fieldKey]}
                         />
                       );

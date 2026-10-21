@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Shield, CreditCard, Landmark, Briefcase, Plus, Search, Filter,
@@ -131,6 +132,13 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
     : 'admin';
   const dashboardPath = `/${rootRole}/dashboard`;
   const businessCatalogPath = `/${rootRole}/business-referral`;
+
+  const renderPortalModal = (content) => {
+    if (typeof document !== 'undefined') {
+      return createPortal(content, document.body);
+    }
+    return content;
+  };
 
   const [activeTab, setActiveTab] = useState('overview'); // overview | all | insurance | creditcard | bank | job | rules | approvals | audit
   const [loading, setLoading] = useState(true);
@@ -1201,7 +1209,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
               className="mgmt-btn-primary"
               onClick={() => setShowSubmitModal(true)}
             >
-              <Plus size={15} /> <span>+ Register Referral</span>
+              <Plus size={15} /> <span>Register Referral</span>
             </button>
           </div>
         </div>
@@ -1252,7 +1260,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
 
       {/* ── Main ERP Management Card ── */}
       <div className="mgmt-table-card">
-        <div style={{ padding: '20px' }}>
+        <div className="mgmt-table-card-body">
           {/* ── DEDICATED TAB: REFERRER-WISE CANDIDATE REGISTRATION & INCENTIVE REPORT (ADMIN ONLY) ── */}
           {activeTab === 'referrer-report' && rootRole === 'admin' && (
             <div className="animate-fade-in">
@@ -1305,7 +1313,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
               </div>
 
               {/* ── 2. Top Summary Cards (6 Cards) ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '1.5rem' }}>
+              <div className="ref-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '1.5rem' }}>
                 {/* 1. Total Unique Referrers */}
                 <div className="mgmt-kpi-card" style={{ borderLeft: '4px solid #2563eb' }}>
                   <div className="mgmt-kpi-icon" style={{ background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb' }}>
@@ -1812,7 +1820,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
           {activeTab === 'overview' && (
             <div>
               {/* 8 Real-Time KPI Summary Cards: Balanced Responsive Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '1.5rem' }}>
+              <div className="ref-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '1.5rem' }}>
                 {/* 1. Total Referrals */}
                 <div className="mgmt-kpi-card" style={{ borderLeft: '4px solid #2563eb' }}>
                   <div className="mgmt-kpi-icon" style={{ background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb' }}>
@@ -1935,11 +1943,11 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
               </div>
 
               {/* Category-Wise Summaries Grid */}
-              <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ marginBottom: '1.5rem', width: '100%', boxSizing: 'border-box' }}>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '0 0 12px 0', color: '#0f172a' }}>
                   Category-Wise Referral Performance & Pipeline
                 </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                <div className="ref-cat-summary-grid">
                   {[
                     { key: 'Credit Card', tab: 'creditcard', label: 'Credit Card Referrals', icon: CreditCard, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
                     { key: 'Insurance', tab: 'insurance', label: 'Insurance Referrals', icon: Shield, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
@@ -1965,23 +1973,21 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
                     return (
                       <div
                         key={cat.key}
+                        className="ref-cat-card"
                         style={{
-                          background: '#ffffff',
                           border: `1px solid ${cat.border}`,
-                          borderRadius: '12px',
-                          padding: '16px',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                            <span style={{ width: '30px', height: '30px', borderRadius: '8px', background: cat.bg, color: cat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <div className="ref-cat-card-header">
+                          <div className="ref-cat-title-wrap">
+                            <span className="ref-cat-icon-badge" style={{ background: cat.bg, color: cat.color }}>
                               <IconComp size={16} />
                             </span>
-                            <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.label}</span>
+                            <span className="ref-cat-label-text">{cat.label}</span>
                           </div>
                           <button
                             type="button"
+                            className="ref-cat-report-btn"
                             onClick={() => {
                               setActiveTab(cat.tab);
                               setCategoryFilter(cat.key);
@@ -1990,54 +1996,44 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
                               background: cat.bg,
                               border: `1px solid ${cat.border}`,
                               color: cat.color,
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              fontSize: '0.74rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              whiteSpace: 'nowrap',
-                              flexShrink: 0
                             }}
                           >
                             <span>View Report</span> <span>→</span>
                           </button>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px', textAlign: 'center' }}>
-                          <div style={{ background: '#f8fafc', padding: '6px 4px', borderRadius: '6px' }}>
-                            <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Total</div>
-                            <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>{total}</div>
+                        <div className="ref-cat-stats-row">
+                          <div className="ref-stat-box">
+                            <div className="ref-stat-label">Total</div>
+                            <div className="ref-stat-val" style={{ color: '#0f172a' }}>{total}</div>
                           </div>
-                          <div style={{ background: '#f8fafc', padding: '6px 4px', borderRadius: '6px' }}>
-                            <div style={{ fontSize: '0.68rem', color: '#3b82f6', fontWeight: 600 }}>Submitted</div>
-                            <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#3b82f6' }}>{submitted}</div>
+                          <div className="ref-stat-box">
+                            <div className="ref-stat-label" style={{ color: '#3b82f6' }}>Submitted</div>
+                            <div className="ref-stat-val" style={{ color: '#3b82f6' }}>{submitted}</div>
                           </div>
-                          <div style={{ background: '#f8fafc', padding: '6px 4px', borderRadius: '6px' }}>
-                            <div style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 600 }}>Approved</div>
-                            <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#059669' }}>{approved}</div>
+                          <div className="ref-stat-box">
+                            <div className="ref-stat-label" style={{ color: '#059669' }}>Approved</div>
+                            <div className="ref-stat-val" style={{ color: '#059669' }}>{approved}</div>
                           </div>
-                          <div style={{ background: '#f8fafc', padding: '6px 4px', borderRadius: '6px' }}>
-                            <div style={{ fontSize: '0.68rem', color: '#dc2626', fontWeight: 600 }}>Rejected</div>
-                            <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#dc2626' }}>{rejected}</div>
+                          <div className="ref-stat-box">
+                            <div className="ref-stat-label" style={{ color: '#dc2626' }}>Rejected</div>
+                            <div className="ref-stat-val" style={{ color: '#dc2626' }}>{rejected}</div>
                           </div>
                         </div>
 
                         {/* Dedicated 3-box mini status bar: Zero collision, crystal clear */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
-                          <div style={{ background: '#f8fafc', padding: '6px 2px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                            <div style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Eligible</div>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: cat.color, marginTop: '2px' }}>₹{eligible.toLocaleString()}</div>
+                        <div className="ref-cat-finance-row">
+                          <div className="ref-finance-box" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                            <div className="ref-finance-label" style={{ color: '#64748b' }}>Eligible</div>
+                            <div className="ref-finance-val" style={{ color: cat.color }}>₹{eligible.toLocaleString()}</div>
                           </div>
-                          <div style={{ background: '#f0fdf4', padding: '6px 2px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                            <div style={{ fontSize: '0.64rem', color: '#15803d', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Paid</div>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#15803d', marginTop: '2px' }}>₹{paid.toLocaleString()}</div>
+                          <div className="ref-finance-box" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                            <div className="ref-finance-label" style={{ color: '#15803d' }}>Paid</div>
+                            <div className="ref-finance-val" style={{ color: '#15803d' }}>₹{paid.toLocaleString()}</div>
                           </div>
-                          <div style={{ background: '#fff7ed', padding: '6px 2px', borderRadius: '8px', border: '1px solid #fed7aa' }}>
-                            <div style={{ fontSize: '0.64rem', color: '#c2410c', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Pending</div>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#ea580c', marginTop: '2px' }}>₹{pending.toLocaleString()}</div>
+                          <div className="ref-finance-box" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+                            <div className="ref-finance-label" style={{ color: '#c2410c' }}>Pending</div>
+                            <div className="ref-finance-val" style={{ color: '#ea580c' }}>₹{pending.toLocaleString()}</div>
                           </div>
                         </div>
                       </div>
@@ -2162,49 +2158,59 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
                     </p>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ position: 'relative', width: '260px' }}>
-                      <Search size={14} style={{ position: 'absolute', left: '10px', top: '9px', color: '#94a3b8' }} />
+                  <div className="ref-overview-filters-wrap">
+                    <div className="ref-overview-search-wrap">
+                      <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                       <input
                         type="text"
                         placeholder="Search candidate, code, referrer..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{ padding: '6px 10px 6px 30px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.8rem', width: '100%', outline: 'none', background: '#ffffff' }}
+                        className="ref-search-input"
+                        style={{ fontSize: '0.8rem', padding: '6px 10px 6px 30px' }}
                       />
                     </div>
 
-                    <select
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                      style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#ffffff' }}
-                    >
-                      <option value="All">All Categories</option>
-                      <option value="Credit Card">Credit Cards</option>
-                      <option value="Insurance">Insurance</option>
-                      <option value="Job">Jobs</option>
-                      <option value="Bank Account">Bank Accounts</option>
-                    </select>
+                    <div className="ref-overview-selects-grid">
+                      <select
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        className="ref-filter-select"
+                        style={{ fontSize: '0.8rem' }}
+                      >
+                        <option value="All">All Categories</option>
+                        <option value="Credit Card">Credit Cards</option>
+                        <option value="Insurance">Insurance</option>
+                        <option value="Job">Jobs</option>
+                        <option value="Bank Account">Bank Accounts</option>
+                      </select>
 
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#ffffff' }}
-                    >
-                      <option value="All">All Statuses</option>
-                      <option value="Submitted">Submitted</option>
-                      <option value="Under Review">Under Review</option>
-                      <option value="Approved">Approved</option>
-                      <option value="Policy Issued">Policy Issued</option>
-                      <option value="Account Opened">Account Opened</option>
-                      <option value="Joined">Joined</option>
-                      <option value="Rejected">Rejected</option>
-                    </select>
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="ref-filter-select"
+                        style={{ fontSize: '0.8rem' }}
+                      >
+                        <option value="All">All Statuses</option>
+                        <option value="Submitted">Submitted</option>
+                        <option value="Under Review">Under Review</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Policy Issued">Policy Issued</option>
+                        <option value="Account Opened">Account Opened</option>
+                        <option value="Joined">Joined</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
+                {/* Mobile Table Scroll Hint */}
+                <div className="ref-table-mobile-hint">
+                  <span>⇄ Swipe table horizontally to view all columns & actions</span>
+                </div>
+
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                  <div className="mgmt-table-wrapper" style={{ overflowX: 'auto' }}>
+                  <div className="mgmt-table-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
                     <table className="mgmt-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                       <thead>
                         <tr>
@@ -2413,35 +2419,36 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
               </div>
 
               {/* Comprehensive Search & Filter Toolbar */}
-              <div style={{ background: '#f8fafc', padding: '14px 18px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ position: 'relative', flex: '1 1 280px', minWidth: '240px' }}>
-                    <Search size={15} style={{ position: 'absolute', left: '10px', top: '9px', color: '#94a3b8' }} />
+              <div className="ref-filter-toolbar">
+                <div className="ref-filter-top-row">
+                  <div className="ref-search-wrap">
+                    <Search size={15} className="ref-search-icon" />
                     <input
                       type="text"
-                      placeholder="Search referrer, employee ID, candidate, application ID, phone..."
+                      placeholder="Search referrer, employee ID, candidate, phone..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{ padding: '6px 12px 6px 32px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem', width: '100%', outline: 'none', background: '#ffffff' }}
+                      className="ref-search-input"
                     />
                     {searchQuery && (
                       <button
                         type="button"
                         onClick={() => setSearchQuery('')}
-                        style={{ position: 'absolute', right: '8px', top: '7px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                        className="ref-search-clear"
+                        title="Clear search"
                       >
                         ✕
                       </button>
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>Status:</span>
+                  <div className="ref-filter-chips-grid">
+                    <div className="ref-filter-field">
+                      <span className="ref-filter-label">Status:</span>
                       <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#ffffff', color: '#1e293b' }}
+                        className="ref-filter-select"
                       >
                         <option value="All">All Statuses</option>
                         {(() => {
@@ -2464,12 +2471,12 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
                       </select>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>Incentive:</span>
+                    <div className="ref-filter-field">
+                      <span className="ref-filter-label">Incentive:</span>
                       <select
                         value={incentiveStatusFilter}
                         onChange={(e) => setIncentiveStatusFilter(e.target.value)}
-                        style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#ffffff', color: '#1e293b' }}
+                        className="ref-filter-select"
                       >
                         <option value="All">All Incentives</option>
                         <option value="Eligible">Eligible</option>
@@ -2482,12 +2489,12 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
                       </select>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>Dept:</span>
+                    <div className="ref-filter-field">
+                      <span className="ref-filter-label">Dept:</span>
                       <select
                         value={departmentFilter}
                         onChange={(e) => setDepartmentFilter(e.target.value)}
-                        style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#ffffff', color: '#1e293b' }}
+                        className="ref-filter-select"
                       >
                         <option value="All">All Departments</option>
                         {uniqueDepartments.map(d => (
@@ -2498,32 +2505,32 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#64748b' }}>
-                      <Calendar size={14} />
-                      <span>From:</span>
+                <div className="ref-filter-bottom-row">
+                  <div className="ref-filter-dates-wrap">
+                    <div className="ref-date-field">
+                      <span className="ref-date-label"><Calendar size={13} /> From:</span>
                       <input
                         type="date"
                         value={startDateFilter}
                         onChange={(e) => setStartDateFilter(e.target.value)}
-                        style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', background: '#ffffff' }}
+                        className="ref-date-input"
                       />
-                      <span>To:</span>
+                    </div>
+                    <div className="ref-date-field">
+                      <span className="ref-date-label">To:</span>
                       <input
                         type="date"
                         value={endDateFilter}
                         onChange={(e) => setEndDateFilter(e.target.value)}
-                        style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', background: '#ffffff' }}
+                        className="ref-date-input"
                       />
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>Referrer:</span>
+                    <div className="ref-filter-field ref-referrer-field">
+                      <span className="ref-filter-label">Referrer:</span>
                       <select
                         value={referrerFilter}
                         onChange={(e) => setReferrerFilter(e.target.value)}
-                        style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', background: '#ffffff', color: '#1e293b', maxWidth: '160px' }}
+                        className="ref-filter-select"
                       >
                         <option value="All">All Referrers</option>
                         {uniqueReferrers.map(u => (
@@ -2533,12 +2540,11 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div className="ref-filter-actions">
                     <button
                       type="button"
                       onClick={handleResetFilters}
-                      className="mgmt-btn-secondary"
-                      style={{ padding: '5px 12px', fontSize: '0.78rem' }}
+                      className="mgmt-btn-secondary ref-action-btn"
                     >
                       Reset Filters
                     </button>
@@ -2551,8 +2557,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
                         collegeId: initialCollegeId || undefined
                       })}
                       download
-                      className="mgmt-btn-secondary"
-                      style={{ padding: '5px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      className="mgmt-btn-secondary ref-action-btn"
                     >
                       <Download size={13} /> Export Report
                     </a>
@@ -2560,9 +2565,14 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
                 </div>
               </div>
 
+              {/* Mobile Table Scroll Hint */}
+              <div className="ref-table-mobile-hint">
+                <span>⇄ Swipe table horizontally to view all columns & actions</span>
+              </div>
+
               {/* Data Table */}
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                <div className="mgmt-table-wrapper" style={{ overflowX: 'auto' }}>
+                <div className="mgmt-table-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}>
                   <table className="mgmt-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
@@ -3179,7 +3189,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
                   className="mgmt-btn-primary"
                   onClick={() => setShowRuleModal(true)}
                 >
-                  <Plus size={16} /> <span>+ Add Incentive Rule</span>
+                  <Plus size={16} /> <span>Add Incentive Rule</span>
                 </button>
               </div>
 
@@ -3310,7 +3320,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
       </div>
 
       {/* ── MODAL 1: COMPLETE TOP-TO-BOTTOM REFERRAL DOSSIER & AUDIT ── */}
-      {showDetailModal && selectedReferral && (
+      {showDetailModal && selectedReferral && renderPortalModal(
         <div className="ref-modal-overlay" onClick={() => setShowDetailModal(false)}>
           <div className="ref-modal-card" style={{ maxWidth: '880px', width: '95%' }} onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
@@ -3356,7 +3366,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
               </div>
 
               {/* Grid 1: Referrer Institutional Identity & Candidate Profile */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px', marginBottom: '1.25rem' }}>
+              <div className="ref-dossier-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px', marginBottom: '1.25rem' }}>
                 {/* 1. Referrer Institutional Profile */}
                 <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
@@ -3814,7 +3824,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
       )}
 
       {/* ── MODAL 2: REVIEW / UPDATE STATUS (CATEGORY-TAILORED FLOW) ── */}
-      {showReviewModal && reviewingReferral && (
+      {showReviewModal && reviewingReferral && renderPortalModal(
         <div className="ref-modal-overlay" onClick={() => setShowReviewModal(false)}>
           <div className="ref-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="ref-modal-header">
@@ -4015,7 +4025,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
       )}
 
       {/* ── MODAL 3: INCENTIVE RULE CREATION ── */}
-      {showRuleModal && (
+      {showRuleModal && renderPortalModal(
         <div className="ref-modal-overlay" onClick={() => setShowRuleModal(false)}>
           <div className="ref-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="ref-modal-header">
@@ -4115,7 +4125,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
       )}
 
       {/* ── MODAL 4: PAYOUT PROCESSING ── */}
-      {showPayoutModal && (
+      {showPayoutModal && renderPortalModal(
         <div className="ref-modal-overlay" onClick={() => { setShowPayoutModal(false); setPayoutTargetReferral(null); }}>
           <div className="ref-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="ref-modal-header">
@@ -4125,17 +4135,17 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
             <form onSubmit={handleConfirmPayout}>
               <div className="ref-modal-body">
                 {payoutTargetReferral ? (
-                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px 16px', marginBottom: '1rem' }}>
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px 14px', marginBottom: '1rem', boxSizing: 'border-box' }}>
                     <div style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 700 }}>PAYOUT TARGET RECORD</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '3px' }}>
-                      <span style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: 700 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.92rem', color: '#0f172a', fontWeight: 700, minWidth: 0, flex: '1 1 auto', wordBreak: 'break-word' }}>
                         {payoutTargetReferral.submitterName} ({payoutTargetReferral.category})
                       </span>
-                      <span style={{ fontSize: '1.3rem', color: '#059669', fontWeight: 900 }}>
+                      <span style={{ fontSize: '1.25rem', color: '#059669', fontWeight: 900, whiteSpace: 'nowrap', flexShrink: 0 }}>
                         ₹{payoutTargetReferral.incentiveAmount}
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px', wordBreak: 'break-all' }}>
                       Referral Code: <strong>{payoutTargetReferral.referralCode}</strong>
                     </div>
                   </div>
@@ -4199,7 +4209,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
       )}
 
       {/* ── MODAL 5: REVERSAL CONFIRMATION ── */}
-      {showReversalModal && reversingIncentive && (
+      {showReversalModal && reversingIncentive && renderPortalModal(
         <div className="ref-modal-overlay" onClick={() => setShowReversalModal(false)}>
           <div className="ref-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="ref-modal-header">
@@ -4237,7 +4247,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
       )}
 
       {/* ── MODAL 6: REGISTER NEW REFERRAL (ADMIN SUBMISSION) ── */}
-      {showSubmitModal && (
+      {showSubmitModal && renderPortalModal(
         <div className="ref-modal-overlay" onClick={() => setShowSubmitModal(false)}>
           <div className="ref-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="ref-modal-header">
@@ -4574,7 +4584,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
       )}
 
       {/* ── REFERRER CANDIDATE HISTORY VIEW DETAILS MODAL ── */}
-      {showCandidateHistoryModal && detailReferrer && (
+      {showCandidateHistoryModal && detailReferrer && renderPortalModal(
         <div className="mgmt-modal-overlay" style={{ zIndex: 1200 }}>
           <div
             className="mgmt-modal-card"
@@ -4936,7 +4946,7 @@ export default function AdminReferralManagement({ initialCollegeId = null }) {
       )}
 
       {/* ── INCENTIVE PAYMENT MANAGEMENT MODAL (PARTIAL & FULL PAYMENT SUPPORT) ── */}
-      {showIncentivePaymentModal && payingCandidate && (
+      {showIncentivePaymentModal && payingCandidate && renderPortalModal(
         <div className="mgmt-modal-overlay" style={{ zIndex: 1300 }}>
           <div
             className="mgmt-modal-card"

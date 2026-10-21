@@ -534,7 +534,7 @@ const Salary = () => {
             onClick={openCustomModal}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.95rem', borderRadius: '6px', border: '1px solid #166534', background: '#16a34a', color: '#ffffff', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 4px rgba(22,101,52,0.2)' }}
           >
-            <UserPlus size={15} /> + Add / Custom Payroll Voucher
+            <UserPlus size={15} /> Add / Custom Payroll Voucher
           </button>
 
           <button 

@@ -544,7 +544,12 @@ export default function BusinessReferralSettings() {
       isVisible: true,
       placeholder: '',
       helpText: '',
+      options: [],
       optionsString: '',
+      newOptionInput: '',
+      editingOptionIndex: null,
+      editingOptionText: '',
+      optionsMode: 'list',
       validationRule: 'none',
       errorMessage: ''
     });
@@ -553,21 +558,150 @@ export default function BusinessReferralSettings() {
 
   const handleOpenEditField = (field) => {
     setEditingField(field);
+    const existingOptions = Array.isArray(field.options) ? [...field.options] : [];
     setFieldForm({
       fieldKey: field.fieldKey,
       label: field.label || '',
       description: field.description || '',
       step: field.step || 1,
-      fieldType: field.fieldType || (field.options && field.options.length > 0 ? 'dropdown' : 'text'),
+      fieldType: field.fieldType || (existingOptions.length > 0 ? 'dropdown' : 'text'),
       isRequired: field.isRequired !== false,
       isVisible: field.isVisible !== false,
       placeholder: field.placeholder || '',
       helpText: field.helpText || '',
-      optionsString: Array.isArray(field.options) ? field.options.join(', ') : '',
+      options: existingOptions,
+      optionsString: existingOptions.join(', '),
+      newOptionInput: '',
+      editingOptionIndex: null,
+      editingOptionText: '',
+      optionsMode: 'list',
       validationRule: field.validationRule || 'none',
       errorMessage: field.errorMessage || ''
     });
     setShowEditFieldModal(true);
+  };
+
+  // ── Dropdown Option List Helpers ──
+  const handleAddOptionToField = (optionText) => {
+    const textToAdd = (optionText !== undefined ? optionText : fieldForm.newOptionInput || '').trim();
+    if (!textToAdd) return;
+
+    let items = [];
+    if (textToAdd.includes(',')) {
+      items = textToAdd.split(',').map(s => s.trim()).filter(Boolean);
+    } else {
+      items = [textToAdd];
+    }
+
+    const currentOptions = Array.isArray(fieldForm.options) ? [...fieldForm.options] : [];
+    const updated = [...currentOptions];
+
+    items.forEach(item => {
+      if (item && !updated.includes(item)) {
+        updated.push(item);
+      }
+    });
+
+    setFieldForm(prev => ({
+      ...prev,
+      options: updated,
+      optionsString: updated.join(', '),
+      newOptionInput: ''
+    }));
+  };
+
+  const handleDeleteOptionFromField = (index) => {
+    const currentOptions = Array.isArray(fieldForm.options) ? [...fieldForm.options] : [];
+    const updated = currentOptions.filter((_, i) => i !== index);
+    setFieldForm(prev => ({
+      ...prev,
+      options: updated,
+      optionsString: updated.join(', '),
+      editingOptionIndex: prev.editingOptionIndex === index ? null : prev.editingOptionIndex
+    }));
+  };
+
+  const handleMoveOptionInField = (index, direction) => {
+    const currentOptions = Array.isArray(fieldForm.options) ? [...fieldForm.options] : [];
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= currentOptions.length) return;
+
+    const temp = currentOptions[index];
+    currentOptions[index] = currentOptions[targetIdx];
+    currentOptions[targetIdx] = temp;
+
+    setFieldForm(prev => ({
+      ...prev,
+      options: currentOptions,
+      optionsString: currentOptions.join(', ')
+    }));
+  };
+
+  const handleStartEditOption = (index) => {
+    setFieldForm(prev => ({
+      ...prev,
+      editingOptionIndex: index,
+      editingOptionText: prev.options[index] || ''
+    }));
+  };
+
+  const handleSaveOptionEdit = (index) => {
+    const newText = (fieldForm.editingOptionText || '').trim();
+    if (!newText) {
+      handleDeleteOptionFromField(index);
+      return;
+    }
+    const currentOptions = Array.isArray(fieldForm.options) ? [...fieldForm.options] : [];
+    currentOptions[index] = newText;
+    setFieldForm(prev => ({
+      ...prev,
+      options: currentOptions,
+      optionsString: currentOptions.join(', '),
+      editingOptionIndex: null,
+      editingOptionText: ''
+    }));
+  };
+
+  const handleCancelOptionEdit = () => {
+    setFieldForm(prev => ({
+      ...prev,
+      editingOptionIndex: null,
+      editingOptionText: ''
+    }));
+  };
+
+  const handleSyncOptionsFromCsv = (csvStr) => {
+    const parsed = csvStr ? csvStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+    setFieldForm(prev => ({
+      ...prev,
+      optionsString: csvStr,
+      options: parsed
+    }));
+  };
+
+  const handleImportCurrentPartners = () => {
+    const catName = activeTab === 'fields' ? fieldCategoryFilter : currentCategoryName;
+    const catConfig = configs[catName] || currentConfig;
+    const activePartners = (catConfig?.partners || [])
+      .filter(p => p.isActive !== false)
+      .map(p => p.name);
+
+    if (activePartners.length === 0) {
+      setFeedback({ type: 'info', message: `No active partners found in ${catName} referral settings.` });
+      return;
+    }
+
+    const currentOptions = Array.isArray(fieldForm.options) ? [...fieldForm.options] : [];
+    const merged = [...currentOptions];
+    activePartners.forEach(pName => {
+      if (!merged.includes(pName)) merged.push(pName);
+    });
+
+    setFieldForm(prev => ({
+      ...prev,
+      options: merged,
+      optionsString: merged.join(', ')
+    }));
   };
 
   const handleSaveFieldForm = async (e) => {
@@ -576,9 +710,20 @@ export default function BusinessReferralSettings() {
     const targetConfig = configs[catName];
     if (!targetConfig) return;
 
-    const optionsArray = fieldForm.optionsString
-      ? fieldForm.optionsString.split(',').map((s) => s.trim()).filter(Boolean)
-      : [];
+    let optionsArray = [];
+    if (Array.isArray(fieldForm.options) && fieldForm.options.length > 0) {
+      optionsArray = fieldForm.options.map(s => String(s).trim()).filter(Boolean);
+    } else if (fieldForm.optionsString) {
+      optionsArray = fieldForm.optionsString.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+
+    if (['dropdown', 'radio', 'checkbox'].includes(fieldForm.fieldType) && optionsArray.length === 0) {
+      setFeedback({
+        type: 'error',
+        message: `Dropdown field "${fieldForm.label || 'Field'}" must have at least one option configured.`
+      });
+      return;
+    }
 
     let updatedFields = [...(targetConfig.fieldsConfig || [])];
 
@@ -2670,15 +2815,194 @@ export default function BusinessReferralSettings() {
                 </div>
 
                 {['dropdown', 'radio', 'checkbox'].includes(fieldForm.fieldType) && (
-                  <div className="brs-form-group">
-                    <label>Selectable Options (Comma separated) *</label>
-                    <textarea
-                      rows={3}
-                      placeholder="e.g. Salaried, Self-Employed, Student, Professional, Other"
-                      value={fieldForm.optionsString}
-                      onChange={(e) => setFieldForm({ ...fieldForm, optionsString: e.target.value })}
-                    />
-                    <span className="brs-form-help">Separate choices by commas. These will be rendered as choices.</span>
+                  <div className="brs-options-box">
+                    <div className="brs-options-header">
+                      <div className="brs-options-header-title">
+                        <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>
+                          Dropdown Select Options *
+                        </span>
+                        <span className="brs-options-count-badge">
+                          {(fieldForm.options || []).length} {(fieldForm.options || []).length === 1 ? 'Option' : 'Options'}
+                        </span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        {currentConfig?.partners?.length > 0 && (
+                          <button
+                            type="button"
+                            className="brs-opt-action-btn import"
+                            onClick={handleImportCurrentPartners}
+                            title="Quick import active partners configured in this category"
+                          >
+                            <Sparkles size={13} />
+                            <span>Import Active Partners</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="brs-opt-action-btn"
+                          onClick={() => setFieldForm(prev => ({
+                            ...prev,
+                            optionsMode: prev.optionsMode === 'csv' ? 'list' : 'csv'
+                          }))}
+                        >
+                          {fieldForm.optionsMode === 'csv' ? 'Interactive List View' : 'Bulk CSV Mode'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {fieldForm.optionsMode === 'csv' ? (
+                      /* CSV Bulk Mode */
+                      <div style={{ marginTop: '10px' }}>
+                        <textarea
+                          rows={4}
+                          className="brs-options-csv-area"
+                          placeholder="e.g. HDFC Bank, ICICI Bank, State Bank of India, Axis Bank"
+                          value={fieldForm.optionsString}
+                          onChange={(e) => handleSyncOptionsFromCsv(e.target.value)}
+                        />
+                        <span className="brs-form-help" style={{ display: 'block', marginTop: '4px' }}>
+                          Enter choices separated by commas. Changes instantly update the interactive option list.
+                        </span>
+                      </div>
+                    ) : (
+                      /* Interactive List Mode */
+                      <div style={{ marginTop: '10px' }}>
+                        {/* Add Option Input Row */}
+                        <div className="brs-option-add-row">
+                          <input
+                            type="text"
+                            placeholder="Type new option name (e.g. HDFC Bank, Salaried, IT Specialist)..."
+                            value={fieldForm.newOptionInput || ''}
+                            onChange={(e) => setFieldForm({ ...fieldForm, newOptionInput: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddOptionToField();
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="mgmt-btn-primary"
+                            style={{ padding: '0 16px', height: '38px', flexShrink: 0 }}
+                            onClick={() => handleAddOptionToField()}
+                            disabled={!(fieldForm.newOptionInput || '').trim()}
+                          >
+                            <Plus size={15} />
+                            <span>Add Option</span>
+                          </button>
+                        </div>
+
+                        {/* Options List */}
+                        {(!fieldForm.options || fieldForm.options.length === 0) ? (
+                          <div className="brs-options-empty-box">
+                            <AlertCircle size={22} color="#94a3b8" />
+                            <p style={{ margin: '6px 0 2px 0', fontWeight: 600, color: '#475569', fontSize: '0.84rem' }}>
+                              No dropdown options added yet
+                            </p>
+                            <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                              Add options individually above or click "Import Active Partners".
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="brs-options-item-list">
+                            {fieldForm.options.map((opt, idx) => (
+                              <div key={idx} className="brs-option-item-row">
+                                <div className="brs-option-item-left">
+                                  <span className="brs-option-idx-badge">{idx + 1}</span>
+                                  {fieldForm.editingOptionIndex === idx ? (
+                                    <input
+                                      type="text"
+                                      className="brs-option-inline-edit"
+                                      autoFocus
+                                      value={fieldForm.editingOptionText}
+                                      onChange={(e) => setFieldForm({ ...fieldForm, editingOptionText: e.target.value })}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          handleSaveOptionEdit(idx);
+                                        } else if (e.key === 'Escape') {
+                                          handleCancelOptionEdit();
+                                        }
+                                      }}
+                                    />
+                                  ) : (
+                                    <span
+                                      className="brs-option-item-text"
+                                      onDoubleClick={() => handleStartEditOption(idx)}
+                                      title="Double-click to edit"
+                                    >
+                                      {opt}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="brs-option-item-actions">
+                                  {fieldForm.editingOptionIndex === idx ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="brs-opt-btn check"
+                                        onClick={() => handleSaveOptionEdit(idx)}
+                                        title="Save option"
+                                      >
+                                        <Check size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="brs-opt-btn cancel"
+                                        onClick={handleCancelOptionEdit}
+                                        title="Cancel editing"
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="brs-opt-btn"
+                                        disabled={idx === 0}
+                                        onClick={() => handleMoveOptionInField(idx, 'up')}
+                                        title="Move option up"
+                                      >
+                                        <ChevronUp size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="brs-opt-btn"
+                                        disabled={idx === fieldForm.options.length - 1}
+                                        onClick={() => handleMoveOptionInField(idx, 'down')}
+                                        title="Move option down"
+                                      >
+                                        <ChevronDown size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="brs-opt-btn"
+                                        onClick={() => handleStartEditOption(idx)}
+                                        title="Edit this option"
+                                      >
+                                        <Edit size={13} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="brs-opt-btn delete"
+                                        onClick={() => handleDeleteOptionFromField(idx)}
+                                        title="Remove option"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

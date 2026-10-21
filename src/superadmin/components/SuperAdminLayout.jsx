@@ -44,11 +44,13 @@ const SuperAdminSidebar = ({ isOpen, onClose }) => {
 
   const superAdminBusinessReferralItems = [
     { name: 'All Categories', path: '/superadmin/business-referral', exact: true, icon: <Layers size={16} /> },
+    { name: 'College Referrals & Incentives', path: '/superadmin/business-referrals?tab=colleges', icon: <Building2 size={16} /> },
     { name: 'Incentives & Rules', path: '/superadmin/business-referral/incentives', icon: <Award size={16} /> },
     { name: 'Credit Cards', path: '/superadmin/business-referral/credit-card', icon: <CreditCard size={16} /> },
     { name: 'Insurance', path: '/superadmin/business-referral/insurance', icon: <ShieldCheck size={16} /> },
     { name: 'Job Openings', path: '/superadmin/business-referral/job-referral', icon: <Briefcase size={16} /> },
-    { name: 'Bank Accounts', path: '/superadmin/business-referral/account-opening', icon: <Building size={16} /> }
+    { name: 'Bank Accounts', path: '/superadmin/business-referral/account-opening', icon: <Building size={16} /> },
+    { name: 'Publishing Central', path: '/superadmin/business-referrals', icon: <Sliders size={16} /> }
   ];
 
   const handleLogout = () => {
@@ -78,13 +80,34 @@ const SuperAdminSidebar = ({ isOpen, onClose }) => {
 
   return (
     <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
-      <div className="sidebar-header" style={{ justifyContent: 'space-between', padding: '0 18px', height: '72px', background: '#365d7a', borderBottom: '1px solid rgba(255, 255, 255, 0.14)' }}>
+      <div 
+        className="sidebar-header" 
+        style={{ 
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'row',
+          flexWrap: 'nowrap',
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          padding: '0 18px', 
+          height: '72px', 
+          background: '#365d7a', 
+          borderBottom: '1px solid rgba(255, 255, 255, 0.14)',
+          boxSizing: 'border-box',
+          width: '100%'
+        }}
+      >
         <img 
           src="/logo.svg" 
           alt="ERPSYS Logo" 
-          style={{ height: '36px', maxWidth: '140px', objectFit: 'contain' }} 
+          style={{ height: '34px', width: 'auto', maxWidth: '140px', objectFit: 'contain', display: 'block' }} 
         />
-        <button className="sidebar-close-btn" onClick={onClose}>
+        <button 
+          className="sidebar-close-btn" 
+          onClick={onClose}
+          aria-label="Close sidebar"
+          title="Close sidebar"
+        >
           <X size={20} />
         </button>
       </div>
@@ -138,7 +161,8 @@ const SuperAdminSidebar = ({ isOpen, onClose }) => {
                     to={item.path} 
                     end={item.exact}
                     className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
-                    style={{ paddingLeft: '2.8rem' }}
+                    style={{ paddingLeft: '2.2rem' }}
+                    title={item.name}
                     onClick={handleNavClick}
                   >
                     {item.icon}

@@ -2432,7 +2432,7 @@ const FeesCollection = () => {
                       }}
                       style={{ display:'inline-flex', alignItems:'center', gap:'5px', padding:'6px 12px', background:'#3b82f6', color:'#ffffff', border:'none', borderRadius:'6px', fontSize:'0.78rem', fontWeight:700, cursor:'pointer' }}
                     >
-                      <UserPlus size={13} /> + Register
+                      <UserPlus size={13} /> Register
                     </button>
                   </div>
                 )}
@@ -4132,7 +4132,7 @@ const FeesCollection = () => {
                     gap: '6px'
                   }}
                 >
-                  <ShieldCheck size={16} /> + Issue No-Due Certificate
+                  <ShieldCheck size={16} /> Issue No-Due Certificate
                 </button>
 
                 <button

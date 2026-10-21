@@ -891,10 +891,10 @@ const HostelDashboard = ({ defaultTab = 'Dashboard' }) => {
                 <Plus size={15} /> Allocate Room
               </button>
               <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={() => setShowAddBlockModal(true)}>
-                <Building size={15} /> + Add Block
+                <Building size={15} /> Add Block
               </button>
               <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={() => setShowAddRoomModal(true)}>
-                <DoorOpen size={15} /> + Add Room
+                <DoorOpen size={15} /> Add Room
               </button>
               <button className="btn-secondary" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={() => setActiveTab('Gate Passes')}>
                 <CheckCircle size={15} /> Gate Passes

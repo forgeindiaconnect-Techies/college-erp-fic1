@@ -180,8 +180,6 @@ export default function InsuranceReferralModal({
     }
   }, [isOpen, defaultCategory, defaultProvider]);
 
-  if (!isOpen) return null;
-
   const defaultInsuranceFields = useMemo(() => [
     { fieldKey: 'applicantName', label: 'Applicant / Policyholder Name', fieldType: 'text', step: 1, isRequired: true, isVisible: true, placeholder: 'Full Name as per PAN', sortOrder: 1 },
     { fieldKey: 'applicantPhone', label: 'Mobile Number', fieldType: 'phone', step: 1, isRequired: true, isVisible: true, placeholder: '10-digit mobile number', validationRule: 'phone', sortOrder: 2 },
@@ -248,6 +246,18 @@ export default function InsuranceReferralModal({
       if (!options || options.length === 0) {
         options = ['Direct Staff Reference', 'Campus Drive', 'Alumni Network', 'Student Inquiry', 'Other'];
       }
+    } else if (key.includes('city') || key === 'location') {
+      if (!options || options.length === 0) {
+        if (f.placeholder && f.placeholder.includes(',')) {
+          options = f.placeholder.replace(/^e\.g\.?\s*/i, '').split(',').map(s => s.trim()).filter(Boolean);
+        } else {
+          options = ['Bangalore', 'Chennai', 'Hyderabad', 'Mumbai', 'Delhi NCR', 'Pune', 'Coimbatore', 'Kolkata', 'Other'];
+        }
+      }
+    }
+
+    if (f.fieldType === 'dropdown' && (!options || options.length === 0) && f.placeholder && f.placeholder.includes(',')) {
+      options = f.placeholder.replace(/^e\.g\.?\s*/i, '').split(',').map(s => s.trim()).filter(Boolean);
     }
 
     return {
@@ -478,6 +488,8 @@ export default function InsuranceReferralModal({
       setTimeout(() => setCopiedCode(false), 2000);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="cc-modal-overlay" onClick={onClose}>

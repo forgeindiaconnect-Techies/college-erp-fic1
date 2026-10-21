@@ -105,13 +105,18 @@
     gap: 1rem !important;
   }
 
-  /* Two-column chart grids stack to 1 column on <= 900px */
+  /* Two-column and multi-column chart grids stack to 1 column on <= 900px */
+  .placement-overview-grid,
+  .placement-companies-grid,
   .animate-fade-in[style*="gridTemplateColumns: '1fr 1fr'"],
   .animate-fade-in[style*="grid-template-columns: 1fr 1fr"],
   div[style*="gridTemplateColumns: '1fr 1fr'"][style*="1.2rem"],
   div[style*="gridTemplateColumns: '1fr 1fr'"][style*="1.5rem"] {
+    display: flex !important;
+    flex-direction: column !important;
     grid-template-columns: 1fr !important;
     gap: 1rem !important;
+    width: 100% !important;
   }
 
   /* 3. 2-Column Sleek KPI Grids on Mobile for ALL Principal Pages */
@@ -263,6 +268,25 @@
   div[style*="minmax(450px, 1fr)"] {
     grid-template-columns: 1fr !important;
     gap: 0.85rem !important;
+  }
+
+  /* 9. Unrestricted smooth scrolling over all charts & SVGs on mobile/touch screens */
+  .chart-touch-container,
+  .recharts-responsive-container,
+  .recharts-wrapper,
+  .recharts-surface,
+  .recharts-surface * {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .recharts-wrapper {
+    pointer-events: auto !important;
+  }
+
+  .principal-placements-page,
+  .principal-approvals-page {
+    padding-bottom: 5rem !important;
   }
 }
 

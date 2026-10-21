@@ -910,7 +910,7 @@ const StudentRegistration = () => {
             </button>
             <button className="erp-btn-header erp-btn-header-primary" onClick={handleBlankForm} type="button">
               <Plus size={15} />
-              <span>+ New Admission</span>
+              <span>New Admission</span>
             </button>
           </div>
         </div>
@@ -2034,7 +2034,7 @@ const StudentRegistration = () => {
             <div className="erp-wizard-footer">
               <button className="erp-btn-header-primary" type="button" onClick={handleBlankForm}>
                 <Plus size={15} />
-                <span>+ Register Another Student</span>
+                <span>Register Another Student</span>
               </button>
             </div>
           </div>

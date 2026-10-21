@@ -1487,6 +1487,11 @@
     width: 100% !important;
     justify-content: center !important;
   }
+
+  .ref-spec-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
 }
 
 @media (max-width: 480px) {

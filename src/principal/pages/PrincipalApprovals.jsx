@@ -7,117 +7,11 @@ import {
 import '../../pages/Dashboard.css';
 import { getApprovals, submitApprovalAction } from '../../api/index.js';
 
-// --- DATA SETS ---
-
-const initialRequests = [
-  { 
-    id: 1, 
-    type: 'Budget Request', 
-    department: 'CSE', 
-    requestedBy: 'Dr. Amit Sharma (HOD)', 
-    date: 'May 26, 2026', 
-    priority: 'High', 
-    status: 'Pending',
-    details: 'Requesting ₹1,80,000 for upgrades to the Advanced AI & Cloud Computing Laboratory. Consumables and server subscription renewals are included.',
-    aiRecommendation: 'Safe to Approve. Budget is within quarterly department allocations. Compliance index is 98.4%.',
-    aiScore: 98,
-    remarks: ''
-  },
-  { 
-    id: 2, 
-    type: 'Leave Request', 
-    department: 'ECE', 
-    requestedBy: 'Dr. Ramesh Varma (HOD)', 
-    date: 'May 25, 2026', 
-    priority: 'Medium', 
-    status: 'Pending',
-    details: 'Casual leave request for 3 days starting May 29, 2026, for attending the National VLSI Symposium. Substitute arrangements have been made with Prof. Anil.',
-    aiRecommendation: 'Safe to Approve. Faculty attendance history is highly compliant (96%). Class replacement schedules have been verified.',
-    aiScore: 95,
-    remarks: ''
-  },
-  { 
-    id: 3, 
-    type: 'Department Event', 
-    department: 'MECH', 
-    requestedBy: 'Dr. Vikram Rao (HOD)', 
-    date: 'May 24, 2026', 
-    priority: 'High', 
-    status: 'Pending',
-    details: 'Hosting a National Mechanical & Automation Symposium (MechAuto 2026) on June 18, 2026. Estimated audience size: 300+ students from 15 colleges.',
-    aiRecommendation: 'Action Recommended. Requires coordination with the General Security & Transport division. Budget fits, but venue conflicts with BCA Exams.',
-    aiScore: 78,
-    remarks: ''
-  },
-  { 
-    id: 4, 
-    type: 'Exam Approval', 
-    department: 'MBA', 
-    requestedBy: 'Dr. Sneha Reddy (HOD)', 
-    date: 'May 26, 2026', 
-    priority: 'High', 
-    status: 'Pending',
-    details: 'Approval request for the End Semester Examination Timetable, external invigilator list, and board of moderators committee roster.',
-    aiRecommendation: 'Safe to Approve. Complies with University statutory mandates. Roster matches qualified faculty index requirements.',
-    aiScore: 99,
-    remarks: ''
-  },
-  { 
-    id: 5, 
-    type: 'Placement Drive', 
-    department: 'CSE', 
-    requestedBy: 'Prof. Ankit Mehta (Placements)', 
-    date: 'May 23, 2026', 
-    priority: 'High', 
-    status: 'Pending',
-    details: 'Scheduling a 3-day exclusive campus recruitment drive for Google Cloud India on June 4-6, 2026. Target audience: Final year CSE, ECE & BCA students.',
-    aiRecommendation: 'Safe to Approve. Highly beneficial. Placement metrics are expected to increase by 3.5%. Facility requirements are available.',
-    aiScore: 97,
-    remarks: ''
-  },
-  { 
-    id: 6, 
-    type: 'Student Request', 
-    department: 'BCA', 
-    requestedBy: 'Dr. Sanjay Dutt (HOD)', 
-    date: 'May 25, 2026', 
-    priority: 'Low', 
-    status: 'Pending',
-    details: 'Permission request from BCA Student Association to conduct an Inter-Class Coding Hackathon (CodeFest) on May 30, 2026.',
-    aiRecommendation: 'Safe to Approve. Student academic standing is high, event complies with co-curricular standards. Zero budget required.',
-    aiScore: 96,
-    remarks: ''
-  },
-  { 
-    id: 7, 
-    type: 'Announcements', 
-    department: 'EEE', 
-    requestedBy: 'Dr. Priya Iyer (HOD)', 
-    date: 'May 24, 2026', 
-    priority: 'Medium', 
-    status: 'Approved',
-    details: 'Urgent Announcement regarding mandatory Internship registrations for Pre-final year Electrical students before June 1, 2026.',
-    aiRecommendation: 'Approved. System notification sent automatically to all targets on May 24.',
-    aiScore: 100,
-    remarks: 'Approved on schedule.'
-  },
-  { 
-    id: 8, 
-    type: 'Staff Requests', 
-    department: 'CSE', 
-    requestedBy: 'Prof. Rajesh Kumar', 
-    date: 'May 22, 2026', 
-    priority: 'Medium', 
-    status: 'Rejected',
-    details: 'Requesting institutional sponsorship of ₹25,000 to attend an overseas AI summit in Singapore.',
-    aiRecommendation: 'Rejected. Exceeds standard faculty development travel bounds for this term.',
-    aiScore: 40,
-    remarks: 'Rejected: Standard budget parameters for international travel are currently locked.'
-  }
-];
+// Real requests loaded dynamically from API & database
+const initialRequests = [];
 
 export default function PrincipalApprovals() {
-  const [requests, setRequests] = useState(initialRequests);
+  const [requests, setRequests] = useState([]);
   const [activeFilter, setActiveFilter] = useState('All'); // All, Pending, Approved, Rejected, Urgent
   const [selectedReq, setSelectedReq] = useState(null); // Currently open request in detail drawer
   const [searchTerm, setSearchTerm] = useState('');
@@ -125,7 +19,7 @@ export default function PrincipalApprovals() {
   // Fetch approvals dynamically & sync with local storage leave requests
   useEffect(() => {
     const loadData = () => {
-      let combinedRequests = [...initialRequests];
+      let combinedRequests = [];
 
       // Load leaves from localStorage
       try {
@@ -147,11 +41,7 @@ export default function PrincipalApprovals() {
             remarks: l.remarks || ''
           }));
           
-          // Merge avoiding duplicate IDs
-          const existingIds = new Set(combinedRequests.map(r => r.id));
-          leaveApprovals.forEach(la => {
-            if (!existingIds.has(la.id)) combinedRequests.unshift(la);
-          });
+          combinedRequests = [...leaveApprovals];
         }
       } catch (err) {}
 
@@ -162,6 +52,12 @@ export default function PrincipalApprovals() {
               ...item,
               id: item._id || item.id
             }));
+            
+            // Merge avoiding duplicate IDs
+            const existingIds = new Set(mapped.map(r => r.id));
+            combinedRequests.forEach(la => {
+              if (!existingIds.has(la.id)) mapped.unshift(la);
+            });
             setRequests(mapped);
           } else {
             setRequests(combinedRequests);
@@ -195,16 +91,30 @@ export default function PrincipalApprovals() {
   const [isForwarding, setIsForwarding] = useState(false);
   const [forwardSuccess, setForwardSuccess] = useState(false);
 
-  // Notification Alerts & Activity Log states
-  const [activityLogs, setActivityLogs] = useState([
-    { text: 'Announcements from Dr. Priya Iyer approved by Principal', time: 'May 24, 11:32 AM' },
-    { text: 'Travel Request from Prof. Rajesh Kumar rejected (remarks logged)', time: 'May 22, 04:15 PM' },
-    { text: 'Approvals database synced with HOD submissions portal', time: 'May 26, 09:00 AM' }
-  ]);
-  const [notifications, setNotifications] = useState([
-    { id: 1, text: 'New Budget request submitted by Dr. Amit Sharma (CSE)', type: 'warning' },
-    { id: 2, text: 'Exam Schedules for MBA department require review', type: 'high' }
-  ]);
+  // Notification Alerts & Activity Log states (pure dynamic from actual records)
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+
+  // Compute live notifications from real pending requests
+  useEffect(() => {
+    const realNotes = [];
+    requests.forEach(req => {
+      if (req.status === 'Pending' && req.priority === 'High') {
+        realNotes.push({
+          id: `note_${req.id}`,
+          text: `Urgent review required: ${req.type} from ${req.requestedBy} (${req.department})`,
+          type: 'high'
+        });
+      } else if (req.status === 'Pending') {
+        realNotes.push({
+          id: `note_${req.id}`,
+          text: `Pending ${req.type} submitted by ${req.requestedBy} (${req.department})`,
+          type: 'warning'
+        });
+      }
+    });
+    setNotifications(realNotes);
+  }, [requests]);
 
   // Restriction dialog for IT Admin boundaries (Step 6)
   const [showRestrictionDialog, setShowRestrictionDialog] = useState(false);
@@ -383,7 +293,7 @@ export default function PrincipalApprovals() {
   });
 
   return (
-    <div className="main-content" style={{ padding: '2rem', minHeight: 'calc(100vh - 70px)', background: 'var(--bg-primary)' }}>
+    <div className="principal-page-container principal-approvals-page" style={{ padding: '1.5rem', minHeight: '100%', background: 'transparent' }}>
       
       {/* HEADER */}
       <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
@@ -500,71 +410,85 @@ export default function PrincipalApprovals() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRequests.map((req) => (
-                  <tr key={req.id}>
-                    <td>
-                      <span style={{ 
-                        fontWeight: 700, fontSize: '0.82rem', 
-                        color: 'var(--text-main)' 
-                      }}>
-                        {req.type}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="dept-code-badge" style={{ backgroundColor: 'rgba(79, 70, 229, 0.08)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700 }}>
-                        {req.department}
-                      </span>
-                    </td>
-                    <td style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>{req.requestedBy}</td>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{req.date}</td>
-                    <td>
-                      <span style={{ 
-                        color: req.priority === 'High' ? '#ef4444' : req.priority === 'Medium' ? '#f59e0b' : '#3b82f6',
-                        fontWeight: 700, fontSize: '0.8rem'
-                      }}>
-                        ⚠️ {req.priority}
-                      </span>
-                    </td>
-                    <td>
-                      <span style={{
-                        backgroundColor: req.status === 'Pending' ? 'rgba(245, 158, 11, 0.1)' : req.status === 'Approved' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                        color: req.status === 'Pending' ? '#f59e0b' : req.status === 'Approved' ? '#10b981' : '#ef4444',
-                        padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700
-                      }}>
-                        {req.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', minWidth: '180px' }}>
-                        <button 
-                          onClick={() => { setSelectedReq(req); setSignatureKey(''); setIsSignatureVerified(false); }}
-                          className="btn-primary" 
-                          style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '6px', flex: '1 1 auto', textAlign: 'center' }}
-                        >
-                          View Details
-                        </button>
-                        {req.status === 'Pending' && (
-                          <>
-                            <button 
-                              onClick={() => handleApprove(req.id)}
-                              className="btn-primary" 
-                              style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '6px', background: 'var(--success)', flex: '1 1 auto', textAlign: 'center' }}
-                            >
-                              Approve
-                            </button>
-                            <button 
-                              onClick={() => { setSelectedReq(req); setRemarksInput(''); }}
-                              className="btn-primary" 
-                              style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '6px', background: 'var(--danger)', flex: '1 1 auto', textAlign: 'center' }}
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
+                {filteredRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem' }}>
+                        <CheckCircle size={36} style={{ color: 'var(--success)', opacity: 0.8 }} />
+                        <strong style={{ fontSize: '1rem', color: 'var(--text-main)' }}>No Approval Requests Found</strong>
+                        <p style={{ margin: 0, fontSize: '0.82rem', maxWidth: 360 }}>
+                          {searchTerm ? `No requests match "${searchTerm}".` : `There are currently no ${activeFilter === 'All' ? '' : activeFilter.toLowerCase()} requests requiring authorization.`}
+                        </p>
                       </div>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredRequests.map((req) => (
+                    <tr key={req.id}>
+                      <td>
+                        <span style={{ 
+                          fontWeight: 700, fontSize: '0.82rem', 
+                          color: 'var(--text-main)' 
+                        }}>
+                          {req.type}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="dept-code-badge" style={{ backgroundColor: 'rgba(79, 70, 229, 0.08)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700 }}>
+                          {req.department}
+                        </span>
+                      </td>
+                      <td style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>{req.requestedBy}</td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{req.date}</td>
+                      <td>
+                        <span style={{ 
+                          color: req.priority === 'High' ? '#ef4444' : req.priority === 'Medium' ? '#f59e0b' : '#3b82f6',
+                          fontWeight: 700, fontSize: '0.8rem'
+                        }}>
+                          ⚠️ {req.priority}
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{
+                          backgroundColor: req.status === 'Pending' ? 'rgba(245, 158, 11, 0.1)' : req.status === 'Approved' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                          color: req.status === 'Pending' ? '#f59e0b' : req.status === 'Approved' ? '#10b981' : '#ef4444',
+                          padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700
+                        }}>
+                          {req.status}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', minWidth: '180px' }}>
+                          <button 
+                            onClick={() => { setSelectedReq(req); setSignatureKey(''); setIsSignatureVerified(false); }}
+                            className="btn-primary" 
+                            style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '6px', flex: '1 1 auto', textAlign: 'center' }}
+                          >
+                            View Details
+                          </button>
+                          {req.status === 'Pending' && (
+                            <>
+                              <button 
+                                onClick={() => handleApprove(req.id)}
+                                className="btn-primary" 
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '6px', background: 'var(--success)', flex: '1 1 auto', textAlign: 'center' }}
+                              >
+                                Approve
+                              </button>
+                              <button 
+                                onClick={() => { setSelectedReq(req); setRemarksInput(''); }}
+                                className="btn-primary" 
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '6px', background: 'var(--danger)', flex: '1 1 auto', textAlign: 'center' }}
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -580,18 +504,24 @@ export default function PrincipalApprovals() {
               🔔 Notifications System
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              {notifications.map((note) => (
-                <div 
-                  key={note.id} 
-                  style={{ 
-                    padding: '0.65rem 0.8rem', borderRadius: '8px', 
-                    background: 'var(--bg-secondary)', borderLeft: `3px solid ${note.type === 'high' ? '#ef4444' : note.type === 'success' ? '#10b981' : '#f59e0b'}`,
-                    fontSize: '0.78rem', color: 'var(--text-main)'
-                  }}
-                >
-                  {note.text}
+              {notifications.length === 0 ? (
+                <div style={{ padding: '0.85rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
+                  No pending action notifications
                 </div>
-              ))}
+              ) : (
+                notifications.map((note) => (
+                  <div 
+                    key={note.id} 
+                    style={{ 
+                      padding: '0.65rem 0.8rem', borderRadius: '8px', 
+                      background: 'var(--bg-secondary)', borderLeft: `3px solid ${note.type === 'high' ? '#ef4444' : note.type === 'success' ? '#10b981' : '#f59e0b'}`,
+                      fontSize: '0.78rem', color: 'var(--text-main)'
+                    }}
+                  >
+                    {note.text}
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -601,12 +531,18 @@ export default function PrincipalApprovals() {
               📋 Decisions Activity Log
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', maxHeight: '250px', overflowY: 'auto' }}>
-              {activityLogs.map((log, idx) => (
-                <div key={idx} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-main)', margin: 0 }}>{log.text}</p>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{log.time}</span>
+              {activityLogs.length === 0 ? (
+                <div style={{ padding: '0.85rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
+                  No recent decisions recorded today.
                 </div>
-              ))}
+              ) : (
+                activityLogs.map((log, idx) => (
+                  <div key={idx} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-main)', margin: 0 }}>{log.text}</p>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{log.time}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

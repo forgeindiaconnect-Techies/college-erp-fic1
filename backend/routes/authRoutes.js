@@ -1022,8 +1022,8 @@ router.post('/seed', async (req, res) => {
 router.get('/users', protect, collegeScope, async (req, res) => {
   try {
     const role = (req.user.role || '').toLowerCase();
-    if (role !== 'admin' && role !== 'principal' && role !== 'system admin') {
-      return res.status(403).json({ message: 'Access denied: Admin/Principal only' });
+    if (role !== 'admin' && role !== 'principal' && role !== 'system admin' && role !== 'librarian') {
+      return res.status(403).json({ message: 'Access denied: Admin/Principal/Librarian only' });
     }
     // Prevent cross-tenant data leak
     const effectiveTenantId = req.collegeId || req.user.tenantId || req.user.collegeId || 'unassigned_college';

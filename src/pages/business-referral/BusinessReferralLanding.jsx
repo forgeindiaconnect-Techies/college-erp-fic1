@@ -5,11 +5,10 @@ import {
   ArrowRight, CheckCircle2, TrendingUp, Sparkles, Filter, Search,
   DollarSign, ChevronRight, Info, ExternalLink, SlidersHorizontal, Sliders,
   Layers, Users, Check, Clock, AlertTriangle, ArrowLeft, LayoutDashboard,
-  Edit, Save, RotateCcw, X
+  Edit, Save, RotateCcw, X, Building2
 } from 'lucide-react';
 import { getIncentiveRules } from '../../api';
 import EditCategoryModal from '../../components/referrals/EditCategoryModal';
-import BusinessReferralCategoryNav from '../../components/referrals/BusinessReferralCategoryNav';
 import { getCustomCategoryOverrides } from '../../utils/categoryConfig';
 import '../admin/UserManagementCommon.css';
 import './BusinessReferralLanding.css';
@@ -318,9 +317,6 @@ export default function BusinessReferralLanding() {
 
   return (
     <div className="management-page animate-fade-in" style={{ padding: '24px 32px' }}>
-      {/* ── Top Category Tabs Navigation ── */}
-      <BusinessReferralCategoryNav activeCategory="all" />
-
       {/* ── Real-Time ERP Header Card (Matches Screenshot 3 standard) ── */}
       <div className="mgmt-header-card" style={{ marginBottom: '24px' }}>
         <div className="mgmt-header-bar" style={{ background: 'linear-gradient(90deg, #3730a5, #10b981, #06b6d4)' }}></div>
@@ -353,6 +349,16 @@ export default function BusinessReferralLanding() {
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button
                   type="button"
+                  className="mgmt-btn-primary"
+                  style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', borderColor: '#1d4ed8', color: '#ffffff', fontWeight: 700, boxShadow: '0 3px 10px rgba(37,99,235,0.25)' }}
+                  onClick={() => navigate('/superadmin/business-referrals?tab=colleges')}
+                  title="Track which college and how many people got referrals and check incentive details"
+                >
+                  <Building2 size={16} />
+                  <span>College Referrals & Incentives</span>
+                </button>
+                <button
+                  type="button"
                   className="mgmt-btn-secondary"
                   style={{ background: '#f0fdf4', color: '#15803d', borderColor: '#bbf7d0', fontWeight: 700 }}
                   onClick={() => navigate('/superadmin/referral-settings')}
@@ -363,7 +369,7 @@ export default function BusinessReferralLanding() {
                 </button>
                 <button
                   type="button"
-                  className="mgmt-btn-primary"
+                  className="mgmt-btn-secondary"
                   onClick={() => navigate('/superadmin/business-referrals')}
                   title="Open Publishing & Lead Central to Create & Edit Opportunities"
                 >

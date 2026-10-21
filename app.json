@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "11e81a84-b109-42b7-bd57-d9d669b2a5c7"
+      }
+    },
+    "android": {
+      "package": "com.pooja_college.newfolder"
+    }
+  }
+}

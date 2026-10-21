@@ -233,7 +233,7 @@ export default function PrincipalPlacements() {
   if (loading) return <div style={{ padding: '2rem' }}>Loading institutional placement data...</div>;
 
   return (
-    <div className="main-content" style={{ padding: '2rem', background: 'var(--bg-primary)', minHeight: 'calc(100vh - 70px)' }}>
+    <div className="principal-page-container principal-placements-page" style={{ padding: '1.5rem', minHeight: '100%', background: 'transparent' }}>
       <div style={{ marginBottom: '1.5rem' }}>
         <h1 style={{ color: 'var(--text-main)', fontSize: '1.6rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Briefcase style={{ color: '#3730A5' }} size={28} /> Placement Cell Control Center
@@ -242,7 +242,7 @@ export default function PrincipalPlacements() {
       </div>
 
       {/* Stats Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="principal-kpi-grid" style={{ marginBottom: '1.5rem' }}>
         {[
           { label: 'Overall Placed', value: `${placementRate}%`, icon: <CheckCircle size={18} />, color: 'var(--success)', bg: '#E1F5EE', sub: 'Placement Rate' },
           { label: 'Highest Package', value: `${highestPackage} LPA`, icon: <DollarSign size={18} />, color: 'var(--success)', bg: '#E1F5EE', sub: 'Institution Max' },
@@ -263,54 +263,58 @@ export default function PrincipalPlacements() {
       </div>
 
       {/* Navigation tabs */}
-      <div className="glass-card" style={{ padding: '0.4rem', borderRadius: 12, display: 'inline-flex', gap: '0.4rem', marginBottom: '1.5rem' }}>
+      <div className="glass-card principal-tabs-bar" style={{ padding: '0.4rem', borderRadius: 12, display: 'flex', gap: '0.4rem', marginBottom: '1.5rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {[['overview', '📊 Placements Overview'], ['companies', '🏢 Top Recruiters'], ['students', '🎓 Placed Students Registry'], ['drives', '📅 Recruitment Drives']].map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key)} style={{ padding: '0.55rem 1rem', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, background: tab === key ? '#3730A5' : 'transparent', color: tab === key ? 'white' : 'var(--text-muted)', border: 'none', cursor: 'pointer', transition: 'all 0.2s' }}>{label}</button>
+          <button key={key} onClick={() => setTab(key)} style={{ padding: '0.55rem 1rem', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, background: tab === key ? '#3730A5' : 'transparent', color: tab === key ? 'white' : 'var(--text-muted)', border: 'none', cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap', flexShrink: 0 }}>{label}</button>
         ))}
       </div>
 
       {/* Overview Tab */}
       {tab === 'overview' && (
-        <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 280px', gap: '1.2rem' }}>
-          <div className="glass-card" style={{ padding: '1.5rem', borderRadius: 16 }}>
+        <div className="animate-fade-in placement-overview-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 280px)', gap: '1.2rem' }}>
+          <div className="glass-card chart-touch-container" style={{ padding: '1.5rem', borderRadius: 16 }}>
             <h4 style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem', marginBottom: '1rem' }}>5-Year Placement Trend (Placed vs Offers)</h4>
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={placementStats}>
-                <defs>
-                  <linearGradient id="colorOffers" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorPlaced" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-                <Area type="monotone" dataKey="offers" name="Total Offers" stroke="#3b82f6" fillOpacity={1} fill="url(#colorOffers)" strokeWidth={2.5} />
-                <Area type="monotone" dataKey="placed" name="Placed Count" stroke="#10b981" fillOpacity={1} fill="url(#colorPlaced)" strokeWidth={2.5} />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div style={{ width: '100%', height: 260, touchAction: 'pan-y' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={placementStats}>
+                  <defs>
+                    <linearGradient id="colorOffers" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorPlaced" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+                  <Area type="monotone" dataKey="offers" name="Total Offers" stroke="#3b82f6" fillOpacity={1} fill="url(#colorOffers)" strokeWidth={2.5} />
+                  <Area type="monotone" dataKey="placed" name="Placed Count" stroke="#10b981" fillOpacity={1} fill="url(#colorPlaced)" strokeWidth={2.5} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
-          <div className="glass-card" style={{ padding: '1.5rem', borderRadius: 16 }}>
+          <div className="glass-card chart-touch-container" style={{ padding: '1.5rem', borderRadius: 16 }}>
             <h4 style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem', marginBottom: '1rem' }}>Department Placement Rate & Avg Package</h4>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={deptPlacementData} barSize={18}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="dept" tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="left" domain={[50, 100]} tick={{ fontSize: 9 }} name="Rate %" />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9 }} name="LPA" />
-                <Tooltip />
-                <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-                <Bar yAxisId="left" dataKey="rate" fill="#6366f1" name="Placement Rate %" radius={[4, 4, 0, 0]} />
-                <Bar yAxisId="right" dataKey="avgPkg" fill="#f59e0b" name="Avg Package (LPA)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div style={{ width: '100%', height: 260, touchAction: 'pan-y' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={deptPlacementData} barSize={18}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="dept" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="left" domain={[50, 100]} tick={{ fontSize: 9 }} name="Rate %" />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9 }} name="LPA" />
+                  <Tooltip />
+                  <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+                  <Bar yAxisId="left" dataKey="rate" fill="#6366f1" name="Placement Rate %" radius={[4, 4, 0, 0]} />
+                  <Bar yAxisId="right" dataKey="avgPkg" fill="#f59e0b" name="Avg Package (LPA)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           <div className="glass-card" style={{ padding: '1.5rem', borderRadius: 16 }}>
@@ -329,18 +333,20 @@ export default function PrincipalPlacements() {
 
       {/* Recruiters Tab */}
       {tab === 'companies' && (
-        <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.2rem' }}>
-          <div className="glass-card" style={{ padding: '1.5rem', borderRadius: 16 }}>
+        <div className="animate-fade-in placement-companies-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '1.2rem' }}>
+          <div className="glass-card chart-touch-container" style={{ padding: '1.5rem', borderRadius: 16 }}>
             <h4 style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem', marginBottom: '1rem' }}>Top Placement Partners (Count Placed)</h4>
-            <ResponsiveContainer width="100%" height={290}>
-              <BarChart data={recruiterData} layout="vertical" barSize={15} margin={{ left: 15 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis dataKey="company" type="category" tick={{ fontSize: 10 }} tickLine={false} />
-                <Tooltip />
-                <Bar dataKey="placed" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Students Placed" />
-              </BarChart>
-            </ResponsiveContainer>
+            <div style={{ width: '100%', height: 290, touchAction: 'pan-y' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={recruiterData} layout="vertical" barSize={15} margin={{ left: 15 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} />
+                  <YAxis dataKey="company" type="category" tick={{ fontSize: 10 }} tickLine={false} />
+                  <Tooltip />
+                  <Bar dataKey="placed" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Students Placed" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
           <div className="glass-card" style={{ padding: '1.5rem', borderRadius: 16 }}>
             <h4 style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem', marginBottom: '1.5rem' }}>Partner Compensation Structure</h4>

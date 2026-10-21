@@ -29,6 +29,388 @@ const generateReferralCode = (category) => {
   return `${prefix}-${timeSlice}-${randomSuffix}`;
 };
 
+/**
+ * Normalizes an Indian/international phone number to clean 10 digits
+ */
+export const normalizePhone = (rawPhone) => {
+  if (!rawPhone) return '';
+  const digits = String(rawPhone).replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+};
+
+/**
+ * Normalizes text strings (names, emails, banks) for safe, whitespace-collapsed, case-insensitive comparison
+ */
+export const normalizeText = (rawText) => {
+  if (!rawText) return '';
+  return String(rawText).trim().toLowerCase().replace(/\s+/g, ' ');
+};
+
+export const escapeRegex = (string) => {
+  return String(string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+/**
+ * Checks whether an incoming applicant matches an existing referral applicant
+ */
+export const isSameApplicant = (incoming, existing) => {
+  if (!incoming || !existing) return false;
+
+  const incPhone = normalizePhone(incoming.phone);
+  const exPhone = normalizePhone(existing.phone);
+
+  const incEmail = normalizeText(incoming.email);
+  const exEmail = normalizeText(existing.email);
+
+  const incName = normalizeText(incoming.name);
+  const exName = normalizeText(existing.name);
+
+  const incRef = normalizeText(incoming.refNumber);
+  const exRef = normalizeText(existing.refNumber);
+
+  // 1. If explicit partner reference ID or application number is provided and matches
+  if (incRef && exRef && incRef === exRef) {
+    return true;
+  }
+
+  // 2. If normalized phone numbers match:
+  if (incPhone && exPhone && incPhone === exPhone) {
+    // 2a. If both provide email and emails match
+    if (incEmail && exEmail && incEmail === exEmail) {
+      return true;
+    }
+    // 2b. Name matches (exact or one contains the other)
+    if (incName && exName) {
+      if (incName === exName || incName.includes(exName) || exName.includes(incName)) {
+        return true;
+      }
+    }
+    // 2c. If neither existing nor incoming has name/email to differentiate, match on phone
+    if ((!incName && !incEmail) || (!exName && !exEmail)) {
+      return true;
+    }
+    // 2d. Explicitly different names and different emails -> Different individuals sharing a contact number!
+    return false;
+  }
+
+  // 3. If phone differs or missing, but both have the exact same verified email AND same name:
+  if (incEmail && exEmail && incEmail === exEmail && incEmail.includes('@')) {
+    if (incName && exName && (incName === exName || incName.includes(exName) || exName.includes(incName))) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+/**
+ * Core Duplicate Referral Checker
+ * Finds if an active referral already exists for the exact same applicant and partner within 90 days
+ */
+export const findDuplicateReferral = async ({
+  category,
+  tenantId,
+  partnerName,
+  applicantName,
+  applicantPhone,
+  applicantEmail,
+  partnerReferenceNumber,
+}) => {
+  const cleanPhone = normalizePhone(applicantPhone);
+  const cleanPartner = (partnerName || '').trim();
+  const cleanName = (applicantName || '').trim();
+  const cleanEmail = (applicantEmail || '').trim().toLowerCase();
+  const cleanRef = (partnerReferenceNumber || '').trim();
+
+  if (!cleanPartner || (!cleanPhone && !cleanEmail && !cleanRef)) {
+    return null;
+  }
+
+  const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const partnerRegex = new RegExp(`^${escapeRegex(cleanPartner)}$`, 'i');
+
+  const partnerFieldMap = {
+    'Insurance': 'insuranceDetails.provider',
+    'Credit Card': 'creditCardDetails.bankName',
+    'Bank Account': 'bankAccountDetails.bankName',
+    'Job': 'jobDetails.companyName',
+  };
+  const phoneFieldMap = {
+    'Insurance': 'insuranceDetails.applicantPhone',
+    'Credit Card': 'creditCardDetails.applicantPhone',
+    'Bank Account': 'bankAccountDetails.applicantPhone',
+    'Job': 'jobDetails.candidatePhone',
+  };
+  const emailFieldMap = {
+    'Insurance': 'insuranceDetails.applicantEmail',
+    'Credit Card': 'creditCardDetails.applicantEmail',
+    'Bank Account': 'bankAccountDetails.applicantEmail',
+    'Job': 'jobDetails.candidateEmail',
+  };
+  const nameFieldMap = {
+    'Insurance': 'insuranceDetails.applicantName',
+    'Credit Card': 'creditCardDetails.applicantName',
+    'Bank Account': 'bankAccountDetails.applicantName',
+    'Job': 'jobDetails.candidateName',
+  };
+  const refFieldMap = {
+    'Insurance': 'insuranceDetails.partnerReferenceNumber',
+    'Credit Card': 'creditCardDetails.partnerReferenceNumber',
+    'Bank Account': 'bankAccountDetails.partnerReferenceNumber',
+    'Job': 'jobDetails.jobReferenceId',
+  };
+
+  const partnerField = partnerFieldMap[category] || 'creditCardDetails.bankName';
+  const phoneField = phoneFieldMap[category] || 'creditCardDetails.applicantPhone';
+  const emailField = emailFieldMap[category] || 'creditCardDetails.applicantEmail';
+  const nameField = nameFieldMap[category] || 'creditCardDetails.applicantName';
+  const refField = refFieldMap[category] || 'creditCardDetails.partnerReferenceNumber';
+
+  const query = {
+    category,
+    [partnerField]: { $regex: partnerRegex },
+    createdAt: { $gte: threeMonthsAgo },
+    status: { $nin: ['Rejected', 'Cancelled'] },
+  };
+
+  if (tenantId && tenantId !== 'system') {
+    query.$or = [{ tenantId }, { collegeId: tenantId }];
+  }
+
+  const identityOr = [];
+  if (cleanPhone) {
+    identityOr.push(
+      { [phoneField]: cleanPhone },
+      { [phoneField]: `+91${cleanPhone}` },
+      { [phoneField]: `+91 ${cleanPhone}` },
+      { [phoneField]: new RegExp(`${cleanPhone}$`) }
+    );
+  }
+  if (cleanEmail && cleanEmail.includes('@')) {
+    identityOr.push({ [emailField]: { $regex: new RegExp(`^${escapeRegex(cleanEmail)}$`, 'i') } });
+  }
+  if (cleanRef) {
+    identityOr.push({ [refField]: cleanRef });
+  }
+
+  if (identityOr.length > 0) {
+    query.$and = [{ $or: identityOr }];
+  }
+
+  const candidates = await Referral.find(query).sort({ createdAt: -1 }).limit(15);
+  if (!candidates || candidates.length === 0) return null;
+
+  const duplicate = candidates.find(cand => {
+    let details = {};
+    if (category === 'Insurance') details = cand.insuranceDetails || {};
+    else if (category === 'Credit Card') details = cand.creditCardDetails || {};
+    else if (category === 'Bank Account') details = cand.bankAccountDetails || {};
+    else if (category === 'Job') details = cand.jobDetails || {};
+
+    const exName = details.applicantName || details.candidateName;
+    const exPhone = details.applicantPhone || details.candidatePhone;
+    const exEmail = details.applicantEmail || details.candidateEmail;
+    const exRef = details.partnerReferenceNumber || details.jobReferenceId;
+
+    return isSameApplicant(
+      {
+        name: cleanName,
+        phone: cleanPhone,
+        email: cleanEmail,
+        refNumber: cleanRef,
+      },
+      {
+        name: exName,
+        phone: exPhone,
+        email: exEmail,
+        refNumber: exRef,
+      }
+    );
+  });
+
+  return duplicate || null;
+};
+
+/**
+ * Resolves any college identifier (MongoDB ObjectId, tenantId, or college name)
+ * into all corresponding candidate identifiers for multi-tenant querying.
+ */
+export const resolveCollegeTenantIds = async (collegeIdentifier) => {
+  if (!collegeIdentifier || collegeIdentifier === 'all' || collegeIdentifier === 'ALL') {
+    return null;
+  }
+  const cleanId = String(collegeIdentifier).trim();
+  const isOid = mongoose.isValidObjectId(cleanId);
+  try {
+    const college = await College.findOne({
+      $or: [
+        ...(isOid ? [{ _id: cleanId }] : []),
+        { tenantId: cleanId },
+        { name: cleanId }
+      ]
+    }).lean();
+
+    if (college) {
+      const ids = [college.tenantId, String(college._id), college.name].filter(Boolean);
+      return Array.from(new Set(ids));
+    }
+  } catch (e) {
+    console.error('Error resolving college tenant IDs:', e);
+  }
+  return [cleanId];
+};
+
+router.get('/test-duplicate-scenarios', async (req, res) => {
+  const results = [];
+  const testTenant = 'COL-TEST-' + Date.now();
+  const createdTestIds = [];
+
+  try {
+    const applicantA = {
+      name: 'Applicant Alpha',
+      phone: '9876543210',
+      email: 'alpha@test.com',
+    };
+    const applicantB = {
+      name: 'Applicant Beta',
+      phone: '9123456780',
+      email: 'beta@test.com',
+    };
+
+    // Scenario 1: Applicant A + HDFC Bank -> Should succeed (no duplicate)
+    const dup1 = await findDuplicateReferral({
+      category: 'Credit Card',
+      tenantId: testTenant,
+      partnerName: 'HDFC Bank',
+      applicantName: applicantA.name,
+      applicantPhone: applicantA.phone,
+      applicantEmail: applicantA.email,
+    });
+    const s1Passed = dup1 === null;
+    results.push({
+      scenario: '1. Applicant A + HDFC Bank (Initial submission)',
+      passed: s1Passed,
+      result: dup1 ? `Unexpected duplicate: ${dup1.referralCode}` : 'Success (No duplicate found)',
+    });
+
+    // Simulate saving Applicant A referral for HDFC Bank
+    const testRefA = await Referral.create({
+      referralCode: 'TEST-CRD-A1',
+      category: 'Credit Card',
+      tenantId: testTenant,
+      collegeId: testTenant,
+      submittedBy: new mongoose.Types.ObjectId(),
+      submitterName: 'User One',
+      submitterEmail: 'user1@test.com',
+      submitterRole: 'Staff',
+      creditCardDetails: {
+        bankName: 'HDFC Bank',
+        applicantName: applicantA.name,
+        applicantPhone: normalizePhone(applicantA.phone),
+        applicantEmail: applicantA.email,
+        applicantConsentGiven: true,
+      },
+      status: 'Submitted',
+    });
+    createdTestIds.push(testRefA._id);
+
+    // Scenario 2: Applicant B + HDFC Bank -> Should succeed (different applicant, same bank)
+    const dup2 = await findDuplicateReferral({
+      category: 'Credit Card',
+      tenantId: testTenant,
+      partnerName: 'HDFC Bank',
+      applicantName: applicantB.name,
+      applicantPhone: applicantB.phone,
+      applicantEmail: applicantB.email,
+    });
+    const s2Passed = dup2 === null;
+    results.push({
+      scenario: '2. Applicant B + HDFC Bank (Different applicant, same bank)',
+      passed: s2Passed,
+      result: dup2 ? `Unexpected duplicate: ${dup2.referralCode}` : 'Success (Allowed independently)',
+    });
+
+    // Scenario 3: Applicant A + HDFC Bank submitted again within 90 days -> Must be detected as duplicate!
+    const dup3 = await findDuplicateReferral({
+      category: 'Credit Card',
+      tenantId: testTenant,
+      partnerName: 'HDFC Bank',
+      applicantName: applicantA.name,
+      applicantPhone: applicantA.phone,
+      applicantEmail: applicantA.email,
+    });
+    const s3Passed = dup3 !== null && dup3.referralCode === 'TEST-CRD-A1';
+    results.push({
+      scenario: '3. Applicant A + HDFC Bank submitted again within 90 days',
+      passed: s3Passed,
+      result: s3Passed ? `Correctly blocked duplicate (Code: ${dup3.referralCode})` : 'FAILED to block duplicate',
+    });
+
+    // Scenario 4: Applicant A + ICICI Bank -> Should succeed (different bank)
+    const dup4 = await findDuplicateReferral({
+      category: 'Credit Card',
+      tenantId: testTenant,
+      partnerName: 'ICICI Bank',
+      applicantName: applicantA.name,
+      applicantPhone: applicantA.phone,
+      applicantEmail: applicantA.email,
+    });
+    const s4Passed = dup4 === null;
+    results.push({
+      scenario: '4. Applicant A + ICICI Bank (Different bank)',
+      passed: s4Passed,
+      result: dup4 ? `Unexpected duplicate: ${dup4.referralCode}` : 'Success (Allowed for different partner)',
+    });
+
+    // Scenario 5: Different authenticated users referring different applicants -> Should succeed
+    const applicantC = {
+      name: 'Applicant Gamma',
+      phone: '9988776655',
+      email: 'gamma@test.com',
+    };
+    const dup5 = await findDuplicateReferral({
+      category: 'Credit Card',
+      tenantId: testTenant,
+      partnerName: 'HDFC Bank',
+      applicantName: applicantC.name,
+      applicantPhone: applicantC.phone,
+      applicantEmail: applicantC.email,
+    });
+    const s5Passed = dup5 === null;
+    results.push({
+      scenario: '5. Different users referring different applicants',
+      passed: s5Passed,
+      result: dup5 ? `Unexpected duplicate: ${dup5.referralCode}` : 'Success (Allowed)',
+    });
+
+    // Scenario 6: Same applicant submitted concurrently by two users -> Prevent duplicate records
+    const dup6 = await findDuplicateReferral({
+      category: 'Credit Card',
+      tenantId: testTenant,
+      partnerName: 'HDFC Bank',
+      applicantName: 'APPLICANT ALPHA', // Case insensitive test
+      applicantPhone: '+91 98765 43210', // Raw formatting test
+      applicantEmail: 'alpha@test.com',
+    });
+    const s6Passed = dup6 !== null && dup6.referralCode === 'TEST-CRD-A1';
+    results.push({
+      scenario: '6. Same applicant submitted by second user (case/phone formatting variation)',
+      passed: s6Passed,
+      result: s6Passed ? `Correctly prevented duplicate (Code: ${dup6.referralCode})` : 'FAILED to prevent duplicate',
+    });
+
+    const allPassed = results.every(r => r.passed);
+    return res.json({ success: allPassed, allPassed, results });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message, results });
+  } finally {
+    // Clean up test records
+    if (createdTestIds.length > 0) {
+      await Referral.deleteMany({ _id: { $in: createdTestIds } }).catch(() => {});
+    }
+  }
+});
+
 // Cache checked tenants in memory to prevent slow duplicate DB operations on every submission
 const seededTenants = new Set();
 
@@ -245,24 +627,22 @@ router.post('/', protect, collegeScope, async (req, res) => {
       insuranceDetails.consentNoticeVersion = insuranceDetails.consentNoticeVersion || 'v1.2-FIC-INS-CONSENT';
       insuranceDetails.applicantConsentGiven = true;
 
-      const phone = insuranceDetails.applicantPhone;
-      const provider = insuranceDetails.provider;
-      if (phone && provider) {
-        const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-        const existing = await Referral.findOne({
-          category: 'Insurance',
-          tenantId,
-          'insuranceDetails.applicantPhone': phone,
-          'insuranceDetails.provider': provider,
-          createdAt: { $gte: threeMonthsAgo },
-          status: { $nin: ['Rejected', 'Cancelled'] },
+      const provider = (insuranceDetails.provider || '').trim();
+      const duplicate = await findDuplicateReferral({
+        category: 'Insurance',
+        tenantId,
+        partnerName: provider,
+        applicantName: insuranceDetails.applicantName,
+        applicantPhone: insuranceDetails.applicantPhone,
+        applicantEmail: insuranceDetails.applicantEmail,
+        partnerReferenceNumber: insuranceDetails.partnerReferenceNumber,
+      });
+
+      if (duplicate) {
+        return res.status(400).json({
+          success: false,
+          message: `An active insurance referral for this applicant with ${provider} already exists (Ref: ${duplicate.referralCode}). Submissions within 90 days are protected against duplicates.`,
         });
-        if (existing) {
-          return res.status(400).json({
-            success: false,
-            message: `An active insurance referral for this applicant with ${provider} already exists (Ref: ${existing.referralCode}). Submissions within 90 days are protected against duplicates.`,
-          });
-        }
       }
     }
 
@@ -282,24 +662,22 @@ router.post('/', protect, collegeScope, async (req, res) => {
       creditCardDetails.consentNoticeVersion = creditCardDetails.consentNoticeVersion || 'v2.4-FIC-CC-CONSENT';
       creditCardDetails.applicantConsentGiven = true;
 
-      const phone = creditCardDetails.applicantPhone;
-      const bank = creditCardDetails.bankName;
-      if (phone && bank) {
-        const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-        const existing = await Referral.findOne({
-          category: 'Credit Card',
-          tenantId,
-          'creditCardDetails.applicantPhone': phone,
-          'creditCardDetails.bankName': bank,
-          createdAt: { $gte: threeMonthsAgo },
-          status: { $nin: ['Rejected', 'Cancelled'] },
+      const bank = (creditCardDetails.bankName || '').trim();
+      const duplicate = await findDuplicateReferral({
+        category: 'Credit Card',
+        tenantId,
+        partnerName: bank,
+        applicantName: creditCardDetails.applicantName,
+        applicantPhone: creditCardDetails.applicantPhone,
+        applicantEmail: creditCardDetails.applicantEmail,
+        partnerReferenceNumber: creditCardDetails.partnerReferenceNumber,
+      });
+
+      if (duplicate) {
+        return res.status(400).json({
+          success: false,
+          message: `A referral for this applicant with ${bank} already exists (Code: ${duplicate.referralCode}). Duplicate submissions within 90 days are not permitted.`,
         });
-        if (existing) {
-          return res.status(400).json({
-            success: false,
-            message: `A referral for this applicant with ${bank} already exists (Code: ${existing.referralCode}). Duplicate submissions within 90 days are not permitted.`,
-          });
-        }
       }
     }
 
@@ -318,24 +696,22 @@ router.post('/', protect, collegeScope, async (req, res) => {
       bankAccountDetails.consentNoticeVersion = bankAccountDetails.consentNoticeVersion || 'v1.2-FIC-ACC-CONSENT';
       bankAccountDetails.applicantConsentGiven = true;
 
-      const phone = bankAccountDetails.applicantPhone;
-      const bank = bankAccountDetails.bankName;
-      if (phone && bank) {
-        const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-        const existing = await Referral.findOne({
-          category: 'Bank Account',
-          tenantId,
-          'bankAccountDetails.applicantPhone': phone,
-          'bankAccountDetails.bankName': bank,
-          createdAt: { $gte: threeMonthsAgo },
-          status: { $nin: ['Rejected', 'Cancelled'] },
+      const bank = (bankAccountDetails.bankName || '').trim();
+      const duplicate = await findDuplicateReferral({
+        category: 'Bank Account',
+        tenantId,
+        partnerName: bank,
+        applicantName: bankAccountDetails.applicantName,
+        applicantPhone: bankAccountDetails.applicantPhone,
+        applicantEmail: bankAccountDetails.applicantEmail,
+        partnerReferenceNumber: bankAccountDetails.partnerReferenceNumber,
+      });
+
+      if (duplicate) {
+        return res.status(400).json({
+          success: false,
+          message: `A bank account lead for this customer with ${bank} already exists (Code: ${duplicate.referralCode}). Submissions within 90 days are protected against duplicates.`,
         });
-        if (existing) {
-          return res.status(400).json({
-            success: false,
-            message: `A bank account lead for this customer with ${bank} already exists (Code: ${existing.referralCode}). Submissions within 90 days are protected against duplicates.`,
-          });
-        }
       }
     }
 
@@ -354,24 +730,22 @@ router.post('/', protect, collegeScope, async (req, res) => {
       jobDetails.consentNoticeVersion = jobDetails.consentNoticeVersion || 'v1.2-FIC-JOB-CONSENT';
       jobDetails.candidateConsentGiven = true;
 
-      const phone = jobDetails.candidatePhone;
-      const company = jobDetails.companyName;
-      if (phone && company) {
-        const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-        const existing = await Referral.findOne({
-          category: 'Job',
-          tenantId,
-          'jobDetails.candidatePhone': phone,
-          'jobDetails.companyName': company,
-          createdAt: { $gte: threeMonthsAgo },
-          status: { $nin: ['Rejected', 'Cancelled'] },
+      const company = (jobDetails.companyName || '').trim();
+      const duplicate = await findDuplicateReferral({
+        category: 'Job',
+        tenantId,
+        partnerName: company,
+        applicantName: jobDetails.candidateName,
+        applicantPhone: jobDetails.candidatePhone,
+        applicantEmail: jobDetails.candidateEmail,
+        partnerReferenceNumber: jobDetails.jobReferenceId,
+      });
+
+      if (duplicate) {
+        return res.status(400).json({
+          success: false,
+          message: `A job candidate referral for this phone number at ${company} already exists (Code: ${duplicate.referralCode}). Submissions within 90 days are protected against duplicates.`,
         });
-        if (existing) {
-          return res.status(400).json({
-            success: false,
-            message: `A job candidate referral for this phone number at ${company} already exists (Code: ${existing.referralCode}). Submissions within 90 days are protected against duplicates.`,
-          });
-        }
       }
     }
 
@@ -618,8 +992,16 @@ router.get('/', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Ad
     } = req.query;
 
     const query = {};
-    if (!isSuperAdmin || (req.query.collegeId && req.query.collegeId !== 'all')) {
-      const allowedTenants = [tenantId, 'COL001', 'mock_college_id', null];
+    if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
+      const targetCollegeIds = await resolveCollegeTenantIds(req.query.collegeId);
+      if (targetCollegeIds && targetCollegeIds.length > 0) {
+        query.$or = [
+          { tenantId: { $in: targetCollegeIds } },
+          { collegeId: { $in: targetCollegeIds } }
+        ];
+      }
+    } else if (!isSuperAdmin) {
+      const allowedTenants = [tenantId, 'COL001', 'mock_college_id', null].filter(Boolean);
       query.$or = [
         { tenantId: { $in: allowedTenants } },
         { collegeId: { $in: allowedTenants } },
@@ -1288,10 +1670,23 @@ router.delete('/rules/:id', protect, collegeScope, authorize('Admin', 'Super Adm
 // ── 8. INCENTIVES LIST & APPROVAL WORKFLOW ─────────────────────────────────────
 router.get('/incentives', protect, collegeScope, async (req, res) => {
   try {
+    const isSuperAdmin = req.user.role === 'Super Admin';
     const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts'].includes(req.user.role);
-    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    let tenantId = req.collegeId || req.user.tenantId || 'COL001';
 
-    const query = { tenantId };
+    const query = {};
+    if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
+      const targetCollegeIds = await resolveCollegeTenantIds(req.query.collegeId);
+      if (targetCollegeIds && targetCollegeIds.length > 0) {
+        query.$or = [
+          { tenantId: { $in: targetCollegeIds } },
+          { collegeId: { $in: targetCollegeIds } }
+        ];
+      }
+    } else if (!isSuperAdmin) {
+      query.tenantId = tenantId;
+    }
+
     if (!isPrivileged) {
       // Non-privileged users can ONLY see their own incentives!
       query.earnedBy = req.user._id;
@@ -1761,8 +2156,16 @@ router.get('/admin-overview', protect, collegeScope, authorize('Admin', 'Super A
     }
 
     const query = {};
-    if (!isSuperAdmin || (req.query.collegeId && req.query.collegeId !== 'all')) {
-      const allowedTenants = [tenantId, 'COL001', 'mock_college_id', null];
+    if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
+      const targetCollegeIds = await resolveCollegeTenantIds(req.query.collegeId);
+      if (targetCollegeIds && targetCollegeIds.length > 0) {
+        query.$or = [
+          { tenantId: { $in: targetCollegeIds } },
+          { collegeId: { $in: targetCollegeIds } }
+        ];
+      }
+    } else if (!isSuperAdmin) {
+      const allowedTenants = [tenantId, 'COL001', 'mock_college_id', null].filter(Boolean);
       query.$or = [
         { tenantId: { $in: allowedTenants } },
         { collegeId: { $in: allowedTenants } },
@@ -1902,48 +2305,105 @@ router.get('/superadmin-overview', protect, authorize('Super Admin'), async (req
   try {
     const colleges = await College.find({}).select('tenantId name email subscriptionPlan subscriptionStatus');
 
+    let totalSystemIncentivesGenerated = 0;
+    let totalSystemPaidIncentives = 0;
+    let totalSystemPendingPayouts = 0;
+    const allSystemPeople = new Set();
+
     const collegeSummaries = await Promise.all(
       colleges.map(async (col) => {
         const tenantId = col.tenantId;
-        const totalReferrals = await Referral.countDocuments({ tenantId });
+        const tenantCondition = {
+          $or: [
+            { tenantId },
+            { collegeId: tenantId }
+          ]
+        };
+
+        const totalReferrals = await Referral.countDocuments(tenantCondition);
         const converted = await Referral.countDocuments({
-          tenantId,
+          ...tenantCondition,
           status: { $in: ['Policy Issued', 'Approved', 'Issued', 'Activated', 'Account Opened', 'Joined'] },
         });
+
+        // Distinct people / referrers from this college
+        const uniqueSubmitters = await Referral.distinct('submittedBy', tenantCondition);
+        const peopleCount = uniqueSubmitters.length;
+        uniqueSubmitters.forEach(uid => allSystemPeople.add(String(uid)));
+
+        // Category breakdown
+        const [insCount, cardCount, bnkCount, jobCount] = await Promise.all([
+          Referral.countDocuments({ ...tenantCondition, category: 'Insurance' }),
+          Referral.countDocuments({ ...tenantCondition, category: 'Credit Card' }),
+          Referral.countDocuments({ ...tenantCondition, category: 'Bank Account' }),
+          Referral.countDocuments({ ...tenantCondition, category: 'Job' }),
+        ]);
+
+        // Incentives breakdown
         const paidAgg = await IncentiveRecord.aggregate([
-          { $match: { tenantId, status: 'Paid' } },
+          { $match: { $or: [{ tenantId }, { collegeId: tenantId }], status: 'Paid' } },
           { $group: { _id: null, total: { $sum: '$amount' } } },
         ]);
         const pendingAgg = await IncentiveRecord.aggregate([
-          { $match: { tenantId, status: { $in: ['Pending Approval', 'Approved', 'Processing'] } } },
+          { $match: { $or: [{ tenantId }, { collegeId: tenantId }], status: { $in: ['Pending Approval', 'Approved', 'Processing', 'Calculated'] } } },
           { $group: { _id: null, total: { $sum: '$amount' } } },
         ]);
 
+        const paid = paidAgg[0]?.total || 0;
+        const pending = pendingAgg[0]?.total || 0;
+        const totalIncentive = paid + pending;
+
+        totalSystemPaidIncentives += paid;
+        totalSystemPendingPayouts += pending;
+        totalSystemIncentivesGenerated += totalIncentive;
+
         return {
+          _id: col._id,
           collegeId: col._id,
           tenantId: col.tenantId,
+          code: col.tenantId,
+          name: col.name,
           collegeName: col.name,
+          plan: col.subscriptionPlan || 'Active',
           subscriptionPlan: col.subscriptionPlan,
-          status: col.subscriptionStatus,
+          status: col.subscriptionStatus || 'Active',
+          subscriptionStatus: col.subscriptionStatus || 'Active',
           totalReferrals,
           converted,
-          paidAmount: paidAgg[0]?.total || 0,
-          pendingAmount: pendingAgg[0]?.total || 0,
+          successfulReferrals: converted,
+          peopleCount,
+          totalPeople: peopleCount,
+          paidAmount: paid,
+          totalPaid: paid,
+          pendingAmount: pending,
+          totalPending: pending,
+          totalIncentives: totalIncentive,
+          categoryBreakdown: {
+            insurance: insCount,
+            creditCard: cardCount,
+            bankAccount: bnkCount,
+            jobReferral: jobCount,
+          },
         };
       })
     );
 
     const totalSystemReferrals = await Referral.countDocuments();
-    const totalSystemIncentives = await IncentiveRecord.aggregate([
-      { $match: { status: 'Paid' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
 
     res.json({
       success: true,
       data: {
+        summary: {
+          totalColleges: colleges.length,
+          totalReferrals: totalSystemReferrals,
+          totalPeopleWithReferrals: allSystemPeople.size,
+          totalIncentivesGenerated: totalSystemIncentivesGenerated,
+          totalPaidIncentives: totalSystemPaidIncentives,
+          totalPendingPayouts: totalSystemPendingPayouts,
+        },
         totalSystemReferrals,
-        totalSystemPaidIncentives: totalSystemIncentives[0]?.total || 0,
+        totalSystemPaidIncentives,
+        totalSystemPendingPayouts,
         colleges: collegeSummaries,
       },
     });
@@ -1972,8 +2432,19 @@ router.get('/reports/referrer-wise', protect, collegeScope, authorize('Admin', '
     } = req.query;
 
     const baseQuery = {};
-    if (!isSuperAdmin || (req.query.collegeId && req.query.collegeId !== 'all')) {
-      baseQuery.tenantId = tenantId;
+    if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
+      const targetCollegeIds = await resolveCollegeTenantIds(req.query.collegeId);
+      if (targetCollegeIds && targetCollegeIds.length > 0) {
+        baseQuery.$or = [
+          { tenantId: { $in: targetCollegeIds } },
+          { collegeId: { $in: targetCollegeIds } }
+        ];
+      }
+    } else if (!isSuperAdmin) {
+      baseQuery.$or = [
+        { tenantId },
+        { collegeId: tenantId }
+      ];
     }
 
     // Submitter Department Filter

@@ -22,8 +22,18 @@ function SingleDynamicField({
     options = []
   } = field;
 
+  const notifyChange = (newVal) => {
+    if (typeof onChange === 'function') {
+      if (onChange.length === 1) {
+        onChange(newVal);
+      } else {
+        onChange(fieldKey, newVal);
+      }
+    }
+  };
+
   const handleChange = (e) => {
-    onChange(fieldKey, e.target.value);
+    notifyChange(e.target.value);
   };
 
   const handleCheckboxMultiChange = (optValue, checked) => {
@@ -34,7 +44,7 @@ function SingleDynamicField({
     } else {
       updated = current.filter(item => item !== optValue);
     }
-    onChange(fieldKey, updated);
+    notifyChange(updated);
   };
 
   const renderInput = () => {
@@ -78,7 +88,7 @@ function SingleDynamicField({
               value={value || ''}
               onChange={(e) => {
                 const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                onChange(fieldKey, val);
+                notifyChange(val);
               }}
               disabled={disabled}
             />
@@ -110,7 +120,36 @@ function SingleDynamicField({
           />
         );
 
-      case 'dropdown':
+      case 'dropdown': {
+        let effectiveOptions = Array.isArray(options) && options.length > 0 ? options : [];
+        if (effectiveOptions.length === 0) {
+          const keyLower = (fieldKey || '').toLowerCase();
+          if (placeholder && placeholder.includes(',')) {
+            effectiveOptions = placeholder.replace(/^e\.g\.?\s*/i, '').split(',').map(s => s.trim()).filter(Boolean);
+          } else if (keyLower.includes('city') || keyLower.includes('location')) {
+            effectiveOptions = ['Bangalore', 'Chennai', 'Hyderabad', 'Mumbai', 'Delhi NCR', 'Pune', 'Coimbatore', 'Kolkata', 'Other'];
+          }
+        }
+
+        const isEgPlaceholder = placeholder && placeholder.trim().toLowerCase().startsWith('e.g.');
+        const selectPrompt = (!placeholder || isEgPlaceholder)
+          ? `-- Select ${label} --`
+          : placeholder;
+
+        if (effectiveOptions.length === 0) {
+          return (
+            <input
+              type="text"
+              id={`field-${fieldKey}`}
+              className={`dfr-input ${error ? 'dfr-error' : ''}`}
+              placeholder={placeholder || `Enter ${label}`}
+              value={value || ''}
+              onChange={handleChange}
+              disabled={disabled}
+            />
+          );
+        }
+
         return (
           <div className="dfr-select-wrap">
             <select
@@ -120,8 +159,8 @@ function SingleDynamicField({
               onChange={handleChange}
               disabled={disabled}
             >
-              <option value="">{placeholder || `-- Select ${label} --`}</option>
-              {options.map((opt, idx) => (
+              <option value="">{selectPrompt}</option>
+              {effectiveOptions.map((opt, idx) => (
                 <option key={idx} value={opt}>
                   {opt}
                 </option>
@@ -129,6 +168,7 @@ function SingleDynamicField({
             </select>
           </div>
         );
+      }
 
       case 'radio':
         return (
@@ -140,7 +180,7 @@ function SingleDynamicField({
                   name={`radio-${fieldKey}`}
                   value={opt}
                   checked={value === opt}
-                  onChange={() => onChange(fieldKey, opt)}
+                  onChange={() => notifyChange(opt)}
                   disabled={disabled}
                 />
                 <span className="dfr-radio-text">{opt}</span>
@@ -174,7 +214,7 @@ function SingleDynamicField({
               type="checkbox"
               id={`field-${fieldKey}`}
               checked={Boolean(value)}
-              onChange={(e) => onChange(fieldKey, e.target.checked)}
+              onChange={(e) => notifyChange(e.target.checked)}
               disabled={disabled}
             />
             <span className="dfr-checkbox-text">{placeholder || label}</span>

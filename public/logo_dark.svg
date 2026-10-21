@@ -1,19 +1,30 @@
 <svg width="200" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <mask id="swoosh-mask-dark">
-      <rect x="0" y="0" width="200" height="60" fill="white" />
-      <path d="M14 44 Q 25 10 60 10 Q 35 22 14 44 Z" fill="black" stroke="black" stroke-width="3.5" stroke-linejoin="round" />
-    </mask>
+    <linearGradient id="logo-dark-grad" x1="12" y1="12" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+    <filter id="logo-dark-glow" x="6" y="6" width="48" height="48" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1d4ed8" flood-opacity="0.25" />
+    </filter>
   </defs>
 
-  <g mask="url(#swoosh-mask-dark)">
-    <rect x="15" y="14" width="10" height="30" fill="#0f2b48" />
-    <rect x="25" y="14" width="20" height="7" fill="#0f2b48" />
-    <rect x="25" y="25.5" width="15" height="6" fill="#0f2b48" />
-    <rect x="25" y="37" width="20" height="7" fill="#0f2b48" />
+  <!-- Modern ERP Tech Monogram Emblem -->
+  <g filter="url(#logo-dark-glow)">
+    <rect x="12" y="12" width="36" height="36" rx="9" fill="url(#logo-dark-grad)" />
+    
+    <!-- Stylized Geometric "E" monogram -->
+    <path d="M 22 21 L 38 21" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" />
+    <path d="M 22 30 L 33 30" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" />
+    <path d="M 22 39 L 38 39" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" />
+    <path d="M 22 21 L 22 39" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" />
+    
+    <!-- Tech Accent Node -->
+    <circle cx="38" cy="30" r="2.2" fill="#93C5FD" />
   </g>
-  
-  <path d="M14 44 Q 25 10 60 10 Q 35 22 14 44 Z" fill="#0066CC" />
-  
-  <text x="49" y="44" fill="#0f2b48" font-size="34" font-weight="bold" font-family="'Outfit', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" letter-spacing="1">RPSYS</text>
+
+  <!-- Crisp Brand Typography: ERPSYS -->
+  <text x="56" y="41" font-family="'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="30" font-weight="900" letter-spacing="0.5">
+    <tspan fill="#0F2B48">ERP</tspan><tspan fill="#2563EB">SYS</tspan>
+  </text>
 </svg>

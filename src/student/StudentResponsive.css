@@ -111,8 +111,9 @@
   .library-header-banner h1,
   .erp-header-title-area h1,
   .banner-left h1,
+  .student-portal-title,
   h1.text-2xl {
-    font-size: 1.3rem !important;
+    font-size: 1.15rem !important;
     line-height: 1.25 !important;
   }
 
@@ -152,6 +153,7 @@
 
   /* ── 3. 2-COLUMN COMPACT KPI GRIDS (PREVENTS 1-COLUMN GIANT STACKING) ── */
   .student-metrics-grid,
+  .student-metrics-strip,
   .library-metrics-grid,
   .analytics-grid,
   .erp-kpi-grid,
@@ -170,6 +172,7 @@
 
   /* Odd 5th or 3rd cards span 2 columns nicely across the bottom */
   .student-metrics-grid > *:last-child:nth-child(odd),
+  .student-metrics-strip > *:last-child:nth-child(odd),
   .library-metrics-grid > *:last-child:nth-child(odd),
   .analytics-grid > *:last-child:nth-child(odd),
   .erp-kpi-grid > *:last-child:nth-child(odd),
@@ -196,8 +199,9 @@
   .card-title-s,
   .summary-label,
   .analytics-card span,
+  .student-kpi-lbl,
   .kpi-title {
-    font-size: 0.68rem !important;
+    font-size: 0.64rem !important;
     letter-spacing: 0.02em !important;
   }
 
@@ -205,14 +209,16 @@
   .metric-value-s,
   .analytics-card h2,
   .summary-grade-card h2,
+  .student-kpi-val,
   .kpi-number {
-    font-size: 1.25rem !important;
-    line-height: 1.2 !important;
+    font-size: 1.15rem !important;
+    line-height: 1.15 !important;
   }
 
   .kpi-subtext,
-  .metric-sub-s {
-    font-size: 0.68rem !important;
+  .metric-sub-s,
+  .student-kpi-sub {
+    font-size: 0.64rem !important;
   }
 
   .kpi-icon-wrap {

@@ -98,6 +98,7 @@ import opportunityRoutes, { autoSeedOpportunitiesIfEmpty } from './routes/opport
 import watchmanRoutes from './routes/watchmanRoutes.js';
 import busTrackingRoutes from './routes/busTrackingRoutes.js';
 import parcelRoutes from './routes/parcelRoutes.js';
+import meetingRoutes from './routes/meetingRoutes.js';
 import { verifyCloudinaryConnection } from './config/cloudinary.js';
 
 // Import Cron Jobs
@@ -1027,6 +1028,7 @@ app.use('/api/parcels', parcelRoutes);
 app.use('/api/watchman', watchmanRoutes);
 app.use('/api/buses', busTrackingRoutes);
 app.use('/api/watchman/buses', busTrackingRoutes);
+app.use('/api/meetings', meetingRoutes);
 
 app.get('/api/cloudinary/status', async (_req, res) => {
   const status = await verifyCloudinaryConnection();

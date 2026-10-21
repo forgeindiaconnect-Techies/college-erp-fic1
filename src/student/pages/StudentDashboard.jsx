@@ -393,10 +393,11 @@ const StudentDashboard = () => {
   const todayDayName = dayNames[new Date().getDay()];
 
   return (
-    <div className="student-dashboard animate-fade-in" style={{ padding: '24px', maxWidth: '1440px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="student-dashboard animate-fade-in">
       
       {/* ── Real-Time Original Student Header Card ── */}
       <div 
+        className="student-hero-banner"
         style={{
           background: 'var(--bg-card, #ffffff)',
           border: '1px solid var(--border-color, #e2e8f0)',
@@ -409,30 +410,31 @@ const StudentDashboard = () => {
       >
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #4f46e5, #06b6d4, #10b981)' }}></div>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
+        <div className="student-hero-inner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontSize: '0.75rem', fontWeight: 700, padding: '0.25rem 0.65rem', borderRadius: '20px', border: '1px solid rgba(16, 185, 129, 0.2)', marginBottom: '0.5rem' }}>
+            <div className="student-sync-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontSize: '0.75rem', fontWeight: 700, padding: '0.25rem 0.65rem', borderRadius: '20px', border: '1px solid rgba(16, 185, 129, 0.2)', marginBottom: '0.5rem' }}>
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
               <span>Real-Time Academic Sync Active</span>
             </div>
-            <h1 style={{ fontSize: '1.55rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', margin: '0 0 0.35rem 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <GraduationCap size={28} className="text-indigo-600" />
-              {studentDetails.name} — Student Portal
+            <h1 className="student-portal-title">
+              <GraduationCap size={22} className="text-indigo-600 shrink-0" />
+              <span>{studentDetails.name} — Student Portal</span>
             </h1>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>
+            <p className="student-portal-sub" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>
               <strong>{studentDetails.dept}</strong> • {studentDetails.sem} (Section {studentDetails.section || 'A'})
               {classAdvisor?.name && <span> • Class Advisor: <strong>{classAdvisor.name}</strong></span>}
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <div style={{ background: '#e0e7ff', color: '#4338ca', border: '1px solid #c7d2fe', padding: '6px 14px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="student-hero-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div className="student-reg-tag" style={{ background: '#e0e7ff', color: '#4338ca', border: '1px solid #c7d2fe', padding: '6px 14px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span>REG NO:</span>
               <strong style={{ letterSpacing: '0.04em' }}>{studentDetails.id}</strong>
             </div>
 
             <button
               type="button"
+              className="student-qr-btn"
               onClick={() => setShowQrModal(true)}
               style={{
                 background: '#2563eb',
@@ -455,7 +457,7 @@ const StudentDashboard = () => {
             <button 
               type="button" 
               onClick={() => fetchOriginalStudentData(true)} 
-              className="btn-secondary" 
+              className="btn-secondary student-sync-btn" 
               style={{ padding: '7px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '8px' }}
             >
               <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Sync
@@ -516,129 +518,129 @@ const StudentDashboard = () => {
       )}
 
       {/* ── 6-KPI Original Academic Metric Strip ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+      <div className="student-metrics-strip" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
         
         {/* Metric 1: Attendance */}
-        <div className="hostel-kpi-card" onClick={() => navigate('/student/attendance')} style={{ cursor: 'pointer', padding: '16px' }}>
+        <div className="hostel-kpi-card" onClick={() => navigate('/student/attendance')} style={{ cursor: 'pointer' }}>
           <div className="hostel-kpi-top">
             <div className="hostel-kpi-icon" style={{ background: studentDetails.attendance >= 75 ? '#dcfce7' : studentDetails.attendance > 0 ? '#fef3c7' : '#f1f5f9', color: studentDetails.attendance >= 75 ? '#16a34a' : studentDetails.attendance > 0 ? '#d97706' : '#64748b' }}>
-              <Percent size={20} />
+              <Percent size={18} />
             </div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: studentDetails.attendance >= 75 ? '#dcfce7' : studentDetails.attendance > 0 ? '#fee2e2' : '#f1f5f9', color: studentDetails.attendance >= 75 ? '#15803d' : studentDetails.attendance > 0 ? '#dc2626' : '#64748b' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: studentDetails.attendance >= 75 ? '#dcfce7' : studentDetails.attendance > 0 ? '#fee2e2' : '#f1f5f9', color: studentDetails.attendance >= 75 ? '#15803d' : studentDetails.attendance > 0 ? '#dc2626' : '#64748b' }}>
               {studentDetails.attendance >= 75 ? 'Exam Eligible' : studentDetails.attendance > 0 ? 'Shortage (<75%)' : 'No Records'}
             </span>
           </div>
           <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attendance Rate</span>
-            <p style={{ fontSize: '1.5rem', fontWeight: 800, margin: '2px 0 0', color: studentDetails.attendance >= 75 ? '#16a34a' : studentDetails.attendance > 0 ? '#dc2626' : 'var(--text-main)' }}>
+            <span className="student-kpi-lbl">Attendance Rate</span>
+            <p className="student-kpi-val" style={{ color: studentDetails.attendance >= 75 ? '#16a34a' : studentDetails.attendance > 0 ? '#dc2626' : 'var(--text-main)' }}>
               {studentDetails.attendance}%
             </p>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-              {studentDetails.attendance > 0 ? 'Calculated from live roll call' : 'Awaiting attendance logging'}
+            <p className="student-kpi-sub">
+              {studentDetails.attendance > 0 ? 'Live roll call verified' : 'Awaiting logs'}
             </p>
           </div>
         </div>
 
         {/* Metric 2: CGPA */}
-        <div className="hostel-kpi-card" onClick={() => navigate('/student/marks')} style={{ cursor: 'pointer', padding: '16px' }}>
+        <div className="hostel-kpi-card" onClick={() => navigate('/student/marks')} style={{ cursor: 'pointer' }}>
           <div className="hostel-kpi-top">
             <div className="hostel-kpi-icon" style={{ background: '#e0e7ff', color: '#4f46e5' }}>
-              <Award size={20} />
+              <Award size={18} />
             </div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: '#e0e7ff', color: '#4338ca' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: '#e0e7ff', color: '#4338ca' }}>
               {studentMarks?.cgpa ? 'Graded' : 'Awaiting Exams'}
             </span>
           </div>
           <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cumulative CGPA</span>
-            <p style={{ fontSize: '1.5rem', fontWeight: 800, margin: '2px 0 0', color: 'var(--text-main)' }}>
+            <span className="student-kpi-lbl">Cumulative CGPA</span>
+            <p className="student-kpi-val" style={{ color: 'var(--text-main)' }}>
               {studentMarks?.cgpa || studentDetails.cgpa || 'N/A'}
             </p>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-              {studentMarks?.cgpa ? 'Official Academic Grade' : 'Semester results pending'}
+            <p className="student-kpi-sub">
+              {studentMarks?.cgpa ? 'Academic Grade' : 'Results pending'}
             </p>
           </div>
         </div>
 
         {/* Metric 3: Internal CIA */}
-        <div className="hostel-kpi-card" onClick={() => navigate('/student/marks')} style={{ cursor: 'pointer', padding: '16px' }}>
+        <div className="hostel-kpi-card" onClick={() => navigate('/student/marks')} style={{ cursor: 'pointer' }}>
           <div className="hostel-kpi-top">
             <div className="hostel-kpi-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
-              <FileText size={20} />
+              <FileText size={18} />
             </div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: '#fef3c7', color: '#b45309' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: '#fef3c7', color: '#b45309' }}>
               {studentMarks?.internal !== null ? 'Recorded' : 'Pending CIA'}
             </span>
           </div>
           <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Internal CIA Score</span>
-            <p style={{ fontSize: '1.5rem', fontWeight: 800, margin: '2px 0 0', color: '#d97706' }}>
+            <span className="student-kpi-lbl">Internal CIA Score</span>
+            <p className="student-kpi-val" style={{ color: '#d97706' }}>
               {studentMarks?.internal !== null ? `${studentMarks.internal} / 50` : '-- / 50'}
             </p>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-              {studentMarks?.internal !== null ? 'Continuous Assessment' : 'Internal marks not entered'}
+            <p className="student-kpi-sub">
+              {studentMarks?.internal !== null ? 'Internal Assessment' : 'Internal marks pending'}
             </p>
           </div>
         </div>
 
         {/* Metric 4: Fee Status */}
-        <div className="hostel-kpi-card" onClick={() => navigate('/student/fees')} style={{ cursor: 'pointer', padding: '16px' }}>
+        <div className="hostel-kpi-card" onClick={() => navigate('/student/fees')} style={{ cursor: 'pointer' }}>
           <div className="hostel-kpi-top">
             <div className="hostel-kpi-icon" style={{ background: studentDetails.feeStatus === 'Paid' ? '#dcfce7' : '#fee2e2', color: studentDetails.feeStatus === 'Paid' ? '#16a34a' : '#dc2626' }}>
-              <CreditCard size={20} />
+              <CreditCard size={18} />
             </div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: studentDetails.feeStatus === 'Paid' ? '#dcfce7' : '#fee2e2', color: studentDetails.feeStatus === 'Paid' ? '#15803d' : '#dc2626' }}>
-              {studentDetails.feeStatus === 'Paid' ? 'All Cleared' : (studentDetails.pendingFeeAmount > 0 ? `Due ₹${studentDetails.pendingFeeAmount.toLocaleString()}` : 'Payment Due')}
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: studentDetails.feeStatus === 'Paid' ? '#dcfce7' : '#fee2e2', color: studentDetails.feeStatus === 'Paid' ? '#15803d' : '#dc2626' }}>
+              {studentDetails.feeStatus === 'Paid' ? 'Cleared' : (studentDetails.pendingFeeAmount > 0 ? `Due ₹${studentDetails.pendingFeeAmount.toLocaleString()}` : 'Payment Due')}
             </span>
           </div>
           <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fee Clearance</span>
-            <p style={{ fontSize: '1.5rem', fontWeight: 800, margin: '2px 0 0', color: studentDetails.feeStatus === 'Paid' ? '#16a34a' : '#dc2626' }}>
+            <span className="student-kpi-lbl">Fee Clearance</span>
+            <p className="student-kpi-val" style={{ color: studentDetails.feeStatus === 'Paid' ? '#16a34a' : '#dc2626' }}>
               {studentDetails.feeStatus}
             </p>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-              {studentDetails.feeStatus === 'Paid' ? 'Zero outstanding balance' : 'Tuition / Hostel fee balance'}
+            <p className="student-kpi-sub">
+              {studentDetails.feeStatus === 'Paid' ? 'Zero dues' : 'Tuition / Hostel balance'}
             </p>
           </div>
         </div>
 
         {/* Metric 5: Assignments */}
-        <div className="hostel-kpi-card" onClick={() => navigate('/student/assignments')} style={{ cursor: 'pointer', padding: '16px' }}>
+        <div className="hostel-kpi-card" onClick={() => navigate('/student/assignments')} style={{ cursor: 'pointer' }}>
           <div className="hostel-kpi-top">
             <div className="hostel-kpi-icon" style={{ background: '#f3e8ff', color: '#9333ea' }}>
-              <ClipboardList size={20} />
+              <ClipboardList size={18} />
             </div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: '#f3e8ff', color: '#7e22ce' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: '#f3e8ff', color: '#7e22ce' }}>
               {assignmentsCount > 0 ? 'Active' : 'Completed'}
             </span>
           </div>
           <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Course Assignments</span>
-            <p style={{ fontSize: '1.5rem', fontWeight: 800, margin: '2px 0 0', color: '#9333ea' }}>
+            <span className="student-kpi-lbl">Course Assignments</span>
+            <p className="student-kpi-val" style={{ color: '#9333ea' }}>
               {assignmentsCount} Active
             </p>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-              {assignmentsCount > 0 ? 'Submissions open' : 'No pending submissions'}
+            <p className="student-kpi-sub">
+              {assignmentsCount > 0 ? 'Submissions open' : 'No pending tasks'}
             </p>
           </div>
         </div>
 
         {/* Metric 6: Library */}
-        <div className="hostel-kpi-card" onClick={() => navigate('/student/library')} style={{ cursor: 'pointer', padding: '16px' }}>
+        <div className="hostel-kpi-card" onClick={() => navigate('/student/library')} style={{ cursor: 'pointer' }}>
           <div className="hostel-kpi-top">
             <div className="hostel-kpi-icon" style={{ background: '#e0f2fe', color: '#0284c7' }}>
-              <BookOpen size={20} />
+              <BookOpen size={18} />
             </div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1' }}>
               {borrowedBooksCount > 0 ? 'Issued' : 'Clear'}
             </span>
           </div>
           <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Library Resources</span>
-            <p style={{ fontSize: '1.5rem', fontWeight: 800, margin: '2px 0 0', color: '#0284c7' }}>
+            <span className="student-kpi-lbl">Library Resources</span>
+            <p className="student-kpi-val" style={{ color: '#0284c7' }}>
               {borrowedBooksCount} Books
             </p>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+            <p className="student-kpi-sub">
               {hasOverdueBooks ? `Fine: ₹${overdueFines}` : 'Zero overdue fines'}
             </p>
           </div>

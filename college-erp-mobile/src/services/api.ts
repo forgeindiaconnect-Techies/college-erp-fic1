@@ -1,7 +1,7 @@
-﻿import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from 'expo-secure-store';
 
 const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000/api';
+  process.env.EXPO_PUBLIC_API_URL || 'https://college-erp-software.onrender.com/api';
 
 export type MobileUser = {
   _id: string;

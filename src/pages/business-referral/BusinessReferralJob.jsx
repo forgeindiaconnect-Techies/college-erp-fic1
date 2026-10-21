@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { getPublicReferralFormConfig, getPublishedOpportunities } from '../../api';
 import JobReferralModal from '../../components/referrals/JobReferralModal';
-import BusinessReferralCategoryNav from '../../components/referrals/BusinessReferralCategoryNav';
 import { useCategoryConfig } from '../../utils/categoryConfig';
 import '../admin/UserManagementCommon.css';
 import './BusinessReferralCategory.css';
@@ -147,9 +146,6 @@ export default function BusinessReferralJob() {
 
   return (
     <div className="management-page animate-fade-in" style={{ padding: '24px 32px' }}>
-      {/* ── Top Category Tabs Navigation ── */}
-      <BusinessReferralCategoryNav activeCategory="job-referral" />
-
       {/* ── Real-Time ERP Header Card ── */}
       <div className="mgmt-header-card" style={{ marginBottom: '24px' }}>
         <div className="mgmt-header-bar" style={{ background: 'linear-gradient(90deg, #6366f1, #4f46e5, #0284c7)' }}></div>

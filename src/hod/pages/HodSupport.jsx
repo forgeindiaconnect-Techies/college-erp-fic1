@@ -170,7 +170,7 @@ const HodSupport = () => {
           onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
           onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
         >
-          <Plus size={16} /> + New Request
+          <Plus size={16} /> New Request
         </button>
       </div>
 

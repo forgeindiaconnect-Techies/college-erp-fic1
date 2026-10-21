@@ -117,15 +117,15 @@ const MyDocumentChecklist = ({ title = "Required Compliance Documents", category
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+      <div className="doc-checklist-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '8px' }}>
         <div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', background: '#eff6ff', padding: '0.15rem 0.5rem', borderRadius: '4px', marginBottom: '0.2rem' }}>
             <ShieldCheck size={12} /> Official Audit Records
           </div>
-          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+          <h3 className="doc-checklist-title" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
             {title}
           </h3>
-          <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+          <p style={{ margin: '0.15rem 0 0', fontSize: '0.76rem', color: '#64748b' }}>
             Document requirements assigned to your account by the Accounts Division.
           </p>
         </div>

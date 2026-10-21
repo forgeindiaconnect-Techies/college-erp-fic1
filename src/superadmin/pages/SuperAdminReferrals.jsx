@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Building2, Award, DollarSign, TrendingUp, Users, CheckCircle2,
@@ -32,12 +33,20 @@ export default function SuperAdminReferrals() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const renderPortalModal = (content) => {
+    if (typeof document !== 'undefined') {
+      return createPortal(content, document.body);
+    }
+    return content;
+  };
+
   // Modal Tab navigation
   const [oppModalTab, setOppModalTab] = useState('details'); // 'details' | 'benefits' | 'form' | 'incentives'
 
   // Multi-tenant & Overview
   const [overviewData, setOverviewData] = useState(null);
   const [selectedCollegeId, setSelectedCollegeId] = useState('ALL');
+  const [selectedCollege, setSelectedCollege] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [lastSyncTime, setLastSyncTime] = useState(new Date());
   const [toastMessage, setToastMessage] = useState(null);
@@ -430,10 +439,16 @@ export default function SuperAdminReferrals() {
     return true;
   });
 
-  const selectedCollegeObj = colleges.find((c) => String(c._id) === String(selectedCollegeId));
+  const currentCollege = selectedCollege || colleges.find((c) => 
+    String(c.tenantId) === String(selectedCollegeId) ||
+    String(c._id) === String(selectedCollegeId) ||
+    String(c.code) === String(selectedCollegeId) ||
+    String(c.collegeId) === String(selectedCollegeId)
+  ) || null;
+  const selectedCollegeObj = currentCollege;
 
   return (
-    <div className="superadmin-referrals-page" style={{ padding: '24px', background: 'var(--bg-main, #f8fafc)', minHeight: '100vh' }}>
+    <div className="superadmin-referrals-page" style={{ background: 'var(--bg-main, #f8fafc)', minHeight: '100vh' }}>
       {/* ── REAL-TIME TOAST ALERT ── */}
       {toastMessage && (
         <div className="ref-floating-toast">
@@ -451,7 +466,7 @@ export default function SuperAdminReferrals() {
       )}
 
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+      <div className="sa-ref-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ padding: '10px', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', borderRadius: '12px', color: '#fff' }}>
@@ -475,7 +490,7 @@ export default function SuperAdminReferrals() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="sa-ref-header-actions" style={{ display: 'flex', gap: '10px' }}>
           <button
             onClick={() => navigate('/superadmin/business-referral')}
             style={{
@@ -804,7 +819,7 @@ export default function SuperAdminReferrals() {
       {activeModule === 'colleges' && (
         <div>
           {/* Top Summary Cards */}
-          <div style={{
+          <div className="sa-top-summary-grid" style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
             gap: '16px',
@@ -868,8 +883,8 @@ export default function SuperAdminReferrals() {
                 </div>
               </div>
 
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+              <div className="sa-tenants-table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+                <table className="sa-tenants-table" style={{ width: '100%', minWidth: '680px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
                   <thead style={{ background: '#f8fafc', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>
                     <tr>
                       <th style={{ padding: '12px 18px', fontWeight: 600 }}>Institution Name</th>
@@ -910,7 +925,10 @@ export default function SuperAdminReferrals() {
                         </td>
                         <td style={{ padding: '14px 18px' }}>
                           <button
-                            onClick={() => setSelectedCollegeId(col._id)}
+                            onClick={() => {
+                              setSelectedCollege(col);
+                              setSelectedCollegeId(col.tenantId || col.code || col._id);
+                            }}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -937,63 +955,142 @@ export default function SuperAdminReferrals() {
             </div>
           ) : (
             <div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                background: 'var(--bg-card, #ffffff)',
-                border: '1px solid var(--border-color, #e2e8f0)',
-                color: 'var(--text-main, #0f172a)',
-                padding: '16px 20px',
-                borderRadius: '14px',
-                marginBottom: '20px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                flexWrap: 'wrap',
-                gap: '12px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Building2 size={22} />
+              <div 
+                className="sa-college-manage-card"
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: 'var(--bg-card, #ffffff)',
+                  border: '1px solid var(--border-color, #e2e8f0)',
+                  color: 'var(--text-main, #0f172a)',
+                  padding: '16px 20px',
+                  borderRadius: '14px',
+                  marginBottom: '20px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  flexWrap: 'wrap',
+                  gap: '14px'
+                }}
+              >
+                <div className="sa-college-manage-left" style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#eff6ff', color: '#2563eb', border: '1px solid #dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Building2 size={24} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Managing Multi-Tenant Institution</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                      {selectedCollegeObj ? (selectedCollegeObj.name || selectedCollegeObj.collegeName) : 'College'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Managing Multi-Tenant Institution
+                      </span>
+                      {(currentCollege?.tenantId || currentCollege?.code) && (
+                        <span style={{ 
+                          background: '#dbeafe', 
+                          color: '#1d4ed8', 
+                          fontFamily: 'monospace', 
+                          fontWeight: 700, 
+                          fontSize: '0.75rem', 
+                          padding: '2px 8px', 
+                          borderRadius: '6px' 
+                        }}>
+                          {currentCollege.tenantId || currentCollege.code}
+                        </span>
+                      )}
+                      <span style={{ 
+                        background: '#f1f5f9', 
+                        color: '#334155', 
+                        fontWeight: 600, 
+                        fontSize: '0.75rem', 
+                        padding: '2px 8px', 
+                        borderRadius: '6px' 
+                      }}>
+                        {currentCollege?.plan || currentCollege?.subscriptionPlan || 'Active'} Plan
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                      {currentCollege?.name || currentCollege?.collegeName || 'Selected College'}
                     </div>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setSelectedCollegeId('ALL')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 16px',
-                    background: '#f8fafc',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '8px',
-                    color: '#334155',
-                    fontSize: '0.86rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <Globe size={16} />
-                  <span>Back to Network Overview</span>
-                </button>
+                <div className="sa-college-manage-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <div className="sa-college-select-wrap" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Switch Institution:</label>
+                    <select
+                      className="sa-college-select"
+                      value={currentCollege?.tenantId || currentCollege?._id || selectedCollegeId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'ALL') {
+                          setSelectedCollegeId('ALL');
+                          setSelectedCollege(null);
+                        } else {
+                          const chosen = colleges.find(c => String(c.tenantId) === String(val) || String(c._id) === String(val));
+                          if (chosen) {
+                            setSelectedCollege(chosen);
+                            setSelectedCollegeId(chosen.tenantId || chosen.code || chosen._id);
+                          }
+                        }
+                      }}
+                      style={{
+                        padding: '7px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        fontSize: '0.86rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        outline: 'none',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                      }}
+                    >
+                      {colleges.map((col) => (
+                        <option key={col._id || col.tenantId} value={col.tenantId || col._id}>
+                          {col.name || col.collegeName} ({col.tenantId || col.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="sa-college-back-btn"
+                    onClick={() => {
+                      setSelectedCollegeId('ALL');
+                      setSelectedCollege(null);
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 16px',
+                      background: '#f8fafc',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      color: '#334155',
+                      fontSize: '0.86rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    title="Return to the list of all connected institutions"
+                  >
+                    <Globe size={16} />
+                    <span>Back to Network Overview</span>
+                  </button>
+                </div>
               </div>
 
-              <AdminReferralManagement initialCollegeId={selectedCollegeId} />
+              <AdminReferralManagement 
+                key={currentCollege?.tenantId || currentCollege?._id || selectedCollegeId}
+                initialCollegeId={currentCollege?.tenantId || currentCollege?._id || selectedCollegeId} 
+              />
             </div>
           )}
         </div>
       )}
 
       {/* ── CREATE / EDIT OPPORTUNITY MODAL ── */}
-      {showOpportunityModal && (
+      {showOpportunityModal && renderPortalModal(
         <div className="ref-modal-overlay">
           <div className="ref-modal-card" style={{ maxWidth: '820px', width: '92%' }}>
             <div className="ref-modal-header">
@@ -1399,7 +1496,7 @@ export default function SuperAdminReferrals() {
       )}
 
       {/* ── APPLICATIONS DRAWER / REVIEW MODAL ── */}
-      {viewingOppApplications && (
+      {viewingOppApplications && renderPortalModal(
         <div className="ref-modal-overlay">
           <div className="ref-modal-card" style={{ maxWidth: '920px', width: '92%' }}>
             <div className="ref-modal-header">

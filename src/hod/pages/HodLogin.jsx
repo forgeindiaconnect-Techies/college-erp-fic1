@@ -29,7 +29,14 @@ const HodLogin = () => {
 
       sessionStorage.setItem('hod_token', userData.token);
       sessionStorage.setItem('hod_session', JSON.stringify({
-        name: userData.name, dept: userData.department, deptCode: userData.department?.substring(0, 2).toUpperCase() || 'CS', role: 'HOD', email: userData.email
+        _id: userData._id || userData.id,
+        id: userData._id || userData.id,
+        name: userData.name,
+        dept: userData.department,
+        deptCode: userData.department?.substring(0, 2).toUpperCase() || 'CS',
+        role: 'HOD',
+        email: userData.email,
+        tenantId: userData.tenantId
       }));
       navigate('/hod');
     } catch (err) {

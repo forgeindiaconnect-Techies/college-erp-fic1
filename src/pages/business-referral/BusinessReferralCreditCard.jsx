@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { getPublicReferralFormConfig, getPublishedOpportunities } from '../../api';
 import CreditCardReferralModal from '../../components/referrals/CreditCardReferralModal';
-import BusinessReferralCategoryNav from '../../components/referrals/BusinessReferralCategoryNav';
 import { useCategoryConfig } from '../../utils/categoryConfig';
 import '../admin/UserManagementCommon.css';
 import './BusinessReferralCategory.css';
@@ -137,9 +136,6 @@ export default function BusinessReferralCreditCard() {
 
   return (
     <div className="management-page animate-fade-in" style={{ padding: '24px 32px' }}>
-      {/* ── Top Category Tabs Navigation ── */}
-      <BusinessReferralCategoryNav activeCategory="credit-card" />
-
       {/* ── Real-Time ERP Header Card ── */}
       <div className="mgmt-header-card" style={{ marginBottom: '24px' }}>
         <div className="mgmt-header-bar" style={{ background: 'linear-gradient(90deg, #2563eb, #10b981, #06b6d4)' }}></div>

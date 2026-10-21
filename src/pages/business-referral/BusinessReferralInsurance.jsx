@@ -8,8 +8,6 @@ import {
 } from 'lucide-react';
 import { getPublicReferralFormConfig, getPublishedOpportunities, createOpportunity } from '../../api';
 import InsuranceReferralModal from '../../components/referrals/InsuranceReferralModal';
-import FormBuilderEditor from '../referrals/FormBuilderEditor';
-import BusinessReferralCategoryNav from '../../components/referrals/BusinessReferralCategoryNav';
 import { useCategoryConfig } from '../../utils/categoryConfig';
 import '../admin/UserManagementCommon.css';
 import '../referrals/AdminReferralManagement.css';
@@ -255,9 +253,6 @@ export default function BusinessReferralInsurance() {
 
   return (
     <div className="management-page animate-fade-in" style={{ padding: '24px 32px' }}>
-      {/* ── Top Category Tabs Navigation ── */}
-      <BusinessReferralCategoryNav activeCategory="insurance" />
-
       {/* ── Real-Time ERP Header Card ── */}
       <div className="mgmt-header-card" style={{ marginBottom: '24px' }}>
         <div className="mgmt-header-bar" style={{ background: 'linear-gradient(90deg, #10b981, #059669, #0284c7)' }}></div>

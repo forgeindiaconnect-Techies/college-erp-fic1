@@ -1,10 +1,10 @@
 /* Super Admin Real-Time ERP Dashboard Styles */
 
 .sa-dashboard {
-  padding: 1.75rem 2rem 3rem 2rem;
+  padding: 1.25rem 1.75rem 2.5rem 1.75rem;
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+  gap: 1.15rem;
   max-width: 1600px;
   margin: 0 auto;
 }
@@ -15,11 +15,11 @@
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 1.25rem;
+  gap: 1rem;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  padding: 1.5rem 1.75rem;
-  border-radius: 16px;
+  padding: 1.15rem 1.45rem;
+  border-radius: 14px;
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
@@ -199,15 +199,15 @@
 /* KPI Cards Grid */
 .sa-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.85rem;
 }
 
 .sa-kpi-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
-  padding: 1.35rem;
+  border-radius: 12px;
+  padding: 0.85rem 1.1rem;
   box-shadow: var(--shadow-sm);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   position: relative;
@@ -227,70 +227,76 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.4rem;
 }
 
 .sa-kpi-icon-box {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
+  flex-shrink: 0;
+}
+
+.sa-kpi-icon-box svg {
+  width: 18px !important;
+  height: 18px !important;
 }
 
 .sa-kpi-title {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .sa-kpi-value {
-  font-size: 2rem;
+  font-size: 1.45rem;
   font-weight: 800;
   color: var(--text-main);
-  line-height: 1.1;
+  line-height: 1.15;
   letter-spacing: -0.02em;
 }
 
 .sa-kpi-footer {
-  margin-top: 1rem;
-  padding-top: 0.75rem;
+  margin-top: 0.5rem;
+  padding-top: 0.45rem;
   border-top: 1px dashed var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
 }
 
 .sa-pill-growth {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: #10b981;
 }
 
 .sa-pill-neutral {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
 }
 
 .sa-pill-urgent {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: #f59e0b;
 }
 
@@ -310,8 +316,8 @@
 .sa-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
-  padding: 1.5rem;
+  border-radius: 14px;
+  padding: 1.15rem 1.35rem;
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
@@ -321,9 +327,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.85rem;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .sa-card-title {
@@ -404,20 +410,20 @@
 /* Quick Actions Hub Grid */
 .sa-quick-actions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
 }
 
 .sa-action-tile {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 1.15rem 1rem;
+  border-radius: 10px;
+  padding: 0.75rem 0.65rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 10px;
+  gap: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -430,24 +436,30 @@
 }
 
 .sa-action-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
+  flex-shrink: 0;
+}
+
+.sa-action-icon svg {
+  width: 17px !important;
+  height: 17px !important;
 }
 
 .sa-action-label {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--text-main);
   line-height: 1.2;
 }
 
 .sa-action-sub {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--text-muted);
 }
 

@@ -24,7 +24,9 @@ import {
   getAllMarks,
   createMark,
   approveMark,
-  getPlacementJobs
+  getPlacementJobs,
+  getMeetings,
+  updateMeetingStatus
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
@@ -83,6 +85,8 @@ const HodDashboard = () => {
   const [loadingMonitoring, setLoadingMonitoring] = useState(true);
   const [placementJobs, setPlacementJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [myMeetings, setMyMeetings] = useState([]);
+  const [loadingMeetings, setLoadingMeetings] = useState(false);
 
   // Student Directory Filters in Dashboard
   const [studentSearch, setStudentSearch] = useState('');
@@ -257,21 +261,64 @@ const HodDashboard = () => {
     }
   }, [deptName]);
 
+  const fetchMyMeetings = useCallback(async () => {
+    try {
+      setLoadingMeetings(true);
+      const res = await getMeetings();
+      const rawList = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      
+      const session = getStoredHodSession();
+      const myEmail = (session?.email || '').toLowerCase().trim();
+      const myId = String(session?._id || session?.id || '').trim();
+
+      // Dual-layer strict isolation: Only meetings explicitly meant for this HOD
+      const isolated = rawList.filter(m => {
+        const mEmail = (m.hodEmail || '').toLowerCase().trim();
+        const mUserId = String(m.hodUserId || '').trim();
+        const mHodId = String(m.hodId || '').trim();
+        
+        if (myEmail && mEmail && myEmail === mEmail) return true;
+        if (myId && (myId === mUserId || myId === mHodId)) return true;
+        
+        return false;
+      });
+
+      setMyMeetings(isolated);
+    } catch (err) {
+      console.error('Failed to load HOD review meetings:', err);
+    } finally {
+      setLoadingMeetings(false);
+    }
+  }, []);
+
+  const handleAcknowledgeMeeting = async (meetingId, newStatus = 'Completed') => {
+    try {
+      await updateMeetingStatus(meetingId, { status: newStatus });
+      setMyMeetings(prev => prev.map(m => m._id === meetingId ? { ...m, status: newStatus } : m));
+    } catch (err) {
+      console.error('Failed to update meeting status:', err);
+      alert('Could not update meeting: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
   useEffect(() => {
     if (!hodSession) {
       navigate('/login');
       return;
     }
     fetchLiveData();
+    fetchMyMeetings();
 
     const handleMarksRefresh = () => {
       fetchLiveData();
+      fetchMyMeetings();
     };
 
     window.addEventListener('erp_marks_updated', handleMarksRefresh);
     window.addEventListener('erp_marks_submitted', handleMarksRefresh);
     window.addEventListener('erp_placement_updated', handleMarksRefresh);
     window.addEventListener('erp_announcement_updated', handleMarksRefresh);
+    window.addEventListener('erp_meeting_updated', handleMarksRefresh);
     window.addEventListener('storage', handleMarksRefresh);
 
     const timer = setTimeout(() => setAnimate(true), 100);
@@ -281,11 +328,13 @@ const HodDashboard = () => {
       window.removeEventListener('erp_marks_submitted', handleMarksRefresh);
       window.removeEventListener('erp_placement_updated', handleMarksRefresh);
       window.removeEventListener('erp_announcement_updated', handleMarksRefresh);
+      window.removeEventListener('erp_meeting_updated', handleMarksRefresh);
       window.removeEventListener('storage', handleMarksRefresh);
     };
-  }, [navigate, fetchLiveData, hodSession]);
+  }, [navigate, fetchLiveData, fetchMyMeetings, hodSession]);
 
   useRealtimeSync(fetchLiveData, ['students', 'staff', 'fees', 'substitutions', 'timetable', 'class_started']);
+  useRealtimeSync(fetchMyMeetings, ['meetings', 'notifications']);
 
   // Strictly filter datasets to HOD's department ONLY
   const departmentStudents = useMemo(() => {
@@ -792,6 +841,144 @@ const HodDashboard = () => {
       {/* HOD Document Compliance Checklist Widget */}
       <div style={{ marginBottom: '1.25rem' }}>
         <MyDocumentChecklist title="HOD & Department Head Compliance Records" category="HOD" />
+      </div>
+
+      {/* Principal Executive Review Meetings Console */}
+      <div style={{
+        background: 'var(--bg-primary, #ffffff)',
+        border: '1px solid var(--border-color, #e2e8f0)',
+        borderRadius: '16px',
+        padding: '1.25rem 1.5rem',
+        marginBottom: '1.25rem',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: 36, height: 36, borderRadius: '10px', background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(79,70,229,0.25)' }}>
+              <Calendar size={18} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                  Principal Executive Review Meetings
+                </h3>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: 'rgba(99, 102, 241, 0.1)', color: '#4f46e5' }}>
+                  {myMeetings.length} Scheduled
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
+                Official department performance reviews and strategic sessions dispatched by the Principal directly to you.
+              </p>
+            </div>
+          </div>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '4px 12px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.1)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+            ✓ Private to Your Department
+          </span>
+        </div>
+
+        {myMeetings.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '12px' }}>
+            {myMeetings.map((mtg, idx) => {
+              const isScheduled = mtg.status === 'Scheduled';
+              const isCompleted = mtg.status === 'Completed';
+              const isCancelled = mtg.status === 'Cancelled';
+
+              const statusBg = isCompleted ? 'rgba(16, 185, 129, 0.1)' : isCancelled ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.12)';
+              const statusColor = isCompleted ? '#059669' : isCancelled ? '#dc2626' : '#d97706';
+              const statusBorder = isCompleted ? 'rgba(16, 185, 129, 0.25)' : isCancelled ? 'rgba(239, 68, 68, 0.25)' : 'rgba(245, 158, 11, 0.25)';
+
+              return (
+                <div 
+                  key={mtg._id || idx}
+                  style={{
+                    background: 'var(--bg-secondary, #f8fafc)',
+                    border: '1px solid var(--border-color, #e2e8f0)',
+                    borderLeft: `4px solid ${statusColor}`,
+                    borderRadius: '12px',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '12px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontWeight: 800, fontSize: '0.94rem', color: 'var(--text-main, #0f172a)' }}>
+                          {mtg.title || 'Executive Review Session'}
+                        </span>
+                      </div>
+                      <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)' }}>
+                        Organizer: <strong>{mtg.organizer?.name || 'Dr. Ramoorthy (Principal)'}</strong>
+                      </p>
+                    </div>
+
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      padding: '3px 10px',
+                      borderRadius: '12px',
+                      background: statusBg,
+                      color: statusColor,
+                      border: `1px solid ${statusBorder}`,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {isCompleted ? <CheckCircle2 size={12} /> : isCancelled ? <AlertCircle size={12} /> : <Clock size={12} />}
+                      {mtg.status || 'Scheduled'}
+                    </span>
+                  </div>
+
+                  {/* Agenda Callout */}
+                  <div style={{ background: 'var(--bg-primary, #ffffff)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '3px' }}>
+                      Agenda & Notes
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-main, #1e293b)', fontWeight: 600, lineHeight: 1.4 }}>
+                      {mtg.agenda || 'Discussion on academic pass rates and department activities.'}
+                    </div>
+                    {mtg.venue && (
+                      <div style={{ marginTop: '6px', fontSize: '0.74rem', color: '#6366f1', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                        <MapPin size={12} /> {mtg.venue}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Date, Time, Venue & Action */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', paddingTop: '8px', borderTop: '1px dashed var(--border-color, #e2e8f0)', fontSize: '0.78rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-muted, #475569)' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                        <Calendar size={13} color="#4f46e5" /> {mtg.date}
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                        <Clock size={13} color="#d97706" /> {mtg.time}
+                      </span>
+                    </div>
+
+                    {isScheduled && (
+                      <button
+                        type="button"
+                        onClick={() => handleAcknowledgeMeeting(mtg._id, 'Completed')}
+                        style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 700, borderRadius: '6px', background: 'rgba(16, 185, 129, 0.1)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.3)', cursor: 'pointer' }}
+                      >
+                        ✓ Mark Completed
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ padding: '20px', textAlign: 'center', background: 'var(--bg-secondary, #f8fafc)', borderRadius: '10px', border: '1px dashed var(--border-color, #cbd5e1)' }}>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted, #64748b)' }}>
+              No executive review sessions currently scheduled with the Principal for your department.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* HOD Department Quick Actions Hub */}

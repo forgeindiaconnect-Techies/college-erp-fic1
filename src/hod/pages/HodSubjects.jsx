@@ -181,7 +181,7 @@ const HodSubjects = () => {
             onClick={openAdd}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '0.85rem', fontWeight: 700, color: '#ffffff', background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', border: 'none', borderRadius: '10px', cursor: 'pointer', boxShadow: '0 2px 6px rgba(37,99,235,0.3)' }}
           >
-            <Plus size={16} /> + Add New Subject
+            <Plus size={16} /> Add New Subject
           </button>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getUsers, getStaffSupportRequests, getClassMonitoringDailyStatus, getPrincipalClassSummary, getPlacementJobs } from '../../api/index';
+import { getUsers, getStaffSupportRequests, getClassMonitoringDailyStatus, getPrincipalClassSummary, getPlacementJobs, getMeetings, updateMeetingStatus } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import { 
   Building2, Users, GraduationCap, UserCheck, 
@@ -19,6 +19,7 @@ export default function PrincipalDashboard() {
   // Data State
   const [allUsers, setAllUsers] = useState([]);
   const [placementJobs, setPlacementJobs] = useState([]);
+  const [scheduledMeetings, setScheduledMeetings] = useState([]);
   const [metrics, setMetrics] = useState({
     students: 0,
     staff: 0,
@@ -114,10 +115,32 @@ export default function PrincipalDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
+  const fetchMeetings = useCallback(async () => {
+    try {
+      const res = await getMeetings();
+      const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      setScheduledMeetings(list);
+    } catch (err) {
+      console.error('Failed to load meetings in Principal Dashboard:', err);
+    }
+  }, []);
+
+  const handleUpdateMeetingStatus = async (meetingId, newStatus) => {
+    try {
+      await updateMeetingStatus(meetingId, { status: newStatus });
+      setScheduledMeetings(prev => prev.map(m => m._id === meetingId ? { ...m, status: newStatus } : m));
+    } catch (err) {
+      console.error('Failed to update meeting status:', err);
+      alert('Could not update meeting status: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
   useRealtimeSync(fetchData, ['users', 'students', 'staff', 'substitutions', 'timetable', 'class_started']);
+  useRealtimeSync(fetchMeetings, ['meetings', 'notifications']);
 
   useEffect(() => {
     fetchData();
+    fetchMeetings();
     const sessionData = sessionStorage.getItem('principal_session');
     if (sessionData) {
       try {
@@ -130,6 +153,7 @@ export default function PrincipalDashboard() {
 
     const handlePlacementRefresh = () => {
       fetchData();
+      fetchMeetings();
     };
     window.addEventListener('erp_placement_updated', handlePlacementRefresh);
     window.addEventListener('storage', handlePlacementRefresh);
@@ -137,7 +161,7 @@ export default function PrincipalDashboard() {
       window.removeEventListener('erp_placement_updated', handlePlacementRefresh);
       window.removeEventListener('storage', handlePlacementRefresh);
     };
-  }, [fetchData]);
+  }, [fetchData, fetchMeetings]);
 
   if (loading) {
     return (
@@ -589,6 +613,181 @@ export default function PrincipalDashboard() {
             <h3 style={{ margin: '2px 0 0', fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)' }}>{placementJobs.length}</h3>
           </div>
         </div>
+      </div>
+
+      {/* Principal–HOD Executive Review Meetings Console */}
+      <div style={{
+        background: 'var(--bg-card, #ffffff)',
+        borderRadius: '16px',
+        border: '1px solid var(--border-color, #e2e8f0)',
+        padding: '20px 24px',
+        boxShadow: 'var(--shadow-card, 0 2px 10px rgba(0,0,0,0.02))',
+        marginBottom: '1.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(79,70,229,0.25)' }}>
+              <Calendar size={20} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                  Scheduled Principal–HOD Executive Reviews
+                </h3>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: 'rgba(99, 102, 241, 0.1)', color: '#4f46e5' }}>
+                  {scheduledMeetings.length} Total
+                </span>
+              </div>
+              <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)' }}>
+                Official department performance reviews, academic audits, and strategic meetings dispatched to HODs.
+              </p>
+            </div>
+          </div>
+
+          <button 
+            type="button" 
+            onClick={() => navigate('/principal/hods')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: '#4f46e5', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s ease' }}
+          >
+            + Schedule New HOD Review
+          </button>
+        </div>
+
+        {scheduledMeetings.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '14px' }}>
+            {scheduledMeetings.map((mtg, idx) => {
+              const isScheduled = mtg.status === 'Scheduled';
+              const isCompleted = mtg.status === 'Completed';
+              const isCancelled = mtg.status === 'Cancelled';
+
+              const statusBg = isCompleted ? 'rgba(16, 185, 129, 0.1)' : isCancelled ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.12)';
+              const statusColor = isCompleted ? '#059669' : isCancelled ? '#dc2626' : '#d97706';
+              const statusBorder = isCompleted ? 'rgba(16, 185, 129, 0.25)' : isCancelled ? 'rgba(239, 68, 68, 0.25)' : 'rgba(245, 158, 11, 0.25)';
+
+              return (
+                <div 
+                  key={mtg._id || idx}
+                  style={{
+                    background: 'var(--bg-primary, #f8fafc)',
+                    border: '1px solid var(--border-color, #e2e8f0)',
+                    borderLeft: `4px solid ${statusColor}`,
+                    borderRadius: '12px',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '12px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 800, fontSize: '0.94rem', color: 'var(--text-main, #0f172a)' }}>
+                          {mtg.hodName || 'Department Head'}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: 'rgba(99, 102, 241, 0.1)', color: '#4f46e5' }}>
+                          {mtg.hodDept || 'Department'}
+                        </span>
+                      </div>
+                      <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)' }}>
+                        Recipient: <strong>{mtg.hodEmail || 'Assigned HOD'}</strong>
+                      </p>
+                    </div>
+
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      padding: '3px 10px',
+                      borderRadius: '12px',
+                      background: statusBg,
+                      color: statusColor,
+                      border: `1px solid ${statusBorder}`,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {isCompleted ? <CheckCircle2 size={12} /> : isCancelled ? <AlertCircle size={12} /> : <Clock size={12} />}
+                      {mtg.status || 'Scheduled'}
+                    </span>
+                  </div>
+
+                  {/* Agenda Callout */}
+                  <div style={{ background: 'var(--bg-card, #ffffff)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '3px' }}>
+                      Agenda
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-main, #1e293b)', fontWeight: 600, lineHeight: 1.4 }}>
+                      {mtg.agenda || 'Academic progress & faculty review session'}
+                    </div>
+                  </div>
+
+                  {/* Date, Time, Venue Footer & Actions */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', paddingTop: '8px', borderTop: '1px dashed var(--border-color, #e2e8f0)', fontSize: '0.78rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-muted, #475569)' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                        <Calendar size={13} color="#4f46e5" /> {mtg.date}
+                      </span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                        <Clock size={13} color="#d97706" /> {mtg.time}
+                      </span>
+                    </div>
+
+                    {/* Status Action Buttons */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {isScheduled && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateMeetingStatus(mtg._id, 'Completed')}
+                            style={{ padding: '4px 8px', fontSize: '0.72rem', fontWeight: 700, borderRadius: '6px', background: 'rgba(16, 185, 129, 0.1)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.3)', cursor: 'pointer' }}
+                            title="Mark as Completed"
+                          >
+                            ✓ Mark Done
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateMeetingStatus(mtg._id, 'Cancelled')}
+                            style={{ padding: '4px 8px', fontSize: '0.72rem', fontWeight: 700, borderRadius: '6px', background: 'rgba(239, 68, 68, 0.1)', color: '#dc2626', border: '1px solid rgba(239, 68, 68, 0.3)', cursor: 'pointer' }}
+                            title="Cancel Meeting"
+                          >
+                            ✕ Cancel
+                          </button>
+                        </>
+                      )}
+                      {!isScheduled && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateMeetingStatus(mtg._id, 'Scheduled')}
+                          style={{ padding: '4px 8px', fontSize: '0.72rem', fontWeight: 600, borderRadius: '6px', background: 'var(--bg-secondary, #e2e8f0)', color: 'var(--text-muted, #475569)', border: 'none', cursor: 'pointer' }}
+                        >
+                          Reopen
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ padding: '24px', textAlign: 'center', background: 'var(--bg-primary, #f8fafc)', borderRadius: '12px', border: '1px dashed var(--border-color, #cbd5e1)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <Calendar size={32} color="#94a3b8" />
+            <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted, #64748b)' }}>
+              No executive meetings currently scheduled with Department Heads.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/principal/hods')}
+              style={{ marginTop: '4px', padding: '6px 14px', borderRadius: '6px', background: '#4f46e5', color: '#ffffff', border: 'none', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Schedule First Review Session →
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Institutional Campus Placements & Hiring Drives Showcase */}

@@ -336,94 +336,109 @@ const UnifiedLogin = () => {
 
             {/* Form */}
             <form onSubmit={handleLogin} className="unified-form" autoComplete="off">
-              <div className="input-group">
-                <label htmlFor="login-username">Username / Email</label>
-                <div className="input-wrapper">
-                  <Mail size={18} className="form-icon" />
-                  <input
-                    id="login-username"
-                    type="text"
-                    name="login_username"
-                    autoComplete="off"
-                    placeholder="Enter your email or username"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
+              <div className="login-form-main-fields">
+                <div className="input-group">
+                  <label htmlFor="login-username">Username / Email</label>
+                  <div className="input-wrapper">
+                    <Mail size={18} className="form-icon" />
+                    <input
+                      id="login-username"
+                      type="text"
+                      name="login_username"
+                      autoComplete="off"
+                      placeholder="Enter your email or username"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="input-group">
-                <label htmlFor="login-password">Password</label>
-                <div className="input-wrapper">
-                  <Lock size={18} className="form-icon" />
-                  <input
-                    id="login-password"
-                    type={showPwd ? 'text' : 'password'}
-                    name="login_password"
-                    autoComplete="new-password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="pwd-toggle-btn"
-                    onClick={() => setShowPwd(!showPwd)}
-                    aria-label={showPwd ? 'Hide password' : 'Show password'}
-                  >
-                    {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
+                <div className="input-group">
+                  <label htmlFor="login-password">Password</label>
+                  <div className="input-wrapper">
+                    <Lock size={18} className="form-icon" />
+                    <input
+                      id="login-password"
+                      type={showPwd ? 'text' : 'password'}
+                      name="login_password"
+                      autoComplete="new-password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className={`pwd-toggle-btn ${showPwd ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setShowPwd(prev => !prev);
+                      }}
+                      onMouseDown={(e) => e.preventDefault()}
+                      aria-label={showPwd ? 'Hide password' : 'Show password'}
+                      title={showPwd ? 'Hide password' : 'Show password'}
+                    >
+                      {showPwd ? <EyeOff size={19} /> : <Eye size={19} />}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="form-meta-row">
-                <label className="remember-me-label">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                  />
-                  <span>Remember me</span>
-                </label>
-              </div>
-
-              {error && (
-                <div className="login-error-msg" role="alert">
-                  <AlertCircle size={15} className="error-icon" />
-                  <span>{error}</span>
+                <div className="form-meta-row">
+                  <label className="remember-me-label">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                    />
+                    <span>Remember me</span>
+                  </label>
                 </div>
-              )}
 
-              <button type="submit" className="login-submit-btn" disabled={loading}>
-                {loading ? (
-                  <>
-                    <span className="login-spinner"></span>
-                    <span>Signing In...</span>
-                  </>
-                ) : (
-                  <>
-                    <ArrowRight size={18} />
-                    <span>Login</span>
-                  </>
+                {error && (
+                  <div className="login-error-msg" role="alert">
+                    <AlertCircle size={15} className="error-icon" />
+                    <span>{error}</span>
+                  </div>
                 )}
-              </button>
 
-              {/* Create Account Link */}
-              <div className="login-register-row">
-                <span>Don't have an institution account? </span>
-                <Link to="/register" className="create-account-link">
-                  Create an Account &rarr;
-                </Link>
+                <button type="submit" className="login-submit-btn" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <span className="login-spinner"></span>
+                      <span>Signing In...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRight size={18} />
+                      <span>Login</span>
+                    </>
+                  )}
+                </button>
               </div>
 
-              {/* Bottom Support Info */}
-              <div className="login-help-footer">
-                <Headphones size={17} className="help-icon" />
-                <div className="help-text">
-                  <span className="help-title">Need help signing in?</span>
-                  <span className="help-sub">Contact your administrator</span>
+              <div className="login-form-bottom-links">
+                {/* Create Account Link */}
+                <div className="login-register-row">
+                  <span>Don't have an institution account? </span>
+                  <Link to="/register" className="create-account-link">
+                    Create an Account &rarr;
+                  </Link>
+                </div>
+
+                {/* Bottom Support Info */}
+                <div className="login-help-footer">
+                  <Headphones size={17} className="help-icon" />
+                  <div className="help-text">
+                    <span className="help-title">Need help signing in?</span>
+                    <span className="help-sub">Contact your administrator</span>
+                  </div>
+                </div>
+
+                {/* Security Trust Badge */}
+                <div className="login-security-badge">
+                  <Shield size={13} className="sec-icon" />
+                  <span>256-Bit SSL Encrypted • Institutional Access</span>
                 </div>
               </div>
             </form>

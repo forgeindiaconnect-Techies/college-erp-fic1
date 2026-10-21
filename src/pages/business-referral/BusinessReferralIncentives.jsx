@@ -6,7 +6,6 @@ import {
   FileCheck2, ShieldCheck, Loader2, Edit
 } from 'lucide-react';
 import { getIncentiveRules } from '../../api';
-import BusinessReferralCategoryNav from '../../components/referrals/BusinessReferralCategoryNav';
 import '../admin/UserManagementCommon.css';
 import './BusinessReferralCategory.css';
 
@@ -135,9 +134,6 @@ export default function BusinessReferralIncentives() {
 
   return (
     <div className="management-page animate-fade-in" style={{ padding: '24px 32px' }}>
-      {/* ── Top Category Tabs Navigation ── */}
-      <BusinessReferralCategoryNav activeCategory="incentives" />
-
       {/* ── Real-Time ERP Header Card (Matches Screenshot 3 standard) ── */}
       <div className="mgmt-header-card" style={{ marginBottom: '24px' }}>
         <div className="mgmt-header-bar" style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706, #10b981)' }}></div>
@@ -544,7 +540,7 @@ export default function BusinessReferralIncentives() {
               </div>
 
               {/* Grid of Key Specifications */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+              <div className="ref-spec-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
                 <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                   <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Reward Value</div>
                   <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#059669', marginTop: '2px' }}>

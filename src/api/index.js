@@ -543,6 +543,12 @@ export const getApprovals = () => api.get('/approvals');
 export const getPendingApprovals = () => api.get('/approvals/pending');
 export const submitApprovalAction = (id, status, comments) => api.put(`/approvals/${id}`, { status, comments });
 
+// Principal - HOD Meetings & Reviews
+export const createMeeting = (data) => api.post('/meetings', data);
+export const getMeetings = (params) => api.get('/meetings', { params });
+export const updateMeetingStatus = (id, status, notes) => api.patch(`/meetings/${id}`, { status, notes });
+export const deleteMeeting = (id) => api.delete(`/meetings/${id}`);
+
 // AI Predictive Analytics
 export const getAIInsights = () => api.get('/analytics/ai-insights');
 

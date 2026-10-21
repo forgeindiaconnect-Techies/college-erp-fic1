@@ -28,11 +28,18 @@ const PrincipalLogin = () => {
       }
 
       sessionStorage.setItem('token', userData.token);
+      sessionStorage.setItem('principal_session', JSON.stringify({
+        name: userData.name,
+        email: userData.email,
+        role: 'Principal',
+        tenantId: userData.tenantId || 'mock_college_id'
+      }));
       sessionStorage.setItem('user_session', JSON.stringify({
         name: userData.name,
         email: userData.email,
         role: 'Principal'
       }));
+      sessionStorage.setItem('tenantId', userData.tenantId || 'mock_college_id');
       navigate('/principal/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid credentials. Try principal@college.edu / password123');

@@ -70,6 +70,9 @@ const LibrarianSidebar = ({ isOpen, onClose }) => {
   };
 
   const handleLogout = () => {
+    sessionStorage.removeItem('librarian_session');
+    sessionStorage.removeItem('librarian_token');
+    sessionStorage.removeItem('token');
     sessionStorage.clear();
     if (onClose) onClose();
     navigate('/login');
@@ -212,10 +215,33 @@ const LibrarianSidebar = ({ isOpen, onClose }) => {
       </nav>
 
       {/* Footer Profile & Logout */}
-      <div className="sidebar-footer">
-        <button className="logout-btn" onClick={handleLogout}>
+      <div className="sidebar-footer" style={{ padding: '12px 16px', background: '#365d7a', borderTop: '1px solid rgba(255, 255, 255, 0.14)' }}>
+        <button 
+          className="logout-btn" 
+          onClick={handleLogout}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            padding: '10px 16px',
+            color: '#ffffff',
+            background: '#ef4444',
+            border: 'none',
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontSize: '0.92rem',
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
+            transition: 'all 0.2s ease',
+            boxSizing: 'border-box'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.background = '#dc2626'}
+          onMouseOut={(e) => e.currentTarget.style.background = '#ef4444'}
+        >
           <LogOut size={18} />
-          <span>Sign Out</span>
+          <span>Logout</span>
         </button>
       </div>
     </aside>
