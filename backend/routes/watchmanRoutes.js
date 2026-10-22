@@ -1058,7 +1058,14 @@ router.post('/visitors/entry', protect, authorize('Watchman', 'Admin', 'Super Ad
 // POST /api/watchman/visitors/:id/exit - Log visitor exit
 router.post('/visitors/:id/exit', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
   try {
-    const visitor = await VisitorLog.findById(req.params.id);
+    const isObjId = mongoose.Types.ObjectId.isValid(req.params.id);
+    const visitor = await VisitorLog.findOne({
+      $or: [
+        ...(isObjId ? [{ _id: req.params.id }] : []),
+        { visitorId: req.params.id },
+        { passNumber: req.params.id }
+      ]
+    });
     if (!visitor) {
       return res.status(404).json({ success: false, message: 'Visitor record not found' });
     }

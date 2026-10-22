@@ -599,15 +599,15 @@ const StaffAssignments = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
                     <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
                       <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Class Scholars</div>
-                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>{classStudents.length || 45}</div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>{classStudents.length}</div>
                     </div>
                     <div style={{ background: '#f0fdf4', color: '#16a34a', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid #bbf7d0' }}>
                       <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>Submitted</div>
-                      <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>{assignmentSubmissions.length || (viewingAssignment.submissionsCount || 0)}</div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>{assignmentSubmissions.length}</div>
                     </div>
                     <div style={{ background: '#fef2f2', color: '#dc2626', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid #fecaca' }}>
                       <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>Pending Turn-in</div>
-                      <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>{Math.max(0, (classStudents.length || 45) - (assignmentSubmissions.length || viewingAssignment.submissionsCount || 0))}</div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>{Math.max(0, classStudents.length - assignmentSubmissions.length)}</div>
                     </div>
                   </div>
                   
@@ -616,8 +616,19 @@ const StaffAssignments = () => {
                     {classStudents.length === 0 ? (
                       <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>No scholars enrolled in this class roster.</div>
                     ) : (
-                      classStudents.slice(0, 20).map((student, idx) => {
-                        const hasSubmitted = idx < (viewingAssignment.submissionsCount || 1) || assignmentSubmissions.some(sub => sub.studentId === student.referenceId || sub.studentId === student.id || sub.studentId === student._id);
+                      classStudents.map((student, idx) => {
+                        const studentId = String(student._id || student.id || student.referenceId || '').toLowerCase().trim();
+                        const studentRoll = String(student.rollNo || '').toLowerCase().trim();
+                        const studentName = String(student.name || '').toLowerCase().trim();
+
+                        const matchingSub = assignmentSubmissions.find(sub => {
+                          const subStudentId = String(sub.studentId || sub.student || sub.studentRollNo || '').toLowerCase().trim();
+                          const subStudentName = String(sub.studentName || sub.name || '').toLowerCase().trim();
+                          return (subStudentId && (subStudentId === studentId || subStudentId === studentRoll)) ||
+                                 (subStudentName && subStudentName === studentName);
+                        });
+
+                        const hasSubmitted = Boolean(matchingSub);
                         return (
                           <div key={student._id || student.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                             <div>

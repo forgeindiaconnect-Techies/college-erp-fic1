@@ -42,16 +42,21 @@ router.get('/student/:studentId', protect, collegeScope, async (req, res) => {
     console.log(`[GET /student/:studentId] Request for: ${req.params.studentId}. User role: ${req.user.role}, Ref ID: ${req.user.referenceId}`);
     
     let studentData = null;
-    let queryCondition = [{ id: req.user.referenceId }];
-    if (req.user.referenceId && req.user.referenceId.length === 24 && /^[0-9a-fA-F]{24}$/.test(req.user.referenceId)) {
-      queryCondition.push({ _id: req.user.referenceId });
-    }
+    const allowedUserIds = [req.user.referenceId, req.user.parentOf, req.user.studentId].filter(Boolean);
+    let queryCondition = allowedUserIds.map(id => ({ id }));
+    allowedUserIds.forEach(id => {
+      if (id.length === 24 && /^[0-9a-fA-F]{24}$/.test(id)) {
+        queryCondition.push({ _id: id });
+      }
+    });
     
-    studentData = await Student.findOne({ $or: queryCondition });
+    if (queryCondition.length > 0) {
+      studentData = await Student.findOne({ $or: queryCondition });
+    }
 
     // If student/parent, verify they are requesting their own record
     if (req.user.role === 'Student' || req.user.role === 'Parent') {
-      const isDirectMatch = req.user.referenceId === req.params.studentId;
+      const isDirectMatch = allowedUserIds.includes(req.params.studentId);
       const isRollNoMatch = studentData && (studentData.id === req.params.studentId || studentData._id.toString() === req.params.studentId);
       
       if (!isDirectMatch && !isRollNoMatch) {
@@ -66,7 +71,14 @@ router.get('/student/:studentId', protect, collegeScope, async (req, res) => {
     
     const records = await Attendance.find({ 
       studentId: { $in: searchIds }, 
-      tenantId: { $in: [req.collegeId, 'unassigned_college', 'mock_college_id'] } 
+      $or: [
+        { tenantId: { $in: [req.collegeId, req.user?.collegeId, req.user?.tenantId, 'COL001', 'unassigned_college', 'mock_college_id'].filter(Boolean) } },
+        { collegeId: { $in: [req.collegeId, req.user?.collegeId, req.user?.tenantId, 'COL001', 'unassigned_college', 'mock_college_id'].filter(Boolean) } },
+        { tenantId: { $exists: false } },
+        { collegeId: { $exists: false } },
+        { tenantId: null },
+        { collegeId: null }
+      ] 
     }).sort({ attendanceDate: -1, date: -1 });
     console.log(`=> Found ${records.length} records`);
     res.json(records);

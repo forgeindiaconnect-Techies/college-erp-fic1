@@ -230,16 +230,75 @@ router.get('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff', 'Super 
 // Get marks for a specific student
 router.get('/student/:studentId', protect, collegeScope, async (req, res) => {
   try {
-    if ((req.user.role === 'Student' || req.user.role === 'Parent') && req.user.referenceId !== req.params.studentId) {
-      return res.status(403).json({ message: 'Unauthorized to view this record' });
+    const sId = req.params.studentId;
+    let studentData = null;
+    try {
+      studentData = await Student.findOne({
+        $or: [
+          (sId && sId.length === 24 && /^[0-9a-fA-F]{24}$/.test(sId)) ? { _id: sId } : null,
+          { id: sId },
+          { rollNo: sId },
+          { registerNo: sId }
+        ].filter(Boolean)
+      }).lean();
+    } catch (e) {}
+
+    const searchIds = [sId];
+    if (studentData) {
+      if (studentData._id) searchIds.push(studentData._id.toString());
+      if (studentData.id) searchIds.push(studentData.id);
+      if (studentData.rollNo) searchIds.push(studentData.rollNo);
+      if (studentData.registerNo) searchIds.push(studentData.registerNo);
     }
-    const records = await Mark.find({
-      studentId: req.params.studentId,
-      collegeId: req.collegeId,
+
+    const allowedUserIds = [req.user.referenceId, req.user.parentOf, req.user.studentId, req.user._id?.toString()].filter(Boolean);
+    if (req.user.role === 'Student' || req.user.role === 'Parent') {
+      const isMatch = allowedUserIds.some(uid => searchIds.includes(uid));
+      if (!isMatch) {
+        return res.status(403).json({ message: 'Unauthorized to view this record' });
+      }
+    }
+
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const studentFilter = {
+      $or: [
+        { studentId: { $in: searchIds } },
+        { registerNo: { $in: searchIds } }
+      ]
+    };
+    const collegeFilter = (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system')
+      ? {
+          $or: [
+            { collegeId: targetCollegeId },
+            { tenantId: targetCollegeId },
+            { collegeId: 'COL001' },
+            { tenantId: 'COL001' },
+            { collegeId: 'unassigned_college' },
+            { tenantId: 'unassigned_college' },
+            { collegeId: { $exists: false } },
+            { collegeId: null }
+          ]
+        }
+      : {};
+
+    let records = await Mark.find({
+      ...studentFilter,
+      ...collegeFilter,
       resultStatus: 'Published'
     })
       .populate('examId')
       .sort({ semester: 1, subject: 1 });
+
+    // Fallback: If no records marked strictly as 'Published', return all marks for this student
+    if (records.length === 0) {
+      records = await Mark.find({
+        ...studentFilter,
+        ...collegeFilter
+      })
+        .populate('examId')
+        .sort({ semester: 1, subject: 1 });
+    }
+
     res.json(records);
   } catch (err) {
     res.status(500).json({ message: err.message });

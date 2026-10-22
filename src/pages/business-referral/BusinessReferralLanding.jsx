@@ -162,28 +162,37 @@ export default function BusinessReferralLanding() {
     };
   }, [loadingRules, approvedRules]);
 
-  // Five defined categories for the Business Referral module with Incentives dynamically backed by database
-  const rawCategories = useMemo(() => [
-    {
-      id: 'incentives',
-      title: 'Incentives',
-      subtitle: 'Approved Institutional Rates & Milestones',
-      icon: <Award size={26} />,
-      badge: incentivesCardData.badge,
-      badgeColor: 'amber',
-      accentColor: '#f59e0b',
-      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-      description: incentivesCardData.description,
-      highlights: incentivesCardData.highlights,
-      metrics: {
-        earningPotential: incentivesCardData.earningPotential,
-        turnaround: incentivesCardData.turnaround,
-        status: incentivesCardData.status
-      },
-      tags: incentivesCardData.tags
-    },
-    {
-      id: 'credit-card',
+  const isSuperAdmin = (rootRole || '').toLowerCase() === 'superadmin' || Boolean(sessionStorage.getItem('superadmin_token'));
+
+  // Defined categories for the Business Referral module.
+  // The dedicated "Incentives" card is restricted exclusively to the Super Admin dashboard.
+  const rawCategories = useMemo(() => {
+    const list = [];
+
+    if (isSuperAdmin) {
+      list.push({
+        id: 'incentives',
+        title: 'Incentives',
+        subtitle: 'Approved Institutional Rates & Milestones',
+        icon: <Award size={26} />,
+        badge: incentivesCardData.badge,
+        badgeColor: 'amber',
+        accentColor: '#f59e0b',
+        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        description: incentivesCardData.description,
+        highlights: incentivesCardData.highlights,
+        metrics: {
+          earningPotential: incentivesCardData.earningPotential,
+          turnaround: incentivesCardData.turnaround,
+          status: incentivesCardData.status
+        },
+        tags: incentivesCardData.tags
+      });
+    }
+
+    list.push(
+      {
+        id: 'credit-card',
       title: 'Credit Card Referral',
       subtitle: 'Leading Banking & Card Partners',
       icon: <CreditCard size={26} />,
@@ -273,8 +282,10 @@ export default function BusinessReferralLanding() {
         status: 'Active'
       },
       tags: ['Zero Balance', 'Student Salary', 'Video KYC', 'Instant Debit']
-    }
-  ], [incentivesCardData]);
+    });
+
+    return list;
+  }, [incentivesCardData, isSuperAdmin]);
 
   // Merge Super Admin custom overrides
   const categories = useMemo(() => {
@@ -420,7 +431,7 @@ export default function BusinessReferralLanding() {
           </div>
           <div className="mgmt-kpi-info">
             <span className="mgmt-kpi-label">Core Categories</span>
-            <h3 className="mgmt-kpi-value">5 Streams</h3>
+            <h3 className="mgmt-kpi-value">{isSuperAdmin ? '5 Streams' : '4 Streams'}</h3>
           </div>
         </div>
 
@@ -589,7 +600,7 @@ export default function BusinessReferralLanding() {
             </div>
             <div>
               <h3>How the Business Referral Workflow Operates</h3>
-              <p>Standardized 4-step institutional lifecycle across all five referral categories</p>
+              <p>Standardized 4-step institutional lifecycle across {isSuperAdmin ? 'all five' : 'all four'} referral categories</p>
             </div>
           </div>
         </div>

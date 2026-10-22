@@ -3563,7 +3563,7 @@ router.post(
 router.get(
   '/clearance',
   protect,
-  authorize('Admin', 'Sub Admin', 'Super Admin', 'Librarian', 'Library', 'Principal', 'Accounts', 'Accountant'),
+  authorize('Admin', 'Sub Admin', 'Super Admin', 'Librarian', 'Library', 'Principal', 'Accounts', 'Accountant', 'HOD', 'Staff'),
   collegeScope,
   async (req, res) => {
     try {

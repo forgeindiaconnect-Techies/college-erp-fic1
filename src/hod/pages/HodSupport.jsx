@@ -175,27 +175,28 @@ const HodSupport = () => {
       </div>
 
       {/* Category Overview Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="hod-support-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
         <div 
           onClick={() => setActiveTab('All')}
           style={{ 
-            padding: '1.1rem 1.25rem', 
+            padding: '0.9rem 1rem', 
             borderRadius: '10px',
             background: activeTab === 'All' ? 'rgba(59,130,246,0.08)' : 'var(--bg-secondary)', 
             border: activeTab === 'All' ? '2px solid #3b82f6' : '1px solid var(--border-color)',
             display: 'flex', 
             alignItems: 'center', 
-            gap: '12px', 
+            gap: '10px', 
             cursor: 'pointer',
-            transition: 'all 0.15s'
+            transition: 'all 0.15s',
+            minWidth: 0
           }}
         >
-          <div style={{ padding: '10px', borderRadius: '10px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6', display: 'flex' }}>
-            <Clock size={20} />
+          <div style={{ padding: '8px', borderRadius: '8px', background: 'rgba(59,130,246,0.12)', color: '#3b82f6', display: 'flex', flexShrink: 0 }}>
+            <Clock size={18} />
           </div>
-          <div>
-            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)' }}>ALL REQUESTS</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '2px' }}>{requests.length}</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', lineHeight: '1.2' }}>ALL REQUESTS</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--text-main)', marginTop: '2px' }}>{requests.length}</div>
           </div>
         </div>
 
@@ -208,22 +209,23 @@ const HodSupport = () => {
               key={cat.id} 
               onClick={() => setActiveTab(cat.id)}
               style={{ 
-                padding: '1.1rem 1.25rem', 
+                padding: '0.9rem 1rem', 
                 borderRadius: '10px',
                 background: isActive ? 'rgba(59,130,246,0.08)' : 'var(--bg-secondary)', 
                 border: isActive ? '2px solid #3b82f6' : '1px solid var(--border-color)',
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: '12px', 
+                gap: '10px', 
                 cursor: 'pointer',
-                transition: 'all 0.15s'
+                transition: 'all 0.15s',
+                minWidth: 0
               }}
             >
-              <div style={{ padding: '10px', borderRadius: '10px', background: cat.bg, color: cat.color, display: 'flex' }}>
-                <IconComp size={20} />
+              <div style={{ padding: '8px', borderRadius: '8px', background: cat.bg, color: cat.color, display: 'flex', flexShrink: 0 }}>
+                <IconComp size={18} />
               </div>
-              <div style={{ overflow: 'hidden' }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{cat.title}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: '1.2', wordBreak: 'break-word', hyphens: 'auto' }}>{cat.title}</div>
                 <div style={{ fontSize: '1.15rem', fontWeight: 800, color: cat.color, marginTop: '2px' }}>{catCount}</div>
               </div>
             </div>
@@ -234,18 +236,16 @@ const HodSupport = () => {
       {/* Real-time Search & Status Filter Toolbar */}
       <div style={{ 
         display: 'flex', 
-        flexWrap: 'wrap', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        gap: '12px', 
-        marginBottom: '1rem',
+        flexDirection: 'column',
+        gap: '10px', 
+        marginBottom: '1.25rem',
         padding: '10px 14px',
         background: 'var(--bg-secondary)',
         borderRadius: '10px',
         border: '1px solid var(--border-color)'
       }}>
         {/* Search Bar */}
-        <div style={{ position: 'relative', flex: '1 1 260px', minWidth: '220px' }}>
+        <div style={{ position: 'relative', width: '100%' }}>
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
@@ -276,14 +276,20 @@ const HodSupport = () => {
         </div>
 
         {/* Status Filter Pills */}
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
+        <div style={{ 
+          display: 'flex', 
+          gap: '6px', 
+          flexWrap: 'wrap', 
+          alignItems: 'center',
+          width: '100%'
+        }}>
           {['All', 'Pending', 'Under Review', 'Resolved', 'Approved', 'Rejected'].map(st => (
             <button
               key={st}
               type="button"
               onClick={() => setStatusFilter(st)}
               style={{
-                padding: '5px 12px',
+                padding: '6px 12px',
                 borderRadius: '6px',
                 border: '1px solid',
                 borderColor: statusFilter === st ? '#3b82f6' : 'var(--border-color)',
@@ -292,7 +298,8 @@ const HodSupport = () => {
                 fontWeight: 700,
                 fontSize: '0.78rem',
                 cursor: 'pointer',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
             >
               {st}

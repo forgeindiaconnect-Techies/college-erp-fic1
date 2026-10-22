@@ -122,6 +122,9 @@
   .main-content .main-content,
   .main-content .page-content,
   .main-content .principal-page-container,
+  .main-content .attendance-page,
+  .main-content .hod-library-container,
+  .main-content .dashboard-container,
   .page-content > div {
     height: auto !important;
     min-height: auto !important;

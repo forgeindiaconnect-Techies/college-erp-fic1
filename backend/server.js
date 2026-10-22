@@ -120,6 +120,7 @@ import Book from './models/Book.js';
 import BookCopy from './models/BookCopy.js';
 import IssueRecord from './models/IssueRecord.js';
 import TransportRoute from './models/TransportRoute.js';
+import Timetable from './models/Timetable.js';
 import TransportDriver from './models/TransportDriver.js';
 import TransportStudent from './models/TransportStudent.js';
 import HostelBlock from './models/HostelBlock.js';
@@ -309,13 +310,17 @@ const autoSeedIfEmpty = async () => {
         { name: 'Sree (Principal)', email: 'sree@gmail.com', password: 'sree123', role: 'Principal', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Dr. Agila (HOD)', email: 'agila@gmail.com', password: 'agila', role: 'HOD', department: 'Information Technology', referenceId: 'HOD001', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Pooja (Staff)', email: 'pooja@gmail.com', password: 'pooja', role: 'Staff', department: 'Computer Science', referenceId: 'STF008', subjects: ['Data Structures'], tenantId: 'COL001', collegeId: 'COL001' },
-        { name: 'Accounts Officer', email: 'accounts@college.edu', password: 'password123', role: 'Accounts', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Ramesh Kumar (Chief Watchman)', email: 'watchman@college.edu', password: 'password123', role: 'Watchman', referenceId: 'WMN-001', phone: '9876543299', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Rajesh Driver (Senior Driver)', email: 'rajesh.driver@college.edu', password: 'password123', role: 'Driver', referenceId: 'DRV-001', phone: '9840212345', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Campus Bus Driver', email: 'driver@college.edu', password: 'password123', role: 'Driver', referenceId: 'DRV-002', phone: '9840212346', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Menaka (Placement Officer)', email: 'menaka@gmail.com', password: 'menaka', role: 'Placement', department: 'Training & Placement Officer', referenceId: 'PLC-002', phone: '8987676567', tenantId: 'COL004-3190860', collegeId: 'COL004-3190860' },
         { name: 'Karthick (Placement Officer)', email: 'karthick@gmail.com', password: 'karthick', role: 'Placement', department: 'Training & Placement Officer', referenceId: 'PLC-001', phone: '9878987678', tenantId: 'COL004-3190860', collegeId: 'COL004-3190860' },
         { name: 'Dr. Suresh Kumar (Placement Officer)', email: 'placement@college.edu', password: 'password123', role: 'Placement', department: 'Training & Placement Cell', referenceId: 'PLC-001', tenantId: 'COL004-3190860', collegeId: 'COL004-3190860' },
+        { name: 'John Doe (Student)', email: 'john@college.edu', password: 'password123', role: 'Student', referenceId: 'CS2022001', studentId: 'CS2022001', department: 'Computer Science', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Mr. Robert Doe (Parent)', email: 'parent_john@college.edu', password: 'password123', role: 'Parent', referenceId: 'CS2022001', parentOf: 'John Doe', studentId: 'CS2022001', department: 'Computer Science', tenantId: 'COL001', collegeId: 'COL001' },
       ];
 
+      
       // Find the primary/active college in the system
       const adminCollege = (await College.findOne({
         $or: [
@@ -351,6 +356,11 @@ const autoSeedIfEmpty = async () => {
         } else {
           u.role = cred.role;
           u.password = cred.password;
+          if (cred.referenceId) u.referenceId = cred.referenceId;
+          if (cred.studentId) u.studentId = cred.studentId;
+          if (cred.parentOf) u.parentOf = cred.parentOf;
+          if (cred.department) u.department = cred.department;
+          if (cred.phone) u.phone = cred.phone;
           if (!u.tenantId || u.tenantId === 'undefined') {
             u.tenantId = resolvedTenantId;
             u.collegeId = resolvedTenantId;
@@ -999,6 +1009,7 @@ app.use('/api/approvals', approvalRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/results', marksRoutes);
 app.use('/api/salaries', salaryRoutes);
+app.use('/api/salary', salaryRoutes);
 app.use('/api/timetable', timetableRoutes);
 app.use('/api/class-advisor', classAdvisorRoutes);
 app.use('/api/assignments', assignmentRoutes);
@@ -1016,6 +1027,7 @@ app.use('/api/subjects', subjectRoutes);
 app.use('/api/academic', academicRoutes);
 app.use('/api/faculty-allocation', facultyAllocationRoutes);
 app.use('/api/period-master', periodMasterRoutes);
+app.use('/api/period-masters', periodMasterRoutes);
 app.use('/api/class-monitoring', classMonitoringRoutes);
 app.use('/api/substitutions', substitutionRoutes);
 app.use('/api/class-sessions', classSessionRoutes);
@@ -1147,6 +1159,37 @@ const startServer = async () => {
     if (updateResult.modifiedCount > 0) {
       console.log(`✅ Multi-tenancy migration: updated ${updateResult.modifiedCount} users to default tenant COL001`);
     }
+
+    // Also sync all academic & administrative records to default tenant COL001 so Mobile & Web see identical data
+    await Student.updateMany(
+      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }, { collegeId: 'unassigned_college' }] },
+      { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
+    );
+    await Staff.updateMany(
+      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }, { collegeId: 'unassigned_college' }] },
+      { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
+    );
+    await Fee.updateMany(
+      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }, { collegeId: 'unassigned_college' }] },
+      { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
+    );
+    await Mark.updateMany(
+      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }, { collegeId: 'unassigned_college' }] },
+      { $set: { collegeId: 'COL001', tenantId: 'COL001', resultStatus: 'Published' } }
+    );
+    await Attendance.updateMany(
+      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }, { tenantId: 'unassigned_college' }, { tenantId: null }, { tenantId: { $exists: false } }] },
+      { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
+    );
+    await Timetable.updateMany(
+      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }, { collegeId: 'unassigned_college' }] },
+      { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
+    );
+    await TransportRoute.updateMany(
+      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }] },
+      { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
+    );
+    console.log('✅ Synchronized all students, marks, fees, attendance, timetables, and routes to COL001 for Web and Mobile parity');
   } catch (err) {
     console.error('Failed to run user multi-tenancy migration:', err);
   }

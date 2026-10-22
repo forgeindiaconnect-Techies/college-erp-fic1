@@ -85,7 +85,8 @@ router.get('/:id', protect, collegeScope, async (req, res) => {
   try {
     const targetCollegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
     // If Student or Parent, they can only view their own record
-    if ((req.user.role === 'Student' || req.user.role === 'Parent') && req.user.referenceId !== req.params.id) {
+    const allowedUserIds = [req.user.referenceId, req.user.parentOf, req.user.studentId].filter(Boolean);
+    if ((req.user.role === 'Student' || req.user.role === 'Parent') && !allowedUserIds.includes(req.params.id)) {
       return res.status(403).json({ message: 'Unauthorized to view this record' });
     }
     
@@ -99,7 +100,20 @@ router.get('/:id', protect, collegeScope, async (req, res) => {
       query = {
         $and: [
           query,
-          { $or: [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }] }
+          {
+            $or: [
+              { collegeId: targetCollegeId },
+              { tenantId: targetCollegeId },
+              { collegeId: 'COL001' },
+              { tenantId: 'COL001' },
+              { collegeId: { $exists: false } },
+              { tenantId: { $exists: false } },
+              { collegeId: null },
+              { tenantId: null },
+              { collegeId: 'unassigned_college' },
+              { tenantId: 'unassigned_college' }
+            ]
+          }
         ]
       };
     }
