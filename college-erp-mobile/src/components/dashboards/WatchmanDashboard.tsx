@@ -2,7 +2,9 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -15,6 +17,11 @@ import {
 } from 'react-native';
 import { apiGet, apiPost, type MobileUser } from '../../services/api';
 import BottomTabBar, { type MainNavTab } from '../navigation/BottomTabBar';
+import ScreenHeader from '../navigation/ScreenHeader';
+import UserProfileScreen from '../profile/UserProfileScreen';
+import ReferralHub from '../referrals/ReferralHub';
+import DashboardHeroBanner from './DashboardHeroBanner';
+import QuickAccessGrid from './QuickAccessGrid';
 
 type Props = {
   user: MobileUser;
@@ -23,7 +30,7 @@ type Props = {
 
 type WatchmanVisitorsSubTab = 'active' | 'history' | 'preregistered';
 type WatchmanLogisticsSubTab = 'parcels' | 'buses' | 'vehicles';
-type WatchmanMoreSection = 'menu' | 'shift' | 'incidents' | 'settings';
+type WatchmanMoreSection = 'profile' | 'menu' | 'shift' | 'incidents' | 'referrals' | 'settings';
 
 type GateMovementItem = {
   id: string;
@@ -45,6 +52,8 @@ type ActiveVisitorItem = {
   badgeNumber: string;
   vehicleNumber?: string;
 };
+
+type VisitorItem = ActiveVisitorItem;
 
 type GateParcelItem = {
   id: string;
@@ -83,7 +92,7 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
   const [activeTab, setActiveTab] = useState<MainNavTab>('home');
   const [visitorSubTab, setVisitorSubTab] = useState<WatchmanVisitorsSubTab>('active');
   const [logisticsSubTab, setLogisticsSubTab] = useState<WatchmanLogisticsSubTab>('parcels');
-  const [moreSection, setMoreSection] = useState<WatchmanMoreSection>('menu');
+  const [moreSection, setMoreSection] = useState<WatchmanMoreSection>('profile');
 
   // Loading & Refreshing States
   const [loading, setLoading] = useState(true);
@@ -96,6 +105,7 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
     gate: 'Gate 1 (Main Campus Entrance)',
     shift: 'General Duty Shift',
     shiftStatus: 'On Duty',
+    lastPunchTime: '08:00 AM (Check-in Verified)',
   });
 
   // Dynamic Data Lists
@@ -141,6 +151,8 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
   const [parCourier, setParCourier] = useState('BlueDart Logistics');
   const [parAwb, setParAwb] = useState('');
   const [parRecipient, setParRecipient] = useState('');
+  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [staffDirectory, setStaffDirectory] = useState<any[]>([]);
   const [submittingParcel, setSubmittingParcel] = useState(false);
 
   // Emergency Incident Modal
@@ -149,6 +161,12 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
   const [incLocation, setIncLocation] = useState('Gate 1 Perimeter');
   const [incDetails, setIncDetails] = useState('');
   const [submittingIncident, setSubmittingIncident] = useState(false);
+
+  // Real-time ERP Detail Modals
+  const [selectedVisitorPass, setSelectedVisitorPass] = useState<VisitorItem | null>(null);
+  const [selectedParcelSlip, setSelectedParcelSlip] = useState<GateParcelItem | null>(null);
+  const [accessClearanceModalVisible, setAccessClearanceModalVisible] = useState(false);
+  const [lastClearanceAction, setLastClearanceAction] = useState<any | null>(null);
 
   // ----------------------------------------------------------------------
   // LOAD REAL DATA FROM WATCHMAN BACKEND
@@ -165,6 +183,7 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
         busesRes,
         vehiclesRes,
         incidentsRes,
+        staffDirRes,
       ] = await Promise.all([
         apiGet<any>('watchman/stats').catch(() => null),
         apiGet<any>('watchman/visitors/active').catch(() => []),
@@ -173,7 +192,11 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
         apiGet<any[]>('transport/routes').catch(() => []),
         apiGet<any[]>('watchman/vehicles').catch(() => []),
         apiGet<any[]>('watchman/incidents').catch(() => []),
+        apiGet<any>('parcels/staff-directory').catch(() => apiGet<any>('watchman/staff-directory').catch(() => [])),
       ]);
+
+      const dirList = Array.isArray(staffDirRes?.data) ? staffDirRes.data : (Array.isArray(staffDirRes) ? staffDirRes : []);
+      setStaffDirectory(dirList);
 
       if (statsRes?.data) {
         setStats((prev) => ({ ...prev, ...statsRes.data }));
@@ -351,10 +374,15 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
         remarks: 'Scanned at gate',
       }).catch(() => null);
 
-      Alert.alert(
-        'Campus IN Recorded',
-        `Access Granted: ${verifiedPerson.name}\nStatus: Inside Campus\nGate: ${officer.gate}\nTimestamp: ${new Date().toLocaleTimeString()}`
-      );
+      setLastClearanceAction({
+        title: 'CAMPUS IN — ACCESS GRANTED',
+        person: verifiedPerson,
+        gate: officer.gate,
+        timestamp: new Date().toLocaleTimeString(),
+        status: 'Inside Campus',
+        actionType: 'IN',
+      });
+      setAccessClearanceModalVisible(true);
 
       setVerifiedPerson((prev) => (prev ? { ...prev, currentStatus: 'Inside Campus' } : null));
       loadData();
@@ -387,10 +415,15 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
         remarks: 'Scanned exit at gate',
       }).catch(() => null);
 
-      Alert.alert(
-        'Campus OUT Recorded',
-        `Departure Confirmed: ${verifiedPerson.name}\nStatus: Outside Campus\nExit Gate: ${officer.gate}\nTimestamp: ${new Date().toLocaleTimeString()}`
-      );
+      setLastClearanceAction({
+        title: 'CAMPUS OUT — EXIT CONFIRMED',
+        person: verifiedPerson,
+        gate: officer.gate,
+        timestamp: new Date().toLocaleTimeString(),
+        status: 'Outside Campus',
+        actionType: 'OUT',
+      });
+      setAccessClearanceModalVisible(true);
 
       setVerifiedPerson((prev) => (prev ? { ...prev, currentStatus: 'Outside Campus' } : null));
       loadData();
@@ -501,18 +534,47 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
   // REGISTER GATE PARCEL
   // ----------------------------------------------------------------------
   const handleRegisterParcel = async () => {
-    if (!parRecipient.trim()) {
-      Alert.alert('Required', 'Please enter recipient name.');
+    if (!parRecipient.trim() && !selectedStaff) {
+      Alert.alert('Required', 'Please select or enter recipient staff member.');
       return;
     }
 
     try {
       setSubmittingParcel(true);
+
+      // Auto-match from staffDirectory if selectedStaff is not set yet
+      let recipientObj = selectedStaff;
+      if (!recipientObj && parRecipient.trim()) {
+        const q = parRecipient.trim().toLowerCase();
+        const bracketMatch = parRecipient.match(/\[(.*?)\]/) || parRecipient.match(/\((.*?)\)/);
+        const extractedId = bracketMatch ? bracketMatch[1].trim().toLowerCase() : '';
+
+        recipientObj = staffDirectory.find(s =>
+          (extractedId && (s.staffId?.toLowerCase() === extractedId || s._id?.toString() === extractedId)) ||
+          s.staffId?.toLowerCase() === q ||
+          s.email?.toLowerCase() === q ||
+          s.name?.toLowerCase() === q ||
+          `${s.name} [${s.staffId}]`.toLowerCase() === q
+        );
+      }
+
+      const recName = recipientObj?.name || parRecipient.trim();
+      const recId = recipientObj?._id || undefined;
+      const recStaffId = recipientObj?.staffId || undefined;
+      const recEmail = recipientObj?.email || undefined;
+      const recRole = recipientObj?.role || 'Staff';
+      const recDept = recipientObj?.department || 'General';
+
       await apiPost('watchman/parcels', {
+        type: 'Parcel',
         deliveryCompany: parCourier.trim() || 'Courier Delivery',
         trackingNumber: parAwb.trim() || undefined,
-        recipientName: parRecipient.trim(),
-        recipientType: 'Staff',
+        recipientId: recId,
+        staffId: recStaffId,
+        recipientEmail: recEmail,
+        recipientName: recName,
+        recipientType: recRole,
+        department: recDept,
         gate: officer.gate || 'Gate 1',
         parcelDetails: 'Standard Package',
       });
@@ -521,7 +583,8 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
       setParCourier('');
       setParAwb('');
       setParRecipient('');
-      Alert.alert('Parcel Logged', `Package logged for ${parRecipient}. Recipient notified.`);
+      setSelectedStaff(null);
+      Alert.alert('Parcel Logged', `Package logged successfully for ${recName}. Recipient notified.`);
       loadData();
     } catch (err: any) {
       Alert.alert('Notice', err?.message || 'Parcel logged successfully.');
@@ -532,25 +595,79 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
     }
   };
 
+  // Android Hardware Back Button Handling
+  useEffect(() => {
+    const onBackPress = () => {
+      if (visitorModalVisible) {
+        setVisitorModalVisible(false);
+        return true;
+      }
+      if (parcelModalVisible) {
+        setParcelModalVisible(false);
+        return true;
+      }
+      if (incidentModalVisible) {
+        setIncidentModalVisible(false);
+        return true;
+      }
+      if (activeTab === 'profile' && moreSection !== 'menu') {
+        setMoreSection('menu');
+        return true;
+      }
+      if (activeTab !== 'home') {
+        setActiveTab('home');
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [activeTab, moreSection, visitorModalVisible, parcelModalVisible, incidentModalVisible]);
+
+  const isInnerScreen = activeTab !== 'home';
+
+  const getScreenTitle = () => {
+    if (activeTab === 'academics') return 'Gate QR & Identity Scanner';
+    if (activeTab === 'referrals') return 'Campus Visitor Register';
+    if (activeTab === 'notifications') return 'Deliveries & Logistics';
+    if (activeTab === 'profile') {
+      if (moreSection === 'shift') return 'Guard Shift Attendance';
+      if (moreSection === 'incidents') return 'Emergency Incident Logs';
+      if (moreSection === 'referrals') return 'Business Referrals';
+      if (moreSection === 'menu') return 'Guard Shift & Controls';
+      return 'Security Officer Profile';
+    }
+    return 'Security Command Center';
+  };
+
+  const handleBackNavigation = () => {
+    if (activeTab === 'profile' && moreSection !== 'profile' && moreSection !== 'settings') {
+      setMoreSection('profile');
+    } else {
+      setActiveTab('home');
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* ============================================================== */}
-      {/* 1. TOP SECURITY GATE COMMAND HEADER                            */}
+      {/* 1. TOP SECURITY GATE COMMAND HEADER WITH BACK NAV & LOGOUT     */}
       {/* ============================================================== */}
-      <View style={styles.topHeaderBar}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>🛡️</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.roleTagRow}>
-              <Text style={styles.roleTag}>SECURITY CONTROL</Text>
-            </View>
-            <Text style={styles.headerNameText} numberOfLines={1}>{officer.name}</Text>
-            <Text style={styles.headerSubText}>{officer.gate} • {officer.shiftStatus}</Text>
-          </View>
-        </View>
-      </View>
+      <ScreenHeader
+        showBack={isInnerScreen}
+        onBack={handleBackNavigation}
+        title={getScreenTitle()}
+        subtitle={activeTab === 'home' ? `${officer.gate} • ${officer.shiftStatus}` : undefined}
+        userName={officer.name}
+        roleBadge="SECURITY"
+        avatarText="🛡️"
+        userSubtitle={`${officer.gate} • ${officer.shiftStatus}`}
+        onProfilePress={() => {
+          setActiveTab('profile');
+          setMoreSection('profile');
+        }}
+        onLogoutPress={onLogout}
+      />
 
       {/* ============================================================== */}
       {/* 2. BODY CONTENT ROUTED BY 5 BOTTOM TABS                        */}
@@ -562,229 +679,174 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
             contentContainerStyle={styles.scrollContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
           >
-            {/* Gate Command Center Hero (Google Pay / PhonePe Style) */}
-            <View style={styles.commandHeroCard}>
-              <View style={styles.heroTopRow}>
-                <View>
-                  <Text style={styles.heroTitle}>{officer.name}</Text>
-                  <Text style={styles.heroSubtitle}>{officer.gate} • {officer.shiftStatus}</Text>
-                </View>
-              </View>
+            {/* 1. Visual Hero Banner with High Quality Security Officer Image */}
+            <DashboardHeroBanner
+              greeting={`Hello, ${officer.name.split(' ')[0] || officer.name} 👋`}
+              subtitle="Gate Control & Campus Security"
+              image={require('../../../assets/images/dashboards/watchman_hero.jpg')}
+              tagline="Safe Campus Secure Future"
+            />
 
-              <View style={styles.heroKpiRow}>
-                <View style={styles.heroKpiItem}>
-                  <Text style={styles.heroKpiLabel}>Movements</Text>
-                  <Text style={[styles.heroKpiValue, { color: '#60A5FA' }]}>
-                    {stats.todayTotalStudents + stats.todayCheckedOutStudents > 0 ? (stats.todayTotalStudents + stats.todayCheckedOutStudents) : movements.length}
-                  </Text>
-                  <Text style={styles.heroKpiSub}>In / Out Log</Text>
+            {/* 2. Gate Operations 2x2 Grid (Matching Reference Design) */}
+            <QuickAccessGrid
+              title="Gate Operations"
+              seeAllText="See all"
+              onSeeAll={() => setActiveTab('academics')}
+              items={[
+                {
+                  id: 'scan',
+                  label: 'Scan Gate Pass',
+                  icon: '🔲',
+                  bg: '#EFF6FF',
+                  borderColor: '#DBEAFE',
+                  textColor: '#1E40AF',
+                  onPress: () => setActiveTab('academics'),
+                },
+                {
+                  id: 'inout',
+                  label: 'Campus In / Out',
+                  icon: '🚪',
+                  bg: '#ECFDF5',
+                  borderColor: '#D1FAE5',
+                  textColor: '#065F46',
+                  badge: stats.studentsInside > 0 ? `${stats.studentsInside} Inside` : undefined,
+                  onPress: () => setActiveTab('academics'),
+                },
+                {
+                  id: 'visitor',
+                  label: 'Visitor Entry',
+                  icon: '👤',
+                  bg: '#F5F3FF',
+                  borderColor: '#EDE9FE',
+                  textColor: '#5B21B6',
+                  badge: stats.visitorsInside > 0 ? `${stats.visitorsInside} Active` : undefined,
+                  onPress: () => setVisitorModalVisible(true),
+                },
+                {
+                  id: 'bus',
+                  label: 'Bus Tracking',
+                  icon: '🚌',
+                  bg: '#FFFBEB',
+                  borderColor: '#FEF3C7',
+                  textColor: '#92400E',
+                  badge: buses.length > 0 ? `${buses.length} Fleet` : undefined,
+                  onPress: () => {
+                    setActiveTab('notifications');
+                    setLogisticsSubTab('buses');
+                  },
+                },
+              ]}
+            />
+
+            {/* 3. Today's Summary Card (Matching Reference Design) */}
+            <View style={styles.summarySectionContainer}>
+              <Text style={styles.summarySectionTitle}>Today's Summary</Text>
+              <View style={styles.summaryCard}>
+                {/* Entries */}
+                <View style={styles.summaryItem}>
+                  <View style={[styles.summaryIconBox, { backgroundColor: '#DCFCE7' }]}>
+                    <Text style={{ fontSize: 16 }}>📥</Text>
+                  </View>
+                  <View style={{ marginLeft: 8 }}>
+                    <Text style={styles.summaryLabel}>Entries</Text>
+                    <Text style={[styles.summaryValue, { color: '#15803D' }]}>
+                      {stats.todayTotalStudents > 0
+                        ? stats.todayTotalStudents
+                        : movements.filter((m) => m.direction === 'In').length}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.heroKpiDivider} />
-                <View style={styles.heroKpiItem}>
-                  <Text style={styles.heroKpiLabel}>Visitors</Text>
-                  <Text style={[styles.heroKpiValue, { color: '#34D399' }]}>
-                    {stats.visitorsInside > 0 ? stats.visitorsInside : activeVisitors.length}
-                  </Text>
-                  <Text style={styles.heroKpiSub}>On Campus</Text>
+
+                <View style={styles.summaryDivider} />
+
+                {/* Exits */}
+                <View style={styles.summaryItem}>
+                  <View style={[styles.summaryIconBox, { backgroundColor: '#EFF6FF' }]}>
+                    <Text style={{ fontSize: 16 }}>📤</Text>
+                  </View>
+                  <View style={{ marginLeft: 8 }}>
+                    <Text style={styles.summaryLabel}>Exits</Text>
+                    <Text style={[styles.summaryValue, { color: '#1E40AF' }]}>
+                      {stats.todayCheckedOutStudents > 0
+                        ? stats.todayCheckedOutStudents
+                        : movements.filter((m) => m.direction === 'Out').length}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.heroKpiDivider} />
-                <View style={styles.heroKpiItem}>
-                  <Text style={styles.heroKpiLabel}>Parcels</Text>
-                  <Text style={[styles.heroKpiValue, { color: '#FBBF24' }]}>
-                    {stats.parcelsAtGate > 0 ? stats.parcelsAtGate : parcels.length}
-                  </Text>
-                  <Text style={styles.heroKpiSub}>In Custody</Text>
+
+                <View style={styles.summaryDivider} />
+
+                {/* Visitors */}
+                <View style={styles.summaryItem}>
+                  <View style={[styles.summaryIconBox, { backgroundColor: '#F5F3FF' }]}>
+                    <Text style={{ fontSize: 16 }}>👤</Text>
+                  </View>
+                  <View style={{ marginLeft: 8 }}>
+                    <Text style={styles.summaryLabel}>Visitors</Text>
+                    <Text style={[styles.summaryValue, { color: '#5B21B6' }]}>
+                      {stats.visitorsInside > 0
+                        ? stats.visitorsInside
+                        : activeVisitors.length}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
 
-            {/* Quick Gate Action Buttons (Google Pay / PhonePe 4-Column Grid) */}
-            <View style={styles.card}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>⚡ Gate Operations</Text>
-                <Text style={styles.cardHeaderSub}>Tap to action</Text>
-              </View>
-
-              <View style={styles.gpayGrid}>
-                {/* 1. Scan QR */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => setActiveTab('academics')}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#EFF6FF' }]}>
-                    <Text style={styles.gpayIcon}>📷</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Scan QR</Text>
-                </TouchableOpacity>
-
-                {/* 2. Campus In */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => {
-                    setActiveTab('academics');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#ECFDF5' }]}>
-                    <Text style={styles.gpayIcon}>🟢</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Campus In</Text>
-                </TouchableOpacity>
-
-                {/* 3. Campus Out */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => {
-                    setActiveTab('academics');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FEF2F2' }]}>
-                    <Text style={styles.gpayIcon}>🔴</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Campus Out</Text>
-                </TouchableOpacity>
-
-                {/* 4. New Visitor */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => setVisitorModalVisible(true)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FAF5FF' }]}>
-                    <Text style={styles.gpayIcon}>👥</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>New Visitor</Text>
-                </TouchableOpacity>
-
-                {/* 5. Bus Movements */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('notifications'); setLogisticsSubTab('buses'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FFFBEB' }]}>
-                    <Text style={styles.gpayIcon}>🚌</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Bus Gate</Text>
-                </TouchableOpacity>
-
-                {/* 6. Parcels */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('notifications'); setLogisticsSubTab('parcels'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#ECFEFF' }]}>
-                    <Text style={styles.gpayIcon}>📦</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Parcels</Text>
-                </TouchableOpacity>
-
-                {/* 7. Alert Incident */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => setIncidentModalVisible(true)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FFF1F2' }]}>
-                    <Text style={styles.gpayIcon}>🚨</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Incident</Text>
-                </TouchableOpacity>
-
-                {/* 8. Shift Roster */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('profile'); setMoreSection('shift'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#EEF2FF' }]}>
-                    <Text style={styles.gpayIcon}>🛡️</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Shift Duty</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Categorized Gate Logistics & Safety (PhonePe Style List) */}
+            {/* Active Visitors on Campus (With One-Tap Quick Exit) */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>🏢 Security & Logistics</Text>
-                <TouchableOpacity onPress={() => setActiveTab('notifications')} activeOpacity={0.7}>
-                  <Text style={styles.cardHeaderLink}>All Logs →</Text>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.cardHeaderTitle}>👥 Active Visitors on Campus ({activeVisitors.length})</Text>
+                  <Text style={styles.sectionSubtitle}>Guests currently inside college premises</Text>
+                </View>
+                <TouchableOpacity onPress={() => { setActiveTab('referrals'); setVisitorSubTab('active'); }} activeOpacity={0.7} style={{ flexShrink: 0 }}>
+                  <Text style={styles.cardHeaderLink}>Full Roster →</Text>
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('notifications'); setLogisticsSubTab('buses'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FFFBEB' }]}>
-                  <Text style={styles.serviceIconEmoji}>🚌</Text>
+              {activeVisitors.length === 0 ? (
+                <View style={styles.emptyStateContainer}>
+                  <Text style={styles.emptyStateEmoji}>✅</Text>
+                  <Text style={styles.emptyStateTitle}>No Active Visitors Inside</Text>
+                  <Text style={styles.emptyStateSubtitle}>All checked-in guests have exited premises.</Text>
                 </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Institutional Bus Gate</Text>
-                  <Text style={styles.serviceRowSub}>{buses.length} Fleet vehicles tracked</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('notifications'); setLogisticsSubTab('parcels'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#ECFEFF' }]}>
-                  <Text style={styles.serviceIconEmoji}>📦</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Gate Custody Deliveries</Text>
-                  <Text style={styles.serviceRowSub}>{parcels.length} Parcels logged for handover</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('profile'); setMoreSection('incidents'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FFF1F2' }]}>
-                  <Text style={styles.serviceIconEmoji}>🚨</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Security Incident Register</Text>
-                  <Text style={styles.serviceRowSub}>{incidents.length} Emergency dispatches recorded</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('referrals'); setVisitorSubTab('active'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FAF5FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>👥</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Current Campus Visitors</Text>
-                  <Text style={styles.serviceRowSub}>{activeVisitors.length} Active visitor passes issued</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
+              ) : (
+                activeVisitors.slice(0, 3).map((v) => (
+                  <TouchableOpacity
+                    key={v.id}
+                    style={styles.visitorMiniRow}
+                    onPress={() => setSelectedVisitorPass(v)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.visitorMiniName}>{v.name}</Text>
+                      <Text style={styles.visitorMiniPurpose}>{v.purpose} • Host: {v.host}</Text>
+                      <Text style={styles.visitorMiniTime}>Entered: {v.checkInTime} • Badge: <Text style={{ fontWeight: '700', color: '#1E3A8A' }}>{v.badgeNumber}</Text></Text>
+                      <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '700', marginTop: 2 }}>View Gate Pass ›</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.exitPillBtn}
+                      onPress={() => handleVisitorExit(v.id, v.name)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.exitPillText}>Mark Exit</Text>
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))
+              )}
             </View>
 
-            {/* Live Campus Gate Movements */}
+            {/* Live Campus Gate Movements (In / Out Register) */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <View>
+                <View style={{ flex: 1, marginRight: 8 }}>
                   <Text style={styles.cardHeaderTitle}>🚪 Real-Time Gate Movements</Text>
                   <Text style={styles.sectionSubtitle}>Live student, staff & visitor transit register</Text>
                 </View>
+                <TouchableOpacity onPress={() => { setActiveTab('referrals'); setVisitorSubTab('history'); }} activeOpacity={0.7} style={{ flexShrink: 0 }}>
+                  <Text style={styles.cardHeaderLink}>History →</Text>
+                </TouchableOpacity>
               </View>
 
               {movements.length === 0 ? (
@@ -794,7 +856,7 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
                   <Text style={styles.emptyStateSubtitle}>Entries and exits logged at the gate will appear here.</Text>
                 </View>
               ) : (
-                movements.slice(0, 5).map((m) => (
+                movements.slice(0, 4).map((m) => (
                   <View key={m.id} style={styles.movementItemRow}>
                     <View style={[styles.directionBadge, m.direction === 'In' ? styles.badgeIn : styles.badgeOut]}>
                       <Text style={[styles.directionBadgeText, m.direction === 'In' ? styles.textIn : styles.textOut]}>
@@ -811,34 +873,38 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
               )}
             </View>
 
-            {/* Active Visitors Summary */}
+            {/* Incoming Deliveries & Custody Parcels */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <View>
-                  <Text style={styles.cardHeaderTitle}>👥 Active Visitors on Campus ({activeVisitors.length})</Text>
-                  <Text style={styles.sectionSubtitle}>Guests currently inside premises</Text>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.cardHeaderTitle}>📦 Gate Deliveries & Parcels ({parcels.length})</Text>
+                  <Text style={styles.sectionSubtitle}>Packages awaiting staff recipient handover</Text>
                 </View>
-                <TouchableOpacity onPress={() => { setActiveTab('referrals'); setVisitorSubTab('active'); }}>
-                  <Text style={styles.cardHeaderLink}>Manage →</Text>
+                <TouchableOpacity onPress={() => { setActiveTab('notifications'); setLogisticsSubTab('parcels'); }} activeOpacity={0.7} style={{ flexShrink: 0 }}>
+                  <Text style={styles.cardLinkText}>All Parcels →</Text>
                 </TouchableOpacity>
               </View>
 
-              {activeVisitors.slice(0, 3).map((v) => (
-                <View key={v.id} style={styles.visitorMiniRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.visitorMiniName}>{v.name}</Text>
-                    <Text style={styles.visitorMiniPurpose}>{v.purpose} • Host: {v.host}</Text>
-                    <Text style={styles.visitorMiniTime}>Entered: {v.checkInTime} ({v.badgeNumber})</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.exitPillBtn}
-                    onPress={() => handleVisitorExit(v.id, v.name)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.exitPillText}>Mark Exit</Text>
-                  </TouchableOpacity>
+              {parcels.length === 0 ? (
+                <View style={styles.emptyStateContainer}>
+                  <Text style={styles.emptyStateEmoji}>📦</Text>
+                  <Text style={styles.emptyStateTitle}>No Pending Parcels</Text>
+                  <Text style={styles.emptyStateSubtitle}>All deliveries received at the gate have been handed over.</Text>
                 </View>
-              ))}
+              ) : (
+                parcels.slice(0, 2).map((p) => (
+                  <View key={p.id} style={styles.parcelCardFull}>
+                    <View style={styles.parcelTopRow}>
+                      <Text style={styles.parcelCourierText}>To: {p.recipientName}</Text>
+                      <View style={styles.statusPillCustody}>
+                        <Text style={styles.statusTextCustody}>{p.status}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.parcelMetaText}>🚚 {p.courier} • AWB: {p.awb}</Text>
+                    <Text style={styles.parcelMetaText}>Gate: {officer.gate} • OTP: <Text style={{ fontWeight: '800', color: '#2563EB' }}>{p.otp}</Text></Text>
+                  </View>
+                ))
+              )}
             </View>
           </ScrollView>
         )}
@@ -1134,7 +1200,12 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
                       </View>
                     ) : (
                       parcels.map((p) => (
-                        <View key={p.id} style={styles.parcelCardFull}>
+                        <TouchableOpacity
+                          key={p.id}
+                          style={styles.parcelCardFull}
+                          onPress={() => setSelectedParcelSlip(p)}
+                          activeOpacity={0.7}
+                        >
                           <View style={styles.parcelTopRow}>
                             <Text style={styles.parcelCourierText}>{p.courier}</Text>
                             <View style={styles.statusPillCustody}>
@@ -1148,7 +1219,8 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
                             <Text style={styles.otpLabel}>Verification OTP for Recipient:</Text>
                             <Text style={styles.otpValueText}>{p.otp}</Text>
                           </View>
-                        </View>
+                          <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '700', marginTop: 6 }}>View Package Details & Clearance Slip ›</Text>
+                        </TouchableOpacity>
                       ))
                     )}
                   </View>
@@ -1219,25 +1291,78 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
           </View>
         )}
 
-        {/* TAB 5: MORE (SHIFT DUTY, EMERGENCY INCIDENTS, PROFILE) */}
+        {/* TAB 5: PROFILE */}
         {activeTab === 'profile' && (
           <View style={{ flex: 1 }}>
-            {/* Context Header Banner */}
-            <View style={styles.pageHeaderBanner}>
-              <Text style={styles.pageHeaderTitle}>Security Officer Shift & Safety</Text>
-              <Text style={styles.pageHeaderDesc}>
-                Manage guard shifts, log campus incidents and emergency alerts, or review gate security settings.
-              </Text>
+            {/* Top Sub-Navigation Switcher: Officer Profile vs Gate Controls */}
+            <View style={styles.profileToggleHeader}>
+              <TouchableOpacity
+                style={[
+                  styles.profileToggleTab,
+                  (moreSection === 'profile' || moreSection === 'settings') && styles.profileToggleTabActive,
+                ]}
+                onPress={() => setMoreSection('profile')}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.profileToggleTabText,
+                    (moreSection === 'profile' || moreSection === 'settings') && styles.profileToggleTabTextActive,
+                  ]}
+                >
+                  🛡️ Officer Profile
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.profileToggleTab,
+                  (moreSection !== 'profile' && moreSection !== 'settings') && styles.profileToggleTabActive,
+                ]}
+                onPress={() => setMoreSection('menu')}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.profileToggleTabText,
+                    (moreSection !== 'profile' && moreSection !== 'settings') && styles.profileToggleTabTextActive,
+                  ]}
+                >
+                  🚨 Shift & Duty
+                </Text>
+              </TouchableOpacity>
             </View>
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
-            >
-              {moreSection !== 'menu' && (
-                <TouchableOpacity style={styles.backToMenuBtn} onPress={() => setMoreSection('menu')} activeOpacity={0.7}>
-                  <Text style={styles.backToMenuText}>← Back to Security Menu</Text>
-                </TouchableOpacity>
-              )}
+
+            {/* VIEW 1: OFFICIAL USER PROFILE (PRIMARY VIEW FOR PROFILE TAB & HEADER AVATAR) */}
+            {(moreSection === 'profile' || moreSection === 'settings') && (
+              <UserProfileScreen
+                user={user}
+                roleTitle="Security Officer"
+                onLogout={onLogout}
+                onBack={() => setActiveTab('home')}
+                hideTopBar={true}
+                roleAttributes={[
+                  { label: 'Officer Name', value: officer.name },
+                  { label: 'Security Badge ID', value: officer.badgeId },
+                  { label: 'Assigned Gate / Post', value: officer.gate },
+                  { label: 'Security Shift', value: officer.shift },
+                  { label: 'Duty Status', value: officer.shiftStatus },
+                  { label: 'Shift Attendance Time', value: officer.lastPunchTime || 'On Duty' },
+                ]}
+              />
+            )}
+
+            {/* VIEW 2: GUARD SHIFT & CONTROLS */}
+            {moreSection !== 'profile' && moreSection !== 'settings' && (
+              <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
+              >
+                {moreSection !== 'menu' && (
+                  <TouchableOpacity style={styles.backToMenuBtn} onPress={() => setMoreSection('menu')} activeOpacity={0.7}>
+                    <Text style={styles.backToMenuText}>← Back to Security Menu</Text>
+                  </TouchableOpacity>
+                )}
 
             {moreSection === 'menu' && (
               <View>
@@ -1260,6 +1385,7 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
                     {[
                       { id: 'shift', label: 'Guard Shift Attendance', desc: 'Clock-in / Clock-out timestamp verification', icon: '⏰' },
                       { id: 'incidents', label: 'Emergency Incidents & Alerts', desc: 'Log security breaches, medical or fire emergencies', icon: '🚨' },
+                      { id: 'referrals', label: 'Business Referral Hub', desc: 'Refer Banking, Cards, Insurance & Jobs for verified rewards', icon: '🎁' },
                       { id: 'settings', label: 'Security Gate Settings', desc: 'Gate assignment and officer verification records', icon: '⚙️' },
                     ].map((item) => (
                       <TouchableOpacity
@@ -1354,35 +1480,17 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
               </View>
             )}
 
-            {/* SUB-SECTION 3: SETTINGS */}
-            {moreSection === 'settings' && (
-              <View style={styles.card}>
-                <Text style={styles.cardHeaderTitle}>⚙️ Gate Security Settings</Text>
-                <Text style={styles.sectionSubtitle}>Configured gate controls and officer details</Text>
-
-                <View style={styles.specGrid}>
-                  <View style={styles.specItem}>
-                    <Text style={styles.specLabel}>Officer Name</Text>
-                    <Text style={styles.specValue}>{officer.name}</Text>
-                  </View>
-                  <View style={styles.specItem}>
-                    <Text style={styles.specLabel}>Security Badge ID</Text>
-                    <Text style={styles.specValue}>{officer.badgeId}</Text>
-                  </View>
-                  <View style={styles.specItem}>
-                    <Text style={styles.specLabel}>Assigned Gate</Text>
-                    <Text style={styles.specValue}>{officer.gate}</Text>
-                  </View>
-                  <View style={styles.specItem}>
-                    <Text style={styles.specLabel}>Security Shift</Text>
-                    <Text style={styles.specValue}>{officer.shift}</Text>
-                  </View>
-                </View>
+            {/* SUB-SECTION 3: BUSINESS REFERRALS */}
+            {moreSection === 'referrals' && (
+              <View style={{ flex: 1, minHeight: 600 }}>
+                <ReferralHub user={user} />
               </View>
             )}
-          </ScrollView>
-        </View>
-      )}
+
+              </ScrollView>
+            )}
+          </View>
+        )}
       </View>
 
       {/* ============================================================== */}
@@ -1390,14 +1498,19 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
       {/* ============================================================== */}
       <BottomTabBar
         activeTab={activeTab}
-        onTabChange={(t) => setActiveTab(t)}
+        onTabChange={(t) => {
+          if (t === 'profile') {
+            setMoreSection('profile');
+          }
+          setActiveTab(t);
+        }}
         notificationsCount={parcels.length}
         tabLabels={{
           home: 'Home',
           academics: 'Scan',
           referrals: 'Visitors',
           notifications: 'Logistics',
-          profile: 'More',
+          profile: 'Profile',
         }}
         tabIcons={{
           home: '🏠',
@@ -1496,13 +1609,80 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
               onChangeText={setParAwb}
             />
 
-            <Text style={styles.inputLabel}>Recipient Faculty / Student Name *</Text>
+            <Text style={styles.inputLabel}>Recipient Faculty / Staff Member *</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="e.g. Prof. Karthik S. (CSE)"
+              placeholder="Type name or ID (e.g. Ananya, HOD001, STF008)..."
               value={parRecipient}
-              onChangeText={setParRecipient}
+              onChangeText={(text) => {
+                setParRecipient(text);
+                if (selectedStaff && !text.includes(selectedStaff.name)) {
+                  setSelectedStaff(null);
+                }
+              }}
             />
+
+            {selectedStaff && (
+              <View style={{
+                backgroundColor: '#ECFDF5',
+                borderColor: '#10B981',
+                borderWidth: 1,
+                borderRadius: 8,
+                padding: 8,
+                marginBottom: 10,
+                flexDirection: 'row',
+                alignItems: 'center'
+              }}>
+                <Text style={{ fontSize: 12, color: '#065F46', fontWeight: '700' }}>
+                  ✓ Linked: {selectedStaff.name} [{selectedStaff.staffId || 'Verified'}] • {selectedStaff.department || 'Staff'}
+                </Text>
+              </View>
+            )}
+
+            {!selectedStaff && parRecipient.trim().length > 1 && (
+              <View style={{
+                maxHeight: 130,
+                backgroundColor: '#FFFFFF',
+                borderColor: '#CBD5E1',
+                borderWidth: 1,
+                borderRadius: 8,
+                marginBottom: 10,
+                overflow: 'hidden'
+              }}>
+                <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                  {staffDirectory
+                    .filter(s =>
+                      s.name?.toLowerCase().includes(parRecipient.toLowerCase()) ||
+                      s.staffId?.toLowerCase().includes(parRecipient.toLowerCase()) ||
+                      s.email?.toLowerCase().includes(parRecipient.toLowerCase()) ||
+                      s.department?.toLowerCase().includes(parRecipient.toLowerCase())
+                    )
+                    .slice(0, 5)
+                    .map((s, idx) => (
+                      <TouchableOpacity
+                        key={s._id || s.staffId || idx}
+                        style={{
+                          padding: 8,
+                          borderBottomColor: '#F1F5F9',
+                          borderBottomWidth: 1,
+                          backgroundColor: '#FAFAFA'
+                        }}
+                        onPress={() => {
+                          setSelectedStaff(s);
+                          setParRecipient(`${s.name} [${s.staffId || s.email}]`);
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
+                          {s.name} <Text style={{ color: '#D97706' }}>[{s.staffId || 'Verified'}]</Text>
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>
+                          {s.department || 'Staff'} • {s.email}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                </ScrollView>
+              </View>
+            )}
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setParcelModalVisible(false)}>
@@ -1560,6 +1740,228 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 4. DIGITAL VISITOR GATE PASS MODAL                            */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedVisitorPass !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedVisitorPass(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 520 }]}>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E3A8A', letterSpacing: 1.2 }}>
+                CAMPUS SECURITY GATE PASS
+              </Text>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A', marginTop: 2 }}>
+                {selectedVisitorPass?.name}
+              </Text>
+              <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginTop: 6, borderWidth: 1, borderColor: '#BFDBFE' }}>
+                <Text style={{ color: '#1D4ED8', fontSize: 13, fontWeight: '800' }}>
+                  BADGE: {selectedVisitorPass?.badgeNumber}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 280 }}>
+              <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Contact Phone:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedVisitorPass?.phone}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Visit Purpose:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedVisitorPass?.purpose}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Host Department:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedVisitorPass?.host}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Vehicle Number:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedVisitorPass?.vehicleNumber || 'Pedestrian Walk-in'}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Entry Check-in Time:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedVisitorPass?.checkInTime}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Authorized Gate:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{officer.gate}</Text>
+                </View>
+              </View>
+
+              <View style={[styles.guidanceTipBox, { marginTop: 10 }]}>
+                <Text style={styles.guidanceTipEmoji}>🛡️</Text>
+                <Text style={styles.guidanceTipText}>
+                  Authorized visitor within campus boundaries. Digital pass must be surrendered or checked out upon exit.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={[styles.modalActions, { marginTop: 14 }]}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setSelectedVisitorPass(null)}
+              >
+                <Text style={styles.modalCancelText}>Close Pass</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, { backgroundColor: '#DC2626' }]}
+                onPress={() => {
+                  if (selectedVisitorPass) {
+                    handleVisitorExit(selectedVisitorPass.id, selectedVisitorPass.name);
+                    setSelectedVisitorPass(null);
+                  }
+                }}
+              >
+                <Text style={styles.modalSubmitText}>Record Departure</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 5. CAMPUS ACCESS CLEARANCE MODAL                               */}
+      {/* ============================================================== */}
+      <Modal
+        visible={accessClearanceModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAccessClearanceModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 420 }]}>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 32, marginBottom: 4 }}>
+                {lastClearanceAction?.actionType === 'IN' ? '✅' : '🚪'}
+              </Text>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>
+                {lastClearanceAction?.title || 'CAMPUS ACCESS CLEARANCE'}
+              </Text>
+              <View
+                style={{
+                  backgroundColor: lastClearanceAction?.actionType === 'IN' ? '#DCFCE7' : '#EFF6FF',
+                  paddingHorizontal: 12,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  marginTop: 6,
+                }}
+              >
+                <Text
+                  style={{
+                    color: lastClearanceAction?.actionType === 'IN' ? '#15803D' : '#1D4ED8',
+                    fontSize: 12,
+                    fontWeight: '800',
+                  }}
+                >
+                  STATUS: {lastClearanceAction?.status}
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Person Name:</Text>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#1E293B' }}>{lastClearanceAction?.person?.name}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Member ID:</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{lastClearanceAction?.person?.id}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Role / Dept:</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>
+                  {lastClearanceAction?.person?.type} • {lastClearanceAction?.person?.dept}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Security Gate:</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{lastClearanceAction?.gate}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Timestamp:</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{lastClearanceAction?.timestamp}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, { marginTop: 14 }]}
+              onPress={() => setAccessClearanceModalVisible(false)}
+            >
+              <Text style={styles.primaryBtnText}>Acknowledge Clearance ✓</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 6. PARCEL DETAILS & CUSTODY SLIP MODAL                         */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedParcelSlip !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedParcelSlip(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 460 }]}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E3A8A', letterSpacing: 1 }}>
+              GATE DELIVERY CUSTODY SLIP
+            </Text>
+            <Text style={[styles.modalTitle, { fontSize: 16, marginTop: 2 }]}>
+              {selectedParcelSlip?.courier} Package
+            </Text>
+            <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 10 }}>
+              Tracking AWB: {selectedParcelSlip?.awb}
+            </Text>
+
+            <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Recipient Staff:</Text>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#1E293B' }}>{selectedParcelSlip?.recipientName}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Received On:</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedParcelSlip?.receivedDate}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Custody Status:</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#15803D' }}>{selectedParcelSlip?.status}</Text>
+              </View>
+            </View>
+
+            <View style={[styles.otpRowBox, { marginTop: 12 }]}>
+              <Text style={styles.otpLabel}>Verification Handover OTP:</Text>
+              <Text style={styles.otpValueText}>{selectedParcelSlip?.otp}</Text>
+            </View>
+
+            <View style={[styles.modalActions, { marginTop: 14 }]}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setSelectedParcelSlip(null)}
+              >
+                <Text style={styles.modalCancelText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, { backgroundColor: '#2563EB' }]}
+                onPress={() => {
+                  if (selectedParcelSlip?.recipientPhone) {
+                    Linking.openURL(`tel:${selectedParcelSlip.recipientPhone}`).catch(() => null);
+                  }
+                  setSelectedParcelSlip(null);
+                }}
+              >
+                <Text style={styles.modalSubmitText}>📞 Call Recipient</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -1700,6 +2102,36 @@ const styles = StyleSheet.create({
     color: '#CBD5E1',
   },
 
+  // PROFILE / SERVICES TOGGLE
+  profileToggleHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 10,
+  },
+  profileToggleTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  profileToggleTabActive: {
+    backgroundColor: '#1E3A8A',
+  },
+  profileToggleTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  profileToggleTabTextActive: {
+    color: '#FFFFFF',
+  },
+
   // CARDS & HEADINGS
   card: {
     backgroundColor: '#FFFFFF',
@@ -1729,6 +2161,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#2563EB',
+  },
+  cardLinkText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  primaryBtn: {
+    backgroundColor: '#1E3A8A',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  primaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   sectionSubtitle: {
     fontSize: 12,
@@ -2591,5 +3039,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#1E40AF',
     lineHeight: 16,
+  },
+  summarySectionContainer: {
+    marginBottom: 16,
+  },
+  summarySectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  summaryCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  summaryItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  summaryValue: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  summaryDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#E2E8F0',
   },
 });

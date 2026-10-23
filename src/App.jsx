@@ -168,6 +168,7 @@ import StaffPayroll from './staff/pages/StaffPayroll';
 import StaffPlacements from './staff/pages/StaffPlacements';
 import StaffLibrary from './staff/pages/StaffLibrary';
 import StaffSupport from './staff/pages/StaffSupport';
+import StaffSettings from './staff/pages/StaffSettings';
 import StaffDeliveryParcelPage from './staff/pages/StaffDeliveryParcelPage';
 import AdminDeliveryParcelManagement from './pages/admin/AdminDeliveryParcelManagement';
 
@@ -606,6 +607,8 @@ function App() {
               <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
               <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
               <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
+              <Route path="parcels"       element={<StaffDeliveryParcelPage />} />
+              <Route path="deliveries"    element={<StaffDeliveryParcelPage />} />
             </Route>
 
             {/* ── HOD ROUTES ── */}
@@ -638,6 +641,8 @@ function App() {
               <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
               <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
               <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
+              <Route path="parcels"       element={<StaffDeliveryParcelPage />} />
+              <Route path="deliveries"    element={<StaffDeliveryParcelPage />} />
             </Route>
 
             {/* ── STAFF ROUTES ── */}
@@ -657,6 +662,8 @@ function App() {
               <Route path="placements" element={<StaffPlacements />} />
               <Route path="library"    element={<StaffLibrary />} />
               <Route path="support"    element={<StaffSupport />} />
+              <Route path="settings"   element={<StaffSettings />} />
+              <Route path="profile"    element={<StaffSettings />} />
               <Route path="parcels"    element={<StaffDeliveryParcelPage />} />
               <Route path="deliveries" element={<StaffDeliveryParcelPage />} />
               <Route path="referrals"  element={<PersonalReferrals />} />
@@ -834,6 +841,8 @@ function App() {
               <Route path="business-referral/insurance" element={<BusinessReferralInsurance />} />
               <Route path="business-referral/job-referral" element={<BusinessReferralJob />} />
               <Route path="business-referral/account-opening" element={<BusinessReferralAccountOpening />} />
+              <Route path="parcels"       element={<StaffDeliveryParcelPage />} />
+              <Route path="deliveries"    element={<StaffDeliveryParcelPage />} />
             </Route>
 
             {/* ── WATCHMAN ROUTES ── */}
@@ -868,6 +877,7 @@ function App() {
               <Route path="verify" element={<QrVerificationPage />} />
               <Route path="notifications" element={<WatchmanNotificationsPage />} />
               <Route path="profile" element={<WatchmanProfilePage />} />
+              <Route path="settings" element={<WatchmanProfilePage />} />
               <Route path="change-password" element={<WatchmanChangePasswordPage />} />
             </Route>
 

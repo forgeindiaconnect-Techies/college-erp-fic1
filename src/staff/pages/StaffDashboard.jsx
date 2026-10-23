@@ -498,6 +498,7 @@ const StaffDashboard = () => {
         <EmployeeAttendanceCard />
       </div>
 
+
       {/* 4 Interactive ERP KPI Cards */}
       <div className="staff-stats-grid staff-kpi-grid">
         <div 

@@ -70,11 +70,13 @@ export default function BottomTabBar({
   );
 }
 
+import { Colors } from '../../constants/designSystem';
+
 const styles = StyleSheet.create({
   tabBarWrapper: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: Colors.surfaceBorder,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.05,
@@ -102,7 +104,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   iconContainerActive: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: Colors.primaryLight,
   },
   tabIcon: {
     fontSize: 20,
@@ -111,7 +113,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -2,
     right: 2,
-    backgroundColor: '#DC2626',
+    backgroundColor: Colors.danger,
     borderRadius: 8,
     minWidth: 16,
     height: 16,
@@ -127,18 +129,18 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#64748B',
+    color: Colors.textMuted,
     marginTop: 1,
   },
   tabLabelActive: {
-    color: '#1E3A8A',
+    color: Colors.primaryAccent,
     fontWeight: '800',
   },
   activeDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#2563EB',
+    backgroundColor: Colors.primaryAccent,
     marginTop: 3,
   },
 });

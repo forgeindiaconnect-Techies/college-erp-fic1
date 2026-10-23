@@ -324,12 +324,19 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
       try {
         const reservationsRes = await getLibraryReservations();
         rData = Array.isArray(reservationsRes.data) ? reservationsRes.data : [];
-        const resKeys = new Set(rData.map(r => `${r.bookId?._id || r.bookId}_${r.userId}`));
+        const resIds = new Set(rData.map(r => String(r._id)));
+        const activeResKeys = new Set(
+          rData
+            .filter(r => ['Pending', 'Approved', 'Reserved'].includes(r.status))
+            .map(r => `${r.bookId?._id || r.bookId}_${r.userId}`)
+        );
         (Array.isArray(tData) ? tData : []).forEach(t => {
           if (['Pending', 'Approved', 'Reserved'].includes(t.status)) {
             const key = `${t.bookId?._id || t.bookId}_${t.userId}`;
-            if (!resKeys.has(key)) {
-              resKeys.add(key);
+            const tId = String(t._id);
+            if (!resIds.has(tId) && !activeResKeys.has(key)) {
+              resIds.add(tId);
+              activeResKeys.add(key);
               rData.push({
                 _id: t._id,
                 bookId: t.bookId,
@@ -1008,7 +1015,27 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
   });
 
   // Unified Borrower Resolver (Students, Staff, HOD)
-  const getBorrowerInfo = (userId, userType) => {
+  const getBorrowerInfo = (userId, userType, resObj = null) => {
+    if (resObj?.borrowerName) {
+      const detectedRole = resObj.userType || userType || 'Student';
+      const roleBadge = detectedRole === 'HOD'
+        ? { label: 'HOD', bg: 'bg-purple-100 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800' }
+        : detectedRole === 'Staff'
+        ? { label: 'Staff', bg: 'bg-blue-100 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800' }
+        : { label: 'Student', bg: 'bg-emerald-100 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800' };
+
+      return {
+        name: resObj.borrowerName,
+        id: resObj.borrowerId || userId,
+        rawId: userId,
+        dept: resObj.borrowerDept || 'Department',
+        role: detectedRole,
+        roleBadge,
+        email: '',
+        rawObj: resObj
+      };
+    }
+
     const cleanId = String(userId || '').trim();
     const cleanType = String(userType || '').trim();
 
@@ -3866,10 +3893,11 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                     }
 
                     return filtered.map(request => {
-                      const studentName = request.studentName || request.studentId?.name || 'Student';
+                      const bInfo = getBorrowerInfo(request.studentId?._id || request.studentId?.id || request.studentId || request.admissionNumber, 'Student');
+                      const studentName = request.studentName || request.studentId?.name || bInfo.name || 'Student';
                       const initials = studentName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || 'ST';
-                      const admNo = request.admissionNumber || request.studentId?.admissionNumber || request.studentId?.rollNo || '-';
-                      const dept = request.department || request.studentId?.department || '-';
+                      const admNo = request.admissionNumber || request.studentId?.admissionNumber || request.studentId?.rollNo || bInfo.id || '-';
+                      const dept = request.department || request.studentId?.department || bInfo.dept || '-';
 
                       return (
                         <tr key={request._id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
@@ -4171,20 +4199,14 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                       .filter(r => {
                         if (!reservationSearch.trim()) return true;
                         const query = reservationSearch.toLowerCase();
-                        const studentObj = students.find(s =>
-                          s.id === r.userId ||
-                          s.referenceId === r.userId ||
-                          s.studentId === r.userId ||
-                          s.rollNo === r.userId ||
-                          s.registerNumber === r.userId ||
-                          String(s._id) === String(r.userId)
-                        );
-                        const sName = (studentObj?.name || r.userId || '').toLowerCase();
-                        const sRoll = (studentObj?.rollNo || studentObj?.registerNumber || studentObj?.studentId || '').toLowerCase();
+                        const bInfo = getBorrowerInfo(r.userId, r.userType, r);
+                        const sName = (bInfo.name || r.userId || '').toLowerCase();
+                        const sRoll = (bInfo.id || '').toLowerCase();
+                        const sDept = (bInfo.dept || '').toLowerCase();
                         const bTitle = (r.bookId?.title || '').toLowerCase();
                         const bAuthor = (r.bookId?.author || '').toLowerCase();
                         const reqId = (r._id || '').toLowerCase();
-                        return sName.includes(query) || sRoll.includes(query) || bTitle.includes(query) || bAuthor.includes(query) || reqId.includes(query);
+                        return sName.includes(query) || sRoll.includes(query) || sDept.includes(query) || bTitle.includes(query) || bAuthor.includes(query) || reqId.includes(query);
                       });
 
                     if (filtered.length === 0) {
@@ -4208,7 +4230,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                     }
 
                     return filtered.map(res => {
-                      const bInfo = getBorrowerInfo(res.userId, res.userType);
+                      const bInfo = getBorrowerInfo(res.userId, res.userType, res);
                       const studentName = bInfo.name;
                       const studentRoll = bInfo.id;
                       const studentDept = bInfo.dept;

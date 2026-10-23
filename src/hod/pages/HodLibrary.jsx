@@ -54,7 +54,12 @@ import {
   getLibraryReservations,
   approveLibraryReservation,
   rejectLibraryReservation,
-  getLibraryClearanceRequests
+  getLibraryClearanceRequests,
+  getMyLibraryTransactions,
+  getMyLibraryReturnRequests,
+  requestLibraryBook,
+  createLibraryReturnRequest,
+  returnLibraryBook
 } from '../../api';
 import './HodLibrary.css';
 
@@ -123,6 +128,14 @@ const HodLibrary = () => {
   const [loading, setLoading] = useState(true);
   const [feedbackMsg, setFeedbackMsg] = useState(null);
 
+  // HOD Personal Borrowing State
+  const [myTransactions, setMyTransactions] = useState([]);
+  const [myReturnRequests, setMyReturnRequests] = useState([]);
+  const [myBorrowSearch, setMyBorrowSearch] = useState('');
+  const [myBorrowStatus, setMyBorrowStatus] = useState('All'); // 'All' | 'Active' | 'Returned' | 'Pending'
+  const [requestingBookId, setRequestingBookId] = useState(null);
+  const [returningTxId, setReturningTxId] = useState(null);
+
   const hodSession = useMemo(() => {
     try {
       return JSON.parse(sessionStorage.getItem('hod_session') || '{}');
@@ -136,7 +149,7 @@ const HodLibrary = () => {
     try {
       setLoading(true);
 
-      const [booksRes, txRes, resRes, stdRes, staffRes, borrowersRes, returnRes, clearanceRes] = await Promise.all([
+      const [booksRes, txRes, resRes, stdRes, staffRes, borrowersRes, returnRes, clearanceRes, myTxRes, myReturnRes] = await Promise.all([
         getLibraryBooks().catch(() => ({ data: [] })),
         getAllLibraryTransactions().catch(() => ({ data: [] })),
         getLibraryReservations().catch(() => ({ data: [] })),
@@ -144,7 +157,9 @@ const HodLibrary = () => {
         getAllStaff ? getAllStaff().catch(() => ({ data: [] })) : getStaff().catch(() => ({ data: [] })),
         getLibraryBorrowers().catch(() => ({ data: [] })),
         getLibraryReturnRequests().catch(() => ({ data: [] })),
-        getLibraryClearanceRequests().catch(() => ({ data: [] }))
+        getLibraryClearanceRequests().catch(() => ({ data: [] })),
+        getMyLibraryTransactions().catch(() => ({ data: [] })),
+        getMyLibraryReturnRequests().catch(() => ({ data: [] }))
       ]);
 
       const rawBooks = Array.isArray(booksRes.data) ? booksRes.data : [];
@@ -182,6 +197,8 @@ const HodLibrary = () => {
       setStaffList(rawStaff);
       setReturnRequests(rawReturn);
       setClearances(rawClearance);
+      setMyTransactions(Array.isArray(myTxRes?.data) ? myTxRes.data : []);
+      setMyReturnRequests(Array.isArray(myReturnRes?.data) ? myReturnRes.data : []);
     } catch (err) {
       console.error('Failed to load library data', err);
     } finally {
@@ -192,6 +209,115 @@ const HodLibrary = () => {
   useEffect(() => {
     fetchLibraryData();
   }, []);
+
+  const handleRequestBook = async (book) => {
+    try {
+      const bId = book._id || book.id;
+      setRequestingBookId(bId);
+      const res = await requestLibraryBook({ bookId: bId });
+      const msg = res?.data?.message || `Book request for "${book.title}" submitted to central library successfully! Waiting for librarian approval.`;
+      setFeedbackMsg({
+        type: 'success',
+        text: msg
+      });
+      await fetchLibraryData();
+    } catch (err) {
+      console.error('HOD request book error:', err);
+      setFeedbackMsg({
+        type: 'error',
+        text: err?.response?.data?.message || 'Failed to submit book request.'
+      });
+    } finally {
+      setRequestingBookId(null);
+    }
+  };
+
+  const handleReturnMyBook = async (tx) => {
+    try {
+      setReturningTxId(tx._id);
+      try {
+        await createLibraryReturnRequest(tx._id);
+      } catch (reqErr) {
+        await returnLibraryBook(tx._id);
+      }
+      setFeedbackMsg({
+        type: 'success',
+        text: `Return request submitted for "${tx.bookId?.title || 'Book'}". Please deposit the physical copy at the central library desk.`
+      });
+      await fetchLibraryData();
+    } catch (err) {
+      console.error('HOD return book error:', err);
+      setFeedbackMsg({
+        type: 'error',
+        text: err?.response?.data?.message || 'Failed to submit return request.'
+      });
+    } finally {
+      setReturningTxId(null);
+    }
+  };
+
+  const isBookRequestedByHod = (bookId) => {
+    const rawTargetId = String(bookId || '').trim();
+    if (!rawTargetId) return false;
+
+    // Check myTransactions
+    const inTx = myTransactions.some(tx => {
+      const bId = String(tx.bookId?._id || tx.bookId || tx.bookId?.id || '');
+      const bCode = String(tx.bookId?.bookId || '');
+      const matchBook = (bId && bId === rawTargetId) || (bCode && bCode === rawTargetId);
+      return matchBook && ['Pending', 'Approved', 'Reserved', 'Issued', 'Overdue'].includes(tx.status);
+    });
+    if (inTx) return true;
+
+    // Check reservations
+    const userKeys = [
+      String(hodSession.id || ''),
+      String(hodSession._id || ''),
+      String(hodSession.referenceId || ''),
+      String(hodSession.email || ''),
+      String(hodSession.name || '')
+    ].filter(Boolean).map(s => s.toLowerCase());
+
+    const inRes = reservations.some(r => {
+      const bId = String(r.bookId?._id || r.bookId || r.bookId?.id || '');
+      const bCode = String(r.bookId?.bookId || '');
+      const matchBook = (bId && bId === rawTargetId) || (bCode && bCode === rawTargetId);
+      const rUid = String(r.userId || '').toLowerCase();
+      const matchUser = userKeys.includes(rUid);
+      return matchBook && (matchUser || r.userType === 'HOD') && ['Pending', 'Approved', 'Reserved', 'Issued'].includes(r.status);
+    });
+
+    return inRes;
+  };
+
+  const isMyReturnPending = (txId) => {
+    return myReturnRequests.some(r => {
+      const rTxId = r.transactionId?._id || r.transactionId;
+      return (String(rTxId) === String(txId)) && r.status === 'Pending';
+    });
+  };
+
+  const filteredMyTransactions = useMemo(() => {
+    return myTransactions.filter(tx => {
+      const title = (tx.bookId?.title || '').toLowerCase();
+      const author = (tx.bookId?.author || '').toLowerCase();
+      const s = myBorrowSearch.toLowerCase();
+      const matchSearch = !myBorrowSearch || title.includes(s) || author.includes(s) || String(tx.status || '').toLowerCase().includes(s);
+
+      const status = String(tx.status || '').toLowerCase();
+      const returnPending = isMyReturnPending(tx._id);
+      let matchFilter = true;
+      if (myBorrowStatus === 'Active') {
+        matchFilter = ['issued', 'overdue'].includes(status) && !returnPending;
+      } else if (myBorrowStatus === 'Returned') {
+        matchFilter = status === 'returned' || Boolean(tx.returnDate);
+      } else if (myBorrowStatus === 'Pending') {
+        matchFilter = ['pending', 'approved', 'reserved'].includes(status) || returnPending;
+      }
+
+      return matchSearch && matchFilter;
+    });
+  }, [myTransactions, myReturnRequests, myBorrowSearch, myBorrowStatus]);
 
   const handleApproveRequest = async (item) => {
     try {
@@ -918,6 +1044,7 @@ const HodLibrary = () => {
       <div className="hod-tabs-bar">
         {[
           { key: 'Department Catalog', label: 'Department Catalog', count: displayBooksList.length, icon: <Book size={15} /> },
+          { key: 'My Borrowed Books', label: 'My Borrowed Books', count: myTransactions.length, icon: <Bookmark size={15} /> },
           { key: 'Student Circulation', label: 'Student Circulation', count: filteredStudentCirculation.length, icon: <GraduationCap size={15} /> },
           { key: 'Faculty Circulation', label: 'Faculty / Staff Circulation', count: filteredStaffCirculation.length, icon: <Briefcase size={15} /> },
           { key: 'Reservations', label: 'Issue Requests', count: pendingIssueRequests.length, alert: pendingIssueRequests.length > 0, icon: <Clock size={15} /> },
@@ -1011,18 +1138,19 @@ const HodLibrary = () => {
                       <th>Location</th>
                       <th>Copies in Stock</th>
                       <th>Availability</th>
+                      <th style={{ textAlign: 'right' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td colSpan="7" className="p-8 text-center text-muted">
+                        <td colSpan="8" className="p-8 text-center text-muted">
                           Loading library catalog...
                         </td>
                       </tr>
                     ) : filteredBooks.length === 0 ? (
                       <tr>
-                        <td colSpan="7" className="p-8 text-center text-muted">
+                        <td colSpan="8" className="p-8 text-center text-muted">
                           <BookOpen size={28} className="mx-auto text-slate-400 mb-2" />
                           <p className="font-semibold text-slate-700">No books found matching search criteria.</p>
                           {catalogScope === 'department' && (
@@ -1044,6 +1172,7 @@ const HodLibrary = () => {
                             ? Number(book.availableCopies)
                             : (book.available !== undefined ? Number(book.available) : total);
                         const isAvail = avail > 0;
+                        const isRequested = isBookRequestedByHod(book._id || book.id);
 
                         return (
                           <tr key={book._id}>
@@ -1099,6 +1228,280 @@ const HodLibrary = () => {
                               >
                                 {isAvail ? 'Available' : 'Out of Stock'}
                               </span>
+                            </td>
+
+                            <td style={{ textAlign: 'right' }}>
+                              {isRequested ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 inline-flex items-center gap-1">
+                                  <Clock size={12} /> Requested ⏳
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRequestBook(book)}
+                                  disabled={!isAvail || requestingBookId === (book._id || book.id)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '7px 14px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: isAvail ? '#4f46e5' : '#cbd5e1',
+                                    color: '#ffffff',
+                                    fontWeight: 700,
+                                    fontSize: '0.78rem',
+                                    cursor: isAvail ? 'pointer' : 'not-allowed',
+                                    boxShadow: isAvail ? '0 2px 6px rgba(79,70,229,0.25)' : 'none'
+                                  }}
+                                >
+                                  <BookOpen size={13} />
+                                  {requestingBookId === (book._id || book.id) ? 'Requesting...' : 'Request Book'}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: MY BORROWED BOOKS (HOD PERSONAL BORROWING ROSTER) */}
+        {activeTab === 'My Borrowed Books' && (
+          <div className="animate-fade-in flex flex-col gap-4">
+            {/* KPI STAT CARDS */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px' }}>
+              <div style={{ padding: '16px 20px', borderRadius: '14px', background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #4f46e5', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Transactions</div>
+                <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>{myTransactions.length} Volumes</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>All personal loan records</div>
+              </div>
+
+              <div style={{ padding: '16px 20px', borderRadius: '14px', background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #10b981', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>Active Issued Loans</div>
+                <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#15803d', margin: '4px 0 2px' }}>
+                  {myTransactions.filter(t => t.status === 'Issued').length} Books
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>Currently in your possession</div>
+              </div>
+
+              <div style={{ padding: '16px 20px', borderRadius: '14px', background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #f59e0b', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#b45309', textTransform: 'uppercase' }}>Pending With Librarian</div>
+                <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#b45309', margin: '4px 0 2px' }}>
+                  {myTransactions.filter(t => t.status === 'Pending' || isMyReturnPending(t._id)).length} Requests
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600 }}>Requests & returns in verification</div>
+              </div>
+
+              <div style={{ padding: '16px 20px', borderRadius: '14px', background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #8b5cf6', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' }}>Completed Returns</div>
+                <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#6d28d9', margin: '4px 0 2px' }}>
+                  {myTransactions.filter(t => t.status === 'Returned' || Boolean(t.returnDate)).length} Books
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#7c3aed', fontWeight: 600 }}>Checked in and restocked</div>
+              </div>
+            </div>
+
+            {/* TOOLBAR */}
+            <div className="hod-table-toolbar">
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', flexWrap: 'nowrap' }}>
+                {['All', 'Active', 'Returned', 'Pending'].map(f => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setMyBorrowStatus(f)}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: myBorrowStatus === f ? '1px solid #4f46e5' : '1px solid #e2e8f0',
+                      background: myBorrowStatus === f ? '#4f46e5' : '#ffffff',
+                      color: myBorrowStatus === f ? '#ffffff' : '#475569'
+                    }}
+                  >
+                    {f === 'All' ? `All My Records (${myTransactions.length})` : f === 'Active' ? 'Active Loans' : f === 'Returned' ? 'Returned' : 'Pending Requests'}
+                  </button>
+                ))}
+              </div>
+
+              <div className="hod-search-box">
+                <Search size={18} className="text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search my requested or borrowed books..."
+                  value={myBorrowSearch}
+                  onChange={(e) => setMyBorrowSearch(e.target.value)}
+                />
+                {myBorrowSearch && (
+                  <button type="button" onClick={() => setMyBorrowSearch('')} className="btn-clear-search">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* MY BORROWED BOOKS TABLE */}
+            <div className="hod-table-card">
+              <div className="overflow-x-auto">
+                <table className="hod-erp-table">
+                  <thead>
+                    <tr>
+                      <th>Book Information</th>
+                      <th>Borrower Account</th>
+                      <th>Issue / Request Date</th>
+                      <th>Due Date</th>
+                      <th>Status & Circulation Stage</th>
+                      <th>Fine</th>
+                      <th style={{ textAlign: 'right' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan="7" className="p-8 text-center text-muted">
+                          Loading your library records...
+                        </td>
+                      </tr>
+                    ) : filteredMyTransactions.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="p-8 text-center text-muted">
+                          <Bookmark size={28} className="mx-auto text-slate-400 mb-2" />
+                          <p className="font-semibold text-slate-700">No library transactions found for your HOD account.</p>
+                          <p className="text-xs text-muted mt-1">
+                            Browse the Department Catalog tab and click <strong>Request Book</strong> to request reference volumes.
+                          </p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredMyTransactions.map((tx) => {
+                        const isReturned = tx.status === 'Returned' || Boolean(tx.returnDate);
+                        const isIssued = tx.status === 'Issued';
+                        const isOverdue = tx.status === 'Overdue';
+                        const isPending = tx.status === 'Pending';
+                        const isApproved = tx.status === 'Approved';
+                        const returnPending = isMyReturnPending(tx._id);
+                        const fine = Number(tx.fineAmount || 0);
+
+                        const issueDateFormatted = tx.issueDate ? new Date(tx.issueDate).toLocaleDateString('en-GB') : (tx.requestDate ? new Date(tx.requestDate).toLocaleDateString('en-GB') : '-');
+                        const dueDateFormatted = tx.dueDate ? new Date(tx.dueDate).toLocaleDateString('en-GB') : '-';
+                        const returnDateFormatted = tx.returnDate ? new Date(tx.returnDate).toLocaleDateString('en-GB') : null;
+                        const copyCode = tx.bookCopyId?.accessionNumber || tx.bookCopyId?.barcode || '-';
+
+                        return (
+                          <tr key={tx._id}>
+                            <td style={{ minWidth: '220px' }}>
+                              <div className="flex items-center gap-2.5">
+                                <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600">
+                                  <BookOpen size={16} />
+                                </div>
+                                <div>
+                                  <span className="font-bold text-[var(--text-main)] block">
+                                    {tx.bookId?.title || 'Library Book'}
+                                  </span>
+                                  <span className="text-[11px] text-muted">
+                                    {tx.bookId?.author ? `By ${tx.bookId.author}` : ''} • Copy: <span className="font-mono font-semibold">{copyCode}</span>
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td>
+                              <div className="flex flex-col">
+                                <span className="font-bold text-xs text-slate-800 dark:text-white flex items-center gap-1.5">
+                                  {hodSession.name || 'HOD Member'}
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-purple-100 text-purple-700 border-purple-200">
+                                    HOD
+                                  </span>
+                                </span>
+                                <span className="text-[11px] text-muted font-mono">{hodDept}</span>
+                              </div>
+                            </td>
+
+                            <td className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                              {issueDateFormatted}
+                            </td>
+
+                            <td className="text-xs">
+                              <span className={isOverdue ? 'text-rose-600 font-bold' : 'text-slate-700 dark:text-slate-300 font-medium'}>
+                                {dueDateFormatted}
+                              </span>
+                            </td>
+
+                            <td>
+                              {isReturned ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 inline-flex items-center gap-1 border border-emerald-200">
+                                  <CheckCircle2 size={12} /> Returned on {returnDateFormatted || issueDateFormatted}
+                                </span>
+                              ) : returnPending ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 inline-flex items-center gap-1 border border-amber-200">
+                                  <RotateCcw size={12} /> Return In Verification
+                                </span>
+                              ) : isOverdue ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-400 inline-flex items-center gap-1 border border-rose-200">
+                                  <AlertCircle size={12} /> Overdue
+                                </span>
+                              ) : isIssued ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400 inline-flex items-center gap-1 border border-blue-200">
+                                  <Clock size={12} /> Active Loan
+                                </span>
+                              ) : isApproved ? (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 inline-flex items-center gap-1 border border-emerald-200">
+                                  <Check size={12} /> Approved (Ready at Desk)
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 inline-flex items-center gap-1 border border-slate-200">
+                                  <Clock size={12} /> Pending Librarian Approval
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                              {fine > 0 ? <span className="text-rose-600">₹{fine}</span> : '₹0'}
+                            </td>
+
+                            <td style={{ textAlign: 'right' }}>
+                              {(isIssued || isOverdue) && !returnPending ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleReturnMyBook(tx)}
+                                  disabled={returningTxId === tx._id}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #fde68a',
+                                    background: '#fffbeb',
+                                    color: '#b45309',
+                                    fontWeight: 700,
+                                    fontSize: '0.76rem',
+                                    cursor: returningTxId === tx._id ? 'not-allowed' : 'pointer'
+                                  }}
+                                >
+                                  <RotateCcw size={12} />
+                                  {returningTxId === tx._id ? 'Submitting...' : 'Request Return'}
+                                </button>
+                              ) : returnPending ? (
+                                <span className="text-xs font-semibold text-amber-600">
+                                  Verification In Progress
+                                </span>
+                              ) : isPending ? (
+                                <span className="text-xs font-semibold text-slate-500">
+                                  Awaiting Issue
+                                </span>
+                              ) : (
+                                <span className="text-xs font-semibold text-emerald-600">
+                                  Completed ✓
+                                </span>
+                              )}
                             </td>
                           </tr>
                         );

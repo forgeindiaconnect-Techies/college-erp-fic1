@@ -49,7 +49,8 @@ import {
   requestLibraryClearance,
   getLibraryFineReceipt,
   getLibraryFinePayments,
-  deleteLibraryTransaction
+  deleteLibraryTransaction,
+  deleteLibraryReservation
 } from '../../api';
 import LibraryNoDueCertificateModal from '../../components/LibraryNoDueCertificateModal';
 import './StudentLibrary.css';
@@ -395,9 +396,13 @@ const StudentLibrary = () => {
       setTransactions((prev) => prev.filter((t) => String(t._id) !== String(transactionId)));
       setReservations((prev) => prev.filter((r) => String(r._id) !== String(transactionId)));
 
-      await deleteLibraryTransaction(transactionId);
+      try {
+        await deleteLibraryReservation(transactionId);
+      } catch (rErr) {
+        await deleteLibraryTransaction(transactionId);
+      }
 
-      setSuccessMsg('Book request cancelled and removed successfully.');
+      setSuccessMsg('Book reservation / request cancelled successfully.');
       await fetchLibraryData(false);
     } catch (err) {
       console.error('Cancel request error:', err);
@@ -2199,9 +2204,40 @@ const StudentLibrary = () => {
                               ) : (
                                 <>
                                   <Trash2 size={13} />
-                                  <span>Cancel</span>
+                                  <span>Cancel Request</span>
                                 </>
                               )}
+                            </button>
+                          )}
+
+                          {res.status === 'Approved' && (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 font-bold text-xs shadow-sm">
+                              <CheckCircle2 size={13} className="text-emerald-600" />
+                              <span>Ready for Pickup</span>
+                            </span>
+                          )}
+
+                          {(res.status === 'Completed' || res.status === 'Issued') && (
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('borrowed')}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-xs transition shadow-sm cursor-pointer"
+                              title="View this book in My Issued Books"
+                            >
+                              <BookOpen size={13} />
+                              <span>View in My Books</span>
+                            </button>
+                          )}
+
+                          {res.status === 'Rejected' && (
+                            <button
+                              type="button"
+                              onClick={() => setReservations((prev) => prev.filter((r) => r._id !== res._id))}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 font-semibold text-xs transition cursor-pointer"
+                              title="Dismiss from list"
+                            >
+                              <X size={13} />
+                              <span>Dismiss</span>
                             </button>
                           )}
                         </td>

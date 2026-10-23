@@ -466,6 +466,7 @@ const StudentDashboard = () => {
         </div>
       </div>
 
+
       {/* Library Fine Warning */}
       {hasOverdueBooks && (
         <div style={{ padding: '14px 18px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '12px' }}>

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Linking,
   Modal,
   Platform,
@@ -15,7 +16,12 @@ import {
 } from 'react-native';
 import { apiGet, apiPost, apiPut, type MobileUser } from '../../services/api';
 import BottomTabBar, { type MainNavTab } from '../navigation/BottomTabBar';
+import ScreenHeader from '../navigation/ScreenHeader';
+import UserProfileScreen from '../profile/UserProfileScreen';
 import ReferralHub from '../referrals/ReferralHub';
+import DashboardHeroBanner from './DashboardHeroBanner';
+import QuickAccessGrid from './QuickAccessGrid';
+import HighlightCard from './HighlightCard';
 
 type Props = {
   user: MobileUser;
@@ -23,7 +29,7 @@ type Props = {
 };
 
 type TransportSubTab = 'operations' | 'route' | 'students' | 'vehicle';
-type MoreSection = 'menu' | 'checklist' | 'payroll' | 'attendance' | 'safety' | 'notices';
+type MoreSection = 'menu' | 'checklist' | 'payroll' | 'attendance' | 'safety' | 'notices' | 'profile';
 
 type Stop = {
   id: string;
@@ -109,7 +115,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
   // Navigation Tabs
   const [activeNavTab, setActiveNavTab] = useState<MainNavTab>('home');
   const [transportSubTab, setTransportSubTab] = useState<TransportSubTab>('operations');
-  const [moreSection, setMoreSection] = useState<MoreSection>('menu');
+  const [moreSection, setMoreSection] = useState<MoreSection>('profile');
 
   // Loading & Refreshing
   const [loading, setLoading] = useState(true);
@@ -121,6 +127,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     driverId: user.referenceId || user.userId || 'DRV-001',
     phone: (user as any).phone || '+91 98402 00000',
     busNo: 'Campus Transit Bus',
+    busNumber: 'Campus Transit Bus',
     route: 'Campus Route',
     routeId: 'R-01',
     capacity: 48,
@@ -166,6 +173,11 @@ export default function DriverDashboard({ user, onLogout }: Props) {
   const [maintType, setMaintType] = useState('Routine Service');
   const [maintDesc, setMaintDesc] = useState('');
   const [maintSubmitting, setMaintSubmitting] = useState(false);
+
+  // Real-time ERP Detail Modals
+  const [selectedPassengerProfile, setSelectedPassengerProfile] = useState<StudentPassenger | null>(null);
+  const [inspectionReportModalVisible, setInspectionReportModalVisible] = useState(false);
+  const [selectedSalarySlip, setSelectedSalarySlip] = useState<SalaryRecord | null>(null);
 
   // Fetch all transport data
   const loadData = useCallback(async () => {
@@ -524,42 +536,78 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     return ['All', ...names];
   }, [passengers]);
 
+  // Android Hardware Back Button Handling
+  useEffect(() => {
+    const onBackPress = () => {
+      if (showTripStartModal) {
+        setShowTripStartModal(false);
+        return true;
+      }
+      if (showTripEndModal) {
+        setShowTripEndModal(false);
+        return true;
+      }
+      if (showMaintModal) {
+        setShowMaintModal(false);
+        return true;
+      }
+      if (activeNavTab === 'profile' && moreSection !== 'menu') {
+        setMoreSection('menu');
+        return true;
+      }
+      if (activeNavTab !== 'home') {
+        setActiveNavTab('home');
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [activeNavTab, moreSection, showTripStartModal, showTripEndModal, showMaintModal]);
+
+  const isInnerScreen = activeNavTab !== 'home';
+
+  const getScreenTitle = () => {
+    if (activeNavTab === 'academics') return 'Transit Operations & Trip';
+    if (activeNavTab === 'referrals') return 'Business Referrals';
+    if (activeNavTab === 'profile') {
+      if (moreSection === 'checklist') return 'Pre-Trip Inspection';
+      if (moreSection === 'payroll') return 'Driver Payroll & Slips';
+      if (moreSection === 'attendance') return 'Duty Attendance';
+      if (moreSection === 'notices') return 'Transit Notices';
+      if (moreSection === 'safety') return 'Driver Safety Guidelines';
+      if (moreSection === 'menu') return 'Fleet Services & Operations';
+      return 'Driver Profile';
+    }
+    return 'Driver Fleet Command';
+  };
+
+  const handleBackNavigation = () => {
+    if (activeNavTab === 'profile' && moreSection !== 'profile') {
+      setMoreSection('profile');
+    } else {
+      setActiveNavTab('home');
+    }
+  };
+
   return (
     <View style={styles.container}>
-      {/* ================= TOP DRIVER HEADER ================= */}
-      <View style={styles.topHeader}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>
-              {driverProfile.name.substring(0, 2).toUpperCase()}
-            </Text>
-          </View>
-          <View>
-            <View style={styles.roleTagRow}>
-              <Text style={styles.roleBadge}>INSTITUTIONAL DRIVER</Text>
-              <View
-                style={[
-                  styles.statusPill,
-                  { backgroundColor: activeTrip ? '#DCFCE7' : '#EFF6FF' },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusPillText,
-                    { color: activeTrip ? '#15803D' : '#1D4ED8' },
-                  ]}
-                >
-                  {activeTrip ? '● ON ROUTE' : 'STANDBY'}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.driverNameText}>{driverProfile.name}</Text>
-            <Text style={styles.driverSubText}>
-              Bus: {driverProfile.busNo} • {driverProfile.route}
-            </Text>
-          </View>
-        </View>
-      </View>
+      {/* ================= TOP DRIVER HEADER WITH BACK NAV & LOGOUT ================= */}
+      <ScreenHeader
+        showBack={isInnerScreen}
+        onBack={handleBackNavigation}
+        title={getScreenTitle()}
+        subtitle={activeNavTab === 'home' ? `Bus ${driverProfile.busNo} • ${activeTrip ? 'On Route' : 'Standby'}` : undefined}
+        userName={driverProfile.name}
+        roleBadge="DRIVER"
+        avatarText={driverProfile.name.substring(0, 2).toUpperCase()}
+        userSubtitle={`Bus: ${driverProfile.busNo} • ${driverProfile.route}`}
+        onProfilePress={() => {
+          setActiveNavTab('profile');
+          setMoreSection('profile');
+        }}
+        onLogoutPress={onLogout}
+      />
 
       {/* ================= MAIN CONTENT BODY ================= */}
       <View style={styles.mainContent}>
@@ -570,332 +618,112 @@ export default function DriverDashboard({ user, onLogout }: Props) {
             contentContainerStyle={styles.scrollContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadData} />}
           >
-            {/* TRIP STATUS HERO CARD */}
-            <View
-              style={[
-                styles.tripHeroCard,
-                { backgroundColor: activeTrip ? '#064E3B' : '#1E3A8A' },
-              ]}
-            >
-              <View style={styles.tripHeroHeader}>
-                <View>
-                  <Text style={styles.tripHeroBadge}>
-                    {activeTrip ? '🟢 TRIP IN PROGRESS' : '⚪ READY FOR DISPATCH'}
-                  </Text>
-                  <Text style={styles.tripHeroTitle}>
-                    {driverProfile.route} ({driverProfile.routeId})
-                  </Text>
-                  <Text style={styles.tripHeroSub}>
-                    Vehicle: {driverProfile.busNo} • {driverProfile.capacity} Seats
-                  </Text>
-                </View>
-                <View style={styles.vehicleSpeedBadge}>
-                  <Text style={styles.vehicleSpeedText}>Limit</Text>
-                  <Text style={styles.vehicleSpeedVal}>20 KM/H</Text>
-                </View>
-              </View>
+            {/* 1. Visual Hero Banner with High Quality Campus Transit Driver Image */}
+            <DashboardHeroBanner
+              greeting={`Hello, ${driverProfile.name.split(' ')[0] || driverProfile.name} 👋`}
+              subtitle="Drive Safe • Serve Better"
+              image={require('../../../assets/images/dashboards/driver_hero.jpg')}
+              tagline="Safe Rides Happy Students"
+            />
 
-              {activeTrip && (
-                <View style={styles.activeTripMetaBox}>
-                  <Text style={styles.activeTripMetaText}>
-                    Started: {activeTrip.startTime || 'Now'} • Shift: {activeTrip.tripType || 'Scheduled'}
-                  </Text>
-                </View>
-              )}
+            {/* 2. Trip Status Highlight Card (Matching Reference Design) */}
+            <HighlightCard
+              sectionTitle="Trip Status"
+              actionText={activeTrip ? "Active" : "Details"}
+              onActionPress={() => {
+                setActiveNavTab('academics');
+                setTransportSubTab('operations');
+              }}
+              icon="🚌"
+              iconBg="#EFF6FF"
+              title={driverProfile.route || 'Route 5 - Main Block'}
+              subtitle={
+                activeTrip
+                  ? `Next Stop: ${stops.find((s) => !s.completed)?.name || 'Campus Terminal'}`
+                  : `Vehicle: ${driverProfile.busNo} • ${driverProfile.capacity} Seats`
+              }
+              badgeText={activeTrip ? "In Transit" : "On Time"}
+              badgeBg="#DCFCE7"
+              badgeTextColor="#15803D"
+              onPress={() => {
+                setActiveNavTab('academics');
+                setTransportSubTab('operations');
+              }}
+            />
 
-              {/* Large Safe Touch Target Trip Action Button */}
-              <TouchableOpacity
-                style={[
-                  styles.largeTripButton,
-                  { backgroundColor: activeTrip ? '#EF4444' : '#10B981' },
-                ]}
-                onPress={() => {
-                  if (activeTrip) {
-                    setShowTripEndModal(true);
-                  } else {
-                    setShowTripStartModal(true);
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.largeTripButtonText}>
-                  {activeTrip ? '🏁 END TRIP & LOG ARRIVAL' : '🚦 START SCHEDULED TRIP'}
-                </Text>
-                <Text style={styles.largeTripButtonSub}>
-                  {activeTrip
-                    ? 'Confirm vehicle is stationary and parked'
-                    : 'Confirm route readiness before departure'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* KPI STATS GRID */}
-            <View style={styles.kpiGrid}>
-              <TouchableOpacity
-                style={[styles.kpiCard, { borderLeftColor: '#10B981' }]}
-                onPress={() => {
-                  setActiveNavTab('academics');
-                  setTransportSubTab('students');
-                }}
-              >
-                <Text style={styles.kpiLabel}>Assigned Students</Text>
-                <Text style={[styles.kpiValue, { color: '#059669' }]}>
-                  {passengers.length}
-                </Text>
-                <Text style={styles.kpiSub}>
-                  {passengers.filter((p) => p.boarded).length} Boarded Today
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.kpiCard, { borderLeftColor: '#3B82F6' }]}
-                onPress={() => {
-                  setActiveNavTab('academics');
-                  setTransportSubTab('route');
-                }}
-              >
-                <Text style={styles.kpiLabel}>Route Stops</Text>
-                <Text style={[styles.kpiValue, { color: '#2563EB' }]}>
-                  {stops.length}
-                </Text>
-                <Text style={styles.kpiSub}>
-                  {stops.filter((s) => s.completed).length} Passed Checkpoints
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.kpiCard, { borderLeftColor: '#F59E0B' }]}
-                onPress={() => {
-                  setActiveNavTab('academics');
-                  setTransportSubTab('vehicle');
-                }}
-              >
-                <Text style={styles.kpiLabel}>Vehicle Health</Text>
-                <Text style={[styles.kpiValue, { color: '#D97706' }]}>
-                  {myVehicle?.status || 'Good'}
-                </Text>
-                <Text style={styles.kpiSub}>FC & Insurance Valid</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.kpiCard, { borderLeftColor: '#8B5CF6' }]}
-                onPress={() => {
-                  setActiveNavTab('profile');
-                  setMoreSection('attendance');
-                }}
-              >
-                <Text style={styles.kpiLabel}>Duty Attendance</Text>
-                <Text style={[styles.kpiValue, { color: '#7C3AED' }]}>
-                  {attendanceLogs[0]?.status || 'Active'}
-                </Text>
-                <Text style={styles.kpiSub}>Tap to Check In/Out</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Quick Action Shortcuts (Google Pay / PhonePe 4-Column Grid) */}
-            <View style={styles.card}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.cardSectionTitle}>⚡ Driver Quick Operations</Text>
-                <Text style={styles.cardHeaderSub}>Tap to action</Text>
-              </View>
-
-              <View style={styles.gpayGrid}>
-                {/* 1. Passenger List */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => {
+            {/* 3. Quick Access 2x2 Grid (Matching Reference Design) */}
+            <QuickAccessGrid
+              title="Quick Access"
+              seeAllText="All Modules →"
+              onSeeAll={() => setActiveNavTab('academics')}
+              items={[
+                {
+                  id: 'trip',
+                  label: 'My Trip',
+                  icon: '🚌',
+                  bg: '#EFF6FF',
+                  borderColor: '#DBEAFE',
+                  textColor: '#1E40AF',
+                  badge: activeTrip ? 'Active' : undefined,
+                  onPress: () => {
                     setActiveNavTab('academics');
-                    setTransportSubTab('students');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#EFF6FF' }]}>
-                    <Text style={styles.gpayIcon}>👨‍🎓</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Passengers</Text>
-                </TouchableOpacity>
-
-                {/* 2. Route Stops */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => {
-                    setActiveNavTab('academics');
-                    setTransportSubTab('route');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#ECFDF5' }]}>
-                    <Text style={styles.gpayIcon}>🗺️</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Route Stops</Text>
-                </TouchableOpacity>
-
-                {/* 3. Vehicle Health */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => {
+                    setTransportSubTab('operations');
+                  },
+                },
+                {
+                  id: 'vehicle',
+                  label: 'My Vehicle',
+                  icon: '🚐',
+                  bg: '#ECFDF5',
+                  borderColor: '#D1FAE5',
+                  textColor: '#065F46',
+                  badge: myVehicle?.status || 'Good',
+                  onPress: () => {
                     setActiveNavTab('academics');
                     setTransportSubTab('vehicle');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FFFBEB' }]}>
-                    <Text style={styles.gpayIcon}>🚌</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Vehicle</Text>
-                </TouchableOpacity>
-
-                {/* 4. Pre-Trip Check */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => {
-                    setActiveNavTab('profile');
-                    setMoreSection('checklist');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FAF5FF' }]}>
-                    <Text style={styles.gpayIcon}>📋</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Inspection</Text>
-                </TouchableOpacity>
-
-                {/* 5. Maintenance */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => setShowMaintModal(true)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FFF1F2' }]}>
-                    <Text style={styles.gpayIcon}>🔧</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Maintenance</Text>
-                </TouchableOpacity>
-
-                {/* 6. Referrals */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => setActiveNavTab('referrals')}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#EEF2FF' }]}>
-                    <Text style={styles.gpayIcon}>🤝</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Referrals</Text>
-                </TouchableOpacity>
-
-                {/* 7. Duty Attendance */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => {
-                    setActiveNavTab('profile');
-                    setMoreSection('attendance');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#ECFEFF' }]}>
-                    <Text style={styles.gpayIcon}>🛡️</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Duty Log</Text>
-                </TouchableOpacity>
-
-                {/* 8. Payslips */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => {
-                    setActiveNavTab('profile');
-                    setMoreSection('payroll');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#F0FDFA' }]}>
-                    <Text style={styles.gpayIcon}>💰</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Payslips</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Categorized Fleet Services & Driver Tools (PhonePe Style List) */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderFlex}>
-                <Text style={styles.cardSectionTitle}>🚍 Transit Fleet Services</Text>
-                <TouchableOpacity
-                  onPress={() => {
+                  },
+                },
+                {
+                  id: 'route',
+                  label: 'My Route',
+                  icon: '📍',
+                  bg: '#F5F3FF',
+                  borderColor: '#EDE9FE',
+                  textColor: '#5B21B6',
+                  badge: stops.length > 0 ? `${stops.length} Stops` : undefined,
+                  onPress: () => {
+                    setActiveNavTab('academics');
+                    setTransportSubTab('route');
+                  },
+                },
+                {
+                  id: 'students',
+                  label: 'Student List',
+                  icon: '🧑‍🤝‍🧑',
+                  bg: '#FFFBEB',
+                  borderColor: '#FEF3C7',
+                  textColor: '#92400E',
+                  badge: passengers.length > 0 ? `${passengers.length} Roster` : undefined,
+                  onPress: () => {
                     setActiveNavTab('academics');
                     setTransportSubTab('students');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.cardLinkText}>View All →</Text>
-                </TouchableOpacity>
-              </View>
+                  },
+                },
+              ]}
+            />
 
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => {
-                  setActiveNavTab('academics');
-                  setTransportSubTab('students');
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#EFF6FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>👨‍🎓</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Student Passenger Roster</Text>
-                  <Text style={styles.serviceRowSub}>
-                    {passengers.length} Assigned riders • {passengers.filter((p) => p.boarded).length} boarded today
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => {
-                  setActiveNavTab('academics');
-                  setTransportSubTab('vehicle');
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FFFBEB' }]}>
-                  <Text style={styles.serviceIconEmoji}>🚌</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Vehicle Readiness & FC</Text>
-                  <Text style={styles.serviceRowSub}>
-                    Bus {driverProfile.busNo} • {myVehicle?.status || 'Active'} condition
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => setShowMaintModal(true)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FFF1F2' }]}>
-                  <Text style={styles.serviceIconEmoji}>🔧</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Log Mechanical Issue</Text>
-                  <Text style={styles.serviceRowSub}>Submit vehicle repair / maintenance ticket</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-            </View>
 
             {/* UPCOMING / RECENT STOPS GLANCE */}
             <View style={styles.card}>
               <View style={styles.cardHeaderFlex}>
-                <Text style={styles.cardSectionTitle}>📍 Route Stops Overview</Text>
+                <Text style={[styles.cardSectionTitle, { flex: 1, marginRight: 8 }]} numberOfLines={1}>📍 Route Stops Overview</Text>
                 <TouchableOpacity
                   onPress={() => {
                     setActiveNavTab('academics');
                     setTransportSubTab('route');
                   }}
+                  style={{ flexShrink: 0 }}
                 >
                   <Text style={styles.cardLinkText}>Full Itinerary →</Text>
                 </TouchableOpacity>
@@ -941,12 +769,13 @@ export default function DriverDashboard({ user, onLogout }: Props) {
             {/* TRANSPORT NOTIFICATIONS & ALERTS */}
             <View style={styles.card}>
               <View style={styles.cardHeaderFlex}>
-                <Text style={styles.cardSectionTitle}>🔔 Transport Announcements</Text>
+                <Text style={[styles.cardSectionTitle, { flex: 1, marginRight: 8 }]} numberOfLines={1}>🔔 Transport Announcements</Text>
                 <TouchableOpacity
                   onPress={() => {
                     setActiveNavTab('profile');
                     setMoreSection('notices');
                   }}
+                  style={{ flexShrink: 0 }}
                 >
                   <Text style={styles.cardLinkText}>View All ({notifications.length})</Text>
                 </TouchableOpacity>
@@ -971,6 +800,58 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                   </View>
                 ))
               )}
+            </View>
+
+            {/* Dedicated Driver Referral Rewards (Letters Fully Visible) */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderFlex}>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <Text style={styles.cardSectionTitle} numberOfLines={1}>💼 Driver Referral Rewards</Text>
+                  <Text style={styles.sectionSubtitle} numberOfLines={2}>
+                    Earn institutional incentives across 4 commercial partner categories
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setActiveNavTab('referrals')} activeOpacity={0.7} style={{ flexShrink: 0 }}>
+                  <Text style={styles.cardLinkText}>Open Hub →</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ gap: 8, marginTop: 4 }}>
+                {[
+                  { id: 'cards', title: 'Credit Cards', desc: 'Pre-approved fuel cashback & toll benefit cards', icon: '💳', bg: '#EFF6FF', badge: 'Up to ₹2,500' },
+                  { id: 'insurance', title: 'Insurance Policies', desc: 'Commercial vehicle, personal accident & family health', icon: '🛡️', bg: '#ECFDF5', badge: 'Up to ₹5,000' },
+                  { id: 'jobs', title: 'Job Openings', desc: 'Refer skilled heavy vehicle drivers & mechanics', icon: '💼', bg: '#F5F3FF', badge: 'Hiring Bonus' },
+                  { id: 'banking', title: 'Bank Accounts', desc: 'Salary accounts with zero minimum balance & free ATM access', icon: '🏛️', bg: '#FFFBEB', badge: 'Up to ₹750' },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: item.bg,
+                      borderRadius: 12,
+                      padding: 12,
+                      borderWidth: 1,
+                      borderColor: 'rgba(0,0,0,0.05)',
+                    }}
+                    onPress={() => setActiveNavTab('referrals')}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      <Text style={{ fontSize: 20 }}>{item.icon}</Text>
+                    </View>
+                    <View style={{ flex: 1, marginRight: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1, marginRight: 6 }} numberOfLines={1}>{item.title}</Text>
+                        <View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, flexShrink: 0 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#15803D' }}>{item.badge}</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 11, color: '#475569', marginTop: 2 }} numberOfLines={2}>{item.desc}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           </ScrollView>
         )}
@@ -1242,7 +1123,12 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                     </View>
                   ) : (
                     filteredStudents.map((student) => (
-                      <View key={student.id} style={styles.passengerCard}>
+                      <TouchableOpacity
+                        key={student.id}
+                        style={styles.passengerCard}
+                        onPress={() => setSelectedPassengerProfile(student)}
+                        activeOpacity={0.7}
+                      >
                         <View style={styles.passengerLeft}>
                           <View style={styles.passengerHeaderRow}>
                             <Text style={styles.passengerName}>{student.name}</Text>
@@ -1277,6 +1163,10 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                               Call Parent ({student.parentPhone})
                             </Text>
                           </TouchableOpacity>
+
+                          <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '700', marginTop: 4 }}>
+                            View Passenger Profile ›
+                          </Text>
                         </View>
 
                         <TouchableOpacity
@@ -1295,7 +1185,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                             {student.boarded ? 'Unmark' : 'Board'}
                           </Text>
                         </TouchableOpacity>
-                      </View>
+                      </TouchableOpacity>
                     ))
                   )}
                 </View>
@@ -1382,43 +1272,100 @@ export default function DriverDashboard({ user, onLogout }: Props) {
           </View>
         )}
 
-        {/* TAB 4: MORE & ACCOUNT */}
+        {/* TAB 4: PROFILE */}
         {activeNavTab === 'profile' && (
           <View style={styles.flexOne}>
-            {/* Context Header Banner */}
-            <View style={styles.pageHeaderBanner}>
-              <Text style={styles.pageHeaderTitle}>Driver Services & Shift Accounts</Text>
-              <Text style={styles.pageHeaderDesc}>
-                Complete pre-trip safety checklists, review monthly payroll payslips, duty attendance, and safety SOPs.
-              </Text>
-            </View>
-            <ScrollView
-              style={styles.scrollArea}
-              contentContainerStyle={styles.scrollContent}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadData} />}
-            >
-              {/* DRIVER PROFILE CARD */}
-              <View style={styles.profileSummaryCard}>
-              <View style={styles.profileAvatarLarge}>
-                <Text style={styles.profileAvatarLargeText}>
-                  {driverProfile.name.substring(0, 2).toUpperCase()}
+            {/* Top Sub-Navigation Switcher: Driver Profile vs Fleet Services */}
+            <View style={styles.profileToggleHeader}>
+              <TouchableOpacity
+                style={[
+                  styles.profileToggleTab,
+                  moreSection === 'profile' && styles.profileToggleTabActive,
+                ]}
+                onPress={() => setMoreSection('profile')}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.profileToggleTabText,
+                    moreSection === 'profile' && styles.profileToggleTabTextActive,
+                  ]}
+                >
+                  👤 Driver Profile
                 </Text>
-              </View>
-              <View style={styles.profileSummaryInfo}>
-                <Text style={styles.profileSummaryName}>{driverProfile.name}</Text>
-                <Text style={styles.profileSummaryRole}>Institutional Campus Driver</Text>
-                <Text style={styles.profileSummaryMeta}>ID: {driverProfile.driverId}</Text>
-                <Text style={styles.profileSummaryMeta}>Bus: {driverProfile.busNo}</Text>
-                <Text style={styles.profileSummaryMeta}>License: {driverProfile.licenseNo}</Text>
-              </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.profileToggleTab,
+                  moreSection !== 'profile' && styles.profileToggleTabActive,
+                ]}
+                onPress={() => setMoreSection('menu')}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.profileToggleTabText,
+                    moreSection !== 'profile' && styles.profileToggleTabTextActive,
+                  ]}
+                >
+                  🚌 Fleet Services
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            {/* NAVIGATION MENU ITEMS */}
-            {moreSection === 'menu' && (
+            {/* VIEW 1: OFFICIAL DRIVER PROFILE (PRIMARY VIEW FOR PROFILE TAB & TOP AVATAR) */}
+            {moreSection === 'profile' && (
+              <UserProfileScreen
+                user={user}
+                roleTitle="Campus Transit Driver"
+                onLogout={onLogout}
+                onBack={() => setActiveNavTab('home')}
+                hideTopBar={true}
+                roleAttributes={[
+                  { label: 'Driver Employee ID', value: driverProfile.driverId },
+                  { label: 'Assigned Vehicle', value: `${driverProfile.busNo} (${driverProfile.capacity} Seats)` },
+                  { label: 'Transit Route', value: `${driverProfile.route} [${driverProfile.routeId}]` },
+                  { label: 'Commercial Driving License', value: driverProfile.licenseNo },
+                  { label: 'Emergency Contact', value: driverProfile.phone },
+                  { label: 'Trip Operational Status', value: activeTrip ? 'En Route (Active Trip)' : 'Standby / Ready' },
+                  { label: 'Vehicle Health Status', value: myVehicle?.status || 'Good' },
+                ]}
+              />
+            )}
+
+            {/* VIEW 2: FLEET SERVICES & TOOLS */}
+            {moreSection !== 'profile' && (
+              <ScrollView
+                style={styles.scrollArea}
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadData} />}
+              >
+                {/* DRIVER PROFILE CARD */}
+                {moreSection === 'menu' && (
+                  <View style={styles.profileSummaryCard}>
+                    <View style={styles.profileAvatarLarge}>
+                      <Text style={styles.profileAvatarLargeText}>
+                        {driverProfile.name.substring(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.profileSummaryInfo}>
+                      <Text style={styles.profileSummaryName}>{driverProfile.name}</Text>
+                      <Text style={styles.profileSummaryRole}>Institutional Campus Driver</Text>
+                      <Text style={styles.profileSummaryMeta}>ID: {driverProfile.driverId}</Text>
+                      <Text style={styles.profileSummaryMeta}>Bus: {driverProfile.busNo}</Text>
+                      <Text style={styles.profileSummaryMeta}>License: {driverProfile.licenseNo}</Text>
+                    </View>
+                  </View>
+                )}
+
+              {/* NAVIGATION MENU ITEMS */}
+              {moreSection === 'menu' && (
               <View style={styles.card}>
                 <Text style={styles.cardSectionTitle}>🛠️ Driver Services & Accounts</Text>
 
                 {[
+                  { id: 'profile', title: 'Driver Identity & Profile', sub: 'Verified employee details and route license', icon: '👤' },
                   { id: 'checklist', title: 'Daily Pre-Trip Inspection', sub: 'Brakes, tires, first-aid & emergency exit check', icon: '📋' },
                   { id: 'payroll', title: 'Salary Slips & Payroll', sub: 'View monthly earnings, allowances and net pay', icon: '💵' },
                   { id: 'attendance', title: 'Duty Attendance Register', sub: 'Driver daily shift check-in and check-out records', icon: '🕒' },
@@ -1501,11 +1448,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                 <TouchableOpacity
                   style={styles.saveChecklistBtn}
                   onPress={() => {
-                    Alert.alert(
-                      'Inspection Completed',
-                      'Daily vehicle safety checklist recorded for today.'
-                    );
-                    setMoreSection('menu');
+                    setInspectionReportModalVisible(true);
                   }}
                 >
                   <Text style={styles.saveChecklistBtnText}>Confirm Pre-Trip Inspection ✓</Text>
@@ -1534,7 +1477,12 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                   </View>
                 ) : (
                   salaries.map((sal, idx) => (
-                    <View key={sal._id || idx} style={styles.payrollCard}>
+                    <TouchableOpacity
+                      key={sal._id || idx}
+                      style={styles.payrollCard}
+                      onPress={() => setSelectedSalarySlip(sal)}
+                      activeOpacity={0.7}
+                    >
                       <View style={styles.payrollHeaderRow}>
                         <Text style={styles.payrollMonthTitle}>
                           {sal.month || 'Current Month'} {sal.year || ''}
@@ -1587,7 +1535,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                           </Text>
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   ))
                 )}
               </View>
@@ -1700,9 +1648,11 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                 ))}
               </View>
             )}
-          </ScrollView>
-        </View>
-      )}
+
+              </ScrollView>
+            )}
+          </View>
+        )}
       </View>
 
       {/* ================= TRIP START CONFIRMATION MODAL ================= */}
@@ -1875,17 +1825,264 @@ export default function DriverDashboard({ user, onLogout }: Props) {
         </View>
       </Modal>
 
+      {/* ============================================================== */}
+      {/* 4. STUDENT PASSENGER TRANSIT PROFILE MODAL                     */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedPassengerProfile !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedPassengerProfile(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 520 }]}>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E3A8A', letterSpacing: 1.2 }}>
+                CAMPUS FLEET TRANSIT DOSSIER
+              </Text>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A', marginTop: 2 }}>
+                {selectedPassengerProfile?.name}
+              </Text>
+              <View
+                style={{
+                  backgroundColor: selectedPassengerProfile?.boarded ? '#DCFCE7' : '#EFF6FF',
+                  paddingHorizontal: 12,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  marginTop: 6,
+                }}
+              >
+                <Text
+                  style={{
+                    color: selectedPassengerProfile?.boarded ? '#15803D' : '#1D4ED8',
+                    fontSize: 12,
+                    fontWeight: '800',
+                  }}
+                >
+                  {selectedPassengerProfile?.boarded ? '✓ BOARDED ON VEHICLE' : 'WAITING AT STOP'}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 280 }}>
+              <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Student Roll No:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedPassengerProfile?.rollNo}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Assigned Stop:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedPassengerProfile?.stop}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Assigned Vehicle:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{driverProfile.busNo}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Emergency Contact:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedPassengerProfile?.parentPhone}</Text>
+                </View>
+              </View>
+
+              <View style={[styles.guidanceTipBox, { marginTop: 10 }]}>
+                <Text style={styles.guidanceTipEmoji}>🚌</Text>
+                <Text style={styles.guidanceTipText}>
+                  Boarding updates sync with parent tracking notification feed in real-time.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={{ gap: 8, marginTop: 14 }}>
+              <TouchableOpacity
+                style={[
+                  styles.modalConfirmBtn,
+                  { backgroundColor: selectedPassengerProfile?.boarded ? '#DC2626' : '#10B981', width: '100%' },
+                ]}
+                onPress={() => {
+                  if (selectedPassengerProfile) {
+                    toggleBoarding(selectedPassengerProfile.id);
+                    setSelectedPassengerProfile((prev) => prev ? { ...prev, boarded: !prev.boarded } : null);
+                  }
+                }}
+              >
+                <Text style={styles.modalConfirmBtnText}>
+                  {selectedPassengerProfile?.boarded ? 'Unmark Boarding' : '✓ Mark as Boarded'}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.modalBtnRow}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => setSelectedPassengerProfile(null)}
+                >
+                  <Text style={styles.modalCancelBtnText}>Close</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalConfirmBtn, { backgroundColor: '#2563EB' }]}
+                  onPress={() => {
+                    if (selectedPassengerProfile?.parentPhone) {
+                      Linking.openURL(`tel:${selectedPassengerProfile.parentPhone}`).catch(() => null);
+                    }
+                  }}
+                >
+                  <Text style={styles.modalConfirmBtnText}>📞 Call Parent</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 5. PRE-TRIP VEHICLE SAFETY INSPECTION REPORT MODAL             */}
+      {/* ============================================================== */}
+      <Modal
+        visible={inspectionReportModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setInspectionReportModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 520 }]}>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E3A8A', letterSpacing: 1.2 }}>
+                FLEET ROADWORTHINESS CERTIFICATION
+              </Text>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginTop: 2 }}>
+                Pre-Trip Safety Inspection
+              </Text>
+              <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginTop: 6 }}>
+                <Text style={{ color: '#15803D', fontSize: 12, fontWeight: '800' }}>✓ CERTIFIED ROADWORTHY</Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 300 }}>
+              <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Vehicle Registration:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{driverProfile.busNo}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Inspected By (Driver):</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{driverProfile.name}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Certification Time:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{new Date().toLocaleTimeString()} (Today)</Text>
+                </View>
+              </View>
+
+              <Text style={[styles.inputLabel, { marginTop: 10 }]}>Inspection Checkpoint Audits</Text>
+              <View style={{ backgroundColor: '#F8FAFC', padding: 10, borderRadius: 8, gap: 6, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <Text style={{ fontSize: 12, color: '#15803D', fontWeight: '700' }}>✓ Pneumatic Brakes & Pressure: OK</Text>
+                <Text style={{ fontSize: 12, color: '#15803D', fontWeight: '700' }}>✓ Tire Tread & Inflation: OK</Text>
+                <Text style={{ fontSize: 12, color: '#15803D', fontWeight: '700' }}>✓ Engine Coolant & Lubricant: OK</Text>
+                <Text style={{ fontSize: 12, color: '#15803D', fontWeight: '700' }}>✓ Fire Extinguisher & Safety Equipment: OK</Text>
+                <Text style={{ fontSize: 12, color: '#15803D', fontWeight: '700' }}>✓ Emergency Exit Doors & Windows: Clear</Text>
+                <Text style={{ fontSize: 12, color: '#15803D', fontWeight: '700' }}>✓ GPS Telematics & Dash Cam: Active</Text>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.modalConfirmBtn, { marginTop: 14, width: '100%', backgroundColor: '#059669' }]}
+              onPress={() => {
+                setInspectionReportModalVisible(false);
+                setMoreSection('menu');
+              }}
+            >
+              <Text style={styles.modalConfirmBtnText}>Confirm & Log Inspection ✓</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 6. DRIVER SALARY SLIP VOUCHER MODAL                            */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedSalarySlip !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedSalarySlip(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 500 }]}>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E3A8A', letterSpacing: 1.2 }}>
+                CAMPUS PAYROLL & HR DISBURSEMENT
+              </Text>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginTop: 2 }}>
+                {selectedSalarySlip?.month || 'Current Month'} {selectedSalarySlip?.year || ''} Payslip
+              </Text>
+              <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginTop: 6 }}>
+                <Text style={{ color: '#15803D', fontSize: 12, fontWeight: '800' }}>
+                  ✓ {selectedSalarySlip?.status || 'PAID & TRANSFERRED'}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 280 }}>
+              <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Driver Employee ID:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{driverProfile.driverId}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Designation:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>Campus Senior Fleet Driver</Text>
+                </View>
+                <View style={{ height: 1, backgroundColor: '#CBD5E1', marginVertical: 4 }} />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Basic Salary:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>₹{selectedSalarySlip?.basicSalary?.toLocaleString() || '18,500'}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Fleet Allowances:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>₹{selectedSalarySlip?.allowances?.toLocaleString() || '3,200'}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Deductions (PF/ESI):</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>-₹{selectedSalarySlip?.deductions?.toLocaleString() || '1,100'}</Text>
+                </View>
+              </View>
+
+              <View style={{ marginTop: 12, backgroundColor: '#EFF6FF', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#BFDBFE' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E3A8A' }}>Net Take-Home Pay</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: '#1E3A8A' }}>
+                    ₹{selectedSalarySlip?.netSalary?.toLocaleString() || '20,600'}
+                  </Text>
+                </View>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.modalConfirmBtn, { marginTop: 14, width: '100%', backgroundColor: '#1E3A8A' }]}
+              onPress={() => setSelectedSalarySlip(null)}
+            >
+              <Text style={styles.modalConfirmBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ================= DRIVER BOTTOM NAVIGATION ================= */}
       <BottomTabBar
         activeTab={activeNavTab}
-        onTabChange={setActiveNavTab}
+        onTabChange={(t) => {
+          if (t === 'profile') {
+            setMoreSection('profile');
+          }
+          setActiveNavTab(t);
+        }}
         notificationsCount={notifications.length}
         tabsList={['home', 'academics', 'referrals', 'profile']}
         tabLabels={{
           home: 'Home',
           academics: 'My Trip',
           referrals: 'Referrals',
-          profile: 'More',
+          profile: 'Profile',
         }}
         tabIcons={{
           home: '🏠',
@@ -1905,6 +2102,35 @@ const styles = StyleSheet.create({
   },
   flexOne: {
     flex: 1,
+  },
+  // PROFILE / SERVICES TOGGLE
+  profileToggleHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 10,
+  },
+  profileToggleTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  profileToggleTabActive: {
+    backgroundColor: '#1E3A8A',
+  },
+  profileToggleTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  profileToggleTabTextActive: {
+    color: '#FFFFFF',
   },
   topHeader: {
     backgroundColor: '#FFFFFF',
@@ -2132,11 +2358,28 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginBottom: 12,
   },
+  sectionSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 8,
+  },
   cardHeaderFlex: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  cardHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 4,
   },
   cardLinkText: {
     fontSize: 12,
@@ -3003,5 +3246,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#1E40AF',
     lineHeight: 16,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 6,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+    width: '100%',
+    maxWidth: 420,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
   },
 });

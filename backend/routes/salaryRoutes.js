@@ -72,14 +72,71 @@ router.get('/', protect, authorize('Admin', 'Principal', 'Accounts'), collegeSco
   }
 });
 
+// GET salaries for logged-in staff member (Strictly confidential)
+router.get('/my', protect, collegeScope, async (req, res) => {
+  try {
+    const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const myId = req.user.referenceId || req.user._id?.toString() || req.user.userId;
+    const myName = req.user.name;
+
+    const idList = [myId, req.user._id?.toString(), req.user.userId, req.user.referenceId].filter(Boolean);
+
+    const query = {
+      $or: [
+        { staffId: { $in: idList } },
+        ...(myName ? [{ staffName: { $regex: new RegExp(`^${myName.trim()}$`, 'i') } }] : [])
+      ]
+    };
+
+    let filter = query;
+    if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
+      filter = {
+        $and: [
+          query,
+          { $or: [{ collegeId }, { tenantId: collegeId }] }
+        ]
+      };
+    }
+
+    const salaries = await Salary.find(filter).sort({ createdAt: -1 });
+    res.json(salaries);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET salaries for a specific staff member
 router.get('/staff/:staffId', protect, collegeScope, async (req, res) => {
   try {
     const collegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
-    const filter = { staffId: req.params.staffId };
+    const staffParam = req.params.staffId;
+
+    // Strict confidentiality: Staff can only query their own records
+    if (req.user?.role === 'Staff' || req.user?.role === 'Faculty') {
+      const myId = String(req.user.referenceId || req.user._id || req.user.userId || '').toLowerCase();
+      const myName = String(req.user.name || '').toLowerCase();
+      const paramLower = String(staffParam).toLowerCase();
+      if (paramLower !== 'my' && paramLower !== myId && paramLower !== myName) {
+        return res.status(403).json({ message: 'Access denied: You can only view your own payroll records.' });
+      }
+    }
+
+    const idList = [staffParam, req.user?.referenceId, req.user?._id?.toString()].filter(Boolean);
+    const query = {
+      $or: [
+        { staffId: { $in: idList } },
+        ...(req.user?.name ? [{ staffName: { $regex: new RegExp(`^${req.user.name.trim()}$`, 'i') } }] : [])
+      ]
+    };
+
+    let filter = query;
     if (req.user?.role !== 'Super Admin' && collegeId && collegeId !== 'system') {
-      filter.$and = [{ $or: [{ collegeId }, { tenantId: collegeId }] }, { staffId: req.params.staffId }];
-      delete filter.staffId;
+      filter = {
+        $and: [
+          query,
+          { $or: [{ collegeId }, { tenantId: collegeId }] }
+        ]
+      };
     }
     const salaries = await Salary.find(filter).sort({ createdAt: -1 });
     res.json(salaries);

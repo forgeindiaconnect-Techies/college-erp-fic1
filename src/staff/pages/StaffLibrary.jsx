@@ -11,7 +11,8 @@ import {
   getMyLibraryTransactions,
   requestLibraryBook,
   createLibraryReturnRequest,
-  returnLibraryBook
+  returnLibraryBook,
+  getMyLibraryReturnRequests
 } from '../../api';
 
 const StaffLibrary = () => {
@@ -22,6 +23,7 @@ const StaffLibrary = () => {
   const [receiptFilter, setReceiptFilter] = useState('All'); // 'All' | 'Active' | 'Returned' | 'Pending'
   const [books, setBooks] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [returnRequests, setReturnRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [requestingId, setRequestingId] = useState(null);
   const [returningId, setReturningId] = useState(null);
@@ -40,13 +42,15 @@ const StaffLibrary = () => {
     try {
       setLoading(true);
       setError('');
-      const [booksRes, txRes] = await Promise.all([
+      const [booksRes, txRes, returnRes] = await Promise.all([
         getLibraryBooks().catch(() => ({ data: [] })),
-        getMyLibraryTransactions().catch(() => ({ data: [] }))
+        getMyLibraryTransactions().catch(() => ({ data: [] })),
+        getMyLibraryReturnRequests().catch(() => ({ data: [] }))
       ]);
       
       setBooks(Array.isArray(booksRes.data) ? booksRes.data : []);
       setTransactions(Array.isArray(txRes.data) ? txRes.data : []);
+      setReturnRequests(Array.isArray(returnRes.data) ? returnRes.data : []);
     } catch (err) {
       console.error('Error fetching library data:', err);
       setError('Failed to load library database.');
@@ -128,7 +132,10 @@ const StaffLibrary = () => {
   }, [books, search, selectedCategory]);
 
   const totalCopies = useMemo(() => {
-    return books.reduce((sum, b) => sum + (Number(b.availableCopies) || (b.status === 'Available' ? 1 : 0)), 0);
+    return books.reduce((sum, b) => {
+      const avail = b.availableCopies !== undefined ? Number(b.availableCopies) : (b.available !== undefined ? Number(b.available) : (b.status === 'Available' ? 1 : 0));
+      return sum + Math.max(0, avail);
+    }, 0);
   }, [books]);
 
   const myActiveTx = useMemo(() => {
@@ -137,6 +144,13 @@ const StaffLibrary = () => {
 
   const isBookRequestedByUser = (bookId) => {
     return transactions.some(tx => (tx.bookId?._id === bookId || tx.bookId === bookId) && ['Pending', 'Approved', 'Reserved', 'Issued', 'Overdue'].includes(tx.status));
+  };
+
+  const isReturnPending = (txId) => {
+    return returnRequests.some(r => {
+      const rTxId = r.transactionId?._id || r.transactionId;
+      return (String(rTxId) === String(txId)) && r.status === 'Pending';
+    });
   };
 
   const filteredTransactions = useMemo(() => {
@@ -361,7 +375,9 @@ const StaffLibrary = () => {
                 </tr>
               ) : (
                 filteredBooks.map((book, idx) => {
-                  const copies = Number(book.availableCopies) || (book.status === 'Available' ? 1 : 0);
+                  const total = book.totalCopies !== undefined ? Number(book.totalCopies) : (Number(book.copies) || 1);
+                  const copies = book.availableCopies !== undefined ? Number(book.availableCopies) : (book.available !== undefined ? Number(book.available) : (book.status === 'Available' ? 1 : 0));
+                  const isAvail = copies > 0;
                   const isRequested = isBookRequestedByUser(book._id);
 
                   return (
@@ -389,11 +405,11 @@ const StaffLibrary = () => {
                           fontWeight: 800,
                           padding: '4px 10px',
                           borderRadius: '20px',
-                          background: copies > 0 ? '#ecfdf5' : '#fef2f2',
-                          color: copies > 0 ? '#059669' : '#dc2626',
-                          border: copies > 0 ? '1px solid #a7f3d0' : '1px solid #fecaca'
+                          background: isAvail ? '#ecfdf5' : '#fef2f2',
+                          color: isAvail ? '#059669' : '#dc2626',
+                          border: isAvail ? '1px solid #a7f3d0' : '1px solid #fecaca'
                         }}>
-                          {copies > 0 ? `✓ ${copies} Available` : 'Out of Stock'}
+                          {isAvail ? `✓ ${copies} / ${total} Available` : 'Out of Stock'}
                         </span>
                       </td>
                       <td style={{ padding: '14px 20px', textAlign: 'right' }}>
@@ -404,20 +420,24 @@ const StaffLibrary = () => {
                         ) : (
                           <button 
                             onClick={() => handleRequestBook(book)}
-                            disabled={copies === 0 || requestingId === book._id}
+                            disabled={!isAvail || requestingId === book._id}
                             style={{
-                              padding: '6px 16px',
+                              padding: '7px 16px',
                               borderRadius: '8px',
                               border: 'none',
-                              background: copies > 0 ? '#2563eb' : '#cbd5e1',
+                              background: isAvail ? '#2563eb' : '#cbd5e1',
                               color: '#ffffff',
                               fontWeight: 700,
                               fontSize: '0.78rem',
-                              cursor: copies > 0 ? 'pointer' : 'not-allowed',
-                              boxShadow: copies > 0 ? '0 2px 6px rgba(37,99,235,0.2)' : 'none'
+                              cursor: isAvail ? 'pointer' : 'not-allowed',
+                              boxShadow: isAvail ? '0 2px 6px rgba(37,99,235,0.2)' : 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px'
                             }}
                           >
-                            {requestingId === book._id ? 'Reserving...' : 'Borrow Request'}
+                            <BookOpen size={14} />
+                            {requestingId === book._id ? 'Requesting...' : 'Request Book'}
                           </button>
                         )}
                       </td>
@@ -463,7 +483,7 @@ const StaffLibrary = () => {
                   const isOverdue = tx.status === 'Overdue';
                   const isPending = tx.status === 'Pending';
                   const isApproved = tx.status === 'Approved';
-                  const isReturnRequested = tx.status === 'Return Requested' || tx.status === 'Return Pending';
+                  const isReturnRequested = tx.status === 'Return Requested' || tx.status === 'Return Pending' || isReturnPending(tx._id);
                   const fine = Number(tx.fineAmount || 0);
 
                   const issueDateFormatted = tx.issueDate ? new Date(tx.issueDate).toLocaleDateString('en-GB') : (tx.requestDate ? new Date(tx.requestDate).toLocaleDateString('en-GB') : '-');

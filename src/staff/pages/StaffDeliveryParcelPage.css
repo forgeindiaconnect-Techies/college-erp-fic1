@@ -152,7 +152,13 @@
   background: #eff6ff;
   padding: 0.15rem 0.5rem;
   border-radius: 6px;
-  margin-left: 4px;
+  margin-left: 0.4rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .btn-erp-refresh {
@@ -160,15 +166,15 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.65rem 1.15rem;
-  border-radius: 10px;
-  border: 1px solid #cbd5e1;
   background: #ffffff;
-  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
   font-size: 0.88rem;
   font-weight: 600;
+  color: #1e293b;
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
 }
 
 .btn-erp-refresh:hover:not(:disabled) {
@@ -176,24 +182,29 @@
   border-color: #94a3b8;
   color: #0f172a;
   transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.07);
+}
+
+.btn-erp-refresh:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn-erp-refresh:disabled {
-  opacity: 0.6;
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
 .spin-anim {
-  animation: spinSlow 1s linear infinite;
+  animation: spin 0.9s linear infinite;
 }
 
-@keyframes spinSlow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
-/* ── 3. 3-Column ERP KPI Cards Grid ─────────────────────────────────────── */
+/* ── 3. Modern 3-Column ERP KPI Cards ───────────────────────────────────── */
 .erp-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -203,39 +214,33 @@
 
 .erp-kpi-card {
   background: #ffffff;
-  border-radius: 14px;
   border: 1px solid #e2e8f0;
+  border-radius: 14px;
   padding: 1.25rem 1.5rem;
   display: flex;
   align-items: center;
-  gap: 1.15rem;
+  gap: 1.25rem;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: hidden;
 }
 
 .erp-kpi-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
 }
 
 .kpi-icon-wrap {
   width: 52px;
   height: 52px;
-  border-radius: 14px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: transform 0.2s;
 }
 
-.erp-kpi-card:hover .kpi-icon-wrap {
-  transform: scale(1.05);
-}
-
-/* KPI Color Schemes */
 .kpi-blue .kpi-icon-wrap {
   background: #eff6ff;
   color: #2563eb;

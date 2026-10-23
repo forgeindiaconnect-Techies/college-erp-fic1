@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
+  Linking,
   Modal,
   RefreshControl,
   ScrollView,
@@ -13,7 +15,12 @@ import {
 } from 'react-native';
 import { apiGet, apiPost, type MobileUser } from '../../services/api';
 import BottomTabBar, { type MainNavTab } from '../navigation/BottomTabBar';
+import ScreenHeader from '../navigation/ScreenHeader';
+import UserProfileScreen from '../profile/UserProfileScreen';
 import ReferralHub from '../referrals/ReferralHub';
+import DashboardHeroBanner from './DashboardHeroBanner';
+import QuickAccessGrid from './QuickAccessGrid';
+import HighlightCard from './HighlightCard';
 
 type Props = {
   user: MobileUser;
@@ -84,6 +91,7 @@ export default function ParentDashboard({ user, onLogout }: Props) {
   const [ward, setWard] = useState({
     name: user.parentOf || 'Student Scholar',
     id: user.referenceId || 'N/A',
+    rollNo: user.referenceId || 'N/A',
     dept: user.department || 'Department',
     sem: 'Semester 1',
     section: 'A',
@@ -131,6 +139,10 @@ export default function ParentDashboard({ user, onLogout }: Props) {
   const [payAmountInput, setPayAmountInput] = useState('');
   const [payPaymentMode, setPayPaymentMode] = useState('Online Gateway');
   const [submittingFee, setSubmittingFee] = useState(false);
+
+  // Real-time ERP Detail Modals
+  const [selectedFeeReceipt, setSelectedFeeReceipt] = useState<any | null>(null);
+  const [transportModalVisible, setTransportModalVisible] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -412,6 +424,7 @@ export default function ParentDashboard({ user, onLogout }: Props) {
       setWard({
         name: studentRes?.name || user.parentOf || 'Student Scholar',
         id: resolvedStudentId || 'N/A',
+        rollNo: studentRes?.rollNo || resolvedStudentId || 'N/A',
         dept: dept,
         sem: sem,
         section: sec,
@@ -524,7 +537,18 @@ export default function ParentDashboard({ user, onLogout }: Props) {
 
       setPayFeeModalVisible(false);
       setPayAmountInput('');
-      Alert.alert('Fee Payment Successful 🎉', `Transaction ID: ${receiptNo}\nAmount Paid: ₹${amountNum.toLocaleString('en-IN')}\nPayment credited to ${ward.name}'s college fee account.`);
+      setSelectedFeeReceipt({
+        receiptNo,
+        amount: amountNum,
+        date: new Date().toLocaleDateString('en-GB'),
+        mode: payPaymentMode,
+        status: 'Paid',
+        category: 'Term Tuition & Infrastructure',
+        studentName: ward.name,
+        rollNo: ward.rollNo,
+        dept: ward.dept,
+        sem: ward.sem,
+      });
       loadData();
     } catch (err: any) {
       Alert.alert('Payment Error', err?.message || 'Could not process fee payment.');
@@ -533,6 +557,27 @@ export default function ParentDashboard({ user, onLogout }: Props) {
     }
   };
 
+  // Android Hardware Back Button Handling
+  useEffect(() => {
+    const onBackPress = () => {
+      if (leaveModalVisible) {
+        setLeaveModalVisible(false);
+        return true;
+      }
+      if (payFeeModalVisible) {
+        setPayFeeModalVisible(false);
+        return true;
+      }
+      if (activeTab !== 'home') {
+        setActiveTab('home');
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [activeTab, leaveModalVisible, payFeeModalVisible]);
+
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const todayName = dayNames[new Date().getDay()];
   const todayClasses = timetableMap[todayName] || [];
@@ -540,37 +585,33 @@ export default function ParentDashboard({ user, onLogout }: Props) {
   return (
     <View style={styles.container}>
       {/* ============================================================== */}
-      {/* 1. TOP HEADER & LINKED WARD BAR                                */}
+      {/* 1. TOP HEADER WITH BACK NAVIGATION & LOGOUT                    */}
       {/* ============================================================== */}
-      <View style={styles.topHeaderBar}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{ward.name.substring(0, 2).toUpperCase()}</Text>
-          </View>
-          <View>
-            <View style={styles.roleTagRow}>
-              <Text style={styles.roleTag}>LINKED WARD</Text>
-            </View>
-            <Text style={styles.headerNameText} numberOfLines={1}>{ward.name}</Text>
-            <Text style={styles.headerSubText}>{ward.dept} • {ward.sem} ({ward.section})</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Class Advisor Quick Bar */}
-      <View style={styles.advisorQuickBar}>
-        <Text style={styles.advisorBarText}>
-          👨‍🏫 Class Advisor: <Text style={{ fontWeight: '700', color: '#0F172A' }}>{ward.advisorName}</Text>
-        </Text>
-        {ward.advisorPhone ? (
-          <TouchableOpacity
-            style={styles.callAdvisorPill}
-            onPress={() => Alert.alert('Class Advisor', `Calling advisor at ${ward.advisorPhone}`)}
-          >
-            <Text style={styles.callAdvisorPillText}>📞 Call</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
+      <ScreenHeader
+        showBack={activeTab !== 'home'}
+        onBack={() => setActiveTab('home')}
+        title={
+          activeTab === 'academics'
+            ? `Ward Academics: ${academicsSubTab.charAt(0).toUpperCase() + academicsSubTab.slice(1)}`
+            : activeTab === 'referrals'
+            ? 'Business Referrals'
+            : activeTab === 'notifications'
+            ? 'Alerts & Notices'
+            : activeTab === 'profile'
+            ? 'Parent Profile'
+            : 'Parent Dashboard'
+        }
+        subtitle={
+          activeTab === 'home'
+            ? `Ward: ${ward.name} • ${ward.dept}`
+            : undefined
+        }
+        userName={user.name || 'Parent Scholar'}
+        roleBadge="PARENT"
+        avatarText={(user.name || 'P').substring(0, 2).toUpperCase()}
+        onProfilePress={() => setActiveTab('profile')}
+        onLogoutPress={onLogout}
+      />
 
       {/* ============================================================== */}
       {/* 2. BODY CONTENT (BASED ON FIXED BOTTOM TAB)                     */}
@@ -582,375 +623,192 @@ export default function ParentDashboard({ user, onLogout }: Props) {
             contentContainerStyle={styles.scrollContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
           >
-            {/* Ward Hero Status Card (Google Pay / PhonePe Style) */}
-            <View style={styles.heroGreetingCard}>
-              <View style={styles.heroTopRow}>
+            {/* 1. Visual Hero Banner with High Quality Parent & Scholar Image */}
+            <DashboardHeroBanner
+              greeting={`Hello, ${user.name.split(' ')[0] || user.name} 👋`}
+              subtitle="Stay connected with your child's progress"
+              image={require('../../../assets/images/dashboards/parent_hero.jpg')}
+              tagline="Together for a Brighter Future"
+            />
+
+            {/* 2. Child Overview Highlight Card (Matching Reference Design) */}
+            <HighlightCard
+              sectionTitle="Child Overview"
+              actionText="Ward Profile →"
+              onActionPress={() => {
+                setActiveTab('academics');
+                setAcademicsSubTab('attendance');
+              }}
+              icon="🧑‍🎓"
+              iconBg="#EFF6FF"
+              title={ward.name}
+              subtitle={`Student ID: ${ward.rollNo} • ${ward.dept} (${ward.sem})`}
+              badgeText={ward.attendance >= 75 ? `${ward.attendance}% Att.` : `${ward.attendance}% Low`}
+              badgeBg={ward.attendance >= 75 ? '#DCFCE7' : '#FEE2E2'}
+              badgeTextColor={ward.attendance >= 75 ? '#15803D' : '#DC2626'}
+              onPress={() => {
+                setActiveTab('academics');
+                setAcademicsSubTab('attendance');
+              }}
+            />
+
+            {/* 3. 2x2 Quick Access Grid (Matching Reference Design) */}
+            <QuickAccessGrid
+              title="Quick Access"
+              seeAllText="All Modules →"
+              onSeeAll={() => setActiveTab('academics')}
+              items={[
+                {
+                  id: 'attendance',
+                  label: 'Child Attendance',
+                  icon: '📅',
+                  bg: '#EFF6FF',
+                  borderColor: '#DBEAFE',
+                  textColor: '#1E40AF',
+                  badge: `${ward.attendance}%`,
+                  onPress: () => {
+                    setActiveTab('academics');
+                    setAcademicsSubTab('attendance');
+                  },
+                },
+                {
+                  id: 'academics',
+                  label: 'Academic Progress',
+                  icon: '📈',
+                  bg: '#ECFDF5',
+                  borderColor: '#D1FAE5',
+                  textColor: '#065F46',
+                  badge: ward.cgpa > 0 ? `${ward.cgpa} CGPA` : undefined,
+                  onPress: () => {
+                    setActiveTab('academics');
+                    setAcademicsSubTab('marks');
+                  },
+                },
+                {
+                  id: 'fees',
+                  label: 'Fee Status',
+                  icon: '💳',
+                  bg: '#F5F3FF',
+                  borderColor: '#EDE9FE',
+                  textColor: '#5B21B6',
+                  badge: ward.pendingFees > 0 ? `₹${ward.pendingFees.toLocaleString()} Due` : 'Cleared',
+                  onPress: () => {
+                    setActiveTab('academics');
+                    setAcademicsSubTab('fees');
+                  },
+                },
+                {
+                  id: 'notifications',
+                  label: 'Notifications',
+                  icon: '🔔',
+                  bg: '#FFFBEB',
+                  borderColor: '#FEF3C7',
+                  textColor: '#92400E',
+                  badge: notifications.length > 0 ? `${notifications.length}` : undefined,
+                  onPress: () => setActiveTab('notifications'),
+                },
+              ]}
+            />
+
+            {/* 4. Latest Updates Highlight Card (Matching Reference Design) */}
+            <HighlightCard
+              sectionTitle="Latest Updates"
+              actionText="See all"
+              onActionPress={() => setActiveTab('notifications')}
+              icon="📢"
+              iconBg="#EFF6FF"
+              title={notifications[0]?.title || 'Parent Teacher Meeting'}
+              subtitle={
+                notifications[0]?.text
+                  ? notifications[0].text.length > 60
+                    ? `${notifications[0].text.slice(0, 60)}...`
+                    : notifications[0].text
+                  : 'Scheduled 25-Oct-2026 • Campus Auditorium'
+              }
+              badgeText={notifications[0]?.tag || 'Notice'}
+              badgeBg="#FEF3C7"
+              badgeTextColor="#92400E"
+              onPress={() => setActiveTab('notifications')}
+            />
+
+            {/* Fee Information & Overview */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
                 <View>
-                  <Text style={styles.greetingTitle}>{ward.name}</Text>
-                  <Text style={styles.greetingSub}>{ward.dept} • {ward.sem} ({ward.section})</Text>
+                  <Text style={styles.cardHeaderTitle}>💳 Fee Overview & Institutional Dues</Text>
+                  <Text style={styles.sectionSubtitle}>Term payments and scholarship allocations</Text>
                 </View>
+                <TouchableOpacity onPress={() => { setActiveTab('academics'); setAcademicsSubTab('fees'); }} activeOpacity={0.7}>
+                  <Text style={styles.cardHeaderLink}>Fee Ledger →</Text>
+                </TouchableOpacity>
               </View>
 
-              <View style={styles.heroKpiRow}>
-                <View style={styles.heroKpiItem}>
-                  <Text style={styles.heroKpiLabel}>Attendance</Text>
-                  <Text style={[styles.heroKpiValue, { color: ward.attendance >= 75 ? '#34D399' : '#F87171' }]}>
-                    {ward.attendance}%
-                  </Text>
-                  <Text style={styles.heroKpiSub}>
-                    {ward.attendance >= 75 ? '✓ Safe' : '⚠️ Shortage'}
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <View style={{ flex: 1, backgroundColor: '#F0FDF4', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#DCFCE7' }}>
+                  <Text style={{ fontSize: 11, color: '#15803D', fontWeight: '700' }}>PAID TO DATE</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: '#15803D', marginTop: 2 }}>
+                    ₹{ward.paidFees.toLocaleString()}
                   </Text>
                 </View>
-
-                <View style={styles.heroKpiDivider} />
-
-                <View style={styles.heroKpiItem}>
-                  <Text style={styles.heroKpiLabel}>Current CGPA</Text>
-                  <Text style={[styles.heroKpiValue, { color: '#60A5FA' }]}>{ward.cgpa}</Text>
-                  <Text style={styles.heroKpiSub}>Academic</Text>
-                </View>
-
-                <View style={styles.heroKpiDivider} />
-
-                <View style={styles.heroKpiItem}>
-                  <Text style={styles.heroKpiLabel}>Pending Fees</Text>
-                  <Text style={[styles.heroKpiValue, { color: ward.pendingFees > 0 ? '#FCA5A5' : '#34D399' }]}>
+                <View style={{ flex: 1, backgroundColor: ward.pendingFees > 0 ? '#FEF2F2' : '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: ward.pendingFees > 0 ? '#FECACA' : '#E2E8F0' }}>
+                  <Text style={{ fontSize: 11, color: ward.pendingFees > 0 ? '#DC2626' : '#64748B', fontWeight: '700' }}>PENDING DUES</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: ward.pendingFees > 0 ? '#DC2626' : '#0F172A', marginTop: 2 }}>
                     ₹{ward.pendingFees.toLocaleString()}
                   </Text>
-                  <Text style={styles.heroKpiSub}>
-                    {ward.pendingFees > 0 ? 'Dues' : 'Cleared'}
-                  </Text>
                 </View>
               </View>
             </View>
 
-            {/* Quick Action Shortcuts (Google Pay / PhonePe 4-Column Grid) */}
-            <View style={styles.card}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>⚡ Quick Parent Actions</Text>
-                <Text style={styles.cardHeaderSub}>Tap to open</Text>
-              </View>
-
-              <View style={styles.gpayGrid}>
-                {/* 1. Attendance */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('attendance'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#ECFDF5' }]}>
-                    <Text style={styles.gpayIcon}>📊</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Attendance</Text>
-                </TouchableOpacity>
-
-                {/* 2. Marks */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('marks'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#F5F3FF' }]}>
-                    <Text style={styles.gpayIcon}>🎓</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Exam Marks</Text>
-                </TouchableOpacity>
-
-                {/* 3. Fee Status */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('fees'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FFF1F2' }]}>
-                    <Text style={styles.gpayIcon}>💳</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Fee Status</Text>
-                </TouchableOpacity>
-
-                {/* 4. Bus Transit */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('transport'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#EFF6FF' }]}>
-                    <Text style={styles.gpayIcon}>🚌</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Bus Transit</Text>
-                </TouchableOpacity>
-
-                {/* 5. Timetable */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('timetable'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FFFBEB' }]}>
-                    <Text style={styles.gpayIcon}>⏰</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Timetable</Text>
-                </TouchableOpacity>
-
-                {/* 6. Leave Status */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('leaves'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#F0FDFA' }]}>
-                    <Text style={styles.gpayIcon}>✉️</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Leave Desk</Text>
-                </TouchableOpacity>
-
-                {/* 7. Referrals */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => setActiveTab('referrals')}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#EEF2FF' }]}>
-                    <Text style={styles.gpayIcon}>🤝</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Referrals</Text>
-                </TouchableOpacity>
-
-                {/* 8. Call Advisor */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => {
-                    if (ward.advisorPhone) {
-                      Alert.alert('Class Advisor', `Calling ${ward.advisorName} at ${ward.advisorPhone}`);
-                    } else {
-                      Alert.alert('Class Advisor', `Advisor: ${ward.advisorName}\nDepartment: ${ward.dept}`);
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#ECFEFF' }]}>
-                    <Text style={styles.gpayIcon}>📞</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Call Advisor</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* WEB SIDEBAR CATEGORY 1: CHILD ACADEMICS */}
+            {/* Dedicated Family Referral Rewards (Letters Fully Visible) */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>📚 Child Academics</Text>
-                <Text style={styles.cardHeaderSub}>Same as Web Portal</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('attendance'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#ECFDF5' }]}>
-                  <Text style={styles.serviceIconEmoji}>📊</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Child Attendance</Text>
-                  <Text style={styles.serviceRowSub}>
-                    Overall: {ward.attendance}% • {ward.attendance >= 75 ? 'Safe threshold' : 'Shortage alert'}
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <Text style={styles.cardHeaderTitle} numberOfLines={1}>💼 Family Referral Rewards</Text>
+                  <Text style={styles.sectionSubtitle} numberOfLines={2}>
+                    Earn institutional rewards and fee credits across 4 commercial categories
                   </Text>
                 </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('marks'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#F5F3FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>🎓</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Child Marks & GPA</Text>
-                  <Text style={styles.serviceRowSub}>
-                    CGPA: {ward.cgpa} • Internal assessments & semester grades
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('timetable'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FFFBEB' }]}>
-                  <Text style={styles.serviceIconEmoji}>⏰</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Timetable & Exams</Text>
-                  <Text style={styles.serviceRowSub}>
-                    Daily periods schedule, faculty info, and examination hall dates
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* WEB SIDEBAR CATEGORY 2: ADMINISTRATION */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>🏢 Administration</Text>
-                <Text style={styles.cardHeaderSub}>Same as Web Portal</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('fees'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FFF1F2' }]}>
-                  <Text style={styles.serviceIconEmoji}>💳</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Fee Status & Receipts</Text>
-                  <Text style={styles.serviceRowSub}>
-                    Paid: ₹{ward.paidFees.toLocaleString()} • Pending Due: ₹{ward.pendingFees.toLocaleString()}
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('leaves'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FAF5FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>📄</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Leave Status & Desk</Text>
-                  <Text style={styles.serviceRowSub}>
-                    {leaves.length > 0 ? `${leaves.length} Applications filed` : 'Submit and monitor child leaves'}
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('transport'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#EFF6FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>🚌</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Transport & Bus Tracking</Text>
-                  <Text style={styles.serviceRowSub}>
-                    Bus: {ward.busNo} • {ward.busRoute}
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => setActiveTab('notifications')}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={styles.serviceIconEmoji}>🔔</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Notifications & Circulars</Text>
-                  <Text style={styles.serviceRowSub}>
-                    {notifications.length} Official announcements and bulletins
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* WEB SIDEBAR CATEGORY 3: BUSINESS REFERRAL */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>💼 Business Referral & Rewards</Text>
-                <TouchableOpacity onPress={() => setActiveTab('referrals')} activeOpacity={0.7}>
+                <TouchableOpacity onPress={() => setActiveTab('referrals')} activeOpacity={0.7} style={{ flexShrink: 0 }}>
                   <Text style={styles.cardHeaderLink}>Open Hub →</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={styles.sectionSubtitle}>
-                Refer credit cards, insurance, job openings & bank accounts to earn verified rewards.
-              </Text>
-              <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={() => setActiveTab('referrals')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.primaryBtnText}>Explore Referral Categories & Submissions</Text>
-              </TouchableOpacity>
-            </View>
 
-            {/* Today's Schedule Glance */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>📅 Ward's Classes ({todayName})</Text>
-                <TouchableOpacity onPress={() => { setActiveTab('academics'); setAcademicsSubTab('timetable'); }}>
-                  <Text style={styles.cardHeaderLink}>Timetable →</Text>
-                </TouchableOpacity>
+              <View style={{ gap: 8, marginTop: 4 }}>
+                {[
+                  { id: 'cards', title: 'Credit Cards', desc: 'Pre-approved cards with cashback & fee waivers', icon: '💳', bg: '#EFF6FF', badge: 'Up to ₹2,500' },
+                  { id: 'insurance', title: 'Insurance Policies', desc: 'Family health, education & vehicle insurance plans', icon: '🛡️', bg: '#ECFDF5', badge: 'Up to ₹5,000' },
+                  { id: 'jobs', title: 'Job Openings', desc: 'Refer candidates for corporate and campus recruitment', icon: '💼', bg: '#F5F3FF', badge: 'Placement Bonus' },
+                  { id: 'banking', title: 'Bank Accounts', desc: 'Zero-balance digital savings accounts & privilege debit cards', icon: '🏛️', bg: '#FFFBEB', badge: 'Up to ₹750' },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: item.bg,
+                      borderRadius: 12,
+                      padding: 12,
+                      borderWidth: 1,
+                      borderColor: 'rgba(0,0,0,0.05)',
+                    }}
+                    onPress={() => setActiveTab('referrals')}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      <Text style={{ fontSize: 20 }}>{item.icon}</Text>
+                    </View>
+                    <View style={{ flex: 1, marginRight: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1, marginRight: 6 }} numberOfLines={1}>{item.title}</Text>
+                        <View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, flexShrink: 0 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#15803D' }}>{item.badge}</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 11, color: '#475569', marginTop: 2 }} numberOfLines={2}>{item.desc}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
               </View>
-
-              {todayClasses.length === 0 ? (
-                <View style={styles.emptyStateBox}>
-                  <Text style={styles.emptyStateText}>
-                    {todayName === 'Sunday' || todayName === 'Saturday'
-                      ? 'Weekend Holiday - No scheduled lectures today.'
-                      : `No classes scheduled for today (${todayName}).`}
-                  </Text>
-                </View>
-              ) : (
-                todayClasses.slice(0, 3).map((item, idx) => (
-                  <View key={idx} style={styles.timelineRow}>
-                    <View style={styles.periodBadge}>
-                      <Text style={styles.periodBadgeNum}>P{item.period}</Text>
-                      <Text style={styles.periodBadgeTime}>{item.time.split(' - ')[0]}</Text>
-                    </View>
-                    <View style={styles.periodInfo}>
-                      <Text style={styles.periodSubject}>{item.subject}</Text>
-                      <Text style={styles.periodMeta}>
-                        {item.faculty} • <Text style={{ color: '#2563EB', fontWeight: '700' }}>Room {item.room}</Text>
-                      </Text>
-                    </View>
-                  </View>
-                ))
-              )}
-            </View>
-
-            {/* Latest College Bulletins */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>🔔 Recent College Notices</Text>
-                <TouchableOpacity onPress={() => setActiveTab('notifications')}>
-                  <Text style={styles.cardHeaderLink}>View All ({notifications.length}) →</Text>
-                </TouchableOpacity>
-              </View>
-
-              {notifications.length === 0 ? (
-                <View style={styles.emptyStateBox}>
-                  <Text style={styles.emptyStateText}>No recent college notices posted.</Text>
-                </View>
-              ) : (
-                notifications.slice(0, 2).map((n) => (
-                  <View key={n.id} style={styles.noticeMiniCard}>
-                    <View style={styles.noticeHeaderRow}>
-                      <Text style={styles.noticeTag}>{n.tag}</Text>
-                      <Text style={styles.noticeDate}>{n.date}</Text>
-                    </View>
-                    <Text style={styles.noticeTitle}>{n.title}</Text>
-                    <Text style={styles.noticeBody} numberOfLines={2}>{n.text}</Text>
-                  </View>
-                ))
-              )}
             </View>
           </ScrollView>
         )}
@@ -1248,11 +1106,25 @@ export default function ParentDashboard({ user, onLogout }: Props) {
                     </View>
                   ) : (
                     feeReceipts.map((r, idx) => (
-                      <View key={idx} style={styles.feeReceiptItem}>
+                      <TouchableOpacity
+                        key={idx}
+                        style={styles.feeReceiptItem}
+                        onPress={() => setSelectedFeeReceipt({
+                          ...r,
+                          studentName: ward.name,
+                          rollNo: ward.rollNo,
+                          dept: ward.dept,
+                          sem: ward.sem,
+                        })}
+                        activeOpacity={0.7}
+                      >
                         <View style={{ flex: 1 }}>
                           <Text style={styles.receiptCategory}>{r.category}</Text>
                           <Text style={styles.receiptMeta}>
                             Receipt: {r.receiptNo} • Mode: {r.mode} • Date: {r.date}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '700', marginTop: 2 }}>
+                            View Official Voucher ›
                           </Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
@@ -1273,7 +1145,7 @@ export default function ParentDashboard({ user, onLogout }: Props) {
                             </Text>
                           </View>
                         </View>
-                      </View>
+                      </TouchableOpacity>
                     ))
                   )}
                 </View>
@@ -1381,10 +1253,10 @@ export default function ParentDashboard({ user, onLogout }: Props) {
                       {ward.driverPhone ? (
                         <TouchableOpacity
                           style={[styles.callDriverBtn, { marginTop: 12 }]}
-                          onPress={() => Alert.alert('Bus Driver', `Calling ${ward.driverName} at ${ward.driverPhone}`)}
+                          onPress={() => setTransportModalVisible(true)}
                           activeOpacity={0.8}
                         >
-                          <Text style={styles.callDriverBtnText}>📞 Call Driver ({ward.driverName})</Text>
+                          <Text style={styles.callDriverBtnText}>🚌 View Bus Route & Call Driver ({ward.driverName})</Text>
                         </TouchableOpacity>
                       ) : null}
                     </View>
@@ -1443,141 +1315,25 @@ export default function ParentDashboard({ user, onLogout }: Props) {
 
       {/* TAB 5: PROFILE */}
       {activeTab === 'profile' && (
-        <View style={{ flex: 1 }}>
-          <View style={styles.pageHeaderBanner}>
-            <Text style={styles.pageHeaderTitle}>Ward Records & Services</Text>
-            <Text style={styles.pageHeaderDesc}>
-              Review parent profile details, fee payment records, transport bus information, and submit leave requests.
-            </Text>
-          </View>
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
-          >
-            {/* Parent Identity */}
-            <View style={styles.card}>
-              <Text style={styles.cardHeaderTitle}>👤 Parent Profile Identity</Text>
-              <View style={styles.profileRowItem}>
-                <Text style={styles.profileFieldLabel}>Parent Name</Text>
-                <Text style={styles.profileFieldValue}>{user.name || 'Parent Scholar'}</Text>
-              </View>
-              <View style={styles.profileRowItem}>
-                <Text style={styles.profileFieldLabel}>Registered Email</Text>
-                <Text style={styles.profileFieldValue}>{user.email || 'N/A'}</Text>
-              </View>
-              <View style={styles.profileRowItem}>
-                <Text style={styles.profileFieldLabel}>Linked Ward Scholar</Text>
-                <Text style={[styles.profileFieldValue, { color: '#2563EB' }]}>{ward.name} ({ward.id})</Text>
-              </View>
-              <View style={styles.profileRowItem}>
-                <Text style={styles.profileFieldLabel}>Department & Term</Text>
-                <Text style={styles.profileFieldValue}>{ward.dept} - {ward.sem}</Text>
-              </View>
-            </View>
-
-            {/* Fee Statement & Online Payment */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>💳 Ward Tuition Fee Statement</Text>
-                <View
-                  style={[
-                    styles.statusPill,
-                    { backgroundColor: ward.pendingFees > 0 ? '#FEF2F2' : '#ECFDF5' },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.statusPillText,
-                      { color: ward.pendingFees > 0 ? '#DC2626' : '#059669' },
-                    ]}
-                  >
-                    {ward.pendingFees > 0 ? 'Dues Outstanding' : 'All Cleared'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.feeBalanceBox}>
-                <Text style={styles.feeBalanceLabel}>Outstanding Term Balance</Text>
-                <Text style={styles.feeBalanceValue}>₹{ward.pendingFees.toLocaleString()}</Text>
-                <Text style={styles.feeBalanceSub}>Total Fees: ₹{ward.totalFees.toLocaleString()} • Paid: ₹{ward.paidFees.toLocaleString()}</Text>
-              </View>
-
-              {ward.pendingFees > 0 && (
-                <TouchableOpacity
-                  style={styles.primaryBtn}
-                  onPress={() => Alert.alert('Payment Gateway', `Initiating secure online payment of ₹${ward.pendingFees.toLocaleString()}`)}
-                >
-                  <Text style={styles.primaryBtnText}>Proceed to Pay Dues Online</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Transport Tracking */}
-            <View style={styles.card}>
-              <Text style={styles.cardHeaderTitle}>🚌 Transport & Bus Tracking</Text>
-              {ward.busNo === 'N/A' || ward.busRoute.includes('Self') ? (
-                <View style={styles.emptyStateBox}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E3A8A', marginBottom: 2 }}>
-                    🚶 Day Scholar / Self Transport
-                  </Text>
-                  <Text style={styles.emptyStateText}>Ward travels via self/day-scholar transit.</Text>
-                </View>
-              ) : (
-                <View style={styles.facilitySection}>
-                  <Text style={styles.facilityTitle}>Assigned Route: {ward.busRoute}</Text>
-                  <Text style={styles.facilityMeta}>Bus Number: {ward.busNo} • Boarding: {ward.stopName}</Text>
-                  <Text style={[styles.facilityMeta, { color: '#059669', fontWeight: '700' }]}>Pickup ETA: {ward.pickupTime}</Text>
-                  {ward.driverPhone ? (
-                    <TouchableOpacity
-                      style={styles.callDriverBtn}
-                      onPress={() => Alert.alert('Bus Driver', `Calling ${ward.driverName} at ${ward.driverPhone}`)}
-                    >
-                      <Text style={styles.callDriverBtnText}>📞 Call Driver ({ward.driverName})</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              )}
-            </View>
-
-            {/* Ward Leave Application */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>📄 Ward Leave Desk</Text>
-                <TouchableOpacity style={styles.applyLeavePill} onPress={() => setLeaveModalVisible(true)}>
-                  <Text style={styles.applyLeavePillText}>+ Apply Leave</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.guidanceTipBox}>
-                <Text style={styles.guidanceTipEmoji}>💡</Text>
-                <Text style={styles.guidanceTipText}>
-                  Request absence for medical emergencies, personal events, or family functions. Notifications are automatically forwarded to the Class Advisor.
-                </Text>
-              </View>
-
-              {leaves.length === 0 ? (
-                <View style={styles.emptyStateBox}>
-                  <Text style={styles.emptyStateText}>No leave applications submitted yet for ward.</Text>
-                </View>
-              ) : (
-                leaves.map((l) => (
-                  <View key={l.id} style={styles.leaveHistoryItem}>
-                    <Text style={styles.leaveHistoryType}>{l.type} ({l.startDate})</Text>
-                    <Text style={styles.leaveHistoryReason}>Reason: {l.reason}</Text>
-                    <Text style={[styles.statusPillText, { color: l.status === 'Approved' ? '#059669' : '#D97706' }]}>
-                      Status: {l.status}
-                    </Text>
-                  </View>
-                ))
-              )}
-            </View>
-
-            {/* Sign Out Button */}
-            <TouchableOpacity style={styles.profileSignOutCard} onPress={onLogout}>
-              <Text style={styles.profileSignOutText}>Sign Out of Parent Portal</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+        <UserProfileScreen
+          user={user}
+          roleTitle="Parent / Guardian"
+          onLogout={onLogout}
+          onBack={() => setActiveTab('home')}
+          hideTopBar={true}
+          roleAttributes={[
+            { label: 'Linked Ward Scholar', value: ward.name },
+            { label: 'Ward Roll Number', value: ward.rollNo || ward.id },
+            { label: 'Ward Department', value: ward.dept },
+            { label: 'Ward Term & Section', value: `${ward.sem} (${ward.section})` },
+            { label: 'Ward Attendance', value: `${ward.attendance}%` },
+            { label: 'Ward CGPA', value: ward.cgpa },
+            { label: 'Class Advisor', value: ward.advisorName },
+            { label: 'Advisor Phone', value: ward.advisorPhone },
+            { label: 'Bus Route', value: ward.busRoute },
+            { label: 'Bus Number', value: ward.busNo },
+          ]}
+        />
       )}
       </View>
 
@@ -1710,6 +1466,154 @@ export default function ParentDashboard({ user, onLogout }: Props) {
                 ) : (
                   <Text style={styles.modalSubmitText}>Confirm & Pay</Text>
                 )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 3. OFFICIAL WARD FEE RECEIPT VOUCHER MODAL                     */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedFeeReceipt !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedFeeReceipt(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 520 }]}>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E3A8A', letterSpacing: 1.2 }}>
+                CAMPUS INSTITUTIONAL ERP
+              </Text>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginTop: 2 }}>
+                Official Fee Payment Voucher
+              </Text>
+              <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginTop: 6 }}>
+                <Text style={{ color: '#15803D', fontSize: 12, fontWeight: '700' }}>✓ VERIFIED & CREDITED TO WARD LEDGER</Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 340 }}>
+              <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Receipt Number:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedFeeReceipt?.receiptNo}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Transaction Date:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedFeeReceipt?.date}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Payment Mode:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedFeeReceipt?.mode || 'Online Gateway'}</Text>
+                </View>
+                <View style={{ height: 1, backgroundColor: '#CBD5E1', marginVertical: 4 }} />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Student / Ward:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedFeeReceipt?.studentName || ward.name}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Roll / Reg Number:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedFeeReceipt?.rollNo || ward.rollNo}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Department / Sem:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedFeeReceipt?.dept || ward.dept} ({selectedFeeReceipt?.sem || ward.sem})</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Fee Category:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{selectedFeeReceipt?.category || 'Tuition & Infrastructure'}</Text>
+                </View>
+              </View>
+
+              <View style={{ marginTop: 12, backgroundColor: '#EFF6FF', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#BFDBFE' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E3A8A' }}>Total Amount Paid</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: '#1E3A8A' }}>
+                    ₹{Number(selectedFeeReceipt?.amount || 0).toLocaleString('en-IN')}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11, color: '#3B82F6', marginTop: 4 }}>
+                  Institution financial audit stamp applied. This is a computer-generated voucher.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, { marginTop: 14 }]}
+              onPress={() => setSelectedFeeReceipt(null)}
+            >
+              <Text style={styles.primaryBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 4. BUS TRANSIT & DRIVER CONTACT MODAL                          */}
+      {/* ============================================================== */}
+      <Modal
+        visible={transportModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTransportModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 480 }]}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E3A8A', letterSpacing: 1 }}>
+              CAMPUS TRANSIT & FLEET
+            </Text>
+            <Text style={[styles.modalTitle, { fontSize: 17, marginTop: 2 }]}>
+              {ward.busRoute}
+            </Text>
+            <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 12 }}>
+              Bus Vehicle No: {ward.busNo}
+            </Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 280 }}>
+              <View style={[styles.specGrid, { marginVertical: 6 }]}>
+                <View style={styles.specItem}>
+                  <Text style={styles.specLabel}>Assigned Driver</Text>
+                  <Text style={[styles.specValue, { color: '#1E293B', fontWeight: '700' }]}>{ward.driverName}</Text>
+                </View>
+                <View style={styles.specItem}>
+                  <Text style={styles.specLabel}>Transit Status</Text>
+                  <Text style={[styles.specValue, { color: '#15803D', fontWeight: '800' }]}>Active on Route</Text>
+                </View>
+              </View>
+
+              <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 8, gap: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>Ward Transit Schedule</Text>
+                <Text style={{ fontSize: 12, color: '#475569' }}>• Designated Boarding Stop: {ward.stopName}</Text>
+                <Text style={{ fontSize: 12, color: '#475569' }}>• Morning Pickup: {ward.pickupTime || '07:45 AM'}</Text>
+                <Text style={{ fontSize: 12, color: '#475569' }}>• Evening Campus Departure: {ward.dropTime || '05:15 PM'}</Text>
+              </View>
+
+              <View style={[styles.guidanceTipBox, { marginTop: 10 }]}>
+                <Text style={styles.guidanceTipEmoji}>🛡️</Text>
+                <Text style={styles.guidanceTipText}>
+                  All campus transport buses are speed-governed and monitored with live GPS tracking by College Transport Cell.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={[styles.modalActions, { marginTop: 14 }]}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setTransportModalVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, { backgroundColor: '#10B981' }]}
+                onPress={() => {
+                  Linking.openURL(`tel:${ward.driverPhone}`).catch(() => null);
+                  setTransportModalVisible(false);
+                }}
+              >
+                <Text style={styles.modalSubmitText}>📞 Call Driver</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2534,6 +2438,27 @@ const styles = StyleSheet.create({
   typeChipTextActive: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  specGrid: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  specItem: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  specLabel: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  specValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   modalInput: {
     backgroundColor: '#F8FAFC',

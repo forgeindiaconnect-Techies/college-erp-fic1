@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, GraduationCap, CalendarCheck,
   BookOpenCheck, Calendar, BookOpen, FileText, ClipboardList, Inbox,
   LogOut, ChevronRight, ChevronDown, Megaphone, Settings, IndianRupee, Briefcase, Library, LifeBuoy, X, Award, Network,
-  CreditCard, ShieldCheck, Layers, Building, FileCheck
+  CreditCard, ShieldCheck, Layers, Building, FileCheck, Package
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -113,6 +113,7 @@ const HodSidebar = ({ isOpen, onClose }) => {
       items: [
         { name: 'Leave Approvals', path: '/hod/leaves', icon: <Inbox size={20} /> },
         { name: 'Announcements', path: '/hod/announcements', icon: <Megaphone size={20} /> },
+        { name: 'Gate Deliveries & Parcels', path: '/hod/parcels', icon: <Package size={20} /> },
         { name: 'Support Center', path: '/hod/support', icon: <LifeBuoy size={20} /> }
       ]
     },

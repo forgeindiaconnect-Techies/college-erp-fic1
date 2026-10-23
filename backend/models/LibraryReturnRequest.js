@@ -23,7 +23,7 @@ const libraryReturnRequestSchema = new mongoose.Schema(
     },
     userType: {
       type: String,
-      enum: ['Student', 'Staff'],
+      enum: ['Student', 'Staff', 'HOD', 'Faculty', 'Teacher', 'Principal', 'Admin', 'Super Admin'],
       required: true
     },
     requestDate: {

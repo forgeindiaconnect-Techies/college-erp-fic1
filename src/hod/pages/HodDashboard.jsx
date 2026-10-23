@@ -7,7 +7,7 @@ import {
   ClipboardList, Megaphone, CheckCircle, Play, CheckCircle2, UserCheck,
   IndianRupee, Search, Filter, Download, Printer, RefreshCw, ShieldCheck,
   AlertCircle, ArrowUpRight, ArrowDownRight, Wallet, Eye, X, Phone, Mail,
-  Award, Sparkles, Building2, Check, AlertOctagon, Zap
+  Award, Sparkles, Building2, Check, AlertOctagon, Zap, Package
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -26,7 +26,8 @@ import {
   approveMark,
   getPlacementJobs,
   getMeetings,
-  updateMeetingStatus
+  updateMeetingStatus,
+  getParcels
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
@@ -87,6 +88,7 @@ const HodDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [myMeetings, setMyMeetings] = useState([]);
   const [loadingMeetings, setLoadingMeetings] = useState(false);
+  const [parcels, setParcels] = useState([]);
 
   // Student Directory Filters in Dashboard
   const [studentSearch, setStudentSearch] = useState('');
@@ -119,7 +121,8 @@ const HodDashboard = () => {
         feesResponse,
         marksResponse,
         monitoringResponse,
-        jobsResponse
+        jobsResponse,
+        parcelsResponse
       ] = await Promise.all([
         getStudents().catch(() => ({ data: [] })),
         getStaff().catch(() => ({ data: [] })),
@@ -129,8 +132,12 @@ const HodDashboard = () => {
         getAllFees().catch(() => ({ data: [] })),
         getAllMarks().catch(() => ({ data: [] })),
         getHodClassMonitoring(deptName).catch(() => ({ data: [] })),
-        getPlacementJobs().catch(() => ({ data: [] }))
+        getPlacementJobs().catch(() => ({ data: [] })),
+        getParcels({ my: 'true' }).catch(() => ({ data: [] }))
       ]);
+
+      const parcelList = Array.isArray(parcelsResponse?.data?.data) ? parcelsResponse.data.data : (Array.isArray(parcelsResponse?.data) ? parcelsResponse.data : []);
+      setParcels(parcelList);
 
       // Multi-key placement jobs loader
       let rawJobs = Array.isArray(jobsResponse?.data) ? jobsResponse.data : (jobsResponse?.data?.jobs || []);
@@ -843,6 +850,58 @@ const HodDashboard = () => {
         <MyDocumentChecklist title="HOD & Department Head Compliance Records" category="HOD" />
       </div>
 
+      {/* Pending Deliveries & Parcels Banner */}
+      {parcels.some(p => p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received') && (
+        <div style={{
+          marginBottom: '1.25rem',
+          background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+          border: '1px solid #fde68a',
+          borderRadius: '14px',
+          padding: '16px 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px',
+          boxShadow: '0 2px 10px rgba(217,119,6,0.08)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: 42, height: 42, borderRadius: '10px', background: '#d97706', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Package size={22} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#92400e' }}>
+                You have {parcels.filter(p => p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received').length} package(s) awaiting collection at the campus gate
+              </h4>
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#b45309' }}>
+                Recent arrival: {parcels.filter(p => p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received')[0]?.deliveryCompany} ({parcels.filter(p => p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received')[0]?.parcelDetails || 'Package'})
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/hod/parcels')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 18px',
+              borderRadius: '10px',
+              background: '#d97706',
+              color: '#ffffff',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(217,119,6,0.25)'
+            }}
+          >
+            <span>View & Confirm Pickup</span>
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Principal Executive Review Meetings Console */}
       <div style={{
         background: 'var(--bg-primary, #ffffff)',
@@ -1093,6 +1152,22 @@ const HodDashboard = () => {
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)' }}>Circulars & broadcasts</div>
             </div>
           </button>
+
+          <button 
+            type="button"
+            onClick={() => navigate('/hod/parcels')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s ease' }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: '8px', background: 'rgba(217, 119, 6, 0.12)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Package size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main, #0f172a)' }}>Gate Deliveries</div>
+              <div style={{ fontSize: '0.7rem', color: '#d97706', fontWeight: 600 }}>
+                {parcels.filter(p => p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received').length} pending at gate
+              </div>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -1116,6 +1191,22 @@ const HodDashboard = () => {
           <GraduationCap size={22} />
           <span>Department Staff</span>
           <strong>{departmentStaff.length}</strong>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/hod/parcels')}
+          className="hod-summary-card"
+          style={{
+            borderLeft: '4px solid #d97706',
+            background: parcels.some(p => p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received') ? '#fffbeb' : undefined
+          }}
+        >
+          <Package size={22} color="#d97706" />
+          <span>Gate Deliveries</span>
+          <strong style={{ color: '#d97706' }}>
+            {parcels.filter(p => p.status === 'Pending Collection' || p.status === 'Received at Gate' || p.status === 'Received').length}
+          </strong>
         </button>
 
         <button

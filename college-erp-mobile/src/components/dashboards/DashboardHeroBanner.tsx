@@ -1,0 +1,158 @@
+import React from 'react';
+import {
+  Image,
+  ImageSourcePropType,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Colors, Radius, Typography, Shadows } from '../../constants/designSystem';
+
+export type DashboardHeroBannerProps = {
+  greeting: string;
+  subtitle: string;
+  image: ImageSourcePropType;
+  tagline: string;
+  taglineSub?: string;
+  activeDotIndex?: number;
+};
+
+export default function DashboardHeroBanner({
+  greeting,
+  subtitle,
+  image,
+  tagline,
+  taglineSub,
+  activeDotIndex = 0,
+}: DashboardHeroBannerProps) {
+  return (
+    <View style={styles.container}>
+      {/* 1. Header Greeting Row */}
+      <View style={styles.greetingHeader}>
+        <Text style={styles.greetingTitle}>{greeting}</Text>
+        <Text style={styles.greetingSubtitle}>{subtitle}</Text>
+      </View>
+
+      {/* 2. Visual Hero Card */}
+      <View style={styles.heroCard}>
+        <Image source={image} style={styles.heroImage} resizeMode="cover" />
+
+        {/* Bottom subtle gradient tint */}
+        <View style={styles.imageOverlayGradient} />
+
+        {/* 3. Hero Tagline Badge (Bottom-Left) */}
+        <View style={styles.taglineBadge}>
+          <Text style={styles.taglineText}>{tagline}</Text>
+          {taglineSub ? <Text style={styles.taglineSubText}>{taglineSub}</Text> : null}
+        </View>
+
+        {/* 4. Carousel Pagination Indicator Dots (Bottom-Center/Right) */}
+        <View style={styles.paginationDotsContainer}>
+          {[0, 1, 2].map((dot) => {
+            const isActive = dot === activeDotIndex;
+            return (
+              <View
+                key={dot}
+                style={[
+                  styles.dot,
+                  isActive ? styles.dotActive : styles.dotInactive,
+                ]}
+              />
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    marginBottom: 16,
+  },
+  greetingHeader: {
+    marginBottom: 12,
+    paddingHorizontal: 2,
+  },
+  greetingTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    letterSpacing: -0.3,
+  },
+  greetingSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  heroCard: {
+    width: '100%',
+    height: 160,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#0F172A',
+    ...Shadows.medium,
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlayGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.15)',
+  },
+  taglineBadge: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: Radius.md,
+    maxWidth: '75%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  taglineText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  taglineSubText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  paginationDotsContainer: {
+    position: 'absolute',
+    bottom: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+  },
+  dot: {
+    height: 5,
+    borderRadius: 3,
+  },
+  dotActive: {
+    width: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  dotInactive: {
+    width: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+});

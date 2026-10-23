@@ -47,7 +47,7 @@ const parcelLogSchema = new mongoose.Schema({
   },
   recipientType: {
     type: String,
-    enum: ['Staff', 'Faculty', 'Department', 'Student', 'Hostel Warden', 'Principal / Admin', 'Other'],
+    enum: ['Staff', 'Faculty', 'HOD', 'Department', 'Student', 'Hostel Warden', 'Principal', 'Principal / Admin', 'Other'],
     default: 'Staff'
   },
   department: {

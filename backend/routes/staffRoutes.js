@@ -36,6 +36,88 @@ router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Ac
   }
 });
 
+// Get logged-in staff member's own profile
+router.get('/me', protect, collegeScope, async (req, res) => {
+  try {
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const refId = req.user.referenceId || req.user.userId || req.user.id || req.user._id?.toString();
+    const query = {
+      $or: [
+        { id: refId },
+        { email: req.user.email },
+        ...(req.user.name ? [{ name: { $regex: new RegExp(`^${req.user.name.trim()}$`, 'i') } }] : [])
+      ]
+    };
+    let staffDoc = await Staff.findOne(query).lean();
+    if (!staffDoc) {
+      staffDoc = {
+        id: refId || 'STF001',
+        name: req.user.name,
+        email: req.user.email,
+        dept: req.user.department || 'General',
+        role: req.user.role || 'Staff',
+        designation: req.user.role === 'HOD' ? 'Head of Department' : 'Assistant Professor',
+        phone: req.user.phone || '+91 98765 43210',
+        qualification: 'M.Tech, Ph.D.',
+        experience: '5+ Years Academic Experience'
+      };
+    }
+    res.json(staffDoc);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Update logged-in staff member's own profile
+router.put('/me', protect, collegeScope, async (req, res) => {
+  try {
+    const refId = req.user.referenceId || req.user.userId || req.user.id || req.user._id?.toString();
+    const allowedUpdates = {};
+    if (req.body.phone !== undefined) allowedUpdates.phone = req.body.phone;
+    if (req.body.qualification !== undefined) allowedUpdates.qualification = req.body.qualification;
+    if (req.body.experience !== undefined) allowedUpdates.experience = req.body.experience;
+    if (req.body.designation !== undefined) allowedUpdates.designation = req.body.designation;
+    if (req.body.name) allowedUpdates.name = req.body.name;
+    if (req.body.email) allowedUpdates.email = req.body.email;
+
+    let updatedStaff = await Staff.findOneAndUpdate(
+      {
+        $or: [
+          { id: refId },
+          { email: req.user.email }
+        ]
+      },
+      { $set: allowedUpdates },
+      { new: true }
+    );
+
+    const userUpdate = {};
+    if (req.body.phone) userUpdate.phone = req.body.phone;
+    if (req.body.name) userUpdate.name = req.body.name;
+    if (req.body.email) userUpdate.email = req.body.email;
+    if (Object.keys(userUpdate).length > 0) {
+      await User.findByIdAndUpdate(req.user._id, { $set: userUpdate });
+    }
+
+    if (!updatedStaff) {
+      updatedStaff = {
+        id: refId,
+        name: req.body.name || req.user.name,
+        email: req.body.email || req.user.email,
+        phone: req.body.phone || req.user.phone,
+        dept: req.user.department || 'General',
+        designation: req.body.designation || 'Assistant Professor',
+        qualification: req.body.qualification || '',
+        experience: req.body.experience || ''
+      };
+    }
+
+    res.json({ success: true, message: 'Profile updated successfully', staff: updatedStaff });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Get staff for payroll (Comprehensive Personnel Roster: HOD, Staff, Drivers, Hostel, Accounts)
 router.get('/payroll-list', protect, authorize('Admin', 'Principal', 'Accounts'), collegeScope, async (req, res) => {
   try {

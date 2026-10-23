@@ -22,7 +22,14 @@ export default function StaffDeliveryParcelPage() {
 
   const staffSession = useMemo(() => {
     try {
-      return JSON.parse(sessionStorage.getItem('staff_session') || '{}');
+      return JSON.parse(
+        sessionStorage.getItem('staff_session') ||
+        sessionStorage.getItem('hod_session') ||
+        sessionStorage.getItem('principal_session') ||
+        sessionStorage.getItem('user_session') ||
+        localStorage.getItem('erp_user') ||
+        '{}'
+      );
     } catch (e) {
       return {};
     }
@@ -46,7 +53,8 @@ export default function StaffDeliveryParcelPage() {
       setLoading(true);
       const res = await getParcels({
         status: statusFilter !== 'All' ? statusFilter : undefined,
-        type: typeFilter !== 'All' ? typeFilter : undefined
+        type: typeFilter !== 'All' ? typeFilter : undefined,
+        my: 'true'
       });
       const list = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
       setParcels(list);

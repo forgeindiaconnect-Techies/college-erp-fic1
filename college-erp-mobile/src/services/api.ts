@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-const CLOUD_API_URL = 'https://college-erp-software.onrender.com/api';
+const CLOUD_API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://college-erp-software.onrender.com/api';
 
 // Track active base URL for synchronous reads
 let currentBaseUrl: string = CLOUD_API_URL;
@@ -33,7 +33,7 @@ type LoginResponse = MobileUser & {
  * 1. Custom URL set by the user in settings
  * 2. Local backend on Developer's machine LAN IP (detected via Expo bundler hostUri) on port 5000
  * 3. Android Emulator (10.0.2.2:5000) or Web (127.0.0.1:5000)
- * 4. Fallback to Cloud Render URL
+ * 4. Fallback to Cloud / Configured URL
  */
 export async function getApiBaseUrl(): Promise<string> {
   try {
@@ -100,7 +100,7 @@ export async function testApiConnection(testUrl?: string): Promise<{ ok: boolean
   const startTime = Date.now();
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const res = await fetch(`${targetUrl}/settings`, {
       method: 'GET',
@@ -143,7 +143,7 @@ async function fetchWithFailover(
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4500);
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     const res = await fetch(`${targetUrl}/${cleanPath}`, {
       ...init,
@@ -311,6 +311,37 @@ export async function apiPut<T>(path: string, body?: any): Promise<T> {
 
   if (!response.ok) {
     throw new Error(data?.message || `Action failed (${response.status})`);
+  }
+
+  return data as T;
+}
+
+export async function apiPatch<T>(path: string, body?: any): Promise<T> {
+  const token = await getAuthToken();
+  const user = await getSavedUser();
+  const tenantId = user?.tenantId || user?.collegeId;
+
+  const response = await fetchWithFailover(path, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+
+  const text = await response.text();
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { message: text };
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.message || `Patch action failed (${response.status})`);
   }
 
   return data as T;

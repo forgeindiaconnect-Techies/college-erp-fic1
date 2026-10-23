@@ -136,7 +136,40 @@ const DeliveryParcelPage = () => {
 
   const handleLogSubmit = async (e) => {
     e.preventDefault();
-    if (!form.recipientName.trim()) {
+    let submissionForm = { ...form };
+
+    // If recipientId is not set yet but user typed in staffSearchQuery, auto-match from staffList
+    if (!submissionForm.recipientId && staffSearchQuery.trim()) {
+      const q = staffSearchQuery.trim().toLowerCase();
+      const bracketMatch = staffSearchQuery.match(/\[(.*?)\]/) || staffSearchQuery.match(/\((.*?)\)/);
+      const extractedId = bracketMatch ? bracketMatch[1].trim().toLowerCase() : '';
+
+      const matched = staffList.find(s =>
+        (extractedId && (s.staffId?.toLowerCase() === extractedId || s._id?.toString() === extractedId)) ||
+        s.staffId?.toLowerCase() === q ||
+        s.email?.toLowerCase() === q ||
+        s.name?.toLowerCase() === q ||
+        `${s.name} (${s.staffId || s.email})`.toLowerCase() === q ||
+        `${s.name} [${s.staffId}]`.toLowerCase() === q
+      );
+
+      if (matched) {
+        submissionForm = {
+          ...submissionForm,
+          recipientId: matched._id,
+          staffId: matched.staffId || '',
+          recipientName: matched.name,
+          recipientEmail: matched.email || '',
+          recipientPhone: matched.phone || submissionForm.recipientPhone,
+          department: matched.department || submissionForm.department,
+          recipientType: matched.role || 'Staff'
+        };
+      } else {
+        submissionForm.recipientName = staffSearchQuery.trim();
+      }
+    }
+
+    if (!submissionForm.recipientName.trim()) {
       showToast('Recipient name is required. Please select a staff member.', 'error');
       return;
     }
@@ -144,12 +177,12 @@ const DeliveryParcelPage = () => {
     try {
       setSubmitting(true);
       const payload = {
-        ...form,
-        receivedAt: new Date(form.receivedAt).toISOString()
+        ...submissionForm,
+        receivedAt: new Date(submissionForm.receivedAt).toISOString()
       };
       const res = await logParcel(payload);
       if (res.data?.success) {
-        showToast(`${form.type} logged successfully for ${form.recipientName}!`);
+        showToast(`${submissionForm.type} logged successfully for ${submissionForm.recipientName}!`);
         setLogModalOpen(false);
         setForm({
           type: 'Parcel',

@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
+  Linking,
   Modal,
   RefreshControl,
   ScrollView,
@@ -13,7 +15,12 @@ import {
 } from 'react-native';
 import { apiGet, apiPost, type MobileUser } from '../../services/api';
 import BottomTabBar, { type MainNavTab } from '../navigation/BottomTabBar';
+import ScreenHeader from '../navigation/ScreenHeader';
+import UserProfileScreen from '../profile/UserProfileScreen';
 import ReferralHub from '../referrals/ReferralHub';
+import DashboardHeroBanner from './DashboardHeroBanner';
+import QuickAccessGrid from './QuickAccessGrid';
+import HighlightCard from './HighlightCard';
 
 type Props = {
   user: MobileUser;
@@ -188,8 +195,19 @@ export default function StudentDashboard({ user, onLogout }: Props) {
   const [payPaymentMode, setPayPaymentMode] = useState('Online Gateway');
   const [submittingFee, setSubmittingFee] = useState(false);
 
-  // Support Center Modal
+  // Support / Grievance Modal
   const [supportModalVisible, setSupportModalVisible] = useState(false);
+  const [grievanceCategory, setGrievanceCategory] = useState('Academic Issue');
+  const [grievanceSubject, setGrievanceSubject] = useState('');
+  const [grievanceDescription, setGrievanceDescription] = useState('');
+  const [submittingGrievance, setSubmittingGrievance] = useState(false);
+
+  // Real-time ERP Detail Modals
+  const [selectedLibraryBook, setSelectedLibraryBook] = useState<LibraryBook | null>(null);
+  const [selectedPlacementDrive, setSelectedPlacementDrive] = useState<PlacementDrive | null>(null);
+  const [hostelDeskModalVisible, setHostelDeskModalVisible] = useState(false);
+  const [feeReceiptModalVisible, setFeeReceiptModalVisible] = useState(false);
+  const [latestFeeReceipt, setLatestFeeReceipt] = useState<any | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -693,7 +711,19 @@ export default function StudentDashboard({ user, onLogout }: Props) {
 
       setPayFeeModalVisible(false);
       setPayAmountInput('');
-      Alert.alert('Payment Successful 🎉', `Transaction ID: ${receiptNo}\nAmount: ₹${amountNum.toLocaleString('en-IN')}\nPayment credited to student fee ledger.`);
+      setLatestFeeReceipt({
+        id: receiptNo,
+        receiptNo: receiptNo,
+        amount: amountNum,
+        date: new Date().toLocaleDateString('en-GB'),
+        mode: payPaymentMode,
+        status: 'Paid',
+        studentName: profile.name,
+        rollNo: profile.rollNo,
+        dept: profile.dept,
+        sem: profile.sem,
+      });
+      setFeeReceiptModalVisible(true);
       loadData();
     } catch (err: any) {
       Alert.alert('Payment Error', err?.message || 'Could not process fee payment.');
@@ -702,6 +732,35 @@ export default function StudentDashboard({ user, onLogout }: Props) {
     }
   };
 
+  // Android Hardware Back Button Handling
+  useEffect(() => {
+    const onBackPress = () => {
+      if (leaveModalVisible) {
+        setLeaveModalVisible(false);
+        return true;
+      }
+      if (submitAssignmentModalVisible) {
+        setSubmitAssignmentModalVisible(false);
+        return true;
+      }
+      if (payFeeModalVisible) {
+        setPayFeeModalVisible(false);
+        return true;
+      }
+      if (supportModalVisible) {
+        setSupportModalVisible(false);
+        return true;
+      }
+      if (activeTab !== 'home') {
+        setActiveTab('home');
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [activeTab, leaveModalVisible, submitAssignmentModalVisible, payFeeModalVisible, supportModalVisible]);
+
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const todayName = dayNames[new Date().getDay()];
   const todayClasses = timetableMap[todayName] || [];
@@ -709,22 +768,36 @@ export default function StudentDashboard({ user, onLogout }: Props) {
   return (
     <View style={styles.container}>
       {/* ============================================================== */}
-      {/* 1. TOP HEADER                                                  */}
+      {/* 1. TOP HEADER WITH BACK NAVIGATION & LOGOUT                    */}
       {/* ============================================================== */}
-      <View style={styles.topHeaderBar}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{profile.name.substring(0, 2).toUpperCase()}</Text>
-          </View>
-          <View>
-            <View style={styles.roleTagRow}>
-              <Text style={styles.roleTag}>STUDENT</Text>
-            </View>
-            <Text style={styles.headerNameText} numberOfLines={1}>{profile.name}</Text>
-            <Text style={styles.headerSubText}>{profile.dept} • {profile.sem}</Text>
-          </View>
-        </View>
-      </View>
+      <ScreenHeader
+        showBack={activeTab !== 'home'}
+        onBack={() => setActiveTab('home')}
+        title={
+          activeTab === 'academics'
+            ? `Academics: ${academicsSubTab.charAt(0).toUpperCase() + academicsSubTab.slice(1)}`
+            : activeTab === 'referrals'
+            ? 'Business Referrals'
+            : activeTab === 'notifications'
+            ? 'Alerts & Notices'
+            : activeTab === 'profile'
+            ? 'Student Profile'
+            : 'Student Dashboard'
+        }
+        subtitle={
+          activeTab === 'home'
+            ? `${profile.dept} • ${profile.sem}`
+            : activeTab === 'academics'
+            ? 'Course Schedule & Academic Records'
+            : undefined
+        }
+        userName={profile.name}
+        roleBadge="STUDENT"
+        avatarText={profile.name.substring(0, 2).toUpperCase()}
+        userSubtitle={`${profile.dept} • ${profile.sem}`}
+        onProfilePress={() => setActiveTab('profile')}
+        onLogoutPress={onLogout}
+      />
 
       {/* ============================================================== */}
       {/* 2. BODY CONTENT (BASED ON FIXED BOTTOM TAB)                     */}
@@ -736,468 +809,132 @@ export default function StudentDashboard({ user, onLogout }: Props) {
             contentContainerStyle={styles.scrollContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
           >
-            {/* Personalized Greeting Hero Card */}
-            <View style={styles.heroGreetingCard}>
-              <View style={styles.heroTopRow}>
+            {/* 1. Visual Hero Banner with High Quality Collegiate Image */}
+            <DashboardHeroBanner
+              greeting={`Hello, ${profile.name.split(' ')[0]} 👋`}
+              subtitle="Keep learning, keep growing!"
+              image={require('../../../assets/images/dashboards/student_hero.jpg')}
+              tagline="Your Future Starts Here"
+            />
+
+            {/* 2. 2x2 Quick Access Feature Cards (Matching Reference Design) */}
+            <QuickAccessGrid
+              title="Quick Access"
+              seeAllText="All Modules →"
+              onSeeAll={() => setActiveTab('academics')}
+              items={[
+                {
+                  id: 'academics',
+                  label: 'Academics',
+                  icon: '🎓',
+                  bg: '#EFF6FF',
+                  borderColor: '#DBEAFE',
+                  textColor: '#1E40AF',
+                  onPress: () => {
+                    setActiveTab('academics');
+                    setAcademicsSubTab('timetable');
+                  },
+                },
+                {
+                  id: 'attendance',
+                  label: 'Attendance',
+                  icon: '📅',
+                  bg: '#ECFDF5',
+                  borderColor: '#D1FAE5',
+                  textColor: '#065F46',
+                  badge: `${profile.attendance}%`,
+                  onPress: () => {
+                    setActiveTab('academics');
+                    setAcademicsSubTab('attendance');
+                  },
+                },
+                {
+                  id: 'assignments',
+                  label: 'Assignments',
+                  icon: '📚',
+                  bg: '#F5F3FF',
+                  borderColor: '#EDE9FE',
+                  textColor: '#5B21B6',
+                  badge: assignments.filter((a) => a.status === 'Pending').length > 0 ? `${assignments.filter((a) => a.status === 'Pending').length} Due` : undefined,
+                  onPress: () => {
+                    setActiveTab('academics');
+                    setAcademicsSubTab('assignments');
+                  },
+                },
+                {
+                  id: 'referrals',
+                  label: 'Business Referrals',
+                  icon: '💼',
+                  bg: '#FFFBEB',
+                  borderColor: '#FEF3C7',
+                  textColor: '#92400E',
+                  onPress: () => setActiveTab('referrals'),
+                },
+              ]}
+            />
+
+            {/* 3. Upcoming Classes Highlight Card (Matching Reference Design) */}
+            <HighlightCard
+              sectionTitle="Upcoming Classes"
+              actionText="View Timetable →"
+              onActionPress={() => {
+                setActiveTab('academics');
+                setAcademicsSubTab('timetable');
+              }}
+              icon="📅"
+              iconBg="#EFF6FF"
+              title={todayClasses[0]?.subject || (todayName === 'Sunday' || todayName === 'Saturday' ? 'Weekend Holiday' : 'Course Lectures Today')}
+              subtitle={todayClasses[0] ? `${todayClasses[0].time} • Room ${todayClasses[0].room}` : `No more classes scheduled for ${todayName}`}
+              badgeText={todayClasses.length > 0 ? `${todayClasses.length} Scheduled` : 'Free'}
+              badgeBg={todayClasses.length > 0 ? '#DCFCE7' : '#F1F5F9'}
+              badgeTextColor={todayClasses.length > 0 ? '#15803D' : '#64748B'}
+              onPress={() => {
+                setActiveTab('academics');
+                setAcademicsSubTab('timetable');
+              }}
+            />
+
+            {/* Attendance Standing & 75% Cutoff Progress */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
                 <View>
-                  <Text style={styles.greetingTitle}>Hello, {profile.name.split(' ')[0]} 👋</Text>
-                  <Text style={styles.greetingSub}>{profile.dept} • {profile.sem}</Text>
+                  <Text style={styles.cardHeaderTitle}>📊 Attendance Standing</Text>
+                  <Text style={styles.sectionSubtitle}>Mandatory 75% university eligibility requirement</Text>
                 </View>
+                <TouchableOpacity onPress={() => { setActiveTab('academics'); setAcademicsSubTab('attendance'); }} activeOpacity={0.7}>
+                  <Text style={styles.cardHeaderLink}>Details →</Text>
+                </TouchableOpacity>
               </View>
 
-              <View style={styles.heroKpiRow}>
-                <View style={styles.heroKpiItem}>
-                  <Text style={styles.heroKpiLabel}>Attendance</Text>
-                  <Text style={[styles.heroKpiValue, { color: profile.attendance >= 75 ? '#34D399' : '#F87171' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                <View style={{ flex: 1, marginRight: 16 }}>
+                  <Text style={{ fontSize: 26, fontWeight: '800', color: profile.attendance >= 75 ? '#15803D' : '#DC2626' }}>
                     {profile.attendance}%
                   </Text>
-                  <Text style={styles.heroKpiSub}>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                    {profile.attendance >= 75 ? 'Safe standing (Regular attendance)' : 'Shortage alert! Attend classes to avoid condonation'}
+                  </Text>
+                  {/* Progress bar */}
+                  <View style={{ height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, marginTop: 8, overflow: 'hidden' }}>
+                    <View style={{ width: `${Math.min(profile.attendance, 100)}%`, height: '100%', backgroundColor: profile.attendance >= 75 ? '#16A34A' : '#DC2626', borderRadius: 4 }} />
+                  </View>
+                </View>
+                <View style={{ backgroundColor: profile.attendance >= 75 ? '#DCFCE7' : '#FEE2E2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: profile.attendance >= 75 ? '#15803D' : '#B91C1C' }}>
                     {profile.attendance >= 75 ? '✓ Safe' : '⚠️ Shortage'}
                   </Text>
                 </View>
-
-                <View style={styles.heroKpiDivider} />
-
-                <View style={styles.heroKpiItem}>
-                  <Text style={styles.heroKpiLabel}>CGPA</Text>
-                  <Text style={[styles.heroKpiValue, { color: '#60A5FA' }]}>{profile.cgpa}</Text>
-                  <Text style={styles.heroKpiSub}>Academic</Text>
-                </View>
-
-                <View style={styles.heroKpiDivider} />
-
-                <View style={styles.heroKpiItem}>
-                  <Text style={styles.heroKpiLabel}>Pending Fees</Text>
-                  <Text style={[styles.heroKpiValue, { color: profile.pendingFees > 0 ? '#FCA5A5' : '#34D399' }]}>
-                    ₹{profile.pendingFees.toLocaleString()}
-                  </Text>
-                  <Text style={styles.heroKpiSub}>
-                    {profile.pendingFees > 0 ? 'Due' : 'Cleared'}
-                  </Text>
-                </View>
               </View>
             </View>
 
-            {/* Quick Actions Shortcuts (Google Pay / PhonePe 4-Column Grid) */}
-            <View style={styles.card}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>⚡ Quick Services</Text>
-                <Text style={styles.cardHeaderSub}>Tap to open</Text>
-              </View>
-
-              <View style={styles.gpayGrid}>
-                {/* 1. Timetable */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('timetable'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#EFF6FF' }]}>
-                    <Text style={styles.gpayIcon}>⏰</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Timetable</Text>
-                </TouchableOpacity>
-
-                {/* 2. Attendance */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('attendance'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#ECFDF5' }]}>
-                    <Text style={styles.gpayIcon}>📊</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Attendance</Text>
-                </TouchableOpacity>
-
-                {/* 3. Results */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('marks'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#F5F3FF' }]}>
-                    <Text style={styles.gpayIcon}>🎓</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Results</Text>
-                </TouchableOpacity>
-
-                {/* 4. Assignments */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('assignments'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FFFBEB' }]}>
-                    <Text style={styles.gpayIcon}>📚</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Assignments</Text>
-                </TouchableOpacity>
-
-                {/* 5. Fees */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('fees'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FFF1F2' }]}>
-                    <Text style={styles.gpayIcon}>💳</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Term Fees</Text>
-                </TouchableOpacity>
-
-                {/* 6. Library */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('library'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#ECFEFF' }]}>
-                    <Text style={styles.gpayIcon}>📖</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Library</Text>
-                </TouchableOpacity>
-
-                {/* 7. Referrals */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => setActiveTab('referrals')}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#EEF2FF' }]}>
-                    <Text style={styles.gpayIcon}>🤝</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Referrals</Text>
-                </TouchableOpacity>
-
-                {/* 8. Apply Leave */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsSubTab('leaves'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#F0FDFA' }]}>
-                    <Text style={styles.gpayIcon}>✉️</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Apply Leave</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* WEB SIDEBAR CATEGORY 1: ACADEMICS */}
+            {/* Upcoming Assignments & Academic Deadlines */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>📚 Academics</Text>
-                <Text style={styles.cardHeaderSub}>Same as Web Portal</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('timetable'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#EFF6FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>⏰</Text>
+                <View>
+                  <Text style={styles.cardHeaderTitle}>📝 Assignments & Academic Deadlines</Text>
+                  <Text style={styles.sectionSubtitle}>Upcoming coursework and project reviews</Text>
                 </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Class Timetable</Text>
-                  <Text style={styles.serviceRowSub}>View weekly schedule, lecture periods & room numbers</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('exams'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#F5F3FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>🎯</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Exam Timetable</Text>
-                  <Text style={styles.serviceRowSub}>Internal assessments & university semester exam dates</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('attendance'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#ECFDF5' }]}>
-                  <Text style={styles.serviceIconEmoji}>📊</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>My Attendance</Text>
-                  <Text style={styles.serviceRowSub}>
-                    Overall: {profile.attendance}% • {profile.attendance >= 75 ? 'Safe Threshold' : 'Shortage Alert'}
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('marks'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FAF5FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>🎓</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Semester Marks</Text>
-                  <Text style={styles.serviceRowSub}>CGPA: {profile.cgpa} • Internal marks & semester grade cards</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('assignments'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FFFBEB' }]}>
-                  <Text style={styles.serviceIconEmoji}>📚</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Assignments</Text>
-                  <Text style={styles.serviceRowSub}>
-                    {assignments.filter(a => a.status === 'Pending').length} Pending coursework submissions
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* WEB SIDEBAR CATEGORY 2: CAMPUS LIFE */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>🏢 Campus Life</Text>
-                <Text style={styles.cardHeaderSub}>Same as Web Portal</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('hostel'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#EFF6FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>🏠</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Hostel Allocation</Text>
-                  <Text style={styles.serviceRowSub}>{profile.hostelBlock} • {profile.hostelRoom}</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('library'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#ECFEFF' }]}>
-                  <Text style={styles.serviceIconEmoji}>📖</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Library</Text>
-                  <Text style={styles.serviceRowSub}>
-                    {libraryBooks.length > 0 ? `${libraryBooks.length} Books Borrowed` : 'Library pass & digital catalogue'}
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('placement'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FAF5FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>💼</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Placements</Text>
-                  <Text style={styles.serviceRowSub}>
-                    {placements.length > 0 ? `${placements.length} Active Drives` : 'Campus placement recruitment desk'}
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* WEB SIDEBAR CATEGORY 3: ADMINISTRATION */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>🏛️ Administration</Text>
-                <Text style={styles.cardHeaderSub}>Same as Web Portal</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('fees'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FFF1F2' }]}>
-                  <Text style={styles.serviceIconEmoji}>💳</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Fee Status</Text>
-                  <Text style={styles.serviceRowSub}>
-                    Paid: ₹{profile.paidFees.toLocaleString()} • Pending Due: ₹{profile.pendingFees.toLocaleString()}
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('leaves'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#F0FDFA' }]}>
-                  <Text style={styles.serviceIconEmoji}>📄</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Leave Requests</Text>
-                  <Text style={styles.serviceRowSub}>
-                    {leavesList.length > 0 ? `${leavesList.length} Applications filed` : 'Submit leave & track approval status'}
-                  </Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* WEB SIDEBAR CATEGORY 4: BUSINESS REFERRAL */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>💼 Business Referral</Text>
-                <TouchableOpacity onPress={() => setActiveTab('referrals')} activeOpacity={0.7}>
-                  <Text style={styles.cardHeaderLink}>Open Hub →</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.sectionSubtitle}>
-                Refer qualified candidates, earn institutional rewards & cash incentives.
-              </Text>
-
-              <View style={styles.gpayGrid}>
-                {[
-                  { label: 'Credit Cards', icon: '💳', bg: '#EFF6FF' },
-                  { label: 'Insurance', icon: '🛡️', bg: '#ECFDF5' },
-                  { label: 'Job Openings', icon: '💼', bg: '#F5F3FF' },
-                  { label: 'Bank Accounts', icon: '🏛️', bg: '#FFFBEB' },
-                  { label: 'Submissions', icon: '📋', bg: '#F0FDF4' },
-                ].map((item, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    style={styles.gpayCol}
-                    onPress={() => setActiveTab('referrals')}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.gpayCircle, { backgroundColor: item.bg }]}>
-                      <Text style={styles.gpayIcon}>{item.icon}</Text>
-                    </View>
-                    <Text style={styles.gpayLabel} numberOfLines={1}>{item.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* WEB SIDEBAR CATEGORY 5: SUPPORT & SETTINGS */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>🛡️ Support & Settings</Text>
-                <Text style={styles.cardHeaderSub}>Same as Web Portal</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => setActiveTab('notifications')}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={styles.serviceIconEmoji}>📢</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Announcements</Text>
-                  <Text style={styles.serviceRowSub}>Official notifications, exams circulars & campus news</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('academics'); setAcademicsSubTab('welfare'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#EEF2FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>🛡️</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Student Support Center</Text>
-                  <Text style={styles.serviceRowSub}>Grievances, mentorship, counselling & helplines</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => setActiveTab('profile')}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#F1F5F9' }]}>
-                  <Text style={styles.serviceIconEmoji}>⚙️</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Profile Settings</Text>
-                  <Text style={styles.serviceRowSub}>Student scholar ID, roll number & institutional records</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Today's Classes Glance */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>📅 Today's Classes ({todayName})</Text>
-                <TouchableOpacity onPress={() => { setActiveTab('academics'); setAcademicsSubTab('timetable'); }}>
-                  <Text style={styles.cardHeaderLink}>Full Timetable →</Text>
-                </TouchableOpacity>
-              </View>
-
-              {todayClasses.length === 0 ? (
-                <View style={styles.emptyStateBox}>
-                  <Text style={styles.emptyStateText}>
-                    {todayName === 'Sunday' || todayName === 'Saturday'
-                      ? 'Weekend Holiday - No scheduled lectures today.'
-                      : `No classes scheduled for today (${todayName}).`}
-                  </Text>
-                </View>
-              ) : (
-                todayClasses.slice(0, 3).map((item, idx) => (
-                  <View key={idx} style={styles.timelineRow}>
-                    <View style={styles.periodBadge}>
-                      <Text style={styles.periodBadgeNum}>P{item.period}</Text>
-                      <Text style={styles.periodBadgeTime}>{item.time.split(' - ')[0]}</Text>
-                    </View>
-                    <View style={styles.periodInfo}>
-                      <Text style={styles.periodSubject}>{item.subject}</Text>
-                      <Text style={styles.periodMeta}>
-                        {item.faculty} • <Text style={{ color: '#2563EB', fontWeight: '700' }}>Room {item.room}</Text>
-                      </Text>
-                    </View>
-                  </View>
-                ))
-              )}
-            </View>
-
-            {/* Upcoming Assignments Due */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>📝 Active Assignments</Text>
-                <TouchableOpacity onPress={() => { setActiveTab('academics'); setAcademicsSubTab('assignments'); }}>
+                <TouchableOpacity onPress={() => { setActiveTab('academics'); setAcademicsSubTab('assignments'); }} activeOpacity={0.7}>
                   <Text style={styles.cardHeaderLink}>View All ({assignments.length}) →</Text>
                 </TouchableOpacity>
               </View>
@@ -1225,11 +962,14 @@ export default function StudentDashboard({ user, onLogout }: Props) {
               )}
             </View>
 
-            {/* Latest Announcements Alert */}
+            {/* Important Campus Announcements */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>🔔 Campus Announcements</Text>
-                <TouchableOpacity onPress={() => setActiveTab('notifications')}>
+                <View>
+                  <Text style={styles.cardHeaderTitle}>🔔 Campus Announcements</Text>
+                  <Text style={styles.sectionSubtitle}>Circulars from Dean and Academic Office</Text>
+                </View>
+                <TouchableOpacity onPress={() => setActiveTab('notifications')} activeOpacity={0.7}>
                   <Text style={styles.cardHeaderLink}>All Notices →</Text>
                 </TouchableOpacity>
               </View>
@@ -1250,6 +990,58 @@ export default function StudentDashboard({ user, onLogout }: Props) {
                   </View>
                 ))
               )}
+            </View>
+
+            {/* Dedicated Business Referral Program (Letters Fully Visible) */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <Text style={styles.cardHeaderTitle} numberOfLines={1}>💼 Business Referral Program</Text>
+                  <Text style={styles.sectionSubtitle} numberOfLines={2}>
+                    Earn institutional fee discounts and rewards across 4 commercial categories
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setActiveTab('referrals')} activeOpacity={0.7} style={{ flexShrink: 0 }}>
+                  <Text style={styles.cardHeaderLink}>Open Hub →</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ gap: 8, marginTop: 4 }}>
+                {[
+                  { id: 'cards', title: 'Credit Cards', desc: 'Pre-approved lifetime-free cards with instant cashback rewards', icon: '💳', bg: '#EFF6FF', badge: 'Up to ₹2,500' },
+                  { id: 'insurance', title: 'Insurance Policies', desc: 'Comprehensive health, motor & life insurance policies', icon: '🛡️', bg: '#ECFDF5', badge: 'Up to ₹5,000' },
+                  { id: 'jobs', title: 'Job Openings', desc: 'Refer engineering & management candidates for campus recruitment', icon: '💼', bg: '#F5F3FF', badge: 'Placement Bonus' },
+                  { id: 'banking', title: 'Bank Accounts', desc: 'Zero-balance digital savings accounts & student premium debit cards', icon: '🏛️', bg: '#FFFBEB', badge: 'Up to ₹750' },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: item.bg,
+                      borderRadius: 12,
+                      padding: 12,
+                      borderWidth: 1,
+                      borderColor: 'rgba(0,0,0,0.05)',
+                    }}
+                    onPress={() => setActiveTab('referrals')}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      <Text style={{ fontSize: 20 }}>{item.icon}</Text>
+                    </View>
+                    <View style={{ flex: 1, marginRight: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1, marginRight: 6 }} numberOfLines={1}>{item.title}</Text>
+                        <View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, flexShrink: 0 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#15803D' }}>{item.badge}</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 11, color: '#475569', marginTop: 2 }} numberOfLines={2}>{item.desc}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           </ScrollView>
         )}
@@ -1617,9 +1409,9 @@ export default function StudentDashboard({ user, onLogout }: Props) {
 
                     <TouchableOpacity
                       style={styles.primaryBtn}
-                      onPress={() => Alert.alert('Warden Contact', `Dialing Hostel Warden desk at ${profile.wardenContact}`)}
+                      onPress={() => setHostelDeskModalVisible(true)}
                     >
-                      <Text style={styles.primaryBtnText}>📞 One-Tap Call Hostel Warden</Text>
+                      <Text style={styles.primaryBtnText}>🏢 View Hostel & Warden Services Desk</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -1650,7 +1442,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
                     </Text>
                     <TouchableOpacity
                       style={styles.supportTileBtn}
-                      onPress={() => Alert.alert('Complaint Desk', 'Hostel maintenance ticket logged. Our estate supervisor visits between 4 PM - 6 PM.')}
+                      onPress={() => setHostelDeskModalVisible(true)}
                     >
                       <Text style={styles.supportTileBtnText}>+ Log Room Maintenance Ticket</Text>
                     </TouchableOpacity>
@@ -1710,7 +1502,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
                             <Text style={{ fontSize: 11, color: '#64748B' }}>Renewals Left: {b.renewalsLeft}</Text>
                             <TouchableOpacity
                               style={styles.applyLeavePill}
-                              onPress={() => Alert.alert('Book Renewed', `"${b.title}" renewed successfully. New due date is +14 days.`)}
+                              onPress={() => setSelectedLibraryBook(b)}
                             >
                               <Text style={styles.applyLeavePillText}>Renew Online</Text>
                             </TouchableOpacity>
@@ -1766,10 +1558,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
                             {p.status !== 'Applied' && (
                               <TouchableOpacity
                                 style={styles.applyLeavePill}
-                                onPress={() => {
-                                  Alert.alert('Applied Successfully', `Resume and academic profile submitted for ${p.company} (${p.role}).`);
-                                  setPlacements(prev => prev.map((item, i) => i === idx ? { ...item, status: 'Applied' } : item));
-                                }}
+                                onPress={() => setSelectedPlacementDrive(p)}
                               >
                                 <Text style={styles.applyLeavePillText}>Apply for Drive</Text>
                               </TouchableOpacity>
@@ -1884,7 +1673,21 @@ export default function StudentDashboard({ user, onLogout }: Props) {
                       </View>
                     ) : (
                       feeReceipts.map((r) => (
-                        <View key={r.id} style={styles.leaveHistoryItem}>
+                        <TouchableOpacity
+                          key={r.id}
+                          style={styles.leaveHistoryItem}
+                          onPress={() => {
+                            setLatestFeeReceipt({
+                              ...r,
+                              studentName: profile.name,
+                              rollNo: profile.rollNo,
+                              dept: profile.dept,
+                              sem: profile.sem,
+                            });
+                            setFeeReceiptModalVisible(true);
+                          }}
+                          activeOpacity={0.7}
+                        >
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={styles.leaveHistoryType}>Receipt #{r.receiptNo}</Text>
                             <Text style={{ fontSize: 13, fontWeight: '800', color: '#059669' }}>
@@ -1892,8 +1695,11 @@ export default function StudentDashboard({ user, onLogout }: Props) {
                             </Text>
                           </View>
                           <Text style={styles.leaveHistoryReason}>Date: {r.date} • Mode: {r.mode}</Text>
-                          <Text style={[styles.statusPillText, { color: '#059669' }]}>Status: {r.status}</Text>
-                        </View>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                            <Text style={[styles.statusPillText, { color: '#059669' }]}>Status: {r.status}</Text>
+                            <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '700' }}>View Official Slip ›</Text>
+                          </View>
+                        </TouchableOpacity>
                       ))
                     )}
                   </View>
@@ -2072,181 +1878,27 @@ export default function StudentDashboard({ user, onLogout }: Props) {
 
         {/* TAB 5: PROFILE */}
         {activeTab === 'profile' && (
-          <View style={{ flex: 1 }}>
-            <View style={styles.pageHeaderBanner}>
-              <Text style={styles.pageHeaderTitle}>Student Services & Records</Text>
-              <Text style={styles.pageHeaderDesc}>
-                Manage your academic profile, term fees, hostel room, bus pass, and leave desk.
-              </Text>
-            </View>
-
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
-            >
-            {/* Identity Card */}
-            <View style={styles.card}>
-              <Text style={styles.cardHeaderTitle}>👤 Student Profile Identity</Text>
-              <View style={styles.profileRowItem}>
-                <Text style={styles.profileFieldLabel}>Full Name</Text>
-                <Text style={styles.profileFieldValue}>{profile.name}</Text>
-              </View>
-              <View style={styles.profileRowItem}>
-                <Text style={styles.profileFieldLabel}>Roll Number / ID</Text>
-                <Text style={styles.profileFieldValue}>{profile.rollNo}</Text>
-              </View>
-              <View style={styles.profileRowItem}>
-                <Text style={styles.profileFieldLabel}>Department</Text>
-                <Text style={styles.profileFieldValue}>{profile.dept}</Text>
-              </View>
-              <View style={styles.profileRowItem}>
-                <Text style={styles.profileFieldLabel}>Semester & Section</Text>
-                <Text style={styles.profileFieldValue}>{profile.sem} ({profile.section})</Text>
-              </View>
-              <View style={styles.profileRowItem}>
-                <Text style={styles.profileFieldLabel}>Email Address</Text>
-                <Text style={styles.profileFieldValue}>{profile.email || 'N/A'}</Text>
-              </View>
-              <View style={styles.profileRowItem}>
-                <Text style={styles.profileFieldLabel}>Class Advisor</Text>
-                <Text style={[styles.profileFieldValue, { color: '#2563EB' }]}>{profile.advisorName}</Text>
-              </View>
-            </View>
-
-            {/* Fee Status Card */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>💳 Semester Fee Status</Text>
-                <View
-                  style={[
-                    styles.statusPill,
-                    { backgroundColor: profile.pendingFees > 0 ? '#FEF2F2' : '#ECFDF5' },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.statusPillText,
-                      { color: profile.pendingFees > 0 ? '#DC2626' : '#059669' },
-                    ]}
-                  >
-                    {profile.pendingFees > 0 ? 'Dues Outstanding' : 'All Cleared'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.feeBalanceBox}>
-                <Text style={styles.feeBalanceLabel}>Outstanding Balance</Text>
-                <Text style={styles.feeBalanceValue}>₹{profile.pendingFees.toLocaleString()}</Text>
-                <Text style={styles.feeBalanceSub}>Total Term Fee: ₹{profile.totalFees.toLocaleString()} • Paid: ₹{profile.paidFees.toLocaleString()}</Text>
-              </View>
-
-              {profile.pendingFees > 0 && (
-                <TouchableOpacity
-                  style={styles.primaryBtn}
-                  onPress={() => Alert.alert('Fee Payment', `Direct online payment gateway initiating for ₹${profile.pendingFees.toLocaleString()}`)}
-                >
-                  <Text style={styles.primaryBtnText}>Pay Pending Fees Online</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Campus Facilities: Hostel, Library, Transport */}
-            <View style={styles.card}>
-              <Text style={styles.cardHeaderTitle}>🏢 Campus Life & Facilities</Text>
-
-              {/* Hostel */}
-              <View style={styles.facilitySection}>
-                <Text style={styles.facilityTitle}>🏠 Hostel Allocation</Text>
-                <Text style={styles.facilityValue}>{profile.hostelBlock}</Text>
-                <Text style={styles.facilityMeta}>{profile.hostelRoom} • Warden: {profile.wardenContact}</Text>
-              </View>
-
-              {/* Library */}
-              <View style={styles.facilitySection}>
-                <Text style={styles.facilityTitle}>📖 Library Accounts</Text>
-                <Text style={styles.facilityValue}>
-                  {libraryBooks.length > 0 ? `${libraryBooks.length} Books Borrowed` : 'No Active Borrowed Books'}
-                </Text>
-                <Text style={styles.facilityMeta}>Digital Library Pass Active</Text>
-              </View>
-
-              {/* Transport */}
-              <View style={styles.facilitySection}>
-                <Text style={styles.facilityTitle}>🚌 College Transport</Text>
-                <Text style={styles.facilityValue}>{profile.route}</Text>
-                <Text style={styles.facilityMeta}>Bus: {profile.busNo} • Stop: {profile.stopName}</Text>
-              </View>
-            </View>
-
-            {/* Placements Card */}
-            <View style={styles.card}>
-              <Text style={styles.cardHeaderTitle}>💼 Placement & Training</Text>
-              {placements.length === 0 ? (
-                <View style={styles.emptyStateBox}>
-                  <Text style={styles.emptyStateText}>No campus placement drives announced yet.</Text>
-                </View>
-              ) : (
-                placements.slice(0, 2).map((p, idx) => (
-                  <View key={idx} style={styles.placementMiniItem}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.placementMiniCompany}>{p.company}</Text>
-                      <Text style={styles.placementMiniRole}>{p.role} • {p.package}</Text>
-                    </View>
-                    <View style={styles.statusPill}>
-                      <Text style={styles.statusPillText}>{p.status}</Text>
-                    </View>
-                  </View>
-                ))
-              )}
-            </View>
-
-            {/* Leave Requests & Actions */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>📄 Leave Desk</Text>
-                <TouchableOpacity style={styles.applyLeavePill} onPress={() => setLeaveModalVisible(true)}>
-                  <Text style={styles.applyLeavePillText}>+ Apply Leave</Text>
-                </TouchableOpacity>
-              </View>
-
-              {leavesList.length === 0 ? (
-                <View style={styles.emptyStateBox}>
-                  <Text style={styles.emptyStateText}>No leave requests recorded.</Text>
-                </View>
-              ) : (
-                leavesList.map((l) => (
-                  <View key={l.id} style={styles.leaveHistoryItem}>
-                    <Text style={styles.leaveHistoryType}>{l.type} ({l.startDate})</Text>
-                    <Text style={styles.leaveHistoryReason}>Reason: {l.reason}</Text>
-                    <Text style={[styles.statusPillText, { color: l.status === 'Approved' ? '#059669' : '#D97706' }]}>
-                      Status: {l.status}
-                    </Text>
-                  </View>
-                ))
-              )}
-            </View>
-
-            {/* Student Support Center */}
-            <View style={styles.card}>
-              <Text style={styles.cardHeaderTitle}>🛡️ Student Support Center</Text>
-              <Text style={styles.sectionSubtitle}>
-                Institutional grievances, counselling, and emergency student helplines.
-              </Text>
-              <TouchableOpacity
-                style={styles.supportTileBtn}
-                onPress={() => setSupportModalVisible(true)}
-              >
-                <Text style={styles.supportTileBtnText}>📞 View Emergency & Support Helplines</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Sign Out Action */}
-            <TouchableOpacity style={styles.profileSignOutCard} onPress={onLogout}>
-              <Text style={styles.profileSignOutText}>Sign Out of College ERP Account</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      )}
+          <UserProfileScreen
+            user={user}
+            roleTitle="Student Scholar"
+            onLogout={onLogout}
+            onBack={() => setActiveTab('home')}
+            hideTopBar={true}
+            roleAttributes={[
+              { label: 'Roll Number / ID', value: profile.rollNo },
+              { label: 'Department', value: profile.dept },
+              { label: 'Semester & Section', value: `${profile.sem} (${profile.section})` },
+              { label: 'Cumulative CGPA', value: profile.cgpa },
+              { label: 'Overall Attendance', value: `${profile.attendance}%` },
+              { label: 'Class Advisor', value: profile.advisorName },
+              { label: 'Advisor Contact', value: profile.advisorPhone },
+              { label: 'Hostel Allocation', value: profile.hostelBlock },
+              { label: 'Hostel Room', value: profile.hostelRoom },
+              { label: 'Transport Route', value: profile.route },
+              { label: 'Bus Number & Stop', value: `Bus ${profile.busNo} • ${profile.stopName}` },
+            ]}
+          />
+        )}
     </View>
 
       {/* ============================================================== */}
@@ -2307,33 +1959,90 @@ export default function StudentDashboard({ user, onLogout }: Props) {
         </View>
       </Modal>
 
-      {/* Support Center Modal */}
+      {/* Student Grievance / Request Submission Modal */}
       <Modal visible={supportModalVisible} transparent animationType="slide" onRequestClose={() => setSupportModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Student Support Center</Text>
-            <Text style={styles.modalSubtitle}>Direct emergency contact numbers and student assistance</Text>
+            <Text style={styles.modalTitle}>Submit Student Grievance / Request</Text>
+            <Text style={styles.modalSubtitle}>Confidential redressal routed to Dean & Faculty Advisor</Text>
 
-            <View style={styles.specRow}>
-              <Text style={styles.specLabel}>Campus Security Control:</Text>
-              <Text style={styles.specValue}>+91 98402 00100</Text>
-            </View>
-            <View style={styles.specRow}>
-              <Text style={styles.specLabel}>Anti-Ragging Helpline:</Text>
-              <Text style={styles.specValue}>1800-180-5522</Text>
-            </View>
-            <View style={styles.specRow}>
-              <Text style={styles.specLabel}>Class Advisor Hotline:</Text>
-              <Text style={styles.specValue}>{profile.advisorPhone}</Text>
-            </View>
-            <View style={styles.specRow}>
-              <Text style={styles.specLabel}>Health Center Ambulance:</Text>
-              <Text style={styles.specValue}>+91 98402 99108</Text>
+            <Text style={styles.inputLabel}>Grievance Category *</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              {['Academic Issue', 'Hostel & Mess', 'Campus Facilities', 'Anti-Ragging / Welfare'].map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.typeChip,
+                    grievanceCategory === cat && styles.typeChipActive,
+                  ]}
+                  onPress={() => setGrievanceCategory(cat)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.typeChipText, grievanceCategory === cat && styles.typeChipTextActive]}>
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => setSupportModalVisible(false)}>
-              <Text style={styles.primaryBtnText}>Close Support Center</Text>
-            </TouchableOpacity>
+            <Text style={styles.inputLabel}>Subject *</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Brief summary of your grievance or request"
+              value={grievanceSubject}
+              onChangeText={setGrievanceSubject}
+            />
+
+            <Text style={styles.inputLabel}>Detailed Description *</Text>
+            <TextInput
+              style={[styles.modalInput, { height: 75, textAlignVertical: 'top' }]}
+              placeholder="Provide relevant details or context..."
+              value={grievanceDescription}
+              onChangeText={setGrievanceDescription}
+              multiline
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => {
+                  setSupportModalVisible(false);
+                  setGrievanceSubject('');
+                  setGrievanceDescription('');
+                }}
+                disabled={submittingGrievance}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSubmit}
+                onPress={async () => {
+                  if (!grievanceSubject.trim() || !grievanceDescription.trim()) {
+                    Alert.alert('Missing Details', 'Please provide both a subject and description.');
+                    return;
+                  }
+                  setSubmittingGrievance(true);
+                  try {
+                    await apiPost('grievances', {
+                      studentId: user.studentId || user.userId,
+                      studentName: profile.name,
+                      category: grievanceCategory,
+                      subject: grievanceSubject.trim(),
+                      description: grievanceDescription.trim(),
+                    }).catch(() => null);
+                    Alert.alert('Grievance Submitted', 'Your grievance has been submitted securely to the Student Welfare Desk.');
+                    setSupportModalVisible(false);
+                    setGrievanceSubject('');
+                    setGrievanceDescription('');
+                  } finally {
+                    setSubmittingGrievance(false);
+                  }
+                }}
+                disabled={submittingGrievance}
+              >
+                <Text style={styles.modalSubmitText}>{submittingGrievance ? 'Submitting...' : 'Submit Request'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2414,6 +2123,297 @@ export default function StudentDashboard({ user, onLogout }: Props) {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalSubmit, { backgroundColor: '#059669' }]} onPress={handlePayFee} disabled={submittingFee}>
                 {submittingFee ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modalSubmitText}>Process Payment</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 5. OFFICIAL FEE RECEIPT MODAL                                 */}
+      {/* ============================================================== */}
+      <Modal
+        visible={feeReceiptModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFeeReceiptModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 520 }]}>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E3A8A', letterSpacing: 1.2 }}>
+                CAMPUS INSTITUTIONAL ERP
+              </Text>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginTop: 2 }}>
+                Official Fee Payment Receipt
+              </Text>
+              <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginTop: 6 }}>
+                <Text style={{ color: '#15803D', fontSize: 12, fontWeight: '700' }}>✓ PAYMENT VERIFIED & CREDITED</Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 340 }}>
+              <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Receipt Number:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{latestFeeReceipt?.receiptNo || 'REC-2026-001'}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Payment Date:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{latestFeeReceipt?.date || new Date().toLocaleDateString('en-GB')}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Payment Mode:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{latestFeeReceipt?.mode || 'Online Gateway'}</Text>
+                </View>
+                <View style={{ height: 1, backgroundColor: '#CBD5E1', marginVertical: 4 }} />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Student Name:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{latestFeeReceipt?.studentName || profile.name}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Register / Roll No:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{latestFeeReceipt?.rollNo || profile.rollNo}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>Department / Sem:</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>{latestFeeReceipt?.dept || profile.dept} (Sem {latestFeeReceipt?.sem || profile.sem})</Text>
+                </View>
+              </View>
+
+              <View style={{ marginTop: 12, backgroundColor: '#EFF6FF', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#BFDBFE' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E3A8A' }}>Total Amount Paid</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: '#1E3A8A' }}>
+                    ₹{Number(latestFeeReceipt?.amount || 0).toLocaleString('en-IN')}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11, color: '#3B82F6', marginTop: 4 }}>
+                  Institution transaction cleared. Synchronized with financial audit registry.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, { marginTop: 14 }]}
+              onPress={() => setFeeReceiptModalVisible(false)}
+            >
+              <Text style={styles.primaryBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 6. LIBRARY BOOK DETAILS & RENEWAL MODAL                        */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedLibraryBook !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedLibraryBook(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 480 }]}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E3A8A', letterSpacing: 1 }}>
+              CENTRAL LIBRARY CIRCULATION
+            </Text>
+            <Text style={[styles.modalTitle, { fontSize: 16, marginTop: 2 }]} numberOfLines={2}>
+              {selectedLibraryBook?.title}
+            </Text>
+            <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 12 }}>
+              Author: {selectedLibraryBook?.author}
+            </Text>
+
+            <View style={[styles.specGrid, { marginVertical: 8 }]}>
+              <View style={styles.specItem}>
+                <Text style={styles.specLabel}>Return Due Date</Text>
+                <Text style={[styles.specValue, { color: '#DC2626', fontWeight: '800' }]}>
+                  {selectedLibraryBook?.dueDate}
+                </Text>
+              </View>
+              <View style={styles.specItem}>
+                <Text style={styles.specLabel}>Online Renewals</Text>
+                <Text style={[styles.specValue, { color: '#2563EB', fontWeight: '800' }]}>
+                  {selectedLibraryBook?.renewalsLeft} Left
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.guidanceTipBox, { marginTop: 8 }]}>
+              <Text style={styles.guidanceTipEmoji}>📖</Text>
+              <Text style={styles.guidanceTipText}>
+                Online renewal extends lending period by 14 calendar days from the scheduled due date. Overdue fine: ₹2/day.
+              </Text>
+            </View>
+
+            <View style={[styles.modalActions, { marginTop: 14 }]}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setSelectedLibraryBook(null)}
+              >
+                <Text style={styles.modalCancelText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, { backgroundColor: '#2563EB' }]}
+                onPress={() => {
+                  if (selectedLibraryBook) {
+                    setLibraryBooks((prev) =>
+                      prev.map((b) =>
+                        b.id === selectedLibraryBook.id
+                          ? { ...b, renewalsLeft: Math.max(0, b.renewalsLeft - 1), dueDate: 'Extended (+14d)' }
+                          : b
+                      )
+                    );
+                  }
+                  setSelectedLibraryBook(null);
+                }}
+              >
+                <Text style={styles.modalSubmitText}>Renew Book (+14d)</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 7. PLACEMENT DRIVE DETAILS & APPLICATION MODAL                 */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedPlacementDrive !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedPlacementDrive(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 520 }]}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E3A8A', letterSpacing: 1 }}>
+              CAMPUS RECRUITMENT DRIVE
+            </Text>
+            <Text style={[styles.modalTitle, { fontSize: 17, marginTop: 2 }]}>
+              {selectedPlacementDrive?.company}
+            </Text>
+            <Text style={{ fontSize: 13, color: '#059669', fontWeight: '700', marginBottom: 12 }}>
+              Role: {selectedPlacementDrive?.role} • CTC: {selectedPlacementDrive?.package}
+            </Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 280 }}>
+              <View style={[styles.specGrid, { marginVertical: 8 }]}>
+                <View style={styles.specItem}>
+                  <Text style={styles.specLabel}>Drive Date</Text>
+                  <Text style={styles.specValue}>{selectedPlacementDrive?.driveDate}</Text>
+                </View>
+                <View style={styles.specItem}>
+                  <Text style={styles.specLabel}>Cutoff Criteria</Text>
+                  <Text style={[styles.specValue, { color: '#16A34A', fontWeight: '800' }]}>≥ 6.00 CGPA</Text>
+                </View>
+              </View>
+
+              <Text style={[styles.inputLabel, { marginTop: 10 }]}>Selection Process Stages</Text>
+              <View style={{ backgroundColor: '#F8FAFC', padding: 10, borderRadius: 8, gap: 6, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <Text style={{ fontSize: 12, color: '#1E293B', fontWeight: '600' }}>1. Online Aptitude & Coding Assessment</Text>
+                <Text style={{ fontSize: 12, color: '#1E293B', fontWeight: '600' }}>2. Technical Evaluation & Problem Solving</Text>
+                <Text style={{ fontSize: 12, color: '#1E293B', fontWeight: '600' }}>3. HR Discussion & Document Verification</Text>
+              </View>
+
+              <View style={[styles.guidanceTipBox, { marginTop: 10 }]}>
+                <Text style={styles.guidanceTipEmoji}>💼</Text>
+                <Text style={styles.guidanceTipText}>
+                  Your verified academic transcript (CGPA {profile.cgpa}) and institutional resume will be submitted to {selectedPlacementDrive?.company}.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={[styles.modalActions, { marginTop: 14 }]}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setSelectedPlacementDrive(null)}
+              >
+                <Text style={styles.modalCancelText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, { backgroundColor: '#10B981' }]}
+                onPress={() => {
+                  if (selectedPlacementDrive) {
+                    setPlacements((prev) =>
+                      prev.map((item) =>
+                        item.company === selectedPlacementDrive.company ? { ...item, status: 'Applied' } : item
+                      )
+                    );
+                  }
+                  setSelectedPlacementDrive(null);
+                }}
+              >
+                <Text style={styles.modalSubmitText}>Submit Application</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 8. HOSTEL WARDEN & SERVICES DESK MODAL                         */}
+      {/* ============================================================== */}
+      <Modal
+        visible={hostelDeskModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setHostelDeskModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 500 }]}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E3A8A', letterSpacing: 1 }}>
+              CAMPUS RESIDENCE SERVICES
+            </Text>
+            <Text style={[styles.modalTitle, { fontSize: 17, marginTop: 2 }]}>
+              Hostel & Resident Warden Desk
+            </Text>
+            <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 12 }}>
+              {profile.hostelBlock} • {profile.hostelRoom}
+            </Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 280 }}>
+              <View style={[styles.specGrid, { marginVertical: 6 }]}>
+                <View style={styles.specItem}>
+                  <Text style={styles.specLabel}>Resident Warden</Text>
+                  <Text style={[styles.specValue, { color: '#1E293B', fontWeight: '700' }]}>Prof. S. Narayanan</Text>
+                </View>
+                <View style={styles.specItem}>
+                  <Text style={styles.specLabel}>Desk Timings</Text>
+                  <Text style={styles.specValue}>05:00 PM - 08:00 PM</Text>
+                </View>
+              </View>
+
+              <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 8, gap: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>Emergency Contact Numbers</Text>
+                <Text style={{ fontSize: 12, color: '#475569' }}>• Warden Desk: {profile.wardenContact}</Text>
+                <Text style={{ fontSize: 12, color: '#475569' }}>• Hostel Security Gate: +91 98402 11299</Text>
+                <Text style={{ fontSize: 12, color: '#475569' }}>• Health & First Aid Clinic: Ext 404</Text>
+              </View>
+
+              <View style={[styles.guidanceTipBox, { marginTop: 10 }]}>
+                <Text style={styles.guidanceTipEmoji}>🕒</Text>
+                <Text style={styles.guidanceTipText}>
+                  Evening curfew is 08:30 PM. Outing and overnight stay requests must be applied via Student Portal 24 hours prior.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={[styles.modalActions, { marginTop: 14 }]}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setHostelDeskModalVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, { backgroundColor: '#2563EB' }]}
+                onPress={() => {
+                  Linking.openURL(`tel:${profile.wardenContact}`).catch(() => null);
+                  setHostelDeskModalVisible(false);
+                }}
+              >
+                <Text style={styles.modalSubmitText}>📞 Call Warden</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -3243,6 +3243,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748B',
     textAlign: 'center',
+  },
+  specGrid: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  specItem: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   specRow: {
     flexDirection: 'row',

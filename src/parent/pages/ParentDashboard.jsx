@@ -214,6 +214,7 @@ const ParentDashboard = () => {
         </div>
       </div>
 
+
       {/* Scholarship Alert Banner */}
       {scholarship && (
         <div style={{ padding: '1rem', background: 'linear-gradient(to right, rgba(99, 102, 241, 0.1), rgba(16, 185, 129, 0.05))', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '15px' }}>

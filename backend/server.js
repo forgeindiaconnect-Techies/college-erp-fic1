@@ -38,6 +38,31 @@ try {
     fs.copyFileSync(genHeroPath, publicCampusHero);
     console.log('✅ Exact reference modern college campus hero image synced to public!');
   }
+
+  // Sync the 5 high-quality dashboard hero images
+  const brainDir = 'C:/Users/Forgeindiaconnect/.gemini/antigravity-ide/brain/d2254b0d-4b8e-41b0-aad3-5cd2ce41c73d';
+  const mobileDashboardsDir = path.join(__dirname, '../college-erp-mobile/assets/images/dashboards');
+  const publicDashboardsDir = path.join(__dirname, '../public/dashboards');
+
+  if (!fs.existsSync(mobileDashboardsDir)) fs.mkdirSync(mobileDashboardsDir, { recursive: true });
+  if (!fs.existsSync(publicDashboardsDir)) fs.mkdirSync(publicDashboardsDir, { recursive: true });
+
+  const dashboardImages = [
+    { src: 'student_dashboard_hero_1792749689462.jpg', dest: 'student_hero.jpg' },
+    { src: 'parent_dashboard_hero_1792749742193.jpg', dest: 'parent_hero.jpg' },
+    { src: 'staff_dashboard_hero_1792749762840.jpg', dest: 'staff_hero.jpg' },
+    { src: 'watchman_dashboard_hero_1792749795171.jpg', dest: 'watchman_hero.jpg' },
+    { src: 'driver_dashboard_hero_1792749817844.jpg', dest: 'driver_hero.jpg' },
+  ];
+
+  dashboardImages.forEach(img => {
+    const fullSrc = path.join(brainDir, img.src);
+    if (fs.existsSync(fullSrc)) {
+      fs.copyFileSync(fullSrc, path.join(mobileDashboardsDir, img.dest));
+      fs.copyFileSync(fullSrc, path.join(publicDashboardsDir, img.dest));
+      console.log(`✅ Synced dashboard hero: ${img.dest}`);
+    }
+  });
 } catch (e) {
   console.warn('Campus image sync:', e.message);
 }
@@ -220,6 +245,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Expires', 'x-tenant-id', 'X-Tenant-Id']
 }));
 app.use(express.json());
+app.use('/dashboards', express.static(path.join(__dirname, '../public/dashboards')));
 
 // Context Middleware for Multi-Tenancy
 app.use((req, res, next) => {
@@ -309,6 +335,10 @@ const autoSeedIfEmpty = async () => {
         { name: 'Vaideeswari (Admin)', email: 'vaideeswari@gmail.com', password: 'password123', role: 'Admin', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Sree (Principal)', email: 'sree@gmail.com', password: 'sree123', role: 'Principal', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Dr. Agila (HOD)', email: 'agila@gmail.com', password: 'agila', role: 'HOD', department: 'Information Technology', referenceId: 'HOD001', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Dr. Ananya', email: 'ananya.hod@college.edu', password: 'password123', role: 'HOD', department: 'Computer Science', referenceId: 'HOD001', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Renuka', email: 'renuka.stf008@college.edu', password: 'password123', role: 'Staff', department: 'Computer Science', referenceId: 'STF008', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Renuka', email: 'renuka.stf002@college.edu', password: 'password123', role: 'Staff', department: 'Electronics & Comm.', referenceId: 'STF002', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Dr. Ramoorthy', email: 'ramoorthy@college.edu', password: 'password123', role: 'Staff', department: 'Mechanical Engg.', referenceId: 'STF010', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Pooja (Staff)', email: 'pooja@gmail.com', password: 'pooja', role: 'Staff', department: 'Computer Science', referenceId: 'STF008', subjects: ['Data Structures'], tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Ramesh Kumar (Chief Watchman)', email: 'watchman@college.edu', password: 'password123', role: 'Watchman', referenceId: 'WMN-001', phone: '9876543299', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Rajesh Driver (Senior Driver)', email: 'rajesh.driver@college.edu', password: 'password123', role: 'Driver', referenceId: 'DRV-001', phone: '9840212345', tenantId: 'COL001', collegeId: 'COL001' },
@@ -368,6 +398,20 @@ const autoSeedIfEmpty = async () => {
           u.markModified('password');
           await u.save();
           console.log(`✅ Verified custom user: ${cred.email} with tenantId: ${u.tenantId}`);
+        }
+      }
+
+      // Ensure specific staff records for delivery routing tests exist in Staff collection
+      const testStaffRecords = [
+        { id: 'HOD001', name: 'Dr. Ananya', email: 'ananya.hod@college.edu', phone: '9876543201', dept: 'Computer Science', designation: 'HOD' },
+        { id: 'STF008', name: 'Renuka', email: 'renuka.stf008@college.edu', phone: '9876543208', dept: 'Computer Science', designation: 'Assistant Professor' },
+        { id: 'STF002', name: 'Renuka', email: 'renuka.stf002@college.edu', phone: '9876543202', dept: 'Electronics & Comm.', designation: 'Assistant Professor' },
+        { id: 'STF010', name: 'Dr. Ramoorthy', email: 'ramoorthy@college.edu', phone: '9876543210', dept: 'Mechanical Engg.', designation: 'Professor' }
+      ];
+      for (const ts of testStaffRecords) {
+        const existing = await Staff.findOne({ $or: [{ id: ts.id }, { email: ts.email }] });
+        if (!existing) {
+          await Staff.create(ts);
         }
       }
 

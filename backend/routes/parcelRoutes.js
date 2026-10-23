@@ -22,7 +22,7 @@ router.get('/staff-directory', protect, async (req, res) => {
 
     // Query User collection for Staff, Faculty, HODs, Principals
     let userQuery = {
-      role: { $in: ['Staff', 'Faculty', 'HOD', 'Principal'] }
+      role: { $in: ['Staff', 'Faculty', 'HOD', 'Principal', 'Teacher'] }
     };
 
     if (req.user?.role !== 'Super Admin' && tenantId && tenantId !== 'system') {
@@ -67,17 +67,18 @@ router.get('/staff-directory', protect, async (req, res) => {
       ];
     }
     const staffDocs = await Staff.find(staffQuery)
-      .select('_id id name email dept phone designation')
+      .select('_id id name email dept phone designation role')
       .limit(100)
       .lean();
 
-    // Deduplicate by email and staffId
+    // Deduplicate by email and staffId, prioritizing User record _id
     const resultMap = new Map();
 
     users.forEach(u => {
       const staffKey = (u.referenceId || u.email || u._id.toString()).toLowerCase();
       resultMap.set(staffKey, {
         _id: u._id,
+        userId: u._id,
         staffId: u.referenceId || `STF-${u._id.toString().slice(-4).toUpperCase()}`,
         name: u.name,
         email: u.email,
@@ -90,14 +91,21 @@ router.get('/staff-directory', protect, async (req, res) => {
     staffDocs.forEach(s => {
       const staffKey = (s.id || s.email || s._id.toString()).toLowerCase();
       if (!resultMap.has(staffKey)) {
+        // Link to matching User if one exists
+        const matchedUser = users.find(u => 
+          (s.email && u.email && u.email.toLowerCase() === s.email.toLowerCase()) ||
+          (s.id && u.referenceId && u.referenceId.toLowerCase() === s.id.toLowerCase())
+        );
+
         resultMap.set(staffKey, {
-          _id: s._id,
-          staffId: s.id || `STF-${s._id.toString().slice(-4).toUpperCase()}`,
+          _id: matchedUser ? matchedUser._id : s._id,
+          userId: matchedUser ? matchedUser._id : null,
+          staffId: s.id || (matchedUser?.referenceId) || `STF-${s._id.toString().slice(-4).toUpperCase()}`,
           name: s.name,
           email: s.email,
           department: s.dept || 'General',
           phone: s.phone || '',
-          role: s.role || 'Staff'
+          role: s.role || s.designation || 'Staff'
         });
       }
     });
@@ -113,16 +121,27 @@ router.get('/staff-directory', protect, async (req, res) => {
 // ── 2. GET ALL DELIVERIES & PARCELS (WITH STRICT ROLE-BASED ACCESS CONTROL) ──
 router.get('/', protect, async (req, res) => {
   try {
-    const isStaff = req.user.role === 'Staff' || req.user.role === 'Faculty';
+    const isPersonalRecipient = ['Staff', 'Faculty', 'HOD', 'Teacher'].includes(req.user.role);
     const isAdmin = ['Admin', 'Super Admin', 'Sub Admin', 'Principal'].includes(req.user.role);
     const isWatchman = ['Watchman', 'Security', 'Guard'].includes(req.user.role);
+
+    // If an Admin/Principal explicitly requests personal parcels or if user is personal recipient:
+    const isSelfView = isPersonalRecipient || (req.query.my === 'true');
 
     const { status, type, search, staffId, recipientId, startDate, endDate } = req.query;
     let query = {};
 
-    // ── STRICT ACCESS CONTROL FOR STAFF ──
-    // Staff members can ONLY ever access parcels assigned to them
-    if (isStaff) {
+    // ── STRICT ACCESS CONTROL FOR RECIPIENTS ──
+    // Recipients can ONLY ever access parcels assigned to them (by unique DB ID, staffId, or email)
+    if (isSelfView) {
+      // Find any linked Staff record for secondary ID resolution
+      const linkedStaff = await Staff.findOne({
+        $or: [
+          { email: req.user.email },
+          ...(req.user.referenceId ? [{ id: req.user.referenceId }] : [])
+        ]
+      }).select('_id id email').lean().catch(() => null);
+
       const staffOrConditions = [
         { recipientId: req.user._id }
       ];
@@ -133,10 +152,13 @@ router.get('/', protect, async (req, res) => {
       if (req.user.email) {
         staffOrConditions.push({ recipientEmail: req.user.email.toLowerCase().trim() });
       }
-      if (req.user.name) {
-        staffOrConditions.push({ recipientName: { $regex: `^${req.user.name.trim()}$`, $options: 'i' } });
+      if (linkedStaff) {
+        if (linkedStaff._id) staffOrConditions.push({ recipientId: linkedStaff._id });
+        if (linkedStaff.id) staffOrConditions.push({ staffId: linkedStaff.id });
+        if (linkedStaff.email) staffOrConditions.push({ recipientEmail: linkedStaff.email.toLowerCase().trim() });
       }
 
+      // STRICT ISOLATION: Do NOT match by loose name regex! Match strictly by ID/email/staffId.
       query.$or = staffOrConditions;
     } else if (isAdmin || isWatchman) {
       // Admin and Watchman see all parcels for their institution
@@ -266,13 +288,28 @@ router.get('/:id', protect, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Delivery / Parcel record not found' });
     }
 
-    // Strict security check for Staff
-    const isStaff = req.user.role === 'Staff' || req.user.role === 'Faculty';
-    if (isStaff) {
-      const isOwner = (parcel.recipientId && parcel.recipientId._id?.toString() === req.user._id.toString()) ||
-        (parcel.recipientId && parcel.recipientId.toString() === req.user._id.toString()) ||
+    // Strict security check for Staff / HOD
+    const isPersonalRecipient = ['Staff', 'Faculty', 'HOD', 'Teacher'].includes(req.user.role);
+    const isAdmin = ['Admin', 'Super Admin', 'Sub Admin', 'Principal'].includes(req.user.role);
+    const isWatchman = ['Watchman', 'Security', 'Guard'].includes(req.user.role);
+
+    if (isPersonalRecipient && !isAdmin && !isWatchman) {
+      const linkedStaff = await Staff.findOne({
+        $or: [
+          { email: req.user.email },
+          ...(req.user.referenceId ? [{ id: req.user.referenceId }] : [])
+        ]
+      }).select('_id id email').lean().catch(() => null);
+
+      const isOwner = (parcel.recipientId && (
+          parcel.recipientId._id?.toString() === req.user._id.toString() ||
+          parcel.recipientId.toString() === req.user._id.toString() ||
+          (linkedStaff && parcel.recipientId.toString() === linkedStaff._id.toString())
+        )) ||
         (req.user.referenceId && parcel.staffId === req.user.referenceId) ||
-        (req.user.email && parcel.recipientEmail?.toLowerCase() === req.user.email.toLowerCase());
+        (linkedStaff?.id && parcel.staffId === linkedStaff.id) ||
+        (req.user.email && parcel.recipientEmail?.toLowerCase() === req.user.email.toLowerCase()) ||
+        (linkedStaff?.email && parcel.recipientEmail?.toLowerCase() === linkedStaff.email.toLowerCase());
 
       if (!isOwner) {
         return res.status(403).json({
@@ -301,6 +338,7 @@ router.post('/', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Sub Adm
       recipientName,
       recipientPhone,
       recipientEmail,
+      recipientType,
       department,
       trackingNumber,
       parcelDetails,
@@ -309,7 +347,7 @@ router.post('/', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Sub Adm
       notes
     } = req.body;
 
-    if (!recipientName && !staffId && !recipientId) {
+    if (!recipientName && !staffId && !recipientId && !recipientEmail) {
       return res.status(400).json({ success: false, message: 'Please select or specify a recipient staff member.' });
     }
     if (!deliveryCompany && !senderName) {
@@ -318,46 +356,109 @@ router.post('/', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Sub Adm
 
     const tenantId = getTenant(req);
 
-    // ── Resolve Staff Member's Unique Database Reference ──
+    // ── Robust Cascading Recipient Resolution ──
     let resolvedUser = null;
-    let finalStaffId = staffId || '';
-    let finalRecipientName = recipientName ? recipientName.trim() : '';
-    let finalRecipientEmail = recipientEmail ? recipientEmail.trim() : '';
-    let finalRecipientPhone = recipientPhone ? recipientPhone.trim() : '';
-    let finalDepartment = department || 'General';
-    let finalRecipientId = null;
+    let resolvedStaff = null;
 
-    if (recipientId && mongoose.Types.ObjectId.isValid(recipientId)) {
-      resolvedUser = await User.findById(recipientId);
-    } else if (staffId) {
-      resolvedUser = await User.findOne({
-        $or: [{ referenceId: staffId }, { _id: mongoose.Types.ObjectId.isValid(staffId) ? staffId : null }]
-      });
-      if (!resolvedUser) {
-        const staffRecord = await Staff.findOne({ id: staffId });
-        if (staffRecord) {
-          finalStaffId = staffRecord.id;
-          finalRecipientName = staffRecord.name;
-          finalRecipientEmail = staffRecord.email;
-          finalRecipientPhone = staffRecord.phone || '';
-          finalDepartment = staffRecord.dept || 'General';
-          finalRecipientId = staffRecord._id;
-        }
+    // Check for bracketed ID in recipientName, e.g. "Ananya [HOD001]" or "Renuka (STF008)"
+    let extractedId = '';
+    if (recipientName) {
+      const match = recipientName.match(/\[(.*?)\]/) || recipientName.match(/\((.*?)\)/);
+      if (match && match[1]) {
+        extractedId = match[1].trim();
       }
-    } else if (recipientName) {
-      resolvedUser = await User.findOne({
-        name: { $regex: `^${recipientName.trim()}$`, $options: 'i' },
-        role: { $in: ['Staff', 'Faculty', 'HOD', 'Principal'] }
-      });
     }
 
-    if (resolvedUser) {
-      finalRecipientId = resolvedUser._id;
-      finalStaffId = resolvedUser.referenceId || finalStaffId || `STF-${resolvedUser._id.toString().slice(-4).toUpperCase()}`;
-      finalRecipientName = resolvedUser.name;
-      finalRecipientEmail = resolvedUser.email;
-      finalRecipientPhone = resolvedUser.phone || finalRecipientPhone;
-      finalDepartment = resolvedUser.department || finalDepartment;
+    // 1. Try recipientId in User collection
+    if (recipientId && mongoose.Types.ObjectId.isValid(recipientId)) {
+      resolvedUser = await User.findById(recipientId);
+      if (!resolvedUser) {
+        // Could be a Staff collection _id
+        resolvedStaff = await Staff.findById(recipientId);
+        if (resolvedStaff) {
+          resolvedUser = await User.findOne({
+            $or: [
+              { email: resolvedStaff.email },
+              { referenceId: resolvedStaff.id }
+            ]
+          });
+        }
+      }
+    }
+
+    // 2. Try staffId or extractedId
+    const targetStaffId = staffId || extractedId;
+    if (!resolvedUser && targetStaffId) {
+      resolvedUser = await User.findOne({ referenceId: targetStaffId });
+      if (!resolvedUser && mongoose.Types.ObjectId.isValid(targetStaffId)) {
+        resolvedUser = await User.findById(targetStaffId);
+      }
+      if (!resolvedUser) {
+        resolvedStaff = await Staff.findOne({ id: targetStaffId });
+        if (resolvedStaff) {
+          resolvedUser = await User.findOne({
+            $or: [
+              { email: resolvedStaff.email },
+              { referenceId: resolvedStaff.id }
+            ]
+          });
+        }
+      }
+    }
+
+    // 3. Try recipientEmail
+    const targetEmail = recipientEmail || (recipientName && recipientName.includes('@') ? recipientName.trim() : '');
+    if (!resolvedUser && targetEmail) {
+      resolvedUser = await User.findOne({ email: targetEmail.toLowerCase().trim() });
+      if (!resolvedUser) {
+        resolvedStaff = await Staff.findOne({ email: targetEmail.toLowerCase().trim() });
+        if (resolvedStaff) {
+          resolvedUser = await User.findOne({ referenceId: resolvedStaff.id });
+        }
+      }
+    }
+
+    // 4. Try exact recipientName (stripping bracketed IDs)
+    if (!resolvedUser && recipientName) {
+      const cleanName = recipientName.replace(/\[.*?\]|\(.*?\)/g, '').trim();
+      if (cleanName) {
+        const candidateUsers = await User.find({
+          name: { $regex: `^${cleanName}$`, $options: 'i' },
+          role: { $in: ['Staff', 'Faculty', 'HOD', 'Principal', 'Teacher'] }
+        });
+
+        if (candidateUsers.length === 1) {
+          resolvedUser = candidateUsers[0];
+        } else if (candidateUsers.length > 1 && department && department !== 'General') {
+          const matchInDept = candidateUsers.find(u => u.department?.toLowerCase() === department.toLowerCase());
+          if (matchInDept) resolvedUser = matchInDept;
+        }
+
+        if (!resolvedUser) {
+          const candidateStaff = await Staff.find({
+            name: { $regex: `^${cleanName}$`, $options: 'i' }
+          });
+          if (candidateStaff.length === 1) {
+            resolvedStaff = candidateStaff[0];
+            resolvedUser = await User.findOne({
+              $or: [{ email: resolvedStaff.email }, { referenceId: resolvedStaff.id }]
+            });
+          }
+        }
+      }
+    }
+
+    // Extract finalized recipient values
+    const finalRecipientId = resolvedUser ? resolvedUser._id : (resolvedStaff ? resolvedStaff._id : (recipientId && mongoose.Types.ObjectId.isValid(recipientId) ? recipientId : null));
+    const finalStaffId = resolvedUser?.referenceId || resolvedStaff?.id || targetStaffId || '';
+    const cleanRawName = recipientName ? recipientName.replace(/\[.*?\]|\(.*?\)/g, '').trim() : '';
+    const finalRecipientName = resolvedUser?.name || resolvedStaff?.name || cleanRawName || 'Campus Staff';
+    const finalRecipientEmail = resolvedUser?.email || resolvedStaff?.email || recipientEmail || '';
+    const finalRecipientPhone = resolvedUser?.phone || resolvedStaff?.phone || recipientPhone || '';
+    const finalDepartment = resolvedUser?.department || resolvedStaff?.dept || department || 'General';
+    let finalRecipientType = recipientType || resolvedUser?.role || resolvedStaff?.designation || (finalStaffId.startsWith('HOD') ? 'HOD' : 'Staff');
+    if (!['Staff', 'Faculty', 'HOD', 'Department', 'Student', 'Hostel Warden', 'Principal', 'Principal / Admin', 'Other'].includes(finalRecipientType)) {
+      finalRecipientType = finalRecipientType === 'Principal' ? 'Principal' : (finalRecipientType === 'HOD' ? 'HOD' : 'Staff');
     }
 
     // Generate unique Parcel ID
@@ -377,7 +478,7 @@ router.post('/', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Sub Adm
       recipientName: finalRecipientName,
       recipientEmail: finalRecipientEmail,
       recipientPhone: finalRecipientPhone,
-      recipientType: 'Staff',
+      recipientType: finalRecipientType,
       department: finalDepartment,
       trackingNumber: trackingNumber ? trackingNumber.trim() : '',
       parcelDetails: parcelDetails ? parcelDetails.trim() : (type === 'Delivery' ? 'Food / Important Delivery' : 'Standard Courier Parcel'),
@@ -393,16 +494,17 @@ router.post('/', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Sub Adm
 
     await newParcel.save();
 
-    // ── Create in-app Notification for the recipient staff ──
+    // ── Create in-app Notification strictly for the recipient ──
     if (finalRecipientId) {
       try {
+        const destLink = finalRecipientType === 'HOD' ? '/hod/parcels' : '/staff/parcels';
         await Notification.create({
           recipient: finalRecipientId,
           title: `📦 New ${type} Arrived at Campus Gate`,
           message: `Your ${type.toLowerCase()} from ${newParcel.deliveryCompany}${newParcel.trackingNumber ? ` (Tracking: ${newParcel.trackingNumber})` : ''} has been received at ${newParcel.gate}. Please collect it from security.`,
           type: 'Info',
           category: 'delivery',
-          link: '/staff/parcels',
+          link: destLink,
           collegeId: tenantId,
           tenantId: tenantId
         });
@@ -414,8 +516,8 @@ router.post('/', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Sub Adm
     // Real-time broadcast
     const io = req.app.get('io');
     if (io) {
-      io.emit('parcelUpdated', { action: 'created', parcel: newParcel });
-      io.emit('dataUpdated', { module: 'parcel', action: 'created', data: newParcel });
+      io.emit('parcelUpdated', { action: 'created', parcel: newParcel, recipientId: finalRecipientId, staffId: finalStaffId });
+      io.emit('dataUpdated', { module: 'parcel', action: 'created', data: newParcel, recipientId: finalRecipientId, staffId: finalStaffId });
     }
 
     res.status(201).json({
@@ -430,7 +532,7 @@ router.post('/', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Sub Adm
 });
 
 // ── 5. CONFIRM COLLECTION / HANDOVER (STAFF OR ADMIN/WATCHMAN) ─────────────
-// Both Staff (confirming self-collection) and Watchman/Admin (confirming gate handover) use this
+// Both Recipients (confirming self-collection) and Watchman/Admin (confirming gate handover) use this
 router.patch('/:id/collect', protect, async (req, res) => {
   try {
     const parcel = await ParcelLog.findById(req.params.id);
@@ -438,16 +540,28 @@ router.patch('/:id/collect', protect, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Delivery / Parcel record not found' });
     }
 
-    const isStaff = req.user.role === 'Staff' || req.user.role === 'Faculty';
+    const isPersonalRecipient = ['Staff', 'Faculty', 'HOD', 'Teacher'].includes(req.user.role);
     const isAdmin = ['Admin', 'Super Admin', 'Sub Admin', 'Principal'].includes(req.user.role);
     const isWatchman = ['Watchman', 'Security', 'Guard'].includes(req.user.role);
 
-    // If Staff is confirming collection, verify it is their own parcel
-    if (isStaff) {
-      const isOwner = (parcel.recipientId && parcel.recipientId.toString() === req.user._id.toString()) ||
+    // If Recipient is confirming collection, verify it is strictly their own parcel
+    if (isPersonalRecipient && !isAdmin && !isWatchman) {
+      const linkedStaff = await Staff.findOne({
+        $or: [
+          { email: req.user.email },
+          ...(req.user.referenceId ? [{ id: req.user.referenceId }] : [])
+        ]
+      }).select('_id id email').lean().catch(() => null);
+
+      const isOwner = (parcel.recipientId && (
+          parcel.recipientId._id?.toString() === req.user._id.toString() ||
+          parcel.recipientId.toString() === req.user._id.toString() ||
+          (linkedStaff && parcel.recipientId.toString() === linkedStaff._id.toString())
+        )) ||
         (req.user.referenceId && parcel.staffId === req.user.referenceId) ||
+        (linkedStaff?.id && parcel.staffId === linkedStaff.id) ||
         (req.user.email && parcel.recipientEmail?.toLowerCase() === req.user.email.toLowerCase()) ||
-        (parcel.recipientName?.toLowerCase() === req.user.name?.toLowerCase());
+        (linkedStaff?.email && parcel.recipientEmail?.toLowerCase() === linkedStaff.email.toLowerCase());
 
       if (!isOwner) {
         return res.status(403).json({

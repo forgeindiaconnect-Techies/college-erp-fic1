@@ -151,10 +151,24 @@ const Navbar = ({ role = 'Admin', onMenuToggle }) => {
 
           {showProfileDropdown && (
             <div className="profile-dropdown animate-fade-in" style={{ background: 'var(--bg-card, #ffffff)' }}>
-              <div className="dropdown-item" onClick={() => { setShowProfileDropdown(false); navigate(`/${role.toLowerCase().replace(/\s+/g, '')}/settings`); }}>
+              <div className="dropdown-item" onClick={() => {
+                setShowProfileDropdown(false);
+                const r = (role || '').toLowerCase().replace(/\s+/g, '');
+                if (r === 'watchman') navigate('/watchman/profile');
+                else if (r === 'driver') navigate('/driver/dashboard');
+                else if (r === 'parent') navigate('/parent/dashboard');
+                else navigate(`/${r}/settings`);
+              }}>
                 <User size={16} /> My Profile
               </div>
-              <div className="dropdown-item" onClick={() => { setShowProfileDropdown(false); navigate(`/${role.toLowerCase().replace(/\s+/g, '')}/settings`); }}>
+              <div className="dropdown-item" onClick={() => {
+                setShowProfileDropdown(false);
+                const r = (role || '').toLowerCase().replace(/\s+/g, '');
+                if (r === 'watchman') navigate('/watchman/profile');
+                else if (r === 'driver') navigate('/driver/dashboard');
+                else if (r === 'parent') navigate('/parent/dashboard');
+                else navigate(`/${r}/settings`);
+              }}>
                 <Settings size={16} /> Settings
               </div>
               <div className="dropdown-divider"></div>

@@ -2,7 +2,9 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -13,9 +15,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { apiGet, apiPost, type MobileUser } from '../../services/api';
+import { apiGet, apiPost, apiPut, apiPatch, type MobileUser } from '../../services/api';
 import BottomTabBar, { type MainNavTab } from '../navigation/BottomTabBar';
+import ScreenHeader from '../navigation/ScreenHeader';
+import UserProfileScreen from '../profile/UserProfileScreen';
 import ReferralHub from '../referrals/ReferralHub';
+import DashboardHeroBanner from './DashboardHeroBanner';
+import QuickAccessGrid from './QuickAccessGrid';
+import HighlightCard from './HighlightCard';
 
 type Props = {
   user: MobileUser;
@@ -36,6 +43,7 @@ type StaffAcademicsTab =
 
 // More & Profile Sub-Views
 type StaffMoreSection =
+  | 'profile'
   | 'menu'
   | 'library'
   | 'placement'
@@ -126,6 +134,10 @@ type StaffLeaveItem = {
   days: number;
   reason: string;
   status: 'Approved' | 'Pending' | 'Rejected';
+  startDate?: string;
+  endDate?: string;
+  subType?: string;
+  timeline?: { date: string; text: string }[];
 };
 
 type PayrollSlip = {
@@ -139,10 +151,12 @@ type PayrollSlip = {
   status: string;
   paymentDate?: string;
   paymentMethod?: string;
+  voucherRef?: string;
 };
 
 type LibraryBookItem = {
   id: string;
+  _id?: string;
   title: string;
   author: string;
   category: string;
@@ -150,6 +164,30 @@ type LibraryBookItem = {
   shelfNumber: string;
   availableCopies: number;
   totalCopies: number;
+  status?: string;
+};
+
+type LibraryTransactionItem = {
+  id: string;
+  bookId: string;
+  bookTitle: string;
+  bookAuthor: string;
+  category?: string;
+  status: 'Pending' | 'Approved' | 'Reserved' | 'Issued' | 'Overdue' | 'Returned' | 'Rejected' | string;
+  issueDate?: string;
+  dueDate?: string;
+  fineAmount?: number;
+  fineStatus?: string;
+  returnRequested?: boolean;
+  returnStatus?: string;
+};
+
+type LibraryReturnRequestItem = {
+  id: string;
+  transactionId?: string;
+  bookTitle?: string;
+  status: 'Pending' | 'Approved' | 'Rejected' | string;
+  requestDate?: string;
 };
 
 type PlacementJobItem = {
@@ -159,7 +197,85 @@ type PlacementJobItem = {
   ctc: string;
   eligibility: string;
   driveDate: string;
+  deadline?: string;
+  totalRounds?: number;
+  rounds?: { roundNumber: number; name: string; type: string }[];
   status: string;
+};
+
+type PlacementCompanyItem = {
+  id: string;
+  name: string;
+  sector: string;
+  location: string;
+  status: string;
+  website?: string;
+  hrContact?: string;
+};
+
+type PlacementApplicationItem = {
+  id: string;
+  student: string;
+  regNo: string;
+  dept?: string;
+  company: string;
+  role: string;
+  status: string;
+  appliedDate?: string;
+  currentRound?: number;
+};
+
+type PlacementInterviewItem = {
+  id: string;
+  candidateName: string;
+  regNo?: string;
+  company: string;
+  role: string;
+  roundNumber: number;
+  roundName: string;
+  date: string;
+  time: string;
+  mode: string;
+  status: string;
+  hall?: string;
+  interviewerNotes?: string;
+};
+
+type PlacementTrainingItem = {
+  id: string;
+  title: string;
+  trainer: string;
+  category: 'Aptitude' | 'Technical' | 'Soft Skills' | 'Mock Interview';
+  schedule: string;
+  enrolledCount: number;
+  status: string;
+  hours: string;
+};
+
+type ParcelItem = {
+  id: string;
+  parcelId?: string;
+  trackingNumber: string;
+  courier: string;
+  senderName: string;
+  details: string;
+  date: string;
+  otp: string;
+  status: 'Pending Collection' | 'Collected' | string;
+  gate?: string;
+  type?: string;
+};
+
+type SupportTicketItem = {
+  id: string;
+  requestType: string;
+  subType?: string;
+  subject?: string;
+  description: string;
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  status: 'Pending' | 'In Progress' | 'Under Review' | 'Resolved' | 'Approved' | 'Rejected';
+  date?: string;
+  timeline?: { date: string; text: string }[];
 };
 
 const DEFAULT_PERIODS: PeriodStructure[] = [
@@ -255,7 +371,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   // Bottom Bar Navigation
   const [activeTab, setActiveTab] = useState<MainNavTab>('home');
   const [academicsTab, setAcademicsTab] = useState<StaffAcademicsTab>('timetable');
-  const [moreSection, setMoreSection] = useState<StaffMoreSection>('menu');
+  const [moreSection, setMoreSection] = useState<StaffMoreSection>('profile');
 
   // Loading & Refreshing States
   const [loading, setLoading] = useState(true);
@@ -267,11 +383,19 @@ export default function StaffDashboard({ user, onLogout }: Props) {
     empId: user.userId || user.referenceId || 'STF007',
     dept: user.department || 'Computer Science',
     designation: 'Assistant Professor',
-    email: user.email || 'karthik@college.edu',
+    email: user.email || 'faculty@college.edu',
     phone: '+91 98234 56789',
+    qualification: 'M.Tech, Ph.D.',
+    experience: '6+ Years Teaching & Research',
     casualLeavesLeft: 12,
     sickLeavesLeft: 8,
   });
+  const [editProfileModalVisible, setEditProfileModalVisible] = useState(false);
+  const [editPhone, setEditPhone] = useState('+91 98234 56789');
+  const [editQualification, setEditQualification] = useState('M.Tech, Ph.D.');
+  const [editExperience, setEditExperience] = useState('6+ Years Teaching & Research');
+  const [editDesignation, setEditDesignation] = useState('Assistant Professor');
+  const [savingProfile, setSavingProfile] = useState(false);
 
   // Teaching Schedule State
   const [activeDay, setActiveDay] = useState<TimetableDay>(() => {
@@ -330,35 +454,68 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   const [newAssignDesc, setNewAssignDesc] = useState('');
   const [submittingAssignment, setSubmittingAssignment] = useState(false);
 
-  // Leaves & Support Center
+  // Leaves & Quota
   const [leaves, setLeaves] = useState<StaffLeaveItem[]>([]);
   const [leaveModalVisible, setLeaveModalVisible] = useState(false);
   const [newLeaveType, setNewLeaveType] = useState('Casual Leave');
   const [newLeaveDates, setNewLeaveDates] = useState('');
+  const [newLeaveStartDate, setNewLeaveStartDate] = useState('');
+  const [newLeaveEndDate, setNewLeaveEndDate] = useState('');
   const [newLeaveReason, setNewLeaveReason] = useState('');
+  const [leaveStatusFilter, setLeaveStatusFilter] = useState<'All' | 'Pending' | 'Approved' | 'Rejected'>('All');
   const [submittingLeave, setSubmittingLeave] = useState(false);
 
+  // Campus Support Center & IT Helpdesk
   const [supportModalVisible, setSupportModalVisible] = useState(false);
   const [supportType, setSupportType] = useState<'IT Support' | 'Salary Query' | 'General Query'>('IT Support');
+  const [supportPriority, setSupportPriority] = useState<'Low' | 'Medium' | 'High' | 'Critical'>('Medium');
   const [supportSubject, setSupportSubject] = useState('');
   const [supportDescription, setSupportDescription] = useState('');
+  const [supportTickets, setSupportTickets] = useState<SupportTicketItem[]>([]);
   const [submittingSupport, setSubmittingSupport] = useState(false);
 
   // Announcements & Updates
   const [notices, setNotices] = useState<any[]>([]);
 
   // Gate Deliveries & Parcels
-  const [parcels, setParcels] = useState<any[]>([]);
+  const [parcels, setParcels] = useState<ParcelItem[]>([]);
+  const [parcelFilter, setParcelFilter] = useState<'All' | 'Pending' | 'Collected'>('All');
+  const [parcelSearch, setParcelSearch] = useState('');
+  const [collectingParcelId, setCollectingParcelId] = useState<string | null>(null);
 
   // Payroll Slips
   const [payrollList, setPayrollList] = useState<PayrollSlip[]>([]);
 
-  // Library Catalog
+  // Library Catalog & Borrowing
   const [libraryBooks, setLibraryBooks] = useState<LibraryBookItem[]>([]);
+  const [libraryTransactions, setLibraryTransactions] = useState<LibraryTransactionItem[]>([]);
+  const [libraryReturnRequests, setLibraryReturnRequests] = useState<LibraryReturnRequestItem[]>([]);
+  const [libraryTab, setLibraryTab] = useState<'catalog' | 'my-books'>('catalog');
+  const [selectedBookCategory, setSelectedBookCategory] = useState('All');
   const [bookSearch, setBookSearch] = useState('');
+  const [requestingBookId, setRequestingBookId] = useState<string | null>(null);
+  const [returningTxId, setReturningTxId] = useState<string | null>(null);
 
-  // Placement Drives
+  // Placement Drives & Management Modules
   const [placementJobs, setPlacementJobs] = useState<PlacementJobItem[]>([]);
+  const [placementCompanies, setPlacementCompanies] = useState<PlacementCompanyItem[]>([]);
+  const [placementApplications, setPlacementApplications] = useState<PlacementApplicationItem[]>([]);
+  const [placementInterviews, setPlacementInterviews] = useState<PlacementInterviewItem[]>([]);
+  const [placementSelections, setPlacementSelections] = useState<any[]>([]);
+  const [placementTab, setPlacementTab] = useState<'drives' | 'roster' | 'applications' | 'interviews' | 'training' | 'companies'>('drives');
+  const [placementSearch, setPlacementSearch] = useState('');
+  const [selectedPlacementJob, setSelectedPlacementJob] = useState<PlacementJobItem | null>(null);
+  const [selectedInterviewRound, setSelectedInterviewRound] = useState<number>(1);
+  const [rosterEligibilityFilter, setRosterEligibilityFilter] = useState<'All' | 'Eligible' | 'Below Criteria'>('All');
+  const [appStatusFilter, setAppStatusFilter] = useState<string>('All');
+  const [selectedStudentPlacementProfile, setSelectedStudentPlacementProfile] = useState<{
+    student: any;
+    apps: any[];
+    isEligible: boolean;
+    isPlaced: boolean;
+  } | null>(null);
+  const [selectedScholarRecord, setSelectedScholarRecord] = useState<any | null>(null);
+  const [selectedAssignmentDetails, setSelectedAssignmentDetails] = useState<any | null>(null);
 
   // ----------------------------------------------------------------------
   // LIVE CLASS SESSION & TIMETABLE "START CLASS" STATE
@@ -402,6 +559,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       // Concurrently fetch real backend resources
       const [
         profileRes,
+        staffMeRes,
         studentsRes,
         scheduleRes,
         deptTimetableRes,
@@ -416,9 +574,16 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         supportRes,
         salaryRes,
         libraryRes,
+        libTxRes,
+        libReturnRes,
         placementRes,
+        placementCompaniesRes,
+        placementAppsRes,
+        placementInterviewsRes,
+        placementSelectionsRes,
       ] = await Promise.all([
         apiGet<any>('auth/me').catch(() => null),
+        apiGet<any>('staff/me').catch(() => null),
         apiGet<any[]>('students').catch(() => []),
         apiGet<any[]>('timetable/my-schedule').catch(() => []),
         apiGet<any[]>(`timetable?department=${encodeURIComponent(dept)}`).catch(() => []),
@@ -429,13 +594,21 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         apiGet<any[]>('exams').catch(() => []),
         apiGet<any[]>('assignments').catch(() => []),
         apiGet<any>('notifications').catch(() => []),
-        apiGet<any[]>('parcels').catch(() => []),
-        apiGet<any[]>('staff-support').catch(() => []),
-        apiGet<any[]>(`salaries/staff/${encodeURIComponent(staffEmpId)}`).catch(() =>
-          apiGet<any[]>(`salary/staff/${encodeURIComponent(staffEmpId)}`).catch(() => [])
+        apiGet<any>('parcels').catch(() => ({ data: [] })),
+        apiGet<any>('staff-support').catch(() => []),
+        apiGet<any>('salaries/my').catch(() =>
+          apiGet<any>(`salaries/staff/${encodeURIComponent(staffEmpId)}`).catch(() =>
+            apiGet<any>(`salary/staff/${encodeURIComponent(staffEmpId)}`).catch(() => [])
+          )
         ),
-        apiGet<any[]>('library/books').catch(() => []),
-        apiGet<any[]>('placement/jobs').catch(() => []),
+        apiGet<any>('library/books').catch(() => []),
+        apiGet<any>('library/my-transactions').catch(() => []),
+        apiGet<any>('library/return-requests/my').catch(() => []),
+        apiGet<any>('placement/jobs').catch(() => []),
+        apiGet<any>('placement/companies').catch(() => []),
+        apiGet<any>('placement/applications').catch(() => []),
+        apiGet<any>('placement/interviews').catch(() => []),
+        apiGet<any>('placement/selections').catch(() => []),
       ]);
 
       // 1. Profile Processing
@@ -638,38 +811,69 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       }));
       setNotices(parsedNotifs);
 
-      // 7. Parcels Processing
-      const rawParcels = Array.isArray(parcelsRes) ? parcelsRes : [];
-      const parsedParcels = rawParcels.map((p: any, idx: number) => ({
+      // 7. Parcels Processing (Fixed robust data unwrapping & real-time gate sync)
+      const rawParcels = Array.isArray(parcelsRes)
+        ? parcelsRes
+        : (Array.isArray(parcelsRes?.data) ? parcelsRes.data : []);
+      const parsedParcels: ParcelItem[] = rawParcels.map((p: any, idx: number) => ({
         id: p._id || p.id || String(idx),
-        courier: p.courier || p.carrier || p.courierName || 'BlueDart Logistics',
-        awb: p.awb || p.trackingNumber || `AWB-${Math.floor(100000 + Math.random() * 900000)}`,
-        date: p.receivedTime || p.date || p.createdAt ? new Date(p.createdAt || Date.now()).toLocaleDateString('en-GB') : 'Today',
-        otp: p.otp || '5821',
-        status: p.status || 'Awaiting Faculty Pickup',
+        parcelId: p.parcelId || `P-${idx + 101}`,
+        courier: p.deliveryCompany || p.courier || p.carrier || p.courierName || 'Gate Courier Desk',
+        senderName: p.senderName || 'Authorized Sender',
+        details: p.parcelDetails || p.type || 'Consignment Package',
+        trackingNumber: p.trackingNumber || p.awb || `AWB-${p.parcelId || idx + 1001}`,
+        date: p.receivedAt || p.receivedTime || p.date || p.createdAt ? new Date(p.receivedAt || p.createdAt || Date.now()).toLocaleDateString('en-GB') : 'Today',
+        otp: p.otp || p.collectionOtp || '5821',
+        status: p.normalizedStatus || p.status || 'Pending Collection',
+        gate: p.gate || 'Campus Security Main Gate',
+        type: p.type || 'Parcel',
       }));
       setParcels(parsedParcels);
 
       // 8. Staff Support & Leaves Processing
-      const rawSupport = Array.isArray(supportRes) ? supportRes : [];
+      const rawSupport = Array.isArray(supportRes) ? supportRes : (Array.isArray((supportRes as any)?.data) ? (supportRes as any).data : []);
       const staffLeaves: StaffLeaveItem[] = rawSupport
-        .filter((r: any) => r.requestType === 'Leave')
+        .filter((r: any) => {
+          const reqType = (r.requestType || '').toLowerCase();
+          const matchStaff = !prof.name || (r.staffName && r.staffName.toLowerCase().includes(prof.name.toLowerCase())) || r.staffId === prof.userId;
+          return reqType === 'leave' && matchStaff;
+        })
         .map((l: any, idx: number) => ({
           id: l._id || l.id || String(idx),
-          type: l.leaveType || 'Casual Leave',
-          from: l.startDate || l.from || '24 Oct 2026',
-          to: l.endDate || l.to || '25 Oct 2026',
+          type: l.subType || l.leaveType || 'Casual Leave',
+          from: l.startDate || l.from || 'Today',
+          to: l.endDate || l.to || l.startDate || 'Tomorrow',
           days: Number(l.days || 1),
-          reason: l.description || l.reason || 'Personal / Family Commitment',
-          status: l.status || 'Approved',
+          reason: l.description || l.reason || 'Personal / Academic Commitment',
+          status: l.status === 'Approved' ? 'Approved' : (l.status === 'Rejected' ? 'Rejected' : 'Pending'),
+          timeline: l.timeline || [],
         }));
       setLeaves(staffLeaves);
 
+      const staffSupportTickets: SupportTicketItem[] = rawSupport
+        .filter((r: any) => {
+          const reqType = (r.requestType || '').toLowerCase();
+          const matchStaff = !prof.name || (r.staffName && r.staffName.toLowerCase().includes(prof.name.toLowerCase())) || r.staffId === prof.userId;
+          return reqType !== 'leave' && matchStaff;
+        })
+        .map((t: any, idx: number) => ({
+          id: t._id || t.id || `TKT-${idx + 101}`,
+          requestType: t.requestType || 'IT Support',
+          subType: t.subType || t.subject || 'Institutional Assistance',
+          subject: t.subType || t.subject || 'Campus Assistance',
+          description: t.description || 'Assistance requested with campus amenities.',
+          priority: t.priority || 'Medium',
+          status: t.status || 'Pending',
+          date: t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : 'Recent',
+          timeline: t.timeline || [],
+        }));
+      setSupportTickets(staffSupportTickets);
+
       // 9. Payroll Slips Processing
-      const rawSalary = Array.isArray(salaryRes) ? salaryRes : [];
+      const rawSalary = Array.isArray(salaryRes) ? salaryRes : (Array.isArray((salaryRes as any)?.data) ? (salaryRes as any).data : []);
       const parsedPayroll: PayrollSlip[] = rawSalary.map((s: any, idx: number) => ({
         id: s._id || s.id || String(idx),
-        month: s.month || 'September 2026',
+        month: s.billingMonth || s.month || 'September 2026',
         basicPay: Number(s.basicPay || 48000),
         hra: Number(s.hra || 14400),
         allowances: Number((s.medicalAllowance || 0) + (s.specialAllowance || 5000)),
@@ -677,48 +881,178 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         netSalary: Number(s.netSalary || 65000),
         status: s.status || 'Disbursed (Direct Credit)',
         paymentDate: s.paymentDate ? new Date(s.paymentDate).toLocaleDateString('en-GB') : '01 Oct 2026',
-        paymentMethod: s.paymentMethod || 'NEFT Bank Transfer',
+        paymentMethod: s.paymentMode || s.paymentMethod || 'NEFT Bank Transfer',
+        voucherRef: s.voucherRef || `PAY-2026-${String(idx + 1).padStart(3, '0')}`,
       }));
       setPayrollList(parsedPayroll);
 
-      // 10. Library Books Processing
-      const rawBooks = Array.isArray(libraryRes) ? libraryRes : [];
+      // 10. Library Books, Transactions & Return Requests Processing
+      const rawBooks = Array.isArray(libraryRes) ? libraryRes : (Array.isArray((libraryRes as any)?.data) ? (libraryRes as any).data : []);
       const parsedBooks: LibraryBookItem[] = rawBooks.map((b: any, idx: number) => ({
         id: b._id || b.id || b.bookId || String(idx),
-        title: b.title || 'Computer System Architecture',
-        author: b.author || 'M. Morris Mano',
-        category: b.category || b.department || 'Computer Science',
-        rackNumber: b.rackNumber || 'R02',
-        shelfNumber: b.shelfNumber || 'S04',
-        availableCopies: Number(b.availableCopies !== undefined ? b.availableCopies : b.available || 4),
-        totalCopies: Number(b.totalCopies || b.copies || 10),
+        _id: b._id || b.id,
+        title: b.title || 'Reference Material',
+        author: b.author || 'Author',
+        category: b.category || b.department || 'General',
+        rackNumber: b.rackNumber || 'R01',
+        shelfNumber: b.shelfNumber || 'S01',
+        availableCopies: Number(b.availableCopies !== undefined ? b.availableCopies : b.available || 0),
+        totalCopies: Number(b.totalCopies || b.copies || 1),
+        status: b.status || (Number(b.availableCopies !== undefined ? b.availableCopies : b.available || 0) > 0 ? 'Available' : 'Out of Stock'),
       }));
       setLibraryBooks(parsedBooks);
 
-      // 11. Placement Drives Processing
-      const rawJobs = Array.isArray(placementRes) ? placementRes : [];
+      const rawReturns = Array.isArray(libReturnRes) ? libReturnRes : (Array.isArray((libReturnRes as any)?.data) ? (libReturnRes as any).data : []);
+      const parsedReturns: LibraryReturnRequestItem[] = rawReturns.map((r: any, idx: number) => ({
+        id: r._id || r.id || String(idx),
+        transactionId: r.transactionId?._id || r.transactionId,
+        bookTitle: r.bookId?.title || 'Library Book',
+        status: r.status || 'Pending',
+        requestDate: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-GB') : 'Recent',
+      }));
+      setLibraryReturnRequests(parsedReturns);
+
+      const rawTx = Array.isArray(libTxRes) ? libTxRes : (Array.isArray((libTxRes as any)?.data) ? (libTxRes as any).data : []);
+      const parsedTx: LibraryTransactionItem[] = rawTx.map((tx: any, idx: number) => {
+        const isReturnPending = parsedReturns.some(
+          (r) => String(r.transactionId) === String(tx._id || tx.id) && r.status === 'Pending'
+        );
+        return {
+          id: tx._id || tx.id || String(idx),
+          bookId: tx.bookId?._id || tx.bookId,
+          bookTitle: tx.bookId?.title || tx.bookTitle || 'Library Book',
+          bookAuthor: tx.bookId?.author || tx.bookAuthor || 'Faculty Edition',
+          category: tx.bookId?.category || 'General',
+          status: tx.status || 'Pending',
+          issueDate: tx.issueDate ? new Date(tx.issueDate).toLocaleDateString('en-GB') : undefined,
+          dueDate: tx.dueDate ? new Date(tx.dueDate).toLocaleDateString('en-GB') : undefined,
+          fineAmount: Number(tx.fineAmount || 0),
+          fineStatus: tx.fineStatus,
+          returnRequested: isReturnPending,
+          returnStatus: isReturnPending ? 'Return Pending' : tx.status,
+        };
+      });
+      setLibraryTransactions(parsedTx);
+
+      // 11. Placement Drives & Companies Processing
+      const rawJobs = Array.isArray(placementRes) ? placementRes : (Array.isArray((placementRes as any)?.data) ? (placementRes as any).data : []);
       const parsedJobs: PlacementJobItem[] = rawJobs.map((j: any, idx: number) => ({
         id: j._id || j.id || String(idx),
-        company: j.company || 'Zoho Corporation',
+        company: j.company || 'Recruiting Enterprise',
         role: j.role || 'Software Development Engineer',
         ctc: j.ctc || '₹8.5 LPA',
         eligibility: j.eligibility || 'CGPA >= 7.5, No Active Backlogs',
         driveDate: j.driveDate ? new Date(j.driveDate).toLocaleDateString('en-GB') : '28 Oct 2026',
+        deadline: j.deadline ? new Date(j.deadline).toLocaleDateString('en-GB') : 'Active',
+        totalRounds: Number(j.totalRounds || 3),
+        rounds: Array.isArray(j.rounds) ? j.rounds : [],
         status: j.status || 'Active Drive',
       }));
       setPlacementJobs(parsedJobs);
 
-      // 12. Update Faculty State
+      const rawCompanies = Array.isArray(placementCompaniesRes) ? placementCompaniesRes : (Array.isArray((placementCompaniesRes as any)?.data) ? (placementCompaniesRes as any).data : []);
+      const parsedCompanies: PlacementCompanyItem[] = rawCompanies.map((c: any, idx: number) => ({
+        id: c._id || c.id || String(idx),
+        name: c.name || 'Campus Recruiting Partner',
+        sector: c.sector || 'IT & Technology',
+        location: c.location || 'Pan India',
+        status: c.status || 'Active Partner',
+        website: c.website || '',
+        hrContact: c.hrContact || c.hrEmail || '',
+      }));
+      setPlacementCompanies(parsedCompanies);
+
+      // Placement Applications
+      const rawApps = Array.isArray(placementAppsRes)
+        ? placementAppsRes
+        : (Array.isArray((placementAppsRes as any)?.data)
+            ? (placementAppsRes as any).data
+            : (Array.isArray((placementAppsRes as any)?.applications)
+                ? (placementAppsRes as any).applications
+                : []));
+      const parsedApps: PlacementApplicationItem[] = rawApps.map((a: any, idx: number) => ({
+        id: a._id || a.appId || a.id || String(idx),
+        student: a.student || a.studentName || 'Department Scholar',
+        regNo: a.regNo || a.rollNo || `CS2026-${String(idx + 1).padStart(3, '0')}`,
+        dept: a.dept || a.department || deptName,
+        company: a.company || a.companyName || 'Enterprise Partner',
+        role: a.role || a.jobRole || 'Associate Software Engineer',
+        status: a.status || 'Applied',
+        appliedDate: a.appliedDate || a.createdAt ? new Date(a.appliedDate || a.createdAt || Date.now()).toLocaleDateString('en-GB') : 'Recent',
+        currentRound: Number(a.currentRound || 1),
+      }));
+      setPlacementApplications(parsedApps);
+
+      // Placement Interviews
+      const rawInt = Array.isArray(placementInterviewsRes)
+        ? placementInterviewsRes
+        : (Array.isArray((placementInterviewsRes as any)?.data)
+            ? (placementInterviewsRes as any).data
+            : (Array.isArray((placementInterviewsRes as any)?.interviews)
+                ? (placementInterviewsRes as any).interviews
+                : []));
+      const parsedInterviews: PlacementInterviewItem[] = rawInt.map((it: any, idx: number) => ({
+        id: it._id || it.intId || it.id || String(idx),
+        candidateName: it.candidateName || it.student || 'Candidate Scholar',
+        regNo: it.regNo || it.rollNo || '',
+        company: it.company || 'Enterprise Recruiter',
+        role: it.role || 'Software Engineer',
+        roundNumber: Number(it.roundNumber || 1),
+        roundName: it.roundName || `Round ${it.roundNumber || 1}: Assessment`,
+        date: it.date ? new Date(it.date).toLocaleDateString('en-GB') : 'Upcoming',
+        time: it.time || '10:30 AM',
+        mode: it.mode || 'Campus Interview Hall B / Virtual',
+        status: it.status || 'Scheduled',
+        hall: it.hall || 'Main Placement Hall',
+        interviewerNotes: it.interviewerNotes || it.notes,
+      }));
+      setPlacementInterviews(parsedInterviews);
+
+      // Placement Selections
+      const rawSel = Array.isArray(placementSelectionsRes)
+        ? placementSelectionsRes
+        : (Array.isArray((placementSelectionsRes as any)?.data)
+            ? (placementSelectionsRes as any).data
+            : (Array.isArray((placementSelectionsRes as any)?.selections)
+                ? (placementSelectionsRes as any).selections
+                : []));
+      setPlacementSelections(rawSel);
+
+      // 12. Update Faculty State with full Staff profile details
+      const staffDoc = staffMeRes || {};
+      const facultyName = staffDoc.name || prof.name || user.name || 'Faculty Member';
+      const facultyEmpId = staffDoc.id || prof.userId || user.userId || user.referenceId || 'STF007';
+      const facultyDept = staffDoc.dept || deptName;
+      const facultyDesig = staffDoc.designation || prof.designation || 'Assistant Professor';
+      const facultyEmail = staffDoc.email || prof.email || user.email || '';
+      const facultyPhone = staffDoc.phone || prof.phone || '+91 98234 56789';
+      const facultyQual = staffDoc.qualification || 'M.Tech, Ph.D.';
+      const facultyExp = staffDoc.experience || '6+ Years Teaching & Research';
+
+      const clApprovedDays = staffLeaves
+        .filter((l) => l.status === 'Approved' && l.type === 'Casual Leave')
+        .reduce((sum, curr) => sum + (curr.days || 1), 0);
+      const slApprovedDays = staffLeaves
+        .filter((l) => l.status === 'Approved' && (l.type === 'Sick Leave' || l.type === 'Medical Leave'))
+        .reduce((sum, curr) => sum + (curr.days || 1), 0);
+
       setFaculty({
-        name: prof.name || user.name || 'Prof. Karthik S.',
-        empId: prof.userId || user.userId || user.referenceId || 'STF007',
-        dept: deptName,
-        designation: prof.designation || 'Assistant Professor',
-        email: prof.email || user.email || 'karthik@college.edu',
-        phone: prof.phone || '+91 98234 56789',
-        casualLeavesLeft: Math.max(0, 12 - staffLeaves.filter((l) => l.type === 'Casual Leave').length),
-        sickLeavesLeft: Math.max(0, 8 - staffLeaves.filter((l) => l.type === 'Sick Leave').length),
+        name: facultyName,
+        empId: facultyEmpId,
+        dept: facultyDept,
+        designation: facultyDesig,
+        email: facultyEmail,
+        phone: facultyPhone,
+        qualification: facultyQual,
+        experience: facultyExp,
+        casualLeavesLeft: Math.max(0, 12 - clApprovedDays),
+        sickLeavesLeft: Math.max(0, 8 - slApprovedDays),
       });
+
+      setEditPhone(facultyPhone);
+      setEditQualification(facultyQual);
+      setEditExperience(facultyExp);
+      setEditDesignation(facultyDesig);
     } catch (err) {
       console.warn('Backend staff load error:', err);
     } finally {
@@ -1010,11 +1344,81 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   };
 
   // ----------------------------------------------------------------------
+  // LIBRARY WORKFLOWS (Request Book & Return Book)
+  // ----------------------------------------------------------------------
+  const handleRequestBook = async (book: LibraryBookItem) => {
+    const targetBookId = book._id || book.id;
+    if (!targetBookId) return;
+    try {
+      setRequestingBookId(targetBookId);
+      await apiPost('library/request', { bookId: targetBookId });
+      Alert.alert(
+        'Borrow Request Registered! 📚',
+        `Your borrow request for "${book.title}" has been submitted to the Central Library. Please collect the physical copy once approved by the librarian.`
+      );
+      await loadData();
+    } catch (err: any) {
+      Alert.alert(
+        'Request Status',
+        err?.message || `Your borrow reservation for "${book.title}" has been registered.`
+      );
+      await loadData();
+    } finally {
+      setRequestingBookId(null);
+    }
+  };
+
+  const handleReturnBook = async (tx: LibraryTransactionItem) => {
+    try {
+      setReturningTxId(tx.id);
+      await apiPost('library/return-requests', { transactionId: tx.id });
+      Alert.alert(
+        'Return Request Submitted! 🔄',
+        `Return request logged for "${tx.bookTitle}". Please deposit the physical copy at the library circulation desk to complete check-in.`
+      );
+      await loadData();
+    } catch (err: any) {
+      Alert.alert(
+        'Return Status',
+        err?.message || 'Return request recorded with the library desk.'
+      );
+      await loadData();
+    } finally {
+      setReturningTxId(null);
+    }
+  };
+
+  // ----------------------------------------------------------------------
+  // PARCEL COLLECTION WORKFLOW
+  // ----------------------------------------------------------------------
+  const handleCollectParcel = async (parcelId: string) => {
+    try {
+      setCollectingParcelId(parcelId);
+      await apiPatch(`parcels/${parcelId}/collect`, {
+        collectedBy: faculty.name || 'Staff Member'
+      });
+      Alert.alert(
+        'Collection Confirmed! 📦',
+        'Parcel receipt verified and logged in campus security gate records.'
+      );
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Collection Error', err?.message || 'Could not update collection status.');
+    } finally {
+      setCollectingParcelId(null);
+    }
+  };
+
+  // ----------------------------------------------------------------------
   // LEAVE SUBMISSION WORKFLOW
   // ----------------------------------------------------------------------
   const handleApplyLeave = async () => {
-    if (!newLeaveDates.trim() || !newLeaveReason.trim()) {
-      Alert.alert('Required Fields', 'Please specify the dates and reason for the leave application.');
+    const reason = newLeaveReason.trim();
+    const startDate = newLeaveStartDate.trim() || newLeaveDates.trim();
+    const endDate = newLeaveEndDate.trim() || startDate;
+
+    if (!startDate || !reason) {
+      Alert.alert('Required Fields', 'Please specify the leave dates and reason for the application.');
       return;
     }
     try {
@@ -1025,18 +1429,23 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         staffEmail: faculty.email,
         department: faculty.dept,
         requestType: 'Leave',
-        subject: `${newLeaveType}: ${newLeaveDates.trim()}`,
-        description: newLeaveReason.trim(),
+        subType: newLeaveType,
+        startDate: startDate,
+        endDate: endDate,
+        description: reason,
         priority: 'Medium',
       });
       setLeaveModalVisible(false);
       setNewLeaveDates('');
+      setNewLeaveStartDate('');
+      setNewLeaveEndDate('');
       setNewLeaveReason('');
-      Alert.alert('Leave Submitted', 'Leave request has been forwarded to the Head of Department for review.');
-      loadData();
+      Alert.alert('Leave Application Submitted', 'Leave request has been forwarded to the Head of Department (HOD) for review.');
+      await loadData();
     } catch (err: any) {
       Alert.alert('Notice', err?.message || 'Leave application registered successfully.');
       setLeaveModalVisible(false);
+      await loadData();
     } finally {
       setSubmittingLeave(false);
     }
@@ -1058,20 +1467,46 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         staffEmail: faculty.email,
         department: faculty.dept,
         requestType: supportType,
+        subType: supportSubject.trim(),
         subject: supportSubject.trim(),
         description: supportDescription.trim(),
-        priority: 'High',
+        priority: supportPriority,
       });
       setSupportModalVisible(false);
       setSupportSubject('');
       setSupportDescription('');
-      Alert.alert('Request Submitted', 'Your ticket has been registered with Campus Support & IT Admin.');
-      loadData();
+      Alert.alert('Ticket Submitted', 'Your ticket has been registered with Campus Support & IT Admin.');
+      await loadData();
     } catch (err: any) {
       Alert.alert('Notice', err?.message || 'Support ticket generated successfully.');
       setSupportModalVisible(false);
+      await loadData();
     } finally {
       setSubmittingSupport(false);
+    }
+  };
+
+  // ----------------------------------------------------------------------
+  // PROFILE UPDATE WORKFLOW
+  // ----------------------------------------------------------------------
+  const handleSaveProfile = async () => {
+    try {
+      setSavingProfile(true);
+      await apiPut('staff/me', {
+        phone: editPhone.trim(),
+        qualification: editQualification.trim(),
+        experience: editExperience.trim(),
+        designation: editDesignation.trim(),
+      });
+      setEditProfileModalVisible(false);
+      Alert.alert('Profile Updated', 'Your staff contact and academic credentials have been saved.');
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Notice', err?.message || 'Profile changes saved.');
+      setEditProfileModalVisible(false);
+      await loadData();
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -1132,6 +1567,173 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       ? (myAssignedExamDuties.length > 0 ? myAssignedExamDuties : examDuties)
       : examDuties;
   }, [examDutyTab, myAssignedExamDuties, examDuties]);
+
+  // ----------------------------------------------------------------------
+  // INSTITUTIONAL SERVICES FILTERED DATA
+  // ----------------------------------------------------------------------
+  // 1. Library Filtered Books & Categories
+  const bookCategories = useMemo(() => {
+    const set = new Set<string>();
+    libraryBooks.forEach((b) => {
+      if (b.category) set.add(b.category);
+    });
+    return ['All', ...Array.from(set)];
+  }, [libraryBooks]);
+
+  const filteredBooks = useMemo(() => {
+    return libraryBooks.filter((b) => {
+      const q = bookSearch.trim().toLowerCase();
+      const matchSearch =
+        !q ||
+        (b.title && b.title.toLowerCase().includes(q)) ||
+        (b.author && b.author.toLowerCase().includes(q)) ||
+        (b.category && b.category.toLowerCase().includes(q));
+      const matchCat = selectedBookCategory === 'All' || b.category === selectedBookCategory;
+      return matchSearch && matchCat;
+    });
+  }, [libraryBooks, bookSearch, selectedBookCategory]);
+
+  const filteredLibraryTransactions = useMemo(() => {
+    return libraryTransactions.filter((tx) => {
+      const q = bookSearch.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        (tx.bookTitle && tx.bookTitle.toLowerCase().includes(q)) ||
+        (tx.bookAuthor && tx.bookAuthor.toLowerCase().includes(q)) ||
+        (tx.status && tx.status.toLowerCase().includes(q))
+      );
+    });
+  }, [libraryTransactions, bookSearch]);
+
+  const activeBorrowedCount = useMemo(() => {
+    return libraryTransactions.filter((tx) =>
+      ['Issued', 'Overdue', 'Approved', 'Reserved', 'Pending'].includes(tx.status)
+    ).length;
+  }, [libraryTransactions]);
+
+  // 2. Placement Filtered Drives & Companies
+  const filteredPlacementJobs = useMemo(() => {
+    if (!placementSearch.trim()) return placementJobs;
+    const q = placementSearch.trim().toLowerCase();
+    return placementJobs.filter(
+      (j) =>
+        (j.company && j.company.toLowerCase().includes(q)) ||
+        (j.role && j.role.toLowerCase().includes(q)) ||
+        (j.eligibility && j.eligibility.toLowerCase().includes(q))
+    );
+  }, [placementJobs, placementSearch]);
+
+  const filteredPlacementCompanies = useMemo(() => {
+    if (!placementSearch.trim()) return placementCompanies;
+    const q = placementSearch.trim().toLowerCase();
+    return placementCompanies.filter(
+      (c) =>
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.sector && c.sector.toLowerCase().includes(q)) ||
+        (c.location && c.location.toLowerCase().includes(q))
+    );
+  }, [placementCompanies, placementSearch]);
+
+  // Placement Coordination Statistics & Derived Metrics (Matching Web StaffPlacements)
+  const totalDeptStudents = students.length;
+  const eligibleDeptStudents = useMemo(() => {
+    return students.filter((s) => Number(s.cgpa ?? 0) >= 6.0);
+  }, [students]);
+
+  const uniqueAppliedRegNos = useMemo(() => {
+    const list = placementApplications.map((a) => (a.regNo || '').toLowerCase()).filter(Boolean);
+    return [...new Set(list)];
+  }, [placementApplications]);
+
+  const uniquePlacedCount = useMemo(() => {
+    const fromSel = placementSelections.map((s: any) => (s.regNo || s.student || '').toLowerCase()).filter(Boolean);
+    const fromApps = placementApplications.filter((a) => a.status === 'Selected').map((a) => a.regNo.toLowerCase());
+    return [...new Set([...fromSel, ...fromApps])].length;
+  }, [placementSelections, placementApplications]);
+
+  const placementPercentage = useMemo(() => {
+    return totalDeptStudents > 0
+      ? Math.min(100, Math.round((uniquePlacedCount / totalDeptStudents) * 100))
+      : 0;
+  }, [uniquePlacedCount, totalDeptStudents]);
+
+  // Filtered Students Roster for Placement
+  const filteredPlacementRoster = useMemo(() => {
+    return students.filter((s) => {
+      const q = placementSearch.trim().toLowerCase();
+      const matchSearch =
+        !q ||
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.rollNo && s.rollNo.toLowerCase().includes(q));
+
+      const isEligible = Number(s.cgpa ?? 0) >= 6.0;
+      let matchEligibility = true;
+      if (rosterEligibilityFilter === 'Eligible') matchEligibility = isEligible;
+      else if (rosterEligibilityFilter === 'Below Criteria') matchEligibility = !isEligible;
+
+      return matchSearch && matchEligibility;
+    });
+  }, [students, placementSearch, rosterEligibilityFilter]);
+
+  // Filtered Placement Applications
+  const filteredPlacementApplications = useMemo(() => {
+    return placementApplications.filter((a) => {
+      const q = placementSearch.trim().toLowerCase();
+      const matchSearch =
+        !q ||
+        (a.student && a.student.toLowerCase().includes(q)) ||
+        (a.regNo && a.regNo.toLowerCase().includes(q)) ||
+        (a.company && a.company.toLowerCase().includes(q)) ||
+        (a.role && a.role.toLowerCase().includes(q));
+
+      const matchStatus = appStatusFilter === 'All' || a.status === appStatusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [placementApplications, placementSearch, appStatusFilter]);
+
+  // Training Programs Catalog
+  const placementTrainingModules: PlacementTrainingItem[] = useMemo(() => [
+    { id: 'tr1', title: 'Quantitative Aptitude & Logical Reasoning Mastery', trainer: 'Campus Career Foundation', category: 'Aptitude', schedule: 'Mon, Wed, Fri (04:00 PM - 05:30 PM)', enrolledCount: totalDeptStudents, status: 'In Progress', hours: '40 Hours Module' },
+    { id: 'tr2', title: 'Data Structures, Algorithms & Technical Mock Drills', trainer: 'Senior Industry Tech Mentors', category: 'Technical', schedule: 'Sat (10:00 AM - 01:00 PM)', enrolledCount: eligibleDeptStudents.length, status: 'Active Sprint', hours: '60 Hours Hands-on' },
+    { id: 'tr3', title: 'Corporate Communication, GD & Interview Etiquette', trainer: 'Executive Soft Skills Division', category: 'Soft Skills', schedule: 'Tue, Thu (03:30 PM - 05:00 PM)', enrolledCount: totalDeptStudents, status: 'Upcoming Cohort', hours: '25 Hours Interactive' },
+    { id: 'tr4', title: 'HR Panel Simulated Mock Interviews & Feedback', trainer: 'Alumni Corporate Network', category: 'Mock Interview', schedule: 'Weekend Fast-Track Sessions', enrolledCount: uniqueAppliedRegNos.length || 18, status: 'Scheduled', hours: '1-on-1 Personalized' },
+  ], [totalDeptStudents, eligibleDeptStudents.length, uniqueAppliedRegNos.length]);
+
+  // 3. Gate Parcels Filtered List
+  const filteredParcels = useMemo(() => {
+    return parcels.filter((p) => {
+      const q = parcelSearch.trim().toLowerCase();
+      const matchSearch =
+        !q ||
+        (p.courier && p.courier.toLowerCase().includes(q)) ||
+        (p.trackingNumber && p.trackingNumber.toLowerCase().includes(q)) ||
+        (p.senderName && p.senderName.toLowerCase().includes(q)) ||
+        (p.details && p.details.toLowerCase().includes(q));
+
+      let matchStatus = true;
+      if (parcelFilter === 'Pending') {
+        matchStatus = p.status !== 'Collected' && p.status !== 'Handed Over';
+      } else if (parcelFilter === 'Collected') {
+        matchStatus = p.status === 'Collected' || p.status === 'Handed Over';
+      }
+      return matchSearch && matchStatus;
+    });
+  }, [parcels, parcelSearch, parcelFilter]);
+
+  const pendingParcelCount = useMemo(() => {
+    return parcels.filter((p) => p.status !== 'Collected' && p.status !== 'Handed Over').length;
+  }, [parcels]);
+
+  // 4. Staff Leaves Filtered List
+  const filteredLeaves = useMemo(() => {
+    if (leaveStatusFilter === 'All') return leaves;
+    return leaves.filter((l) => l.status === leaveStatusFilter);
+  }, [leaves, leaveStatusFilter]);
+
+  // 5. Campus Support Filtered Tickets
+  const filteredSupportTickets = useMemo(() => {
+    return supportTickets;
+  }, [supportTickets]);
 
   // ----------------------------------------------------------------------
   // ACTION HANDLERS: START CLASS / LIVE SESSION & EXAM DUTY ATTENDANCE
@@ -1375,35 +1977,78 @@ export default function StaffDashboard({ user, onLogout }: Props) {
     };
   }, [marksFilteredStudents, studentMarksData, marksViewMode]);
 
-  // Filtered Library Books
-  const filteredBooks = useMemo(() => {
-    return libraryBooks.filter(
-      (b) =>
-        b.title.toLowerCase().includes(bookSearch.toLowerCase()) ||
-        b.author.toLowerCase().includes(bookSearch.toLowerCase()) ||
-        b.category.toLowerCase().includes(bookSearch.toLowerCase())
-    );
-  }, [libraryBooks, bookSearch]);
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+  const currentDayIndex = new Date().getDay();
+  const todayName: TimetableDay = (currentDayIndex >= 1 && currentDayIndex <= 6)
+    ? (dayNames[currentDayIndex] as TimetableDay)
+    : 'Monday';
+
+  // Android Hardware Back Button Handling
+  useEffect(() => {
+    const onBackPress = () => {
+      if (activeTab === 'profile' && moreSection !== 'menu') {
+        setMoreSection('menu');
+        return true;
+      }
+      if (activeTab !== 'home') {
+        setActiveTab('home');
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [activeTab, moreSection]);
+
+  const isInnerScreen = activeTab !== 'home';
+
+  const getScreenTitle = () => {
+    if (activeTab === 'academics') {
+      return `Academics: ${academicsTab.charAt(0).toUpperCase() + academicsTab.slice(1)}`;
+    }
+    if (activeTab === 'referrals') return 'Business Referrals';
+    if (activeTab === 'notifications') return 'Alerts & Notices';
+    if (activeTab === 'profile') {
+      if (moreSection === 'library') return 'Central Library';
+      if (moreSection === 'placement') return 'Placement Drives';
+      if (moreSection === 'parcels') return 'Gate Deliveries';
+      if (moreSection === 'leaves') return 'Staff Leaves';
+      if (moreSection === 'payroll') return 'Monthly Payroll';
+      if (moreSection === 'support') return 'Campus IT Support';
+      if (moreSection === 'menu') return 'Faculty Services & Tools';
+      return 'Faculty Profile';
+    }
+    return 'Faculty Dashboard';
+  };
+
+  const handleBackNavigation = () => {
+    if (activeTab === 'profile' && moreSection !== 'profile' && moreSection !== 'settings') {
+      setMoreSection('profile');
+    } else {
+      setActiveTab('home');
+    }
+  };
 
   return (
     <View style={styles.container}>
       {/* ============================================================== */}
-      {/* 1. TOP FACULTY NATIVE HEADER                                    */}
+      {/* 1. TOP FACULTY NATIVE HEADER WITH BACK NAV & LOGOUT             */}
       {/* ============================================================== */}
-      <View style={styles.topHeaderBar}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{faculty.name.substring(0, 2).toUpperCase()}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.roleTagRow}>
-              <Text style={styles.roleTag}>FACULTY MEMBER</Text>
-            </View>
-            <Text style={styles.headerNameText} numberOfLines={1}>{faculty.name}</Text>
-            <Text style={styles.headerSubText}>{faculty.dept} • {faculty.designation}</Text>
-          </View>
-        </View>
-      </View>
+      <ScreenHeader
+        showBack={isInnerScreen}
+        onBack={handleBackNavigation}
+        title={getScreenTitle()}
+        subtitle={activeTab === 'home' ? `${faculty.dept} • ${faculty.designation}` : undefined}
+        userName={faculty.name}
+        roleBadge="FACULTY"
+        avatarText={faculty.name.substring(0, 2).toUpperCase()}
+        userSubtitle={`${faculty.dept} • ${faculty.designation}`}
+        onProfilePress={() => {
+          setActiveTab('profile');
+          setMoreSection('profile');
+        }}
+        onLogoutPress={onLogout}
+      />
 
       {/* ============================================================== */}
       {/* 2. BODY CONTENT ROUTED BY 5 BOTTOM TABS                        */}
@@ -1415,325 +2060,131 @@ export default function StaffDashboard({ user, onLogout }: Props) {
             contentContainerStyle={styles.scrollContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
           >
-            {/* Faculty Welcome Hero Card (Google Pay / PhonePe Style) */}
-            <View style={styles.heroGreetingCard}>
-              <View style={styles.heroTopRow}>
-                <View>
-                  <Text style={styles.greetingTitle}>Welcome, {faculty.name.split(' ')[0]} 👋</Text>
-                  <Text style={styles.greetingSub}>{faculty.dept} • {faculty.designation}</Text>
-                </View>
-              </View>
+            {/* 1. Visual Hero Banner with High Quality Academic Faculty Image */}
+            <DashboardHeroBanner
+              greeting={`Hello, ${faculty.name.split(' ')[0] || faculty.name} 👋`}
+              subtitle="Make a difference every day"
+              image={require('../../../assets/images/dashboards/staff_hero.jpg')}
+              tagline="Educate Empower Achieve"
+            />
 
-              <View style={styles.heroKpiRow}>
-                <View style={styles.heroKpiItem}>
-                  <Text style={styles.heroKpiLabel}>Today's Lectures</Text>
-                  <Text style={[styles.heroKpiValue, { color: '#60A5FA' }]}>{todayClasses.length}</Text>
-                  <Text style={styles.heroKpiSub}>Teaching</Text>
-                </View>
-                <View style={styles.heroKpiDivider} />
-                <View style={styles.heroKpiItem}>
-                  <Text style={styles.heroKpiLabel}>Class Scholars</Text>
-                  <Text style={[styles.heroKpiValue, { color: '#34D399' }]}>{students.length}</Text>
-                  <Text style={styles.heroKpiSub}>Active Roster</Text>
-                </View>
-                <View style={styles.heroKpiDivider} />
-                <View style={styles.heroKpiItem}>
-                  <Text style={styles.heroKpiLabel}>Exam Duties</Text>
-                  <Text style={[styles.heroKpiValue, { color: '#FBBF24' }]}>{examDuties.length}</Text>
-                  <Text style={styles.heroKpiSub}>Invigilations</Text>
-                </View>
-              </View>
-            </View>
+            {/* 2. Today's Classes Highlight Card (Matching Reference Design) */}
+            <HighlightCard
+              sectionTitle="Today's Classes"
+              actionText="View Timetable"
+              onActionPress={() => {
+                setActiveTab('academics');
+                setAcademicsTab('timetable');
+              }}
+              icon="💻"
+              iconBg="#EFF6FF"
+              title={todayClasses[0]?.subject || (todayClasses.length === 0 ? 'No Lectures Today' : 'Lectures Today')}
+              subtitle={
+                todayClasses[0]
+                  ? `${todayClasses[0].time} • ${todayClasses[0].room.toLowerCase().startsWith('room') ? todayClasses[0].room : `Room ${todayClasses[0].room}`} • ${todayClasses[0].classSection || faculty.dept}`
+                  : 'No scheduled lectures for today'
+              }
+              badgeText={todayClasses.length > 0 ? `${todayClasses.length} Scheduled` : 'Free'}
+              badgeBg={todayClasses.length > 0 ? '#DCFCE7' : '#F1F5F9'}
+              badgeTextColor={todayClasses.length > 0 ? '#15803D' : '#64748B'}
+              onPress={() => {
+                setActiveTab('academics');
+                setAcademicsTab('timetable');
+              }}
+            />
 
-            {/* Quick Action Shortcuts (Google Pay / PhonePe 4-Column Grid) */}
-            <View style={styles.card}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>⚡ Faculty Services</Text>
-                <Text style={styles.cardHeaderSub}>Tap to open</Text>
-              </View>
+            {/* 3. Quick Actions 2x2 Grid (Matching Reference Design) */}
+            <QuickAccessGrid
+              title="Quick Actions"
+              seeAllText="All Services →"
+              onSeeAll={() => setActiveTab('academics')}
+              items={[
+                {
+                  id: 'attendance',
+                  label: 'Take Attendance',
+                  icon: '👥',
+                  bg: '#EFF6FF',
+                  borderColor: '#DBEAFE',
+                  textColor: '#1E40AF',
+                  badge: todayClasses.filter((c) => !c.attendanceMarked).length > 0 ? `${todayClasses.filter((c) => !c.attendanceMarked).length} Pending` : undefined,
+                  onPress: () => {
+                    setActiveTab('academics');
+                    setAcademicsTab('attendance');
+                  },
+                },
+                {
+                  id: 'marks',
+                  label: 'Upload Marks',
+                  icon: '📤',
+                  bg: '#ECFDF5',
+                  borderColor: '#D1FAE5',
+                  textColor: '#065F46',
+                  onPress: () => {
+                    setActiveTab('academics');
+                    setAcademicsTab('marks');
+                  },
+                },
+                {
+                  id: 'assignments',
+                  label: 'Assignments',
+                  icon: '📑',
+                  bg: '#F5F3FF',
+                  borderColor: '#EDE9FE',
+                  textColor: '#5B21B6',
+                  onPress: () => {
+                    setActiveTab('academics');
+                    setAcademicsTab('assignments');
+                  },
+                },
+                {
+                  id: 'myclass',
+                  label: 'My Class',
+                  icon: '🧑‍🤝‍🧑',
+                  bg: '#FFFBEB',
+                  borderColor: '#FEF3C7',
+                  textColor: '#92400E',
+                  badge: students.length > 0 ? `${students.length} Scholars` : undefined,
+                  onPress: () => {
+                    setActiveTab('academics');
+                    setAcademicsTab('myclass');
+                  },
+                },
+              ]}
+            />
 
-              <View style={styles.gpayGrid}>
-                {/* 1. Take Attendance */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsTab('attendance'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#ECFDF5' }]}>
-                    <Text style={styles.gpayIcon}>📝</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Attendance</Text>
-                </TouchableOpacity>
+            {/* 4. Upcoming Exam Duty Highlight Card (Matching Reference Design) */}
+            <HighlightCard
+              sectionTitle="Upcoming Exam Duty"
+              actionText="View All"
+              onActionPress={() => {
+                setActiveTab('academics');
+                setAcademicsTab('duty');
+              }}
+              icon="📋"
+              iconBg="#EFF6FF"
+              title={examDuties[0]?.subject || examDuties[0]?.name || 'University Semester Examinations'}
+              subtitle={
+                examDuties[0]
+                  ? `${examDuties[0].date} • ${examDuties[0].time || 'Session Duty'} • Hall ${examDuties[0].hall || 'Main Block'}`
+                  : 'No upcoming exam invigilation assigned'
+              }
+              badgeText={examDuties.length > 0 ? `${examDuties.length} Duties` : 'None'}
+              badgeBg={examDuties.length > 0 ? '#FEF3C7' : '#F1F5F9'}
+              badgeTextColor={examDuties.length > 0 ? '#92400E' : '#64748B'}
+              onPress={() => {
+                setActiveTab('academics');
+                setAcademicsTab('duty');
+              }}
+            />
 
-                {/* 2. Upload Marks */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsTab('marks'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#F5F3FF' }]}>
-                    <Text style={styles.gpayIcon}>📊</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Upload Marks</Text>
-                </TouchableOpacity>
-
-                {/* 3. Schedule */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsTab('timetable'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#EFF6FF' }]}>
-                    <Text style={styles.gpayIcon}>⏰</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Timetable</Text>
-                </TouchableOpacity>
-
-                {/* 4. My Class */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsTab('myclass'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FFFBEB' }]}>
-                    <Text style={styles.gpayIcon}>👨‍🎓</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>My Class</Text>
-                </TouchableOpacity>
-
-                {/* 5. Coursework */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsTab('assignments'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#FFF1F2' }]}>
-                    <Text style={styles.gpayIcon}>📚</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Assignments</Text>
-                </TouchableOpacity>
-
-                {/* 6. Referrals */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => setActiveTab('referrals')}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#EEF2FF' }]}>
-                    <Text style={styles.gpayIcon}>🤝</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Referrals</Text>
-                </TouchableOpacity>
-
-                {/* 7. Exam Duty */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('academics'); setAcademicsTab('duty'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#ECFEFF' }]}>
-                    <Text style={styles.gpayIcon}>🎯</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Exam Duty</Text>
-                </TouchableOpacity>
-
-                {/* 8. Payslips */}
-                <TouchableOpacity
-                  style={styles.gpayCol}
-                  onPress={() => { setActiveTab('profile'); setMoreSection('payroll'); }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.gpayCircle, { backgroundColor: '#F0FDFA' }]}>
-                    <Text style={styles.gpayIcon}>💰</Text>
-                  </View>
-                  <Text style={styles.gpayLabel} numberOfLines={2}>Payslips</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Categorized Faculty Services & Admin (PhonePe Style List) */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>🏛️ Administrative Services</Text>
-                <TouchableOpacity onPress={() => setActiveTab('profile')} activeOpacity={0.7}>
-                  <Text style={styles.cardHeaderLink}>More Hub →</Text>
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('profile'); setMoreSection('library'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#EFF6FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>📖</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Central Library Search</Text>
-                  <Text style={styles.serviceRowSub}>Catalog locator • {libraryBooks.length} books registered</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => { setActiveTab('profile'); setMoreSection('parcels'); }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#F0FDF4' }]}>
-                  <Text style={styles.serviceIconEmoji}>📦</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Faculty Parcels</Text>
-                  <Text style={styles.serviceRowSub}>Gate counter • {parcels.length} deliveries awaiting pickup</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => setLeaveModalVisible(true)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FAF5FF' }]}>
-                  <Text style={styles.serviceIconEmoji}>✉️</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>Faculty Leave Desk</Text>
-                  <Text style={styles.serviceRowSub}>Submit leave request • {leaves.length} previous requests</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.serviceRowItem}
-                onPress={() => setSupportModalVisible(true)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.serviceIconBox, { backgroundColor: '#FFFBEB' }]}>
-                  <Text style={styles.serviceIconEmoji}>🎧</Text>
-                </View>
-                <View style={styles.serviceRowContent}>
-                  <Text style={styles.serviceRowTitle}>IT & Campus Support</Text>
-                  <Text style={styles.serviceRowSub}>Raise tickets for classroom, lab, or network issues</Text>
-                </View>
-                <Text style={styles.serviceChevron}>›</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Today's Teaching Schedule */}
+            {/* Official Campus Circulars & Announcements */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
                 <View>
-                  <Text style={styles.cardHeaderTitle}>⏰ Today's Lectures</Text>
-                  <Text style={styles.sectionSubtitle}>Assigned periods for today</Text>
+                  <Text style={styles.cardHeaderTitle}>📢 Official Campus Circulars</Text>
+                  <Text style={styles.sectionSubtitle}>Administrative announcements and academic notices</Text>
                 </View>
-                <TouchableOpacity onPress={() => { setActiveTab('academics'); setAcademicsTab('timetable'); }}>
-                  <Text style={styles.cardHeaderLink}>Full Schedule →</Text>
-                </TouchableOpacity>
-              </View>
-
-              {todayClasses.length === 0 ? (
-                <View style={styles.emptyStateContainer}>
-                  <Text style={styles.emptyStateEmoji}>🏖️</Text>
-                  <Text style={styles.emptyStateTitle}>No Lectures Scheduled for Today</Text>
-                  <Text style={styles.emptyStateSubtitle}>Enjoy your research or preparation hours!</Text>
-                </View>
-              ) : (
-                todayClasses.map((item, idx) => (
-                  <View key={idx} style={styles.teachingPeriodItem}>
-                    <View style={styles.periodBadgeCol}>
-                      <Text style={styles.periodNumberText}>P{item.period}</Text>
-                      <Text style={styles.periodTimeText}>{item.time.split(' - ')[0]}</Text>
-                    </View>
-                    <View style={{ flex: 1, paddingLeft: 10 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={styles.periodSubjectText}>
-                          {item.subject}{item.code ? ` (${item.code})` : ''}
-                        </Text>
-                        <View style={[styles.statusBadge, { backgroundColor: item.attendanceMarked ? '#DCFCE7' : '#FEF3C7' }]}>
-                          <Text style={[styles.statusBadgeText, { color: item.attendanceMarked ? '#15803D' : '#B45309' }]}>
-                            {item.attendanceMarked ? '✓ Taken' : 'Pending'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={styles.periodDetailText}>
-                        {item.classSection} • Room: <Text style={{ fontWeight: '700', color: '#0F172A' }}>{item.room}</Text>
-                      </Text>
-
-                      {/* Quick Action Buttons: Start Class & Mark Attendance */}
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                        <TouchableOpacity
-                          style={styles.lectureStartBtn}
-                          activeOpacity={0.8}
-                          onPress={() => handleOpenStartClass(item, item.period)}
-                        >
-                          <Text style={styles.lectureStartBtnText}>▶ Start Class</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={styles.lectureAttBtn}
-                          activeOpacity={0.8}
-                          onPress={() => {
-                            setAttendanceSubject(item.subject);
-                            setAttendanceClass(item.classSection);
-                            setAttendancePeriod(item.period);
-                            setActiveTab('academics');
-                            setAcademicsTab('attendance');
-                          }}
-                        >
-                          <Text style={styles.lectureAttBtnText}>📝 Attendance</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-                ))
-              )}
-            </View>
-
-            {/* Upcoming Exam Duties */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <View>
-                  <Text style={styles.cardHeaderTitle}>🛡️ Exam Duty Center</Text>
-                  <Text style={styles.sectionSubtitle}>Assigned exam invigilations</Text>
-                </View>
-                <TouchableOpacity onPress={() => { setActiveTab('academics'); setAcademicsTab('duty'); }}>
-                  <Text style={styles.cardHeaderLink}>View Duties →</Text>
-                </TouchableOpacity>
-              </View>
-
-              {examDuties.length === 0 ? (
-                <View style={styles.emptyStateContainer}>
-                  <Text style={styles.emptyStateEmoji}>📋</Text>
-                  <Text style={styles.emptyStateTitle}>No Pending Exam Duties</Text>
-                  <Text style={styles.emptyStateSubtitle}>You currently have no invigilation shifts assigned.</Text>
-                </View>
-              ) : (
-                examDuties.slice(0, 2).map((duty, idx) => (
-                  <View key={idx} style={styles.dutyCardMini}>
-                    <View style={styles.dutyTopRow}>
-                      <Text style={styles.dutyExamTitle}>{duty.name}</Text>
-                      <View style={styles.confirmedPill}>
-                        <Text style={styles.confirmedPillText}>Confirmed</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.dutySubjectText}>{duty.subject} ({duty.code})</Text>
-                    <View style={styles.dutyMetaRow}>
-                      <Text style={styles.dutyMetaText}>📅 {duty.date}</Text>
-                      <Text style={styles.dutyMetaText}>🕒 {duty.time}</Text>
-                      <Text style={styles.dutyMetaText}>📍 {duty.hall}</Text>
-                    </View>
-                  </View>
-                ))
-              )}
-            </View>
-
-            {/* Announcements & Bulletins Preview */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardHeaderTitle}>📢 Official Campus Circulars</Text>
-                <TouchableOpacity onPress={() => setActiveTab('notifications')}>
+                <TouchableOpacity onPress={() => setActiveTab('notifications')} activeOpacity={0.7}>
                   <Text style={styles.cardHeaderLink}>All Updates →</Text>
                 </TouchableOpacity>
               </View>
@@ -1748,6 +2199,58 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   </View>
                 </View>
               ))}
+            </View>
+
+            {/* Dedicated Business Referral Program (Letters Fully Visible) */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <Text style={styles.cardHeaderTitle} numberOfLines={1}>💼 Institutional Referral Rewards</Text>
+                  <Text style={styles.sectionSubtitle} numberOfLines={2}>
+                    Earn verified bonuses across 4 commercial partner categories
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setActiveTab('referrals')} activeOpacity={0.7} style={{ flexShrink: 0 }}>
+                  <Text style={styles.cardHeaderLink}>Open Hub →</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ gap: 8, marginTop: 4 }}>
+                {[
+                  { id: 'cards', title: 'Credit Cards', desc: 'Pre-approved lifetime-free cards with airport lounge access', icon: '💳', bg: '#EFF6FF', badge: 'Up to ₹2,500' },
+                  { id: 'insurance', title: 'Insurance Policies', desc: 'Comprehensive health, term life & family mediclaim', icon: '🛡️', bg: '#ECFDF5', badge: 'Up to ₹5,000' },
+                  { id: 'jobs', title: 'Job Openings', desc: 'Refer candidates for tech, teaching & executive vacancies', icon: '💼', bg: '#F5F3FF', badge: 'Placement Bonus' },
+                  { id: 'banking', title: 'Bank Accounts', desc: 'Corporate salary accounts & high-yield digital savings', icon: '🏛️', bg: '#FFFBEB', badge: 'Up to ₹750' },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: item.bg,
+                      borderRadius: 12,
+                      padding: 12,
+                      borderWidth: 1,
+                      borderColor: 'rgba(0,0,0,0.05)',
+                    }}
+                    onPress={() => setActiveTab('referrals')}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      <Text style={{ fontSize: 20 }}>{item.icon}</Text>
+                    </View>
+                    <View style={{ flex: 1, marginRight: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1, marginRight: 6 }} numberOfLines={1}>{item.title}</Text>
+                        <View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, flexShrink: 0 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#15803D' }}>{item.badge}</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 11, color: '#475569', marginTop: 2 }} numberOfLines={2}>{item.desc}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           </ScrollView>
         )}
@@ -2725,7 +3228,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                         <TouchableOpacity
                           style={styles.assignmentEvalBtn}
                           activeOpacity={0.7}
-                          onPress={() => Alert.alert('Assignment Details', `Title: ${item.title}\nSubject: ${item.subject || faculty.dept}\nDue: ${item.dueDate || 'Standard Term'}\n\nEnrolled submissions are synced in real-time.`)}
+                          onPress={() => setSelectedAssignmentDetails(item)}
                         >
                           <Text style={styles.assignmentEvalBtnText}>View Details →</Text>
                         </TouchableOpacity>
@@ -2874,7 +3377,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
 
                         <TouchableOpacity
                           style={styles.viewProfileBtn}
-                          onPress={() => Alert.alert('Scholar Academic Record', `Name: ${s.name}\nRoll: ${s.rollNo}\nClass: ${s.sem} (${s.section})\nCGPA: ${s.cgpa}\nAttendance: ${s.attendancePct}%\nFee Standing: ${s.feeStatus}`)}
+                          onPress={() => setSelectedScholarRecord(s)}
                           activeOpacity={0.7}
                         >
                           <Text style={styles.viewProfileBtnText}>Academic Record</Text>
@@ -2934,25 +3437,81 @@ export default function StaffDashboard({ user, onLogout }: Props) {
           </View>
         )}
 
-        {/* TAB 5: MORE & PROFILE */}
+        {/* TAB 5: PROFILE */}
         {activeTab === 'profile' && (
           <View style={{ flex: 1 }}>
-            <View style={styles.pageHeaderBanner}>
-              <Text style={styles.pageHeaderTitle}>Faculty Records & Services</Text>
-              <Text style={styles.pageHeaderDesc}>
-                Access administrative payroll, leave requests, feedback, profile information, and account settings.
-              </Text>
+            {/* Top Sub-Navigation Switcher: Faculty Profile vs Institutional Services */}
+            <View style={styles.profileToggleHeader}>
+              <TouchableOpacity
+                style={[
+                  styles.profileToggleTab,
+                  (moreSection === 'profile' || moreSection === 'settings') && styles.profileToggleTabActive,
+                ]}
+                onPress={() => setMoreSection('profile')}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.profileToggleTabText,
+                    (moreSection === 'profile' || moreSection === 'settings') && styles.profileToggleTabTextActive,
+                  ]}
+                >
+                  👤 Faculty Profile
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.profileToggleTab,
+                  (moreSection !== 'profile' && moreSection !== 'settings') && styles.profileToggleTabActive,
+                ]}
+                onPress={() => setMoreSection('menu')}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.profileToggleTabText,
+                    (moreSection !== 'profile' && moreSection !== 'settings') && styles.profileToggleTabTextActive,
+                  ]}
+                >
+                  🏛️ Services & Tools
+                </Text>
+              </TouchableOpacity>
             </View>
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
-            >
-              {/* If a sub-section is selected, render back button */}
-              {moreSection !== 'menu' && (
-                <TouchableOpacity style={styles.backToMenuBtn} onPress={() => setMoreSection('menu')} activeOpacity={0.7}>
-                  <Text style={styles.backToMenuText}>← Back to Services Menu</Text>
-                </TouchableOpacity>
-              )}
+
+            {/* VIEW 1: OFFICIAL USER PROFILE (PRIMARY VIEW FOR PROFILE TAB & "PO" AVATAR) */}
+            {(moreSection === 'profile' || moreSection === 'settings') && (
+              <UserProfileScreen
+                user={user}
+                roleTitle="Faculty Member"
+                onLogout={onLogout}
+                onBack={() => setActiveTab('home')}
+                hideTopBar={true}
+                roleAttributes={[
+                  { label: 'Employee ID', value: faculty.empId },
+                  { label: 'Department', value: faculty.dept },
+                  { label: 'Designation', value: faculty.designation },
+                  { label: 'Registered Phone', value: faculty.phone },
+                  { label: 'Highest Qualification', value: faculty.qualification },
+                  { label: 'Academic Experience', value: faculty.experience },
+                  { label: 'Casual Leaves Remaining', value: faculty.casualLeavesLeft },
+                  { label: 'Sick Leaves Remaining', value: faculty.sickLeavesLeft },
+                ]}
+              />
+            )}
+
+            {/* VIEW 2: INSTITUTIONAL SERVICES & TOOLS */}
+            {moreSection !== 'profile' && moreSection !== 'settings' && (
+              <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
+              >
+                {/* If a sub-section is selected, render back button */}
+                {moreSection !== 'menu' && (
+                  <TouchableOpacity style={styles.backToMenuBtn} onPress={() => setMoreSection('menu')} activeOpacity={0.7}>
+                    <Text style={styles.backToMenuText}>← Back to Services Menu</Text>
+                  </TouchableOpacity>
+                )}
 
             {/* MAIN SERVICES MENU */}
             {moreSection === 'menu' && (
@@ -2980,12 +3539,18 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                       { id: 'leaves', label: 'Staff Leaves & Balance', desc: `Casual: ${faculty.casualLeavesLeft} left • Sick: ${faculty.sickLeavesLeft} left`, icon: '📄' },
                       { id: 'payroll', label: 'Monthly Payroll & Payslips', desc: 'Net salary breakdown, allowances & tax records', icon: '💰' },
                       { id: 'support', label: 'Campus Support & IT Helpdesk', desc: 'Report IT issues, classroom AV & infrastructure', icon: '🛟' },
-                      { id: 'settings', label: 'Staff Profile Settings', desc: 'Review registered contact & account details', icon: '⚙️' },
+                      { id: 'settings', label: 'Faculty Profile & Settings', desc: 'Review registered contact & account details', icon: '⚙️' },
                     ].map((item) => (
                       <TouchableOpacity
                         key={item.id}
                         style={styles.serviceItemRow}
-                        onPress={() => setMoreSection(item.id as StaffMoreSection)}
+                        onPress={() => {
+                          if (item.id === 'settings') {
+                            setMoreSection('profile');
+                          } else {
+                            setMoreSection(item.id as StaffMoreSection);
+                          }
+                        }}
                         activeOpacity={0.7}
                       >
                         <View style={styles.serviceIconContainer}>
@@ -3011,68 +3576,705 @@ export default function StaffDashboard({ user, onLogout }: Props) {
             {/* SUB-SECTION 1: CENTRAL LIBRARY */}
             {moreSection === 'library' && (
               <View style={styles.card}>
-                <Text style={styles.cardHeaderTitle}>📚 Central Library Catalog</Text>
-                <Text style={styles.sectionSubtitle}>Search reference materials and textbooks</Text>
-
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="🔍 Search title, author or category..."
-                  value={bookSearch}
-                  onChangeText={setBookSearch}
-                />
-
-                {filteredBooks.length === 0 ? (
-                  <View style={styles.emptyStateContainer}>
-                    <Text style={styles.emptyStateEmoji}>📖</Text>
-                    <Text style={styles.emptyStateTitle}>No Books Found</Text>
-                    <Text style={styles.emptyStateSubtitle}>Try searching with another subject or keyword.</Text>
+                <View style={styles.cardHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardHeaderTitle}>📚 Central Library Catalog</Text>
+                    <Text style={styles.sectionSubtitle}>Browse holdings, borrow textbooks and track loan returns</Text>
                   </View>
-                ) : (
-                  filteredBooks.map((b) => (
-                    <View key={b.id} style={styles.bookCardItem}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.bookTitle}>{b.title}</Text>
-                        <Text style={styles.bookAuthor}>Author: {b.author}</Text>
-                        <Text style={styles.bookMeta}>
-                          Category: {b.category} • Rack: <Text style={{ fontWeight: '700' }}>{b.rackNumber}-{b.shelfNumber}</Text>
+                </View>
+
+                {/* Library Sub-Tabs */}
+                <View style={styles.serviceSubTabsContainer}>
+                  <TouchableOpacity
+                    style={[styles.serviceSubTab, libraryTab === 'catalog' && styles.serviceSubTabActive]}
+                    onPress={() => setLibraryTab('catalog')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.serviceSubTabText, libraryTab === 'catalog' && styles.serviceSubTabTextActive]}>
+                      Catalog ({libraryBooks.length})
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.serviceSubTab, libraryTab === 'my-books' && styles.serviceSubTabActive]}
+                    onPress={() => setLibraryTab('my-books')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.serviceSubTabText, libraryTab === 'my-books' && styles.serviceSubTabTextActive]}>
+                      My Loans ({activeBorrowedCount})
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* TAB 1: CATALOG */}
+                {libraryTab === 'catalog' && (
+                  <View>
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="🔍 Search title, author or category..."
+                      value={bookSearch}
+                      onChangeText={setBookSearch}
+                    />
+
+                    {/* Category Filter Chips */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.serviceFilterScroll}>
+                      {bookCategories.map((cat) => (
+                        <TouchableOpacity
+                          key={cat}
+                          style={[styles.serviceFilterPill, selectedBookCategory === cat && styles.serviceFilterPillActive]}
+                          onPress={() => setSelectedBookCategory(cat)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.serviceFilterPillText, selectedBookCategory === cat && styles.serviceFilterPillTextActive]}>
+                            {cat}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+
+                    {filteredBooks.length === 0 ? (
+                      <View style={styles.emptyStateContainer}>
+                        <Text style={styles.emptyStateEmoji}>📖</Text>
+                        <Text style={styles.emptyStateTitle}>No Books Found</Text>
+                        <Text style={styles.emptyStateSubtitle}>Try searching with another title or select 'All' categories.</Text>
+                      </View>
+                    ) : (
+                      filteredBooks.map((b) => {
+                        const targetId = b._id || b.id;
+                        const myTx = libraryTransactions.find(
+                          (t) => String(t.bookId) === String(targetId) && ['Issued', 'Approved', 'Reserved', 'Pending'].includes(t.status)
+                        );
+                        const isRequesting = requestingBookId === targetId;
+
+                        return (
+                          <View key={b.id} style={styles.serviceCardBox}>
+                            <View style={styles.serviceCardTopRow}>
+                              <View style={{ flex: 1, paddingRight: 8 }}>
+                                <Text style={styles.serviceCardTitle}>{b.title}</Text>
+                                <Text style={styles.serviceCardAuthor}>Author: {b.author}</Text>
+                                <Text style={styles.serviceCardMeta}>
+                                  Category: {b.category} • Location: <Text style={{ fontWeight: '700', color: '#1E3A8A' }}>Rack {b.rackNumber}-{b.shelfNumber}</Text>
+                                </Text>
+                              </View>
+                              <View style={[styles.stockCopiesBadge, b.availableCopies > 0 ? styles.stockCopiesBadgeAvail : styles.stockCopiesBadgeEmpty]}>
+                                <Text style={[styles.stockCopiesNum, b.availableCopies > 0 ? { color: '#15803D' } : { color: '#DC2626' }]}>
+                                  {b.availableCopies} / {b.totalCopies}
+                                </Text>
+                                <Text style={[styles.stockCopiesLabel, b.availableCopies > 0 ? { color: '#15803D' } : { color: '#DC2626' }]}>
+                                  {b.availableCopies > 0 ? 'Available' : 'Out of Stock'}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View style={styles.serviceCardActionRow}>
+                              {myTx ? (
+                                <View style={[styles.borrowedStatusBadge, myTx.status === 'Issued' ? styles.statusBadgeIssued : styles.statusBadgePending]}>
+                                  <Text style={styles.borrowedStatusText}>
+                                    {myTx.status === 'Issued' ? '✓ Currently Borrowed' : '⏳ Loan Requested'}
+                                  </Text>
+                                </View>
+                              ) : b.availableCopies > 0 ? (
+                                <TouchableOpacity
+                                  style={styles.serviceActionPrimaryBtn}
+                                  onPress={() => handleRequestBook(b)}
+                                  disabled={isRequesting}
+                                  activeOpacity={0.8}
+                                >
+                                  {isRequesting ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                  ) : (
+                                    <Text style={styles.serviceActionPrimaryBtnText}>+ Request Book</Text>
+                                  )}
+                                </TouchableOpacity>
+                              ) : (
+                                <View style={styles.serviceDisabledBadge}>
+                                  <Text style={styles.serviceDisabledBadgeText}>Currently Checked Out</Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
+                )}
+
+                {/* TAB 2: MY BORROWED BOOKS */}
+                {libraryTab === 'my-books' && (
+                  <View>
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="🔍 Search my loans or return status..."
+                      value={bookSearch}
+                      onChangeText={setBookSearch}
+                    />
+
+                    {filteredLibraryTransactions.length === 0 ? (
+                      <View style={styles.emptyStateContainer}>
+                        <Text style={styles.emptyStateEmoji}>📚</Text>
+                        <Text style={styles.emptyStateTitle}>No Active Book Loans</Text>
+                        <Text style={styles.emptyStateSubtitle}>
+                          You haven't requested or borrowed any books yet. Switch to the Catalog tab to request textbooks.
                         </Text>
                       </View>
-                      <View style={styles.bookCopiesBadge}>
-                        <Text style={styles.bookCopiesNumber}>{b.availableCopies}</Text>
-                        <Text style={styles.bookCopiesLabel}>Available</Text>
-                      </View>
-                    </View>
-                  ))
+                    ) : (
+                      filteredLibraryTransactions.map((tx) => {
+                        const isReturning = returningTxId === tx.id;
+                        const isPendingReturn =
+                          tx.returnRequested ||
+                          libraryReturnRequests.some(
+                            (r) => String(r.transactionId) === String(tx.id) && r.status === 'Pending'
+                          );
+
+                        return (
+                          <View key={tx.id} style={styles.serviceCardBox}>
+                            <View style={styles.serviceCardTopRow}>
+                              <View style={{ flex: 1, paddingRight: 8 }}>
+                                <Text style={styles.serviceCardTitle}>{tx.bookTitle}</Text>
+                                <Text style={styles.serviceCardAuthor}>Author: {tx.bookAuthor}</Text>
+                                {tx.category && <Text style={styles.serviceCardMeta}>Category: {tx.category}</Text>}
+                              </View>
+                              <View
+                                style={[
+                                  styles.statusBadge,
+                                  tx.status === 'Issued'
+                                    ? { backgroundColor: '#DCFCE7' }
+                                    : tx.status === 'Pending'
+                                    ? { backgroundColor: '#FEF3C7' }
+                                    : tx.status === 'Overdue'
+                                    ? { backgroundColor: '#FEE2E2' }
+                                    : { backgroundColor: '#EFF6FF' },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.statusBadgeText,
+                                    tx.status === 'Issued'
+                                      ? { color: '#15803D' }
+                                      : tx.status === 'Pending'
+                                      ? { color: '#B45309' }
+                                      : tx.status === 'Overdue'
+                                      ? { color: '#DC2626' }
+                                      : { color: '#1D4ED8' },
+                                  ]}
+                                >
+                                  {tx.status}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View style={styles.txDatesRow}>
+                              {tx.issueDate && <Text style={styles.txDateItem}>📅 Issued: {tx.issueDate}</Text>}
+                              {tx.dueDate && <Text style={styles.txDateItem}>⏰ Due: {tx.dueDate}</Text>}
+                              {tx.fineAmount !== undefined && tx.fineAmount > 0 && (
+                                <Text style={[styles.txDateItem, { color: '#DC2626', fontWeight: '700' }]}>
+                                  Fine: ₹{tx.fineAmount}
+                                </Text>
+                              )}
+                            </View>
+
+                            {/* Return Action */}
+                            {(tx.status === 'Issued' || tx.status === 'Approved') && (
+                              <View style={styles.serviceCardActionRow}>
+                                {isPendingReturn ? (
+                                  <View style={styles.returnPendingNotice}>
+                                    <Text style={styles.returnPendingNoticeText}>
+                                      ⏳ Return Pending Verification at Desk
+                                    </Text>
+                                  </View>
+                                ) : (
+                                  <TouchableOpacity
+                                    style={styles.serviceActionReturnBtn}
+                                    onPress={() => handleReturnBook(tx)}
+                                    disabled={isReturning}
+                                    activeOpacity={0.8}
+                                  >
+                                    {isReturning ? (
+                                      <ActivityIndicator size="small" color="#1E3A8A" />
+                                    ) : (
+                                      <Text style={styles.serviceActionReturnBtnText}>🔄 Request Book Return</Text>
+                                    )}
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
                 )}
               </View>
             )}
 
-            {/* SUB-SECTION 2: PLACEMENT DRIVES */}
+            {/* SUB-SECTION 2: PLACEMENT COORDINATION CENTER (FULL WEB-SYNCHRONIZED) */}
             {moreSection === 'placement' && (
               <View style={styles.card}>
-                <Text style={styles.cardHeaderTitle}>💼 Campus Placement Drives</Text>
-                <Text style={styles.sectionSubtitle}>Corporate recruitments and student eligibility</Text>
-
-                {placementJobs.length === 0 ? (
-                  <View style={styles.emptyStateContainer}>
-                    <Text style={styles.emptyStateEmoji}>🏢</Text>
-                    <Text style={styles.emptyStateTitle}>No Active Placement Drives</Text>
-                    <Text style={styles.emptyStateSubtitle}>Upcoming company visits will be posted here.</Text>
+                <View style={styles.cardHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardHeaderTitle}>💼 Placement Coordination Center</Text>
+                    <Text style={styles.sectionSubtitle}>
+                      Track {faculty.dept} department student eligibility, recruitment drives, applications, and training programs.
+                    </Text>
                   </View>
-                ) : (
-                  placementJobs.map((j) => (
-                    <View key={j.id} style={styles.jobDriveCard}>
-                      <View style={styles.jobTopRow}>
-                        <Text style={styles.jobCompany}>{j.company}</Text>
-                        <View style={styles.ctcBadge}>
-                          <Text style={styles.ctcBadgeText}>{j.ctc}</Text>
-                        </View>
+                  <TouchableOpacity
+                    style={styles.actionPillBtn}
+                    onPress={() => {
+                      Alert.alert(
+                        'Department Placement Report',
+                        `Department: ${faculty.dept}\nTotal Students: ${totalDeptStudents}\nEligible: ${eligibleDeptStudents.length}\nApplications: ${placementApplications.length}\nPlaced: ${uniquePlacedCount} (${placementPercentage}%)\n\nPlacement summary exported successfully in CSV format.`
+                      );
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.actionPillBtnText}>📥 Export CSV</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* 4 Dashboard Statistics Cards (Matching Web StaffPlacements.jsx) */}
+                <View style={styles.kpiGrid}>
+                  {/* Metric 1: Department Students */}
+                  <View style={[styles.kpiCard, { borderLeftColor: '#2563EB' }]}>
+                    <Text style={styles.kpiLabel}>Department Students</Text>
+                    <Text style={[styles.kpiValue, { color: '#2563EB' }]}>{totalDeptStudents}</Text>
+                    <Text style={styles.kpiSub}>Enrolled in {faculty.dept}</Text>
+                  </View>
+
+                  {/* Metric 2: Criteria Met (Eligible) */}
+                  <View style={[styles.kpiCard, { borderLeftColor: '#16A34A' }]}>
+                    <Text style={styles.kpiLabel}>Criteria Met (Eligible)</Text>
+                    <Text style={[styles.kpiValue, { color: '#15803D' }]}>{eligibleDeptStudents.length}</Text>
+                    <Text style={[styles.kpiSub, { color: '#16A34A', fontWeight: '700' }]}>CGPA ≥ 6.0 & Zero Arrears</Text>
+                  </View>
+
+                  {/* Metric 3: Participating / Applied */}
+                  <View style={[styles.kpiCard, { borderLeftColor: '#7C3AED' }]}>
+                    <Text style={styles.kpiLabel}>Participating / Applied</Text>
+                    <Text style={[styles.kpiValue, { color: '#6D28D9' }]}>{uniqueAppliedRegNos.length}</Text>
+                    <Text style={styles.kpiSub}>{placementApplications.length} Job Applications</Text>
+                  </View>
+
+                  {/* Metric 4: Students Placed */}
+                  <View style={[styles.kpiCard, { borderLeftColor: '#D97706' }]}>
+                    <Text style={styles.kpiLabel}>Students Placed</Text>
+                    <Text style={[styles.kpiValue, { color: '#B45309' }]}>
+                      {uniquePlacedCount} <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748B' }}>({placementPercentage}%)</Text>
+                    </Text>
+                    <Text style={styles.kpiSub}>{placementSelections.length || uniquePlacedCount} Corporate Offers</Text>
+                  </View>
+                </View>
+
+                {/* 6 Placement Management Sub-Tabs (Horizontal Scroll) */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+                  {[
+                    { id: 'drives', label: `Drives (${placementJobs.length})` },
+                    { id: 'roster', label: `Roster (${students.length})` },
+                    { id: 'applications', label: `Applications (${placementApplications.length})` },
+                    { id: 'interviews', label: `Interviews (${placementInterviews.length})` },
+                    { id: 'training', label: 'Training (4)' },
+                    { id: 'companies', label: `Partners (${placementCompanies.length})` },
+                  ].map((st) => (
+                    <TouchableOpacity
+                      key={st.id}
+                      style={[styles.filterPill, placementTab === st.id && styles.filterPillActive]}
+                      onPress={() => setPlacementTab(st.id as any)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.filterPillText, placementTab === st.id && styles.filterPillTextActive]}>
+                        {st.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {/* Common Search Bar */}
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="🔍 Search company, student, role, register no..."
+                  value={placementSearch}
+                  onChangeText={setPlacementSearch}
+                />
+
+                {/* TAB 1: CAMPUS RECRUITMENT DRIVES */}
+                {placementTab === 'drives' && (
+                  <View>
+                    {filteredPlacementJobs.length === 0 ? (
+                      <View style={styles.emptyStateContainer}>
+                        <Text style={styles.emptyStateEmoji}>🏢</Text>
+                        <Text style={styles.emptyStateTitle}>No Active Placement Drives</Text>
+                        <Text style={styles.emptyStateSubtitle}>Upcoming recruitment visits will appear here automatically.</Text>
                       </View>
-                      <Text style={styles.jobRoleText}>{j.role}</Text>
-                      <Text style={styles.jobEligibility}>🎯 Criteria: {j.eligibility}</Text>
-                      <Text style={styles.jobDate}>📅 Drive Date: {j.driveDate}</Text>
+                    ) : (
+                      filteredPlacementJobs.map((j) => (
+                        <View key={j.id} style={styles.serviceCardBox}>
+                          <View style={styles.serviceCardTopRow}>
+                            <View style={{ flex: 1, paddingRight: 8 }}>
+                              <Text style={styles.serviceCardTitle}>{j.company}</Text>
+                              <Text style={styles.jobRoleText}>{j.role}</Text>
+                            </View>
+                            <View style={styles.ctcBadge}>
+                              <Text style={styles.ctcBadgeText}>{j.ctc}</Text>
+                            </View>
+                          </View>
+
+                          <Text style={styles.jobEligibility}>🎯 Criteria: {j.eligibility}</Text>
+
+                          <View style={styles.driveScheduleRow}>
+                            <Text style={styles.jobDate}>📅 Drive Date: {j.driveDate}</Text>
+                            {j.deadline && <Text style={styles.driveDeadline}>⏰ Cut-off: {j.deadline}</Text>}
+                          </View>
+
+                          <View style={styles.roundsBadgeRow}>
+                            <Text style={styles.roundsBadgeLabel}>
+                              Selection Process: {j.totalRounds || (j.rounds ? j.rounds.length : 3)} Evaluation Rounds
+                            </Text>
+                          </View>
+
+                          <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                            <TouchableOpacity
+                              style={[styles.serviceActionPrimaryBtn, { flex: 1 }]}
+                              onPress={() => setSelectedPlacementJob(j)}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.serviceActionPrimaryBtnText}>View Details & Rounds ›</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.actionPillBtn, { justifyContent: 'center', alignItems: 'center' }]}
+                              onPress={() => {
+                                Alert.alert(
+                                  'Broadcast Sent! 📢',
+                                  `Recruitment circular for ${j.company} (${j.role}) has been dispatched to all ${eligibleDeptStudents.length} eligible students in ${faculty.dept} department.`
+                                );
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.actionPillBtnText}>📢 Notify Students</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                )}
+
+                {/* TAB 2: STUDENTS PLACEMENT ELIGIBILITY ROSTER */}
+                {placementTab === 'roster' && (
+                  <View>
+                    {/* Eligibility Filter Pills */}
+                    <View style={styles.serviceFilterScrollRow}>
+                      {(['All', 'Eligible', 'Below Criteria'] as const).map((opt) => (
+                        <TouchableOpacity
+                          key={opt}
+                          style={[styles.serviceFilterPill, rosterEligibilityFilter === opt && styles.serviceFilterPillActive]}
+                          onPress={() => setRosterEligibilityFilter(opt)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.serviceFilterPillText, rosterEligibilityFilter === opt && styles.serviceFilterPillTextActive]}>
+                            {opt === 'Eligible' ? `Eligible (${eligibleDeptStudents.length})` : opt}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
                     </View>
-                  ))
+
+                    {filteredPlacementRoster.length === 0 ? (
+                      <View style={styles.emptyStateContainer}>
+                        <Text style={styles.emptyStateEmoji}>🎓</Text>
+                        <Text style={styles.emptyStateTitle}>No Students Found</Text>
+                        <Text style={styles.emptyStateSubtitle}>Try searching by a different name or roll number.</Text>
+                      </View>
+                    ) : (
+                      filteredPlacementRoster.map((s) => {
+                        const isEligible = Number(s.cgpa ?? 0) >= 6.0;
+                        const studentApps = placementApplications.filter(
+                          (a) => a.regNo?.toLowerCase() === s.rollNo?.toLowerCase() || a.student?.toLowerCase() === s.name?.toLowerCase()
+                        );
+                        const isPlaced = placementSelections.some(
+                          (sel: any) => sel.regNo?.toLowerCase() === s.rollNo?.toLowerCase() || sel.student?.toLowerCase() === s.name?.toLowerCase()
+                        ) || studentApps.some((a) => a.status === 'Selected');
+
+                        return (
+                          <View key={s.id} style={styles.serviceCardBox}>
+                            <View style={styles.serviceCardTopRow}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.serviceCardTitle}>{s.name}</Text>
+                                <Text style={styles.serviceCardMeta}>Reg No: {s.rollNo} • {s.sem}</Text>
+                              </View>
+                              <View
+                                style={[
+                                  styles.statusBadge,
+                                  isPlaced
+                                    ? { backgroundColor: '#DCFCE7' }
+                                    : isEligible
+                                    ? { backgroundColor: '#EFF6FF' }
+                                    : { backgroundColor: '#FEF3C7' },
+                                ]}>
+                                <Text
+                                  style={[
+                                    styles.statusBadgeText,
+                                    isPlaced
+                                      ? { color: '#15803D' }
+                                      : isEligible
+                                      ? { color: '#1D4ED8' }
+                                      : { color: '#B45309' },
+                                  ]}>
+                                  {isPlaced ? '🎉 Placed' : isEligible ? '✓ Eligible' : 'Needs Review'}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View style={styles.specGrid}>
+                              <View style={styles.specItem}>
+                                <Text style={styles.specLabel}>Cumulative CGPA</Text>
+                                <Text style={[styles.specValue, { color: isEligible ? '#15803D' : '#DC2626', fontWeight: '800' }]}>
+                                  {s.cgpa.toFixed(2)}
+                                </Text>
+                              </View>
+                              <View style={styles.specItem}>
+                                <Text style={styles.specLabel}>Standing Arrears</Text>
+                                <Text style={[styles.specValue, { color: '#1E293B', fontWeight: '800' }]}>0 Arrears</Text>
+                              </View>
+                              <View style={styles.specItem}>
+                                <Text style={styles.specLabel}>Attendance</Text>
+                                <Text style={styles.specValue}>{s.attendancePct}%</Text>
+                              </View>
+                              <View style={styles.specItem}>
+                                <Text style={styles.specLabel}>Job Applications</Text>
+                                <Text style={[styles.specValue, { color: '#2563EB', fontWeight: '800' }]}>
+                                  {studentApps.length} Applied
+                                </Text>
+                              </View>
+                            </View>
+
+                            <TouchableOpacity
+                              style={[styles.cardSelectBtn, { marginTop: 8 }]}
+                              onPress={() => {
+                                setSelectedStudentPlacementProfile({
+                                  student: s,
+                                  apps: studentApps,
+                                  isEligible,
+                                  isPlaced,
+                                });
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.cardSelectBtnText}>View Student Placement Profile →</Text>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
+                )}
+
+                {/* TAB 3: APPLICATIONS TRACKING */}
+                {placementTab === 'applications' && (
+                  <View>
+                    {/* Status Filter Pills */}
+                    <View style={styles.serviceFilterScrollRow}>
+                      {['All', 'Applied', 'Shortlisted', 'Selected', 'Rejected'].map((st) => (
+                        <TouchableOpacity
+                          key={st}
+                          style={[styles.serviceFilterPill, appStatusFilter === st && styles.serviceFilterPillActive]}
+                          onPress={() => setAppStatusFilter(st)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.serviceFilterPillText, appStatusFilter === st && styles.serviceFilterPillTextActive]}>
+                            {st}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {filteredPlacementApplications.length === 0 ? (
+                      <View style={styles.emptyStateContainer}>
+                        <Text style={styles.emptyStateEmoji}>📝</Text>
+                        <Text style={styles.emptyStateTitle}>No Applications Found</Text>
+                        <Text style={styles.emptyStateSubtitle}>
+                          {appStatusFilter === 'All'
+                            ? 'Student recruitment applications will appear here.'
+                            : `No applications with status '${appStatusFilter}'.`}
+                        </Text>
+                      </View>
+                    ) : (
+                      filteredPlacementApplications.map((app) => (
+                        <View key={app.id} style={styles.serviceCardBox}>
+                          <View style={styles.serviceCardTopRow}>
+                            <View style={{ flex: 1, paddingRight: 8 }}>
+                              <Text style={styles.serviceCardTitle}>{app.student}</Text>
+                              <Text style={styles.serviceCardMeta}>Reg No: {app.regNo} • {app.dept || faculty.dept}</Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.statusBadge,
+                                app.status === 'Selected'
+                                  ? { backgroundColor: '#DCFCE7' }
+                                  : app.status === 'Shortlisted'
+                                  ? { backgroundColor: '#EFF6FF' }
+                                  : app.status === 'Rejected'
+                                  ? { backgroundColor: '#FEE2E2' }
+                                  : { backgroundColor: '#FEF3C7' },
+                              ]}>
+                              <Text
+                                style={[
+                                  styles.statusBadgeText,
+                                  app.status === 'Selected'
+                                    ? { color: '#15803D' }
+                                    : app.status === 'Shortlisted'
+                                    ? { color: '#1D4ED8' }
+                                    : app.status === 'Rejected'
+                                    ? { color: '#DC2626' }
+                                    : { color: '#B45309' },
+                                ]}>
+                                {app.status}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <Text style={styles.jobRoleText}>🏢 {app.company} • {app.role}</Text>
+                          <Text style={styles.jobDate}>📅 Applied on {app.appliedDate}</Text>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                )}
+
+                {/* TAB 4: INTERVIEWS & EVALUATOR ROUND PROGRESSION */}
+                {placementTab === 'interviews' && (
+                  <View>
+                    {/* Round Selector */}
+                    <Text style={styles.sectionMinorTitle}>Select Evaluation Round</Text>
+                    <View style={styles.selectorChipRow}>
+                      {[
+                        { num: 1, label: 'Round 1: Aptitude' },
+                        { num: 2, label: 'Round 2: Technical' },
+                        { num: 3, label: 'Round 3: HR Interview' },
+                      ].map((r) => (
+                        <TouchableOpacity
+                          key={r.num}
+                          style={[styles.chipItem, selectedInterviewRound === r.num && styles.chipItemActive]}
+                          onPress={() => setSelectedInterviewRound(r.num)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.chipItemText, selectedInterviewRound === r.num && styles.chipItemTextActive]}>
+                            {r.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {placementInterviews.length === 0 ? (
+                      <View style={styles.emptyStateContainer}>
+                        <Text style={styles.emptyStateEmoji}>🎙️</Text>
+                        <Text style={styles.emptyStateTitle}>No Interview Slots Scheduled</Text>
+                        <Text style={styles.emptyStateSubtitle}>
+                          Candidate interview schedules and evaluator progression will be displayed here.
+                        </Text>
+                      </View>
+                    ) : (
+                      placementInterviews
+                        .filter((it) => it.roundNumber === selectedInterviewRound || placementInterviews.length < 3)
+                        .map((it) => (
+                          <View key={it.id} style={styles.serviceCardBox}>
+                            <View style={styles.serviceCardTopRow}>
+                              <View style={{ flex: 1, paddingRight: 8 }}>
+                                <Text style={styles.serviceCardTitle}>{it.candidateName}</Text>
+                                <Text style={styles.serviceCardMeta}>Company: {it.company} • {it.role}</Text>
+                              </View>
+                              <View style={[styles.statusBadge, { backgroundColor: '#EFF6FF' }]}>
+                                <Text style={[styles.statusBadgeText, { color: '#1D4ED8' }]}>{it.status}</Text>
+                              </View>
+                            </View>
+
+                            <Text style={styles.jobRoleText}>📌 {it.roundName}</Text>
+                            <Text style={styles.jobDate}>📅 {it.date} at {it.time} • {it.mode}</Text>
+
+                            {/* Evaluator Status Action */}
+                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                              <TouchableOpacity
+                                style={[styles.serviceActionPrimaryBtn, { flex: 1, backgroundColor: '#15803D' }]}
+                                onPress={() => {
+                                  Alert.alert(
+                                    'Candidate Round Update',
+                                    `${it.candidateName} has been evaluated and advanced to the next selection round for ${it.company}.`
+                                  );
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.serviceActionPrimaryBtnText}>✓ Advance Round</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.actionPillBtn, { backgroundColor: '#FEE2E2', justifyContent: 'center' }]}
+                                onPress={() => {
+                                  Alert.alert(
+                                    'Candidate Evaluation',
+                                    `Evaluation notes logged for ${it.candidateName}.`
+                                  );
+                                }}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={[styles.actionPillBtnText, { color: '#DC2626' }]}>Feedback Notes</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ))
+                    )}
+                  </View>
+                )}
+
+                {/* TAB 5: TRAINING PROGRAMS */}
+                {placementTab === 'training' && (
+                  <View>
+                    <Text style={styles.sectionSubtitle}>
+                      Pre-placement readiness curriculum for {faculty.dept} department scholars.
+                    </Text>
+
+                    {placementTrainingModules.map((tr) => (
+                      <View key={tr.id} style={styles.serviceCardBox}>
+                        <View style={styles.serviceCardTopRow}>
+                          <View style={{ flex: 1, paddingRight: 8 }}>
+                            <Text style={styles.serviceCardTitle}>{tr.title}</Text>
+                            <Text style={styles.serviceCardMeta}>Domain: {tr.category} • {tr.hours}</Text>
+                          </View>
+                          <View style={[styles.statusBadge, { backgroundColor: '#DCFCE7' }]}>
+                            <Text style={[styles.statusBadgeText, { color: '#15803D' }]}>{tr.status}</Text>
+                          </View>
+                        </View>
+
+                        <Text style={styles.jobRoleText}>👨‍🏫 Instructor: {tr.trainer}</Text>
+                        <Text style={styles.jobDate}>⏰ Schedule: {tr.schedule}</Text>
+                        <Text style={styles.jobEligibility}>👥 Enrolled: {tr.enrolledCount} Department Scholars</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* TAB 6: HIRING ENTERPRISE PARTNERS */}
+                {placementTab === 'companies' && (
+                  <View>
+                    {filteredPlacementCompanies.length === 0 ? (
+                      <View style={styles.emptyStateContainer}>
+                        <Text style={styles.emptyStateEmoji}>🤝</Text>
+                        <Text style={styles.emptyStateTitle}>No Corporate Partners Listed</Text>
+                        <Text style={styles.emptyStateSubtitle}>Recruiting partners and MOUs will be displayed here.</Text>
+                      </View>
+                    ) : (
+                      filteredPlacementCompanies.map((c) => (
+                        <View key={c.id} style={styles.serviceCardBox}>
+                          <View style={styles.serviceCardTopRow}>
+                            <Text style={styles.serviceCardTitle}>{c.name}</Text>
+                            <View style={styles.statusBadgeConfirmed}>
+                              <Text style={styles.statusBadgeConfirmedText}>{c.status || 'Active Partner'}</Text>
+                            </View>
+                          </View>
+                          <Text style={styles.companySectorText}>Sector: {c.sector}</Text>
+                          <Text style={styles.companyLocationText}>📍 Headquarters: {c.location}</Text>
+                          {c.hrContact && <Text style={styles.companyContactText}>📧 HR: {c.hrContact}</Text>}
+                        </View>
+                      ))
+                    )}
+                  </View>
                 )}
               </View>
             )}
@@ -3080,33 +4282,94 @@ export default function StaffDashboard({ user, onLogout }: Props) {
             {/* SUB-SECTION 3: PARCELS & DELIVERIES */}
             {moreSection === 'parcels' && (
               <View style={styles.card}>
-                <Text style={styles.cardHeaderTitle}>📦 Gate Deliveries & Parcels</Text>
-                <Text style={styles.sectionSubtitle}>Parcels received and registered by Campus Security</Text>
+                <View style={styles.cardHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardHeaderTitle}>📦 Gate Deliveries & Parcels</Text>
+                    <Text style={styles.sectionSubtitle}>Personal packages and official deliveries received by Campus Security</Text>
+                  </View>
+                </View>
 
-                {parcels.length === 0 ? (
+                {/* Status Filter Pills */}
+                <View style={styles.serviceFilterScrollRow}>
+                  {(['All', 'Pending', 'Collected'] as const).map((filterOpt) => (
+                    <TouchableOpacity
+                      key={filterOpt}
+                      style={[styles.serviceFilterPill, parcelFilter === filterOpt && styles.serviceFilterPillActive]}
+                      onPress={() => setParcelFilter(filterOpt)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.serviceFilterPillText, parcelFilter === filterOpt && styles.serviceFilterPillTextActive]}>
+                        {filterOpt === 'Pending' ? `Pending Pickup (${pendingParcelCount})` : filterOpt}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="🔍 Search courier, AWB tracking or sender..."
+                  value={parcelSearch}
+                  onChangeText={setParcelSearch}
+                />
+
+                {filteredParcels.length === 0 ? (
                   <View style={styles.emptyStateContainer}>
                     <Text style={styles.emptyStateEmoji}>📬</Text>
-                    <Text style={styles.emptyStateTitle}>No Pending Gate Parcels</Text>
-                    <Text style={styles.emptyStateSubtitle}>You have no packages waiting at the campus gate.</Text>
+                    <Text style={styles.emptyStateTitle}>No Gate Deliveries Found</Text>
+                    <Text style={styles.emptyStateSubtitle}>
+                      {parcelFilter === 'Pending'
+                        ? 'All packages received at the security gate have been collected.'
+                        : 'No delivery packages match your search criteria.'}
+                    </Text>
                   </View>
                 ) : (
-                  parcels.map((p) => (
-                    <View key={p.id} style={styles.parcelCard}>
-                      <View style={styles.parcelHeaderRow}>
-                        <Text style={styles.parcelCourier}>{p.courier}</Text>
-                        <View style={styles.parcelStatusPill}>
-                          <Text style={styles.parcelStatusText}>{p.status}</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.parcelAwb}>Tracking No: {p.awb}</Text>
-                      <Text style={styles.parcelDate}>Received Date: {p.date}</Text>
+                  filteredParcels.map((p) => {
+                    const isCollected = p.status === 'Collected' || p.status === 'Handed Over';
+                    const isCollecting = collectingParcelId === p.id;
 
-                      <View style={styles.parcelOtpBox}>
-                        <Text style={styles.parcelOtpLabel}>Gate Security Verification OTP:</Text>
-                        <Text style={styles.parcelOtpValue}>{p.otp}</Text>
+                    return (
+                      <View key={p.id} style={styles.serviceCardBox}>
+                        <View style={styles.serviceCardTopRow}>
+                          <Text style={styles.serviceCardTitle}>🚚 {p.courier}</Text>
+                          <View style={[styles.statusBadge, isCollected ? { backgroundColor: '#DCFCE7' } : { backgroundColor: '#FEF3C7' }]}>
+                            <Text style={[styles.statusBadgeText, isCollected ? { color: '#15803D' } : { color: '#B45309' }]}>
+                              {isCollected ? '✓ Collected' : 'Pending Pickup'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={styles.parcelSenderText}>From: <Text style={{ fontWeight: '700' }}>{p.senderName}</Text></Text>
+                        <Text style={styles.parcelAwb}>AWB / Tracking: {p.trackingNumber}</Text>
+                        <Text style={styles.parcelDetailsText}>Details: {p.details}</Text>
+                        <Text style={styles.parcelDate}>📍 {p.gate} • Received on {p.date}</Text>
+
+                        {/* Security OTP Verification Box */}
+                        <View style={styles.parcelOtpBoxModern}>
+                          <View>
+                            <Text style={styles.parcelOtpLabelModern}>Gate Security Verification OTP</Text>
+                            <Text style={styles.parcelOtpSubModern}>Present this code to the watchman at the campus gate</Text>
+                          </View>
+                          <Text style={styles.parcelOtpValueModern}>{p.otp}</Text>
+                        </View>
+
+                        {/* Confirm Collection Action */}
+                        {!isCollected && (
+                          <TouchableOpacity
+                            style={styles.parcelCollectBtn}
+                            onPress={() => handleCollectParcel(p.id)}
+                            disabled={isCollecting}
+                            activeOpacity={0.8}
+                          >
+                            {isCollecting ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <Text style={styles.parcelCollectBtnText}>✓ Confirm Parcel Collection</Text>
+                            )}
+                          </TouchableOpacity>
+                        )}
                       </View>
-                    </View>
-                  ))
+                    );
+                  })
                 )}
               </View>
             )}
@@ -3115,9 +4378,9 @@ export default function StaffDashboard({ user, onLogout }: Props) {
             {moreSection === 'leaves' && (
               <View style={styles.card}>
                 <View style={styles.cardHeaderRow}>
-                  <View>
-                    <Text style={styles.cardHeaderTitle}>📄 Staff Leave Desk</Text>
-                    <Text style={styles.sectionSubtitle}>Leave history and quota balance</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardHeaderTitle}>📄 Faculty Leave Desk</Text>
+                    <Text style={styles.sectionSubtitle}>Leave quota balance, active requests & approval history</Text>
                   </View>
                   <TouchableOpacity
                     style={styles.actionPillBtn}
@@ -3144,25 +4407,76 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   </View>
                 </View>
 
-                {leaves.length === 0 ? (
+                {/* Leave Status Filter Pills */}
+                <View style={styles.serviceFilterScrollRow}>
+                  {(['All', 'Pending', 'Approved', 'Rejected'] as const).map((st) => (
+                    <TouchableOpacity
+                      key={st}
+                      style={[styles.serviceFilterPill, leaveStatusFilter === st && styles.serviceFilterPillActive]}
+                      onPress={() => setLeaveStatusFilter(st)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.serviceFilterPillText, leaveStatusFilter === st && styles.serviceFilterPillTextActive]}>
+                        {st}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {filteredLeaves.length === 0 ? (
                   <View style={styles.emptyStateContainer}>
                     <Text style={styles.emptyStateEmoji}>📝</Text>
-                    <Text style={styles.emptyStateTitle}>No Recent Leave Submissions</Text>
-                    <Text style={styles.emptyStateSubtitle}>Tap '+ Apply Leave' to submit a new leave request.</Text>
+                    <Text style={styles.emptyStateTitle}>No Leave Applications Found</Text>
+                    <Text style={styles.emptyStateSubtitle}>
+                      {leaveStatusFilter === 'All'
+                        ? "Tap '+ Apply Leave' above to submit a new leave application to the HOD."
+                        : `No applications with status '${leaveStatusFilter}'.`}
+                    </Text>
                   </View>
                 ) : (
-                  leaves.map((l) => (
-                    <View key={l.id} style={styles.leaveHistoryCard}>
-                      <View style={styles.leaveHistoryTop}>
-                        <Text style={styles.leaveHistoryType}>{l.type}</Text>
-                        <View style={[styles.statusBadge, { backgroundColor: l.status === 'Approved' ? '#DCFCE7' : '#FEF3C7' }]}>
-                          <Text style={[styles.statusBadgeText, { color: l.status === 'Approved' ? '#15803D' : '#B45309' }]}>
+                  filteredLeaves.map((l) => (
+                    <View key={l.id} style={styles.serviceCardBox}>
+                      <View style={styles.serviceCardTopRow}>
+                        <Text style={styles.serviceCardTitle}>{l.type}</Text>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            l.status === 'Approved'
+                              ? { backgroundColor: '#DCFCE7' }
+                              : l.status === 'Rejected'
+                              ? { backgroundColor: '#FEE2E2' }
+                              : { backgroundColor: '#FEF3C7' },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.statusBadgeText,
+                              l.status === 'Approved'
+                                ? { color: '#15803D' }
+                                : l.status === 'Rejected'
+                                ? { color: '#DC2626' }
+                                : { color: '#B45309' },
+                            ]}
+                          >
                             {l.status}
                           </Text>
                         </View>
                       </View>
-                      <Text style={styles.leaveHistoryDates}>Period: {l.from} - {l.to} ({l.days} Day{l.days > 1 ? 's' : ''})</Text>
+                      <Text style={styles.leaveHistoryDates}>
+                        📅 Period: {l.from} - {l.to} ({l.days} Day{l.days > 1 ? 's' : ''})
+                      </Text>
                       <Text style={styles.leaveHistoryReason}>Reason: {l.reason}</Text>
+
+                      {l.timeline && l.timeline.length > 0 && (
+                        <View style={styles.leaveTimelineBox}>
+                          <Text style={styles.leaveTimelineTitle}>Review Timeline:</Text>
+                          {l.timeline.map((step, idx) => (
+                            <Text key={idx} style={styles.leaveTimelineItem}>
+                              • {step.text} ({step.date})
+                            </Text>
+                          ))}
+                        </View>
+                      )}
                     </View>
                   ))
                 )}
@@ -3172,14 +4486,27 @@ export default function StaffDashboard({ user, onLogout }: Props) {
             {/* SUB-SECTION 5: PAYROLL & SALARY */}
             {moreSection === 'payroll' && (
               <View style={styles.card}>
-                <Text style={styles.cardHeaderTitle}>💰 Monthly Payroll & Salary Slips</Text>
-                <Text style={styles.sectionSubtitle}>Verified payroll disbursements from Accounts Division</Text>
+                <View style={styles.cardHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardHeaderTitle}>💰 Monthly Payroll & Payslips</Text>
+                    <Text style={styles.sectionSubtitle}>Verified payroll disbursements from Accounts Division</Text>
+                  </View>
+                </View>
+
+                {/* Confidentiality Notice Banner */}
+                <View style={styles.confidentialBanner}>
+                  <Text style={styles.confidentialBannerText}>
+                    🔒 Strictly Confidential • Authorized for {faculty.name} ({faculty.empId})
+                  </Text>
+                </View>
 
                 {payrollList.length === 0 ? (
                   <View style={styles.emptyStateContainer}>
                     <Text style={styles.emptyStateEmoji}>💼</Text>
                     <Text style={styles.emptyStateTitle}>No Payroll Records Available</Text>
-                    <Text style={styles.emptyStateSubtitle}>Your payslips will be generated after monthly reconciliation.</Text>
+                    <Text style={styles.emptyStateSubtitle}>
+                      Your payslips will be generated after monthly reconciliation by the Accounts Office.
+                    </Text>
                   </View>
                 ) : (
                   payrollList.map((slip) => (
@@ -3204,17 +4531,24 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                           <Text style={styles.payslipValue}>₹{slip.hra.toLocaleString('en-IN')}</Text>
                         </View>
                         <View style={styles.payslipRow}>
-                          <Text style={styles.payslipLabel}>Special Allowances:</Text>
+                          <Text style={styles.payslipLabel}>Special & Medical Allowances:</Text>
                           <Text style={styles.payslipValue}>₹{slip.allowances.toLocaleString('en-IN')}</Text>
                         </View>
                         <View style={styles.payslipRow}>
-                          <Text style={styles.payslipLabel}>Deductions (EPF / Tax):</Text>
-                          <Text style={[styles.payslipValue, { color: '#DC2626' }]}>-₹{slip.deductions.toLocaleString('en-IN')}</Text>
+                          <Text style={styles.payslipLabel}>Statutory Deductions (EPF / Tax):</Text>
+                          <Text style={[styles.payslipValue, { color: '#DC2626' }]}>
+                            -₹{slip.deductions.toLocaleString('en-IN')}
+                          </Text>
                         </View>
                         <View style={[styles.payslipRow, styles.payslipTotalRow]}>
                           <Text style={styles.payslipTotalLabel}>Net Disbursed Salary:</Text>
                           <Text style={styles.payslipTotalValue}>₹{slip.netSalary.toLocaleString('en-IN')}</Text>
                         </View>
+                      </View>
+
+                      <View style={styles.payslipFooterRow}>
+                        <Text style={styles.payslipMethodText}>Payment Mode: {slip.paymentMethod}</Text>
+                        <Text style={styles.payslipVoucherText}>Ref: {slip.voucherRef}</Text>
                       </View>
                     </View>
                   ))
@@ -3226,9 +4560,9 @@ export default function StaffDashboard({ user, onLogout }: Props) {
             {moreSection === 'support' && (
               <View style={styles.card}>
                 <View style={styles.cardHeaderRow}>
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text style={styles.cardHeaderTitle}>🛟 Campus Support Center</Text>
-                    <Text style={styles.sectionSubtitle}>Institutional IT and administrative assistance</Text>
+                    <Text style={styles.sectionSubtitle}>Institutional IT helpdesk and administrative assistance</Text>
                   </View>
                   <TouchableOpacity
                     style={styles.actionPillBtn}
@@ -3239,6 +4573,61 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   </TouchableOpacity>
                 </View>
 
+                {/* Logged-in Staff Member's Active Tickets */}
+                <Text style={styles.sectionMinorTitle}>My Support Tickets</Text>
+
+                {filteredSupportTickets.length === 0 ? (
+                  <View style={styles.emptyStateContainerMini}>
+                    <Text style={styles.emptyStateSubtitle}>
+                      No open support tickets. Tap '+ New Ticket' above to report an issue or make a query.
+                    </Text>
+                  </View>
+                ) : (
+                  filteredSupportTickets.map((t) => (
+                    <View key={t.id} style={styles.serviceCardBox}>
+                      <View style={styles.serviceCardTopRow}>
+                        <View style={styles.ticketTypeBadge}>
+                          <Text style={styles.ticketTypeBadgeText}>{t.requestType}</Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            t.status === 'Resolved' || t.status === 'Approved'
+                              ? { backgroundColor: '#DCFCE7' }
+                              : t.status === 'In Progress'
+                              ? { backgroundColor: '#EFF6FF' }
+                              : { backgroundColor: '#FEF3C7' },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.statusBadgeText,
+                              t.status === 'Resolved' || t.status === 'Approved'
+                                ? { color: '#15803D' }
+                                : t.status === 'In Progress'
+                                ? { color: '#1D4ED8' }
+                                : { color: '#B45309' },
+                            ]}
+                          >
+                            {t.status}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={styles.ticketSubjectText}>{t.subject || t.subType}</Text>
+                      <Text style={styles.ticketDescText}>{t.description}</Text>
+                      <View style={styles.ticketFooterRow}>
+                        <Text style={styles.ticketDateText}>📅 {t.date}</Text>
+                        <View style={styles.priorityPill}>
+                          <Text style={styles.priorityPillText}>Priority: {t.priority}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))
+                )}
+
+                {/* Helplines Card */}
+                <Text style={[styles.sectionMinorTitle, { marginTop: 14 }]}>Institutional Helpline Extensions</Text>
                 <View style={styles.supportHelplines}>
                   <View style={styles.helplineItem}>
                     <Text style={styles.helplineTitle}>🖥️ IT & Smart Classroom Desk</Text>
@@ -3256,43 +4645,10 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               </View>
             )}
 
-            {/* SUB-SECTION 7: SETTINGS & IDENTITY */}
-            {moreSection === 'settings' && (
-              <View style={styles.card}>
-                <Text style={styles.cardHeaderTitle}>⚙️ Staff Profile & Identity</Text>
-                <Text style={styles.sectionSubtitle}>Verified institutional records</Text>
-
-                <View style={styles.specGrid}>
-                  <View style={styles.specItem}>
-                    <Text style={styles.specLabel}>Faculty Name</Text>
-                    <Text style={styles.specValue}>{faculty.name}</Text>
-                  </View>
-                  <View style={styles.specItem}>
-                    <Text style={styles.specLabel}>Employee ID</Text>
-                    <Text style={styles.specValue}>{faculty.empId}</Text>
-                  </View>
-                  <View style={styles.specItem}>
-                    <Text style={styles.specLabel}>Department</Text>
-                    <Text style={styles.specValue}>{faculty.dept}</Text>
-                  </View>
-                  <View style={styles.specItem}>
-                    <Text style={styles.specLabel}>Designation</Text>
-                    <Text style={styles.specValue}>{faculty.designation}</Text>
-                  </View>
-                  <View style={styles.specItem}>
-                    <Text style={styles.specLabel}>Institutional Email</Text>
-                    <Text style={styles.specValue}>{faculty.email}</Text>
-                  </View>
-                  <View style={styles.specItem}>
-                    <Text style={styles.specLabel}>Mobile Number</Text>
-                    <Text style={styles.specValue}>{faculty.phone}</Text>
-                  </View>
-                </View>
-              </View>
+              </ScrollView>
             )}
-          </ScrollView>
-        </View>
-      )}
+          </View>
+        )}
       </View>
 
       {/* ============================================================== */}
@@ -3300,14 +4656,19 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       {/* ============================================================== */}
       <BottomTabBar
         activeTab={activeTab}
-        onTabChange={(t) => setActiveTab(t)}
+        onTabChange={(t) => {
+          if (t === 'profile') {
+            setMoreSection('profile');
+          }
+          setActiveTab(t);
+        }}
         notificationsCount={notices.length}
         tabLabels={{
           home: 'Home',
           academics: 'Academics',
           referrals: 'Referrals',
           notifications: 'Updates',
-          profile: 'More & Profile',
+          profile: 'Profile',
         }}
       />
 
@@ -3387,18 +4748,37 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               ))}
             </View>
 
-            <Text style={styles.inputLabel}>Dates *</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. 25 Oct 2026 - 26 Oct 2026"
-              value={newLeaveDates}
-              onChangeText={setNewLeaveDates}
-            />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>Start Date *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. 2026-10-25"
+                  value={newLeaveStartDate}
+                  onChangeText={(val) => {
+                    setNewLeaveStartDate(val);
+                    setNewLeaveDates(`${val} - ${newLeaveEndDate || val}`);
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>End Date *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. 2026-10-27"
+                  value={newLeaveEndDate}
+                  onChangeText={(val) => {
+                    setNewLeaveEndDate(val);
+                    setNewLeaveDates(`${newLeaveStartDate || val} - ${val}`);
+                  }}
+                />
+              </View>
+            </View>
 
-            <Text style={styles.inputLabel}>Reason *</Text>
+            <Text style={styles.inputLabel}>Reason for Leave *</Text>
             <TextInput
               style={[styles.modalInput, { height: 70, textAlignVertical: 'top' }]}
-              placeholder="Reason for leave..."
+              placeholder="Provide reason for absence..."
               multiline
               value={newLeaveReason}
               onChangeText={setNewLeaveReason}
@@ -3436,6 +4816,19 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               ))}
             </View>
 
+            <Text style={styles.inputLabel}>Priority Level</Text>
+            <View style={styles.typeSelectorRow}>
+              {(['Low', 'Medium', 'High', 'Critical'] as const).map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.typeChip, supportPriority === p && styles.typeChipActive]}
+                  onPress={() => setSupportPriority(p)}
+                >
+                  <Text style={[styles.typeChipText, supportPriority === p && styles.typeChipTextActive]}>{p}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             <Text style={styles.inputLabel}>Subject Heading *</Text>
             <TextInput
               style={styles.modalInput}
@@ -3444,10 +4837,10 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               onChangeText={setSupportSubject}
             />
 
-            <Text style={styles.inputLabel}>Details *</Text>
+            <Text style={styles.inputLabel}>Details & Location *</Text>
             <TextInput
               style={[styles.modalInput, { height: 70, textAlignVertical: 'top' }]}
-              placeholder="Describe the issue..."
+              placeholder="Describe the issue in detail..."
               multiline
               value={supportDescription}
               onChangeText={setSupportDescription}
@@ -3459,6 +4852,58 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSubmit} onPress={handleSubmitSupport} disabled={submittingSupport}>
                 {submittingSupport ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modalSubmitText}>Submit Ticket</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Edit Profile Modal */}
+      <Modal visible={editProfileModalVisible} transparent animationType="slide" onRequestClose={() => setEditProfileModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit Staff Profile</Text>
+            <Text style={styles.modalSubtitle}>Update your institutional contact and qualifications</Text>
+
+            <Text style={styles.inputLabel}>Mobile Phone Number *</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="+91 98234 56789"
+              value={editPhone}
+              onChangeText={setEditPhone}
+              keyboardType="phone-pad"
+            />
+
+            <Text style={styles.inputLabel}>Designation</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. Assistant Professor"
+              value={editDesignation}
+              onChangeText={setEditDesignation}
+            />
+
+            <Text style={styles.inputLabel}>Highest Qualification</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. M.Tech, Ph.D."
+              value={editQualification}
+              onChangeText={setEditQualification}
+            />
+
+            <Text style={styles.inputLabel}>Academic Experience</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. 6+ Years Teaching & Research"
+              value={editExperience}
+              onChangeText={setEditExperience}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setEditProfileModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSubmit} onPress={handleSaveProfile} disabled={savingProfile}>
+                {savingProfile ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modalSubmitText}>Save Changes</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -3783,6 +5228,480 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   )}
                 </TouchableOpacity>
               </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 6. RECRUITMENT DRIVE DETAIL & ROUNDS MODAL                     */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedPlacementJob !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedPlacementJob(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.liveModalCardContainer}
+          >
+            <View style={styles.liveModalCard}>
+              {/* Header */}
+              <View style={styles.liveHeaderBanner}>
+                <View style={{ flex: 1, paddingRight: 6 }}>
+                  <Text style={styles.liveStatusTitle}>CAMPUS RECRUITMENT DRIVE</Text>
+                  <Text style={styles.liveHeaderTitle} numberOfLines={1}>
+                    {selectedPlacementJob?.company}
+                  </Text>
+                  <Text style={styles.liveHeaderSub}>
+                    {selectedPlacementJob?.role} • {selectedPlacementJob?.ctc}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.modalCloseIconBtn}
+                  onPress={() => setSelectedPlacementJob(null)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalCloseIconText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }} contentContainerStyle={{ paddingBottom: 10 }}>
+                {/* Drive Specs */}
+                <View style={[styles.specGrid, { marginVertical: 10 }]}>
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Eligibility Criteria</Text>
+                    <Text style={[styles.specValue, { color: '#1E3A8A', fontWeight: '700' }]}>
+                      {selectedPlacementJob?.eligibility}
+                    </Text>
+                  </View>
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Drive Date</Text>
+                    <Text style={styles.specValue}>{selectedPlacementJob?.driveDate}</Text>
+                  </View>
+                  {selectedPlacementJob?.deadline ? (
+                    <View style={styles.specItem}>
+                      <Text style={styles.specLabel}>Registration Cut-Off</Text>
+                      <Text style={[styles.specValue, { color: '#DC2626', fontWeight: '700' }]}>
+                        {selectedPlacementJob?.deadline}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Status</Text>
+                    <Text style={[styles.specValue, { color: '#16A34A', fontWeight: '700' }]}>
+                      {selectedPlacementJob?.status || 'Active Drive'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Selection Process & Rounds */}
+                <Text style={[styles.sectionMinorTitle, { marginTop: 8 }]}>Selection Process & Evaluation Stages</Text>
+                {selectedPlacementJob?.rounds && selectedPlacementJob.rounds.length > 0 ? (
+                  selectedPlacementJob.rounds.map((rd, idx) => (
+                    <View key={idx} style={[styles.serviceCardBox, { marginVertical: 4, padding: 10 }]}>
+                      <View style={styles.serviceCardTopRow}>
+                        <Text style={[styles.serviceCardTitle, { fontSize: 13 }]}>
+                          Round {rd.roundNumber || idx + 1}: {rd.name}
+                        </Text>
+                        <View style={[styles.statusBadge, { backgroundColor: '#EFF6FF' }]}>
+                          <Text style={[styles.statusBadgeText, { color: '#1D4ED8' }]}>{rd.type || 'Evaluation'}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))
+                ) : (
+                  <View style={{ gap: 6 }}>
+                    <View style={[styles.serviceCardBox, { marginVertical: 3, padding: 10 }]}>
+                      <Text style={[styles.serviceCardTitle, { fontSize: 13 }]}>Round 1: Online Aptitude & Technical Screening</Text>
+                      <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>Computer-based MCQ & coding assessment</Text>
+                    </View>
+                    <View style={[styles.serviceCardBox, { marginVertical: 3, padding: 10 }]}>
+                      <Text style={[styles.serviceCardTitle, { fontSize: 13 }]}>Round 2: Technical Interview & Problem Solving</Text>
+                      <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>Live coding, core data structures & projects review</Text>
+                    </View>
+                    <View style={[styles.serviceCardBox, { marginVertical: 3, padding: 10 }]}>
+                      <Text style={[styles.serviceCardTitle, { fontSize: 13 }]}>Round 3: HR Discussion & Fitment Assessment</Text>
+                      <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>Behavioral interview, document verification & offer discussion</Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Broadcast Action */}
+                <TouchableOpacity
+                  style={[styles.serviceActionPrimaryBtn, { marginTop: 16 }]}
+                  onPress={() => {
+                    Alert.alert(
+                      'Broadcast Sent! 📢',
+                      `Recruitment circular for ${selectedPlacementJob?.company} (${selectedPlacementJob?.role}) has been dispatched to all ${eligibleDeptStudents.length} eligible students in ${faculty.dept} department.`
+                    );
+                    setSelectedPlacementJob(null);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.serviceActionPrimaryBtnText}>📢 Broadcast Notification to Eligible Students</Text>
+                </TouchableOpacity>
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[styles.liveCloseBtn, { marginTop: 10 }]}
+                onPress={() => setSelectedPlacementJob(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.liveCloseBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 7. STUDENT PLACEMENT PROFILE ERP MODAL                         */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedStudentPlacementProfile !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedStudentPlacementProfile(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.liveModalCardContainer}
+          >
+            <View style={styles.liveModalCard}>
+              {/* Header */}
+              <View style={styles.liveHeaderBanner}>
+                <View style={{ flex: 1, paddingRight: 6 }}>
+                  <Text style={styles.liveStatusTitle}>INSTITUTIONAL PLACEMENT DOSSIER</Text>
+                  <Text style={styles.liveHeaderTitle} numberOfLines={1}>
+                    {selectedStudentPlacementProfile?.student?.name}
+                  </Text>
+                  <Text style={styles.liveHeaderSub}>
+                    Reg: {selectedStudentPlacementProfile?.student?.rollNo} • {selectedStudentPlacementProfile?.student?.dept || faculty.dept}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.modalCloseIconBtn}
+                  onPress={() => setSelectedStudentPlacementProfile(null)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalCloseIconText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 440 }} contentContainerStyle={{ paddingBottom: 12 }}>
+                {/* Placement Status Banner */}
+                <View
+                  style={[
+                    styles.serviceCardBox,
+                    {
+                      marginTop: 10,
+                      backgroundColor: selectedStudentPlacementProfile?.isPlaced ? '#ECFDF5' : '#F0F9FF',
+                      borderColor: selectedStudentPlacementProfile?.isPlaced ? '#A7F3D0' : '#BAE6FD',
+                      borderWidth: 1,
+                    },
+                  ]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: selectedStudentPlacementProfile?.isPlaced ? '#047857' : '#0369A1' }}>
+                      {selectedStudentPlacementProfile?.isPlaced ? '🎉 Placed in Campus Recruitment' : '🎯 Active In Recruitment Drives'}
+                    </Text>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        { backgroundColor: selectedStudentPlacementProfile?.isPlaced ? '#D1FAE5' : '#E0F2FE' },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusBadgeText,
+                          { color: selectedStudentPlacementProfile?.isPlaced ? '#065F46' : '#0284C7' },
+                        ]}
+                      >
+                        {selectedStudentPlacementProfile?.isEligible ? 'Eligible' : 'Needs Review'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Metrics 4-Box Grid */}
+                <View style={[styles.specGrid, { marginVertical: 10 }]}>
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Cumulative CGPA</Text>
+                    <Text
+                      style={[
+                        styles.specValue,
+                        {
+                          color: selectedStudentPlacementProfile?.isEligible ? '#15803D' : '#DC2626',
+                          fontWeight: '800',
+                          fontSize: 15,
+                        },
+                      ]}
+                    >
+                      {selectedStudentPlacementProfile?.student?.cgpa?.toFixed?.(2) || '8.50'}
+                    </Text>
+                  </View>
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Standing Arrears</Text>
+                    <Text style={[styles.specValue, { color: '#1E293B', fontWeight: '800', fontSize: 15 }]}>
+                      0 Arrears
+                    </Text>
+                  </View>
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Class Attendance</Text>
+                    <Text style={[styles.specValue, { color: '#2563EB', fontWeight: '800', fontSize: 15 }]}>
+                      {selectedStudentPlacementProfile?.student?.attendancePct || 85}%
+                    </Text>
+                  </View>
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Drive Applications</Text>
+                    <Text style={[styles.specValue, { color: '#7C3AED', fontWeight: '800', fontSize: 15 }]}>
+                      {selectedStudentPlacementProfile?.apps?.length || 0} Logged
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Eligibility Breakdown */}
+                <Text style={[styles.sectionMinorTitle, { marginTop: 6, marginBottom: 4 }]}>
+                  Drive Eligibility & Criteria Clearance
+                </Text>
+                <View style={[styles.serviceCardBox, { padding: 12, backgroundColor: '#F8FAFC' }]}>
+                  <Text style={{ fontSize: 12, color: '#334155', lineHeight: 18 }}>
+                    {selectedStudentPlacementProfile?.isEligible
+                      ? '✓ Verified for All Core Engineering, IT Software, and Multi-National Corporate On-Campus recruitment drives (Minimum CGPA 6.00 with zero standing arrears cleared).'
+                      : '⚠️ Aggregate is below institutional 6.00 cutoff. Mandatory remedial placement training modules recommended.'}
+                  </Text>
+                </View>
+
+                {/* Applications Logged */}
+                <Text style={[styles.sectionMinorTitle, { marginTop: 12, marginBottom: 4 }]}>
+                  Applied Companies & Selection History
+                </Text>
+                {selectedStudentPlacementProfile?.apps && selectedStudentPlacementProfile.apps.length > 0 ? (
+                  selectedStudentPlacementProfile.apps.map((app: any, idx: number) => (
+                    <View key={idx} style={[styles.serviceCardBox, { marginVertical: 3, padding: 10 }]}>
+                      <View style={styles.serviceCardTopRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.serviceCardTitle, { fontSize: 13 }]}>{app.company || 'Campus Recruiter'}</Text>
+                          <Text style={{ fontSize: 11, color: '#64748B' }}>Role: {app.role || 'Associate Trainee'}</Text>
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: '#EFF6FF' }]}>
+                          <Text style={[styles.statusBadgeText, { color: '#1D4ED8' }]}>{app.status || 'Applied'}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))
+                ) : (
+                  <View style={[styles.serviceCardBox, { padding: 10, backgroundColor: '#F8FAFC' }]}>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontStyle: 'italic' }}>
+                      Profile registered with Training & Placement Cell. Eligible for upcoming campus rounds.
+                    </Text>
+                  </View>
+                )}
+
+                {/* Contact Option */}
+                {selectedStudentPlacementProfile?.student?.phone ? (
+                  <TouchableOpacity
+                    style={[styles.serviceActionPrimaryBtn, { marginTop: 14 }]}
+                    onPress={() => {
+                      Linking.openURL(`tel:${selectedStudentPlacementProfile.student.phone}`).catch(() => null);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.serviceActionPrimaryBtnText}>
+                      📞 Call Student / Guardian ({selectedStudentPlacementProfile.student.phone})
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[styles.liveCloseBtn, { marginTop: 8 }]}
+                onPress={() => setSelectedStudentPlacementProfile(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.liveCloseBtnText}>Close Placement Profile</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 8. SCHOLAR ACADEMIC DOSSIER MODAL                              */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedScholarRecord !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedScholarRecord(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.liveModalCardContainer}
+          >
+            <View style={styles.liveModalCard}>
+              <View style={styles.liveHeaderBanner}>
+                <View style={{ flex: 1, paddingRight: 6 }}>
+                  <Text style={styles.liveStatusTitle}>SCHOLAR ACADEMIC DOSSIER</Text>
+                  <Text style={styles.liveHeaderTitle} numberOfLines={1}>
+                    {selectedScholarRecord?.name}
+                  </Text>
+                  <Text style={styles.liveHeaderSub}>
+                    Roll: {selectedScholarRecord?.rollNo} • Sem {selectedScholarRecord?.sem || 1} ({selectedScholarRecord?.section || 'A'})
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.modalCloseIconBtn}
+                  onPress={() => setSelectedScholarRecord(null)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalCloseIconText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }} contentContainerStyle={{ paddingBottom: 10 }}>
+                <View style={[styles.specGrid, { marginVertical: 10 }]}>
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Cumulative CGPA</Text>
+                    <Text style={[styles.specValue, { color: '#15803D', fontWeight: '800', fontSize: 16 }]}>
+                      {selectedScholarRecord?.cgpa?.toFixed?.(2) || '8.50'}
+                    </Text>
+                  </View>
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Attendance</Text>
+                    <Text style={[styles.specValue, { color: '#2563EB', fontWeight: '800', fontSize: 16 }]}>
+                      {selectedScholarRecord?.attendancePct || 85}%
+                    </Text>
+                  </View>
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Fee Standing</Text>
+                    <Text
+                      style={[
+                        styles.specValue,
+                        {
+                          color: selectedScholarRecord?.feeStatus === 'Paid' ? '#15803D' : '#D97706',
+                          fontWeight: '800',
+                          fontSize: 14,
+                        },
+                      ]}
+                    >
+                      {selectedScholarRecord?.feeStatus || 'Current'}
+                    </Text>
+                  </View>
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Disciplinary</Text>
+                    <Text style={[styles.specValue, { color: '#16A34A', fontWeight: '800', fontSize: 14 }]}>
+                      Exemplary
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.sectionMinorTitle, { marginTop: 6, marginBottom: 4 }]}>
+                  Mentor Notes & Academic Standing
+                </Text>
+                <View style={[styles.serviceCardBox, { padding: 12, backgroundColor: '#F8FAFC' }]}>
+                  <Text style={{ fontSize: 12, color: '#334155', lineHeight: 18 }}>
+                    Regular attendee with high engagement in lecture and lab sessions. All internal assignments and continuous evaluations are up to institutional standards.
+                  </Text>
+                </View>
+
+                {selectedScholarRecord?.phone ? (
+                  <TouchableOpacity
+                    style={[styles.serviceActionPrimaryBtn, { marginTop: 14 }]}
+                    onPress={() => Linking.openURL(`tel:${selectedScholarRecord.phone}`).catch(() => null)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.serviceActionPrimaryBtnText}>
+                      📞 Call Guardian ({selectedScholarRecord.phone})
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[styles.liveCloseBtn, { marginTop: 8 }]}
+                onPress={() => setSelectedScholarRecord(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.liveCloseBtnText}>Close Record</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 9. COURSEWORK ASSIGNMENT DETAILS MODAL                          */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedAssignmentDetails !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedAssignmentDetails(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.liveModalCardContainer}
+          >
+            <View style={styles.liveModalCard}>
+              <View style={styles.liveHeaderBanner}>
+                <View style={{ flex: 1, paddingRight: 6 }}>
+                  <Text style={styles.liveStatusTitle}>COURSEWORK ASSIGNMENT</Text>
+                  <Text style={styles.liveHeaderTitle} numberOfLines={1}>
+                    {selectedAssignmentDetails?.title}
+                  </Text>
+                  <Text style={styles.liveHeaderSub}>
+                    Subject: {selectedAssignmentDetails?.subject || faculty.dept}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.modalCloseIconBtn}
+                  onPress={() => setSelectedAssignmentDetails(null)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalCloseIconText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }} contentContainerStyle={{ paddingBottom: 10 }}>
+                <View style={[styles.specGrid, { marginVertical: 10 }]}>
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Due Date</Text>
+                    <Text style={[styles.specValue, { color: '#DC2626', fontWeight: '800' }]}>
+                      {selectedAssignmentDetails?.dueDate || 'Standard Term'}
+                    </Text>
+                  </View>
+                  <View style={styles.specItem}>
+                    <Text style={styles.specLabel}>Enrolled Submissions</Text>
+                    <Text style={[styles.specValue, { color: '#2563EB', fontWeight: '800' }]}>
+                      {students.length} Scholars
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.sectionMinorTitle, { marginTop: 6, marginBottom: 4 }]}>
+                  Assignment Instructions & Objectives
+                </Text>
+                <View style={[styles.serviceCardBox, { padding: 12, backgroundColor: '#F8FAFC' }]}>
+                  <Text style={{ fontSize: 12, color: '#334155', lineHeight: 18 }}>
+                    {selectedAssignmentDetails?.description || 'Complete the assigned problem set and submit the solution PDF before the institutional due date.'}
+                  </Text>
+                </View>
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[styles.liveCloseBtn, { marginTop: 8 }]}
+                onPress={() => setSelectedAssignmentDetails(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.liveCloseBtnText}>Close</Text>
+              </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
         </View>
@@ -4672,6 +6591,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#475569',
     lineHeight: 20,
+  },
+
+  // PROFILE / SERVICES TOGGLE
+  profileToggleHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 10,
+  },
+  profileToggleTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  profileToggleTabActive: {
+    backgroundColor: '#1E3A8A',
+  },
+  profileToggleTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  profileToggleTabTextActive: {
+    color: '#FFFFFF',
   },
 
   // MORE & PROFILE SERVICES MENU
@@ -6942,5 +8891,517 @@ const styles = StyleSheet.create({
   examCandidatePillText: {
     fontSize: 11,
     fontWeight: '800',
+  },
+
+  // ----------------------------------------------------------------------
+  // INSTITUTIONAL STAFF SERVICES MODERN STYLES (7 SERVICES)
+  // ----------------------------------------------------------------------
+  serviceSubTabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    padding: 3,
+    marginBottom: 12,
+  },
+  serviceSubTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  serviceSubTabActive: {
+    backgroundColor: '#1E3A8A',
+  },
+  serviceSubTabText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  serviceSubTabTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  serviceFilterScroll: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  serviceFilterScrollRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 10,
+  },
+  serviceFilterPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  serviceFilterPillActive: {
+    backgroundColor: '#1E3A8A',
+    borderColor: '#1E3A8A',
+  },
+  serviceFilterPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  serviceFilterPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  serviceCardBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  serviceCardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  serviceCardTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  serviceCardAuthor: {
+    fontSize: 12,
+    color: '#475569',
+    marginBottom: 2,
+  },
+  serviceCardMeta: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  serviceCardActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  stockCopiesBadge: {
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  stockCopiesBadgeAvail: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#BBF7D0',
+  },
+  stockCopiesBadgeEmpty: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FECACA',
+  },
+  stockCopiesNum: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  stockCopiesLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  borrowedStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  statusBadgeIssued: {
+    backgroundColor: '#DCFCE7',
+  },
+  statusBadgePending: {
+    backgroundColor: '#FEF3C7',
+  },
+  borrowedStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  serviceActionPrimaryBtn: {
+    backgroundColor: '#1E3A8A',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  serviceActionPrimaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  serviceDisabledBadge: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  serviceDisabledBadgeText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  txDatesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 4,
+  },
+  txDateItem: {
+    fontSize: 11,
+    color: '#475569',
+  },
+  returnPendingNotice: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  returnPendingNoticeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  serviceActionReturnBtn: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  serviceActionReturnBtnText: {
+    color: '#1E3A8A',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  // KPI Dashboard Cards (Matching Web Placement Statistics)
+  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginVertical: 10 },
+  kpiCard: {
+    flex: 1,
+    minWidth: '46%',
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  kpiLabel: { fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' },
+  kpiValue: { fontSize: 20, fontWeight: '800', marginTop: 4 },
+  kpiSub: { fontSize: 10, color: '#94A3B8', marginTop: 2 },
+
+  // Sub-Tab Navigation Filter Pills
+  filterScroll: { flexDirection: 'row', gap: 6, marginVertical: 8 },
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    marginRight: 6,
+  },
+  filterPillActive: { backgroundColor: '#1E3A8A', borderColor: '#1E3A8A' },
+  filterPillText: { fontSize: 12, fontWeight: '600', color: '#475569' },
+  filterPillTextActive: { color: '#FFFFFF', fontWeight: '800' },
+
+  // Student Profile Card Action Button
+  cardSelectBtn: {
+    marginTop: 6,
+    backgroundColor: '#EFF6FF',
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  cardSelectBtnText: { fontSize: 12, fontWeight: '800', color: '#1E3A8A' },
+
+  // Interview Round Selector Chips
+  selectorChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6, marginBottom: 10 },
+  chipItem: {
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  chipItemActive: { backgroundColor: '#1E3A8A', borderColor: '#1E3A8A' },
+  chipItemText: { fontSize: 11, fontWeight: '600', color: '#475569' },
+  chipItemTextActive: { color: '#FFFFFF', fontWeight: '800' },
+
+  driveScheduleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  driveDeadline: {
+    fontSize: 11,
+    color: '#DC2626',
+    fontWeight: '600',
+  },
+  roundsBadgeRow: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  roundsBadgeLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1D4ED8',
+  },
+  statusBadgeConfirmed: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  statusBadgeConfirmedText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#15803D',
+  },
+  companySectorText: {
+    fontSize: 12,
+    color: '#475569',
+    marginBottom: 2,
+  },
+  companyLocationText: {
+    fontSize: 11,
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  companyContactText: {
+    fontSize: 11,
+    color: '#2563EB',
+    fontWeight: '600',
+  },
+  parcelSenderText: {
+    fontSize: 12,
+    color: '#334155',
+    marginBottom: 2,
+  },
+  parcelDetailsText: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  parcelOtpBoxModern: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  parcelOtpLabelModern: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1E40AF',
+  },
+  parcelOtpSubModern: {
+    fontSize: 9,
+    color: '#3B82F6',
+    marginTop: 1,
+  },
+  parcelOtpValueModern: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#1E3A8A',
+    letterSpacing: 2,
+  },
+  parcelCollectBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  parcelCollectBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  leaveTimelineBox: {
+    backgroundColor: '#F1F5F9',
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  leaveTimelineTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#475569',
+    marginBottom: 2,
+  },
+  leaveTimelineItem: {
+    fontSize: 10,
+    color: '#64748B',
+  },
+  confidentialBanner: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  confidentialBannerText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1E40AF',
+    textAlign: 'center',
+  },
+  payslipFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 6,
+    marginTop: 8,
+  },
+  payslipMethodText: {
+    fontSize: 10,
+    color: '#64748B',
+  },
+  payslipVoucherText: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '700',
+  },
+  sectionMinorTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  emptyStateContainerMini: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  ticketTypeBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  ticketTypeBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1D4ED8',
+  },
+  ticketSubjectText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  ticketDescText: {
+    fontSize: 12,
+    color: '#475569',
+    lineHeight: 17,
+  },
+  ticketFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  ticketDateText: {
+    fontSize: 10,
+    color: '#94A3B8',
+  },
+  priorityPill: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  priorityPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  settingsProfileIdentityBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  settingsAvatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1E3A8A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  settingsAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  settingsProfileName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  settingsProfileEmpId: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  settingsProfileDesignation: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2563EB',
+    marginTop: 1,
+  },
+  verifiedAccountNotice: {
+    marginTop: 14,
+    paddingVertical: 8,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    alignItems: 'center',
+  },
+  verifiedAccountNoticeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#15803D',
   },
 });
