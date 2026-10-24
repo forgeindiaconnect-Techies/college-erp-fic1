@@ -208,6 +208,14 @@ export default function StudentDashboard({ user, onLogout }: Props) {
   const [libraryCategoryFilter, setLibraryCategoryFilter] = useState('All Categories');
   const [libraryAvailableOnly, setLibraryAvailableOnly] = useState(false);
   const [noDueModalVisible, setNoDueModalVisible] = useState(false);
+  const [libraryTransactions, setLibraryTransactions] = useState<any[]>([]);
+  const [libraryReservations, setLibraryReservations] = useState<any[]>([]);
+  const [libraryReturnRequests, setLibraryReturnRequests] = useState<any[]>([]);
+  const [libraryClearanceDoc, setLibraryClearanceDoc] = useState<any>(null);
+  const [returnConfirmModalVisible, setReturnConfirmModalVisible] = useState(false);
+  const [selectedTxForReturn, setSelectedTxForReturn] = useState<any>(null);
+  const [submittingReturnRequest, setSubmittingReturnRequest] = useState(false);
+  const [requestingClearance, setRequestingClearance] = useState(false);
 
   // Placement Module Subtabs & Filter States (Matching Screenshot 3)
   const [placementSubTab, setPlacementSubTab] = useState<'drives' | 'applications' | 'interviews' | 'eligibility'>('drives');
@@ -316,6 +324,9 @@ export default function StudentDashboard({ user, onLogout }: Props) {
         transportRes,
         libraryMyTxRes,
         libraryBooksRes,
+        libraryReservationsRes,
+        libraryReturnRequestsRes,
+        libraryClearanceRes,
         placementsRes,
         placementAppsRes,
         leavesRes,
@@ -336,6 +347,9 @@ export default function StudentDashboard({ user, onLogout }: Props) {
         apiGet<any[]>(`transport/routes`).catch(() => []),
         apiGet<any[]>(`library/my-transactions`).catch(() => apiGet<any[]>(`library/transactions/my`).catch(() => [])),
         apiGet<any>(`library/books`).catch(() => []),
+        apiGet<any[]>(`library/reservations`).catch(() => []),
+        apiGet<any[]>(`library/return-requests/my`).catch(() => []),
+        apiGet<any>(`library/clearance/my`).catch(() => null),
         apiGet<any[]>(`placement/jobs`).catch(() => []),
         apiGet<any[]>(`placement/applications`).catch(() => []),
         resolvedStudentId ? apiGet<any[]>(`leaves/student/${encodeURIComponent(resolvedStudentId)}`).catch(() => apiGet<any[]>(`leaves`).catch(() => [])) : [],
@@ -835,8 +849,13 @@ export default function StudentDashboard({ user, onLogout }: Props) {
         );
       }
 
-      // 12. Process Library (Active Transactions + Available Catalogue)
+      // 12. Process Library (Active Transactions, Reservations, Return Requests, Clearance)
       const rawLib = Array.isArray(libraryMyTxRes) ? libraryMyTxRes : [];
+      setLibraryTransactions(rawLib);
+      setLibraryReservations(Array.isArray(libraryReservationsRes) ? libraryReservationsRes : []);
+      setLibraryReturnRequests(Array.isArray(libraryReturnRequestsRes) ? libraryReturnRequestsRes : []);
+      setLibraryClearanceDoc(libraryClearanceRes?.data || libraryClearanceRes || null);
+
       const parsedBooks: LibraryBook[] = rawLib.map((b: any, idx: number) => ({
         id: String(b._id || b.id || b.transactionId || (b.bookId?._id ? `${b.bookId._id}-${idx}` : `${b.bookId || 'BK'}-${idx}`)),
         title: b.bookId?.title || b.bookTitle || b.title || 'Library Book',
@@ -1124,6 +1143,49 @@ export default function StudentDashboard({ user, onLogout }: Props) {
     }
   };
 
+  // Action: Submit Return Request for Issued Library Book
+  const handleReturnBookRequest = async (tx: any) => {
+    if (!tx) return;
+    try {
+      setSubmittingReturnRequest(true);
+      const txId = tx._id || tx.id || tx.transactionId;
+      await apiPost('library/return-requests', {
+        transactionId: txId,
+        reason: 'Student returned physical copy at library desk',
+      });
+      Alert.alert(
+        'Return Request Submitted 🔄',
+        `Your return request for "${tx.bookId?.title || tx.title || 'the book'}" has been sent to the Librarian. Present the physical copy at the Central Library desk for check-in.`
+      );
+      setReturnConfirmModalVisible(false);
+      setSelectedTxForReturn(null);
+      await loadData();
+      setLibrarySubTab('requests');
+    } catch (err: any) {
+      Alert.alert('Return Request', err?.message || 'Failed to submit return request.');
+    } finally {
+      setSubmittingReturnRequest(false);
+    }
+  };
+
+  // Action: Request Official Library Clearance
+  const handleRequestLibraryClearance = async () => {
+    try {
+      setRequestingClearance(true);
+      const res: any = await apiPost('library/clearance/request', {});
+      setLibraryClearanceDoc(res?.clearance || res?.data?.clearance || res);
+      Alert.alert(
+        'Clearance Approved ✅',
+        'Official Institutional No Due Clearance has been verified and issued. You may now view or save your certificate.'
+      );
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Clearance Notice', err?.message || 'Library clearance could not be generated at this time.');
+    } finally {
+      setRequestingClearance(false);
+    }
+  };
+
   // Action: Apply for Placement Recruitment Drive
   const handleApplyPlacement = async (drive: PlacementDrive) => {
     try {
@@ -1261,6 +1323,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
       if (supportModalVisible) { setSupportModalVisible(false); return true; }
       if (feeReceiptModalVisible) { setFeeReceiptModalVisible(false); return true; }
       if (selectedLibraryBook) { setSelectedLibraryBook(null); return true; }
+      if (returnConfirmModalVisible) { setReturnConfirmModalVisible(false); return true; }
       if (requestBookModalVisible) { setRequestBookModalVisible(false); return true; }
       if (selectedPlacementDrive) { setSelectedPlacementDrive(null); return true; }
       if (hostelDeskModalVisible) { setHostelDeskModalVisible(false); return true; }
@@ -1283,6 +1346,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
     supportModalVisible,
     feeReceiptModalVisible,
     selectedLibraryBook,
+    returnConfirmModalVisible,
     requestBookModalVisible,
     selectedPlacementDrive,
     hostelDeskModalVisible,
@@ -1293,6 +1357,8 @@ export default function StudentDashboard({ user, onLogout }: Props) {
     placementStageModalVisible,
     noDuesFeeModalVisible,
   ]);
+
+  const activeBorrowedCount = libraryTransactions.filter((tx: any) => tx.status === 'Issued' || tx.status === 'Overdue').length;
 
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const todayName = dayNames[new Date().getDay()];
@@ -1397,8 +1463,10 @@ export default function StudentDashboard({ user, onLogout }: Props) {
                   onPress={() => { setActiveTab('academics'); setAcademicsSubTab('library'); }}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.nativeStatChipValue, { color: '#7C3AED' }]}>{libraryBooks.length}</Text>
-                  <Text style={styles.nativeStatChipLabel}>Library</Text>
+                  <Text style={[styles.nativeStatChipValue, { color: activeBorrowedCount > 0 ? '#1E3A8A' : '#059669' }]}>
+                    {activeBorrowedCount}
+                  </Text>
+                  <Text style={styles.nativeStatChipLabel}>Borrowed</Text>
                 </TouchableOpacity>
                 <View style={styles.nativeStatChipDivider} />
                 <TouchableOpacity
@@ -1424,7 +1492,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
               <View style={styles.native6Grid}>
                 {[
                   { id: 'timetable', label: 'Timetable', icon: '⏰', bg: '#EFF6FF', badge: 'Active', onPress: () => { setActiveTab('academics'); setAcademicsSubTab('timetable'); } },
-                  { id: 'library', label: 'Library', icon: '📖', bg: '#F0FDF4', badge: `${libraryBooks.length} Books`, onPress: () => { setActiveTab('academics'); setAcademicsSubTab('library'); } },
+                  { id: 'library', label: 'Library', icon: '📖', bg: '#F0FDF4', badge: activeBorrowedCount > 0 ? `${activeBorrowedCount} Borrowed` : 'Catalog', onPress: () => { setActiveTab('academics'); setAcademicsSubTab('library'); } },
                   { id: 'placement', label: 'Placements', icon: '💼', bg: '#FAF5FF', badge: '1 Drive', onPress: () => { setActiveTab('academics'); setAcademicsSubTab('placement'); } },
                   { id: 'leaves', label: 'Leave & OD', icon: '✈️', bg: '#FFF7ED', badge: 'Apply', onPress: () => { setActiveTab('academics'); setAcademicsSubTab('leaves'); } },
                   { id: 'attendance', label: 'Attendance', icon: '📊', bg: '#ECFDF5', badge: `${profile.attendance}%`, onPress: () => { setActiveTab('academics'); setAcademicsSubTab('attendance'); } },
@@ -2455,319 +2523,676 @@ export default function StudentDashboard({ user, onLogout }: Props) {
               {/* ============================================================== */}
               {/* MODULE 1: CENTRAL LIBRARY PORTAL (Matching Screenshot 2)        */}
               {/* ============================================================== */}
-              {/* ============================================================== */}
               {/* MODULE 1: CENTRAL LIBRARY PORTAL                               */}
               {/* ============================================================== */}
-              {academicsSubTab === 'library' && (
-                <View style={{ gap: 12 }}>
-                  {/* Clean Mobile Header & Metrics Card */}
-                  <View style={styles.card}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={styles.catalogBookIconBox}>
-                          <Text style={{ fontSize: 18 }}>📖</Text>
-                        </View>
-                        <View>
-                          <Text style={styles.cardHeaderTitle}>Central Library</Text>
-                          <Text style={{ fontSize: 11, color: '#64748B' }}>Book Circulation & Digital Pass</Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.refreshPillBtn}
-                        onPress={loadData}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.refreshPillBtnText}>🔄 Refresh</Text>
-                      </TouchableOpacity>
-                    </View>
+              {academicsSubTab === 'library' && (() => {
+                const activeIssuedList = libraryTransactions.filter((tx: any) => tx.status === 'Issued' || tx.status === 'Overdue');
 
-                    {/* Single Sleek Metric Strip Row */}
-                    <View style={styles.nativeStatStripRow}>
-                      <View style={styles.nativeStatChip}>
-                        <Text style={[styles.nativeStatChipValue, { color: '#1E3A8A' }]}>{libraryBooks.length}</Text>
-                        <Text style={styles.nativeStatChipLabel}>Borrowed</Text>
-                      </View>
-                      <View style={styles.nativeStatChipDivider} />
-                      <View style={styles.nativeStatChip}>
-                        <Text style={[styles.nativeStatChipValue, { color: '#059669' }]}>0</Text>
-                        <Text style={styles.nativeStatChipLabel}>Overdue</Text>
-                      </View>
-                      <View style={styles.nativeStatChipDivider} />
-                      <View style={styles.nativeStatChip}>
-                        <Text style={[styles.nativeStatChipValue, { color: '#059669' }]}>₹0</Text>
-                        <Text style={styles.nativeStatChipLabel}>Fine Balance</Text>
-                      </View>
-                    </View>
+                const overdueList = libraryTransactions.filter((tx: any) => tx.status === 'Overdue');
+                const pendingIssueList = libraryTransactions.filter((tx: any) => tx.status === 'Pending' || tx.status === 'Approved');
+                const reservationsList = libraryReservations.filter((r: any) => r.status === 'Pending' || r.status === 'Approved');
+                const returnReqList = libraryReturnRequests;
+                const pendingReturnCount = libraryReturnRequests.filter((r: any) => r.status === 'Pending').length;
 
-                    {/* Quick Access to Clearance Certificate */}
-                    <TouchableOpacity
-                      style={styles.noDueQuickPassBtn}
-                      onPress={() => setNoDueModalVisible(true)}
-                      activeOpacity={0.8}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={{ fontSize: 16 }}>🛡️</Text>
-                        <View>
-                          <Text style={styles.noDueQuickPassTitle}>Library No-Dues: ELIGIBLE</Text>
-                          <Text style={styles.noDueQuickPassSubtitle}>Zero fines • Tap to view certificate</Text>
-                        </View>
-                      </View>
-                      <Text style={{ color: '#059669', fontSize: 13, fontWeight: '800' }}>View Pass →</Text>
-                    </TouchableOpacity>
-                  </View>
+                const calcFine = libraryTransactions.reduce((acc: number, tx: any) => {
+                  const fine = Number(tx.fineAmount || 0);
+                  const paid = Number(tx.finePaid || 0);
+                  return acc + Math.max(0, fine - paid);
+                }, 0);
 
-                  {/* Native Full-Width Segmented Tab Switcher */}
-                  <View style={styles.nativeSegmentContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.nativeSegmentBtn,
-                        (librarySubTab === 'catalog' || librarySubTab === 'clearance' || librarySubTab === 'requests') && styles.nativeSegmentBtnActive,
-                      ]}
-                      onPress={() => setLibrarySubTab('catalog')}
-                      activeOpacity={0.8}
-                    >
-                      <Text
-                        style={[
-                          styles.nativeSegmentText,
-                          (librarySubTab === 'catalog' || librarySubTab === 'clearance' || librarySubTab === 'requests') && styles.nativeSegmentTextActive,
-                        ]}
-                      >
-                        📖 Book Catalog ({catalogBooks.length > 0 ? catalogBooks.length : 3})
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.nativeSegmentBtn,
-                        librarySubTab === 'issued' && styles.nativeSegmentBtnActive,
-                      ]}
-                      onPress={() => setLibrarySubTab('issued')}
-                      activeOpacity={0.8}
-                    >
-                      <Text
-                        style={[
-                          styles.nativeSegmentText,
-                          librarySubTab === 'issued' && styles.nativeSegmentTextActive,
-                        ]}
-                      >
-                        📚 My Borrowed ({libraryBooks.length})
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                const isEligible =
+                  activeIssuedList.length === 0 &&
+                  overdueList.length === 0 &&
+                  pendingIssueList.length === 0 &&
+                  pendingReturnCount === 0 &&
+                  calcFine === 0;
 
-                  {/* Segment 1: Catalog */}
-                  {(librarySubTab === 'catalog' || librarySubTab === 'clearance' || librarySubTab === 'requests') && (
+                const pendingReturnTxIds = new Set(
+                  libraryReturnRequests
+                    .filter((r: any) => r.status === 'Pending')
+                    .map((r: any) => String(r.transactionId?._id || r.transactionId || ''))
+                );
+
+                return (
+                  <View style={{ gap: 12 }}>
+                    {/* Top Mobile Header & Live Stats Card */}
                     <View style={styles.card}>
-                      {/* Search Bar */}
-                      <View style={styles.searchBoxRow}>
-                        <Text style={{ fontSize: 14 }}>🔍</Text>
-                        <TextInput
-                          style={styles.searchBoxInput}
-                          placeholder="Search title, author, or book ID..."
-                          placeholderTextColor="#94A3B8"
-                          value={librarySearchText}
-                          onChangeText={setLibrarySearchText}
-                        />
-                        {librarySearchText ? (
-                          <TouchableOpacity onPress={() => setLibrarySearchText('')}>
-                            <Text style={{ fontSize: 14, color: '#94A3B8' }}>✕</Text>
-                          </TouchableOpacity>
-                        ) : null}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <View style={styles.catalogBookIconBox}>
+                            <Text style={{ fontSize: 18 }}>📖</Text>
+                          </View>
+                          <View>
+                            <Text style={styles.cardHeaderTitle}>Central Library</Text>
+                            <Text style={{ fontSize: 11, color: '#64748B' }}>Catalog, Borrowings & Clearance</Text>
+                          </View>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.refreshPillBtn}
+                          onPress={loadData}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.refreshPillBtnText}>🔄 Sync</Text>
+                        </TouchableOpacity>
                       </View>
 
-                      {/* Filter Chips */}
-                      <View style={{ marginTop: 10 }}>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                          {['All Categories', 'TAMIL', 'RAMANUJAM'].map((cat) => (
-                            <TouchableOpacity
-                              key={cat}
-                              style={[
-                                styles.filterChipPill,
-                                libraryCategoryFilter === cat && styles.filterChipPillActive,
-                              ]}
-                              onPress={() => setLibraryCategoryFilter(cat)}
-                              activeOpacity={0.7}
-                            >
-                              <Text
-                                style={[
-                                  styles.filterChipPillText,
-                                  libraryCategoryFilter === cat && styles.filterChipPillTextActive,
-                                ]}
-                              >
-                                {cat}
+                      {/* 4-Stat Mobile Metrics Strip */}
+                      <View style={styles.nativeStatStripRow}>
+                        <View style={styles.nativeStatChip}>
+                          <Text style={[styles.nativeStatChipValue, { color: '#1E3A8A' }]}>{activeIssuedList.length}</Text>
+                          <Text style={styles.nativeStatChipLabel}>Borrowed</Text>
+                        </View>
+                        <View style={styles.nativeStatChipDivider} />
+                        <View style={styles.nativeStatChip}>
+                          <Text style={[styles.nativeStatChipValue, { color: '#D97706' }]}>{pendingIssueList.length + reservationsList.length}</Text>
+                          <Text style={styles.nativeStatChipLabel}>Requests</Text>
+                        </View>
+                        <View style={styles.nativeStatChipDivider} />
+                        <View style={styles.nativeStatChip}>
+                          <Text style={[styles.nativeStatChipValue, { color: overdueList.length > 0 ? '#DC2626' : '#059669' }]}>
+                            {overdueList.length}
+                          </Text>
+                          <Text style={styles.nativeStatChipLabel}>Overdue</Text>
+                        </View>
+                        <View style={styles.nativeStatChipDivider} />
+                        <View style={styles.nativeStatChip}>
+                          <Text style={[styles.nativeStatChipValue, { color: calcFine > 0 ? '#DC2626' : '#059669' }]}>
+                            ₹{calcFine}
+                          </Text>
+                          <Text style={styles.nativeStatChipLabel}>Fine Due</Text>
+                        </View>
+                      </View>
+
+                      {/* Dynamic Clearance Status Banner */}
+                      {!isEligible ? (
+                        <TouchableOpacity
+                          style={[styles.noDueQuickPassBtn, { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', marginTop: 10 }]}
+                          onPress={() => setLibrarySubTab('clearance')}
+                          activeOpacity={0.8}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                            <Text style={{ fontSize: 16 }}>⚠️</Text>
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.noDueQuickPassTitle, { color: '#B91C1C' }]}>
+                                Library No-Dues: INELIGIBLE
                               </Text>
-                            </TouchableOpacity>
-                          ))}
-                          <TouchableOpacity
-                            style={[
-                              styles.filterChipPill,
-                              libraryAvailableOnly && styles.filterChipPillActive,
-                            ]}
-                            onPress={() => setLibraryAvailableOnly(!libraryAvailableOnly)}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={[styles.filterChipPillText, libraryAvailableOnly && styles.filterChipPillTextActive]}>
-                              {libraryAvailableOnly ? '✓ In Stock Only' : 'Filter In Stock'}
-                            </Text>
-                          </TouchableOpacity>
-                        </ScrollView>
-                      </View>
-
-                      {/* Catalog Items List */}
-                      <View style={{ marginTop: 12, gap: 10 }}>
-                        {(() => {
-                          const catalogList = (catalogBooks.length > 0 ? catalogBooks : [
-                            {
-                              _id: 'bk-1521',
-                              bookId: 'LIB-1521',
-                              title: 'Algorithm',
-                              author: 'Agila',
-                              category: 'RAMANUJAM',
-                              department: 'TAMIL',
-                              location: 'Rack R06 • Shelf S03',
-                              availableCopies: 3,
-                              totalCopies: 3,
-                              isReserved: true,
-                            },
-                            {
-                              _id: 'bk-1522',
-                              bookId: 'LIB-1522',
-                              title: 'MATHS',
-                              author: 'Thomas Edition',
-                              category: 'RAMANUJAM',
-                              department: 'TAMIL',
-                              location: 'Rack R01 • Shelf S01',
-                              availableCopies: 9,
-                              totalCopies: 10,
-                              isReserved: false,
-                            },
-                            {
-                              _id: 'bk-1523',
-                              bookId: 'LIB-1523',
-                              title: 'Tamil Literature & Grammar',
-                              author: 'Dr. Subramanian',
-                              category: 'TAMIL',
-                              department: 'TAMIL',
-                              location: 'Rack R02 • Shelf S02',
-                              availableCopies: 5,
-                              totalCopies: 5,
-                              isReserved: false,
-                            },
-                          ]).filter((b: any) => {
-                            if (libraryCategoryFilter !== 'All Categories') {
-                              const matchCat = (b.category || '').toLowerCase() === libraryCategoryFilter.toLowerCase() ||
-                                               (b.department || '').toLowerCase() === libraryCategoryFilter.toLowerCase();
-                              if (!matchCat) return false;
-                            }
-                            if (libraryAvailableOnly && Number(b.availableCopies || 0) <= 0) return false;
-                            if (librarySearchText.trim()) {
-                              const q = librarySearchText.trim().toLowerCase();
-                              const title = (b.title || '').toLowerCase();
-                              const author = (b.author || '').toLowerCase();
-                              const id = (b.bookId || b._id || '').toLowerCase();
-                              return title.includes(q) || author.includes(q) || id.includes(q);
-                            }
-                            return true;
-                          });
-
-                          if (catalogList.length === 0) {
-                            return (
-                              <View style={styles.emptyStateBox}>
-                                <Text style={styles.emptyStateText}>No titles matching your search criteria.</Text>
-                              </View>
-                            );
-                          }
-
-                          return catalogList.map((cb: any, idx: number) => (
-                            <View key={`cat-book-${cb._id || cb.bookId || idx}-${idx}`} style={styles.catalogCardItem}>
-                              <View style={styles.catalogCardTopRow}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 8 }}>
-                                  <View style={styles.catalogBookIconBox}>
-                                    <Text style={{ fontSize: 16 }}>📖</Text>
-                                  </View>
-                                  <View style={{ flex: 1 }}>
-                                    <Text style={styles.catalogBookTitle} numberOfLines={1}>{cb.title}</Text>
-                                    <Text style={styles.catalogBookAuthor}>by {cb.author || 'Author'}</Text>
-                                    <Text style={styles.catalogBookIdBadge}>ID: {cb.bookId || `LIB-${1520 + idx}`}</Text>
-                                  </View>
-                                </View>
-                                <View style={styles.stockAvailabilityBadge}>
-                                  <Text style={styles.stockAvailabilityText}>
-                                    ● {cb.availableCopies !== undefined ? `${cb.availableCopies} of ${cb.totalCopies || cb.availableCopies} Available` : 'In Stock'}
-                                  </Text>
-                                </View>
-                              </View>
-
-                              <View style={styles.catalogMetaRow}>
-                                <View style={{ flex: 1 }}>
-                                  <Text style={styles.catalogMetaCategory}>{cb.category || 'GENERAL'}</Text>
-                                  <Text style={styles.catalogMetaDept}>Dept: {cb.department || profile.dept || 'TAMIL'}</Text>
-                                </View>
-                                <View style={styles.catalogLocationPill}>
-                                  <Text style={styles.catalogLocationText}>📍 {cb.location || 'Rack R06 • Shelf S03'}</Text>
-                                </View>
-                              </View>
-
-                              <View style={styles.catalogActionRow}>
-                                {cb.isReserved ? (
-                                  <View style={styles.reservedBadge}>
-                                    <Text style={styles.reservedBadgeText}>🔖 Reserved</Text>
-                                  </View>
-                                ) : (
-                                  <TouchableOpacity
-                                    style={styles.requestBookBtn}
-                                    onPress={() => {
-                                      setSelectedCatalogBook(cb);
-                                      setRequestBookModalVisible(true);
-                                    }}
-                                    activeOpacity={0.7}
-                                  >
-                                    <Text style={styles.requestBookBtnText}>📖 Request Book</Text>
-                                  </TouchableOpacity>
-                                )}
-                              </View>
-                            </View>
-                          ));
-                        })()}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Segment 2: My Issued Books */}
-                  {librarySubTab === 'issued' && (
-                    <View style={styles.card}>
-                      <Text style={styles.cardHeaderTitle}>📚 Borrowed Books in Circulation</Text>
-                      {libraryBooks.length === 0 ? (
-                        <View style={styles.emptyStateBox}>
-                          <Text style={styles.emptyStateText}>No active library books borrowed currently. Quota: 4 Books available.</Text>
-                        </View>
-                      ) : (
-                        libraryBooks.map((b, idx) => (
-                          <View key={`issued-book-${b.id || idx}-${idx}`} style={styles.catalogCardItem}>
-                            <View style={styles.catalogCardTopRow}>
-                              <View style={{ flex: 1 }}>
-                                <Text style={styles.catalogBookTitle}>{b.title}</Text>
-                                <Text style={styles.catalogBookAuthor}>by {b.author}</Text>
-                              </View>
-                              <View style={[styles.statusPill, { backgroundColor: '#EFF6FF' }]}>
-                                <Text style={[styles.statusPillText, { color: '#2563EB' }]}>Due: {b.dueDate}</Text>
-                              </View>
-                            </View>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
-                              <Text style={{ fontSize: 11, color: '#64748B' }}>Renewals Remaining: {b.renewalsLeft}</Text>
-                              <TouchableOpacity
-                                style={styles.applyLeavePill}
-                                onPress={() => setSelectedLibraryBook(b)}
-                              >
-                                <Text style={styles.applyLeavePillText}>Renew Online</Text>
-                              </TouchableOpacity>
+                              <Text style={[styles.noDueQuickPassSubtitle, { color: '#7F1D1D' }]}>
+                                {activeIssuedList.length} active borrowing(s) require return before clearance
+                              </Text>
                             </View>
                           </View>
-                        ))
+                          <Text style={{ color: '#B91C1C', fontSize: 12, fontWeight: '800' }}>Rules →</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.noDueQuickPassBtn, { marginTop: 10 }]}
+                          onPress={() => setNoDueModalVisible(true)}
+                          activeOpacity={0.8}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                            <Text style={{ fontSize: 16 }}>🛡️</Text>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.noDueQuickPassTitle}>Library No-Dues: ELIGIBLE</Text>
+                              <Text style={styles.noDueQuickPassSubtitle}>Zero pending books & zero fines • Tap for pass</Text>
+                            </View>
+                          </View>
+                          <Text style={{ color: '#059669', fontSize: 12, fontWeight: '800' }}>View Pass →</Text>
+                        </TouchableOpacity>
                       )}
                     </View>
-                  )}
-                </View>
-              )}
+
+                    {/* Native Horizontal Pill Navigation */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                      {[
+                        { id: 'catalog', label: `Catalog (${catalogBooks.length > 0 ? catalogBooks.length : 3})`, icon: '📖' },
+                        { id: 'issued', label: `Issued (${activeIssuedList.length})`, icon: '📚' },
+                        { id: 'requests', label: `Requests & Returns (${pendingIssueList.length + reservationsList.length + returnReqList.length})`, icon: '⏳' },
+                        { id: 'clearance', label: 'No Due Clearance', icon: '🛡️' },
+                      ].map((tab) => (
+                        <TouchableOpacity
+                          key={tab.id}
+                          style={[
+                            styles.segmentSubTabPill,
+                            librarySubTab === tab.id && styles.segmentSubTabPillActive,
+                          ]}
+                          onPress={() => setLibrarySubTab(tab.id as any)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.segmentSubTabPillText,
+                              librarySubTab === tab.id && styles.segmentSubTabPillTextActive,
+                            ]}
+                          >
+                            {tab.icon} {tab.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+
+                    {/* SCREEN 1: LIBRARY CATALOG */}
+                    {librarySubTab === 'catalog' && (
+                      <View style={styles.card}>
+                        {/* Search Bar */}
+                        <View style={styles.searchBoxRow}>
+                          <Text style={{ fontSize: 14 }}>🔍</Text>
+                          <TextInput
+                            style={styles.searchBoxInput}
+                            placeholder="Search title, author, or book ID..."
+                            placeholderTextColor="#94A3B8"
+                            value={librarySearchText}
+                            onChangeText={setLibrarySearchText}
+                          />
+                          {librarySearchText ? (
+                            <TouchableOpacity onPress={() => setLibrarySearchText('')}>
+                              <Text style={{ fontSize: 14, color: '#94A3B8' }}>✕</Text>
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+
+                        {/* Filter Chips */}
+                        <View style={{ marginTop: 10 }}>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                            {['All Categories', 'TAMIL', 'RAMANUJAM'].map((cat) => (
+                              <TouchableOpacity
+                                key={cat}
+                                style={[
+                                  styles.filterChipPill,
+                                  libraryCategoryFilter === cat && styles.filterChipPillActive,
+                                ]}
+                                onPress={() => setLibraryCategoryFilter(cat)}
+                                activeOpacity={0.7}
+                              >
+                                <Text
+                                  style={[
+                                    styles.filterChipPillText,
+                                    libraryCategoryFilter === cat && styles.filterChipPillTextActive,
+                                  ]}
+                                >
+                                  {cat}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                            <TouchableOpacity
+                              style={[
+                                styles.filterChipPill,
+                                libraryAvailableOnly && styles.filterChipPillActive,
+                              ]}
+                              onPress={() => setLibraryAvailableOnly(!libraryAvailableOnly)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.filterChipPillText, libraryAvailableOnly && styles.filterChipPillTextActive]}>
+                                {libraryAvailableOnly ? '✓ In Stock Only' : 'Filter In Stock'}
+                              </Text>
+                            </TouchableOpacity>
+                          </ScrollView>
+                        </View>
+
+                        {/* Catalog Items List */}
+                        <View style={{ marginTop: 12, gap: 10 }}>
+                          {(() => {
+                            const catalogList = (catalogBooks.length > 0 ? catalogBooks : [
+                              {
+                                _id: 'bk-1521',
+                                bookId: 'LIB-1521',
+                                title: 'Algorithm',
+                                author: 'Agila',
+                                category: 'RAMANUJAM',
+                                department: 'TAMIL',
+                                location: 'Rack R06 • Shelf S03',
+                                availableCopies: 3,
+                                totalCopies: 3,
+                                isReserved: false,
+                              },
+                              {
+                                _id: 'bk-1522',
+                                bookId: 'LIB-1522',
+                                title: 'MATHS',
+                                author: 'Thomas Edition',
+                                category: 'RAMANUJAM',
+                                department: 'TAMIL',
+                                location: 'Rack R01 • Shelf S01',
+                                availableCopies: 9,
+                                totalCopies: 10,
+                                isReserved: false,
+                              },
+                              {
+                                _id: 'bk-1523',
+                                bookId: 'LIB-1523',
+                                title: 'Tamil Literature & Grammar',
+                                author: 'Dr. Subramanian',
+                                category: 'TAMIL',
+                                department: 'TAMIL',
+                                location: 'Rack R02 • Shelf S02',
+                                availableCopies: 5,
+                                totalCopies: 5,
+                                isReserved: false,
+                              },
+                            ]).filter((b: any) => {
+                              if (libraryCategoryFilter !== 'All Categories') {
+                                const matchCat = (b.category || '').toLowerCase() === libraryCategoryFilter.toLowerCase() ||
+                                                 (b.department || '').toLowerCase() === libraryCategoryFilter.toLowerCase();
+                                if (!matchCat) return false;
+                              }
+                              if (libraryAvailableOnly && Number(b.availableCopies || 0) <= 0) return false;
+                              if (librarySearchText.trim()) {
+                                const q = librarySearchText.trim().toLowerCase();
+                                const title = (b.title || '').toLowerCase();
+                                const author = (b.author || '').toLowerCase();
+                                const id = (b.bookId || b._id || '').toLowerCase();
+                                return title.includes(q) || author.includes(q) || id.includes(q);
+                              }
+                              return true;
+                            });
+
+                            if (catalogList.length === 0) {
+                              return (
+                                <View style={styles.emptyStateBox}>
+                                  <Text style={styles.emptyStateText}>No titles matching your search criteria.</Text>
+                                </View>
+                              );
+                            }
+
+                            return catalogList.map((cb: any, idx: number) => {
+                              const bId = String(cb._id || cb.id || cb.bookId || '');
+                              const isAlreadyRequested = pendingIssueList.some((tx: any) => String(tx.bookId?._id || tx.bookId || '') === bId) ||
+                                                         reservationsList.some((r: any) => String(r.bookId?._id || r.bookId || '') === bId);
+
+                              return (
+                                <View key={`cat-book-${cb._id || cb.bookId || idx}-${idx}`} style={styles.catalogCardItem}>
+                                  <View style={styles.catalogCardTopRow}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 8 }}>
+                                      <View style={styles.catalogBookIconBox}>
+                                        <Text style={{ fontSize: 16 }}>📖</Text>
+                                      </View>
+                                      <View style={{ flex: 1 }}>
+                                        <Text style={styles.catalogBookTitle} numberOfLines={1}>{cb.title}</Text>
+                                        <Text style={styles.catalogBookAuthor}>by {cb.author || 'Author'}</Text>
+                                        <Text style={styles.catalogBookIdBadge}>ID: {cb.bookId || `LIB-${1520 + idx}`}</Text>
+                                      </View>
+                                    </View>
+                                    <View style={styles.stockAvailabilityBadge}>
+                                      <Text style={styles.stockAvailabilityText}>
+                                        ● {cb.availableCopies !== undefined ? `${cb.availableCopies} of ${cb.totalCopies || cb.availableCopies} Available` : 'In Stock'}
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  <View style={styles.catalogMetaRow}>
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={styles.catalogMetaCategory}>{cb.category || 'GENERAL'}</Text>
+                                      <Text style={styles.catalogMetaDept}>Dept: {cb.department || profile.dept || 'TAMIL'}</Text>
+                                    </View>
+                                    <View style={styles.catalogLocationPill}>
+                                      <Text style={styles.catalogLocationText}>📍 {cb.location || 'Rack R06 • Shelf S03'}</Text>
+                                    </View>
+                                  </View>
+
+                                  <View style={styles.catalogActionRow}>
+                                    {isAlreadyRequested || cb.isReserved ? (
+                                      <View style={styles.reservedBadge}>
+                                        <Text style={styles.reservedBadgeText}>🔖 Requested / Reserved</Text>
+                                      </View>
+                                    ) : (
+                                      <TouchableOpacity
+                                        style={styles.requestBookBtn}
+                                        onPress={() => {
+                                          setSelectedCatalogBook(cb);
+                                          setRequestBookModalVisible(true);
+                                        }}
+                                        activeOpacity={0.7}
+                                      >
+                                        <Text style={styles.requestBookBtnText}>📖 Request Book</Text>
+                                      </TouchableOpacity>
+                                    )}
+                                  </View>
+                                </View>
+                              );
+                            });
+                          })()}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* SCREEN 2: MY ISSUED BOOKS */}
+                    {librarySubTab === 'issued' && (
+                      <View style={styles.card}>
+                        <View style={styles.cardHeaderRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.cardHeaderTitle}>📚 My Borrowed Books ({activeIssuedList.length})</Text>
+                            <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                              Active book loans in hand requiring physical check-in for clearance
+                            </Text>
+                          </View>
+                        </View>
+
+                        {activeIssuedList.length === 0 ? (
+                          <View style={[styles.emptyStateBox, { paddingVertical: 24 }]}>
+                            <Text style={{ fontSize: 28, marginBottom: 6 }}>🎉</Text>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#059669', marginBottom: 2 }}>
+                              No Active Book Loans!
+                            </Text>
+                            <Text style={styles.emptyStateText}>
+                              All borrowed items have been cleared. You are eligible for Library No-Due Clearance.
+                            </Text>
+                          </View>
+                        ) : (
+                          <View style={{ gap: 10, marginTop: 10 }}>
+                            {activeIssuedList.map((b: any, idx: number) => {
+                              const txId = String(b._id || b.id || b.transactionId || '');
+                              const hasReturnPending = pendingReturnTxIds.has(txId);
+                              const isOverdue = b.status === 'Overdue' || (b.fine && Number(b.fine) > 0);
+
+                              return (
+                                <View key={`issued-book-${b._id || b.id || idx}-${idx}`} style={styles.catalogCardItem}>
+                                  <View style={styles.catalogCardTopRow}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, marginRight: 8 }}>
+                                      <View style={[styles.catalogBookIconBox, { backgroundColor: isOverdue ? '#FEF2F2' : '#EFF6FF' }]}>
+                                        <Text style={{ fontSize: 16 }}>{isOverdue ? '⚠️' : '📖'}</Text>
+                                      </View>
+                                      <View style={{ flex: 1 }}>
+                                        <Text style={styles.catalogBookTitle} numberOfLines={1}>
+                                          {b.bookId?.title || b.title || 'Library Book'}
+                                        </Text>
+                                        <Text style={styles.catalogBookAuthor}>
+                                          by {b.bookId?.author || b.author || 'Author'}
+                                        </Text>
+                                        <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>
+                                          Loan Ref: TX-{txId.slice(-6) || `00${idx + 1}`}
+                                        </Text>
+                                      </View>
+                                    </View>
+                                    <View style={[styles.statusPill, { backgroundColor: isOverdue ? '#FEF2F2' : '#EFF6FF' }]}>
+                                      <Text style={[styles.statusPillText, { color: isOverdue ? '#DC2626' : '#2563EB', fontWeight: '800' }]}>
+                                        {isOverdue ? 'Overdue' : `Due: ${b.dueDate || '14 Days'}`}
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  <View style={styles.catalogMetaRow}>
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={styles.catalogMetaCategory}>
+                                        {b.bookId?.category || b.category || 'ACADEMIC'}
+                                      </Text>
+                                      <Text style={styles.catalogMetaDept}>
+                                        Fine: ₹{Number(b.fineAmount || b.fine || 0)}
+                                      </Text>
+                                    </View>
+
+                                    {/* Action: Return Request Button */}
+                                    {hasReturnPending ? (
+                                      <View style={styles.libReturnPendingBadge}>
+                                        <Text style={styles.libReturnPendingBadgeText}>
+                                          ⏳ Return Pending Verification
+                                        </Text>
+                                      </View>
+                                    ) : (
+                                      <TouchableOpacity
+                                        style={styles.libReturnBtn}
+                                        onPress={() => {
+                                          setSelectedTxForReturn(b);
+                                          setReturnConfirmModalVisible(true);
+                                        }}
+                                        activeOpacity={0.7}
+                                      >
+                                        <Text style={styles.libReturnBtnText}>🔄 Return Book</Text>
+                                      </TouchableOpacity>
+                                    )}
+                                  </View>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                    {/* SCREEN 3: MY REQUESTS & RETURN STATUS */}
+                    {librarySubTab === 'requests' && (
+                      <View style={{ gap: 12 }}>
+                        {/* Section A: Issue Requests */}
+                        <View style={styles.card}>
+                          <Text style={styles.cardHeaderTitle}>📥 Book Issue Requests ({pendingIssueList.length + reservationsList.length})</Text>
+                          <Text style={styles.sectionSubtitle}>Requested titles awaiting librarian review & desk pickup</Text>
+
+                          {pendingIssueList.length + reservationsList.length === 0 ? (
+                            <View style={[styles.emptyStateBox, { paddingVertical: 14 }]}>
+                              <Text style={styles.emptyStateText}>No pending book requests currently.</Text>
+                            </View>
+                          ) : (
+                            <View style={{ gap: 8, marginTop: 10 }}>
+                              {pendingIssueList.map((tx: any, idx: number) => (
+                                <View key={`pending-issue-${tx._id || idx}-${idx}`} style={styles.catalogCardItem}>
+                                  <View style={styles.catalogCardTopRow}>
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={styles.catalogBookTitle}>{tx.bookId?.title || tx.bookTitle || 'Book Title'}</Text>
+                                      <Text style={styles.catalogBookAuthor}>by {tx.bookId?.author || tx.author || 'Author'}</Text>
+                                    </View>
+                                    <View style={[styles.statusPill, { backgroundColor: tx.status === 'Approved' ? '#ECFDF5' : '#FFFBEB' }]}>
+                                      <Text style={[styles.statusPillText, { color: tx.status === 'Approved' ? '#059669' : '#D97706', fontWeight: '800' }]}>
+                                        {tx.status === 'Approved' ? '✓ Ready to Collect' : '⏳ Awaiting Issue'}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  <Text style={{ fontSize: 11, color: '#64748B', marginTop: 4 }}>
+                                    Collect within 48 hours at Central Library counter with student ID.
+                                  </Text>
+                                </View>
+                              ))}
+                              {reservationsList.map((res: any, idx: number) => (
+                                <View key={`reservation-${res._id || idx}-${idx}`} style={styles.catalogCardItem}>
+                                  <View style={styles.catalogCardTopRow}>
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={styles.catalogBookTitle}>{res.bookId?.title || 'Reserved Title'}</Text>
+                                      <Text style={styles.catalogBookAuthor}>by {res.bookId?.author || 'Author'}</Text>
+                                    </View>
+                                    <View style={[styles.statusPill, { backgroundColor: '#EFF6FF' }]}>
+                                      <Text style={[styles.statusPillText, { color: '#2563EB', fontWeight: '800' }]}>
+                                        🔖 Reserved
+                                      </Text>
+                                    </View>
+                                  </View>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Section B: Return Requests */}
+                        <View style={styles.card}>
+                          <Text style={styles.cardHeaderTitle}>📤 Book Return Requests ({returnReqList.length})</Text>
+                          <Text style={styles.sectionSubtitle}>Track physical return verification & librarian signoff</Text>
+
+                          {returnReqList.length === 0 ? (
+                            <View style={[styles.emptyStateBox, { paddingVertical: 14 }]}>
+                              <Text style={styles.emptyStateText}>No return requests submitted yet.</Text>
+                            </View>
+                          ) : (
+                            <View style={{ gap: 8, marginTop: 10 }}>
+                              {returnReqList.map((rr: any, idx: number) => (
+                                <View key={`return-req-${rr._id || idx}-${idx}`} style={styles.catalogCardItem}>
+                                  <View style={styles.catalogCardTopRow}>
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={styles.catalogBookTitle}>
+                                        {rr.bookId?.title || 'Returned Book'}
+                                      </Text>
+                                      <Text style={styles.catalogBookAuthor}>
+                                        Submitted on {rr.createdAt ? new Date(rr.createdAt).toLocaleDateString('en-GB') : 'Today'}
+                                      </Text>
+                                    </View>
+                                    <View
+                                      style={[
+                                        styles.statusPill,
+                                        {
+                                          backgroundColor:
+                                            rr.status === 'Completed' ? '#ECFDF5' : rr.status === 'Rejected' ? '#FEF2F2' : '#FFFBEB',
+                                        },
+                                      ]}
+                                    >
+                                      <Text
+                                        style={[
+                                          styles.statusPillText,
+                                          {
+                                            color:
+                                              rr.status === 'Completed' ? '#059669' : rr.status === 'Rejected' ? '#DC2626' : '#D97706',
+                                            fontWeight: '800',
+                                          },
+                                        ]}
+                                      >
+                                        {rr.status === 'Completed'
+                                          ? '✓ Return Completed'
+                                          : rr.status === 'Rejected'
+                                          ? '✕ Declined'
+                                          : '⏳ Inspection Pending'}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  <Text style={{ fontSize: 11, color: '#64748B', marginTop: 4 }}>
+                                    {rr.remarks || 'Present book at desk for barcode scanning.'}
+                                  </Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* SCREEN 4: NO DUE CLEARANCE */}
+                    {librarySubTab === 'clearance' && (
+                      <View style={{ gap: 12 }}>
+                        {!isEligible ? (
+                          <View style={styles.clearanceIneligibleCard}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                              <Text style={{ fontSize: 26 }}>⚠️</Text>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 15, fontWeight: '900', color: '#991B1B' }}>
+                                  Clearance Status: INELIGIBLE
+                                </Text>
+                                <Text style={{ fontSize: 11, color: '#7F1D1D', marginTop: 1 }}>
+                                  Active borrowings must be cleared before No-Dues can be generated.
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Compliance Checklist */}
+                            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#FECACA', marginTop: 6 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: '#991B1B', textTransform: 'uppercase', marginBottom: 6 }}>
+                                Institutional Clearance Requirements
+                              </Text>
+
+                              <View style={styles.clearanceCheckRow}>
+                                <Text style={{ fontSize: 12, color: '#334155' }}>1. All Borrowed Books Returned</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: activeIssuedList.length === 0 ? '#059669' : '#DC2626' }}>
+                                  {activeIssuedList.length === 0 ? '✓ 0 Borrowed' : `❌ ${activeIssuedList.length} In Hand`}
+                                </Text>
+                              </View>
+
+                              <View style={styles.clearanceCheckRow}>
+                                <Text style={{ fontSize: 12, color: '#334155' }}>2. Return Inspection Completed</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: pendingReturnCount === 0 ? '#059669' : '#D97706' }}>
+                                  {pendingReturnCount === 0 ? '✓ Cleared' : `⏳ ${pendingReturnCount} Pending`}
+                                </Text>
+                              </View>
+
+                              <View style={styles.clearanceCheckRow}>
+                                <Text style={{ fontSize: 12, color: '#334155' }}>3. Overdue Items</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: overdueList.length === 0 ? '#059669' : '#DC2626' }}>
+                                  {overdueList.length === 0 ? '✓ 0 Overdue' : `❌ ${overdueList.length} Overdue`}
+                                </Text>
+                              </View>
+
+                              <View style={[styles.clearanceCheckRow, { borderBottomWidth: 0 }]}>
+                                <Text style={{ fontSize: 12, color: '#334155' }}>4. Outstanding Library Fine</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: calcFine === 0 ? '#059669' : '#DC2626' }}>
+                                  {calcFine === 0 ? '✓ ₹0 Due' : `❌ ₹${calcFine} Due`}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <TouchableOpacity
+                              style={[styles.primaryBtn, { backgroundColor: '#1E3A8A', marginTop: 4, height: 44 }]}
+                              onPress={() => setLibrarySubTab('issued')}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.primaryBtnText}>📚 Return Issued Books Now</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <View style={styles.clearanceEligibleCard}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <View>
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: '#047857', letterSpacing: 0.8 }}>
+                                  CENTRAL LIBRARY DIVISION
+                                </Text>
+                                <Text style={{ fontSize: 16, fontWeight: '900', color: '#065F46', marginTop: 2 }}>
+                                  Institutional Library Clearance
+                                </Text>
+                              </View>
+                              <View style={styles.certBadgeSeal}>
+                                <Text style={styles.certBadgeSealText}>✓ VERIFIED</Text>
+                              </View>
+                            </View>
+
+                            <View style={{ backgroundColor: '#FFFFFF', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#A7F3D0', gap: 6 }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ fontSize: 12, color: '#64748B' }}>Certificate Ref:</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>
+                                  {libraryClearanceDoc?.certificateRef || `ERP/LIB-NDC/2026/${profile.rollNo || 'RAM001'}`}
+                                </Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ fontSize: 12, color: '#64748B' }}>Student Name:</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>{profile.name}</Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ fontSize: 12, color: '#64748B' }}>Roll / ID:</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>{profile.rollNo}</Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ fontSize: 12, color: '#64748B' }}>Department:</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A' }}>{profile.dept} • {profile.sem}</Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ fontSize: 12, color: '#64748B' }}>All Materials Returned:</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>✓ Yes (100% Cleared)</Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ fontSize: 12, color: '#64748B' }}>Outstanding Dues:</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>₹0 (No Pending Fines)</Text>
+                              </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                              <TouchableOpacity
+                                style={[styles.primaryBtn, { flex: 1, backgroundColor: '#059669', height: 44 }]}
+                                onPress={() => setNoDueModalVisible(true)}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.primaryBtnText}>📄 View Official Pass</Text>
+                              </TouchableOpacity>
+                              {!libraryClearanceDoc && (
+                                <TouchableOpacity
+                                  style={[styles.primaryBtn, { flex: 1, backgroundColor: '#1E3A8A', height: 44 }]}
+                                  onPress={handleRequestLibraryClearance}
+                                  disabled={requestingClearance}
+                                  activeOpacity={0.8}
+                                >
+                                  {requestingClearance ? (
+                                    <ActivityIndicator color="#FFFFFF" />
+                                  ) : (
+                                    <Text style={styles.primaryBtnText}>🛡️ Request Signoff</Text>
+                                  )}
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
 
               {/* ============================================================== */}
               {/* MODULE 2: CAMPUS PLACEMENTS & RECRUITMENT (Screenshot 3)       */}
@@ -4066,6 +4491,93 @@ export default function StudentDashboard({ user, onLogout }: Props) {
       </Modal>
 
       {/* ============================================================== */}
+      {/* 6B. LIBRARY RETURN REQUEST CONFIRMATION MODAL                  */}
+      {/* ============================================================== */}
+      <Modal
+        visible={returnConfirmModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!submittingReturnRequest) {
+            setReturnConfirmModalVisible(false);
+            setSelectedTxForReturn(null);
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: 520 }]}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#1E3A8A', letterSpacing: 1 }}>
+              CENTRAL LIBRARY CIRCULATION
+            </Text>
+            <Text style={[styles.modalTitle, { fontSize: 17, marginTop: 2 }]}>
+              Initiate Book Return Request
+            </Text>
+            <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 12 }}>
+              Physical Check-in & Condition Inspection
+            </Text>
+
+            <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12, gap: 6 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Book Title:</Text>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: '#1E293B', flex: 1, textAlign: 'right', marginLeft: 8 }} numberOfLines={1}>
+                  {selectedTxForReturn?.bookId?.title || selectedTxForReturn?.title || 'Library Book'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Author:</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>
+                  {selectedTxForReturn?.bookId?.author || selectedTxForReturn?.author || 'Library Author'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Accession / ID:</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>
+                  {selectedTxForReturn?.bookId?.bookId || selectedTxForReturn?.accessionNo || (selectedTxForReturn?._id ? String(selectedTxForReturn._id).slice(-8) : 'LIB-ACC')}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>Scheduled Due Date:</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: selectedTxForReturn?.status === 'Overdue' ? '#DC2626' : '#059669' }}>
+                  {selectedTxForReturn?.dueDate ? new Date(selectedTxForReturn.dueDate).toLocaleDateString('en-GB') : (selectedTxForReturn?.dueDate || 'On Schedule')}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.guidanceTipBox}>
+              <Text style={styles.guidanceTipEmoji}>🔄</Text>
+              <Text style={styles.guidanceTipText}>
+                Submitting this request notifies the Librarian to prepare physical check-in. Please present this physical copy at the Central Library desk to complete verification and clear your record.
+              </Text>
+            </View>
+
+            <View style={[styles.modalActions, { marginTop: 14 }]}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => {
+                  setReturnConfirmModalVisible(false);
+                  setSelectedTxForReturn(null);
+                }}
+                disabled={submittingReturnRequest}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, { backgroundColor: '#1E3A8A' }]}
+                onPress={() => handleReturnBookRequest(selectedTxForReturn)}
+                disabled={submittingReturnRequest}
+              >
+                {submittingReturnRequest ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Submit Return Request</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
       {/* 7. PLACEMENT DRIVE DETAILS & APPLICATION MODAL                 */}
       {/* ============================================================== */}
       <Modal
@@ -4514,64 +5026,167 @@ export default function StudentDashboard({ user, onLogout }: Props) {
         onRequestClose={() => setNoDueModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxHeight: 520 }]}>
-            <View style={{ alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingBottom: 12, marginBottom: 14 }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: '#1E3A8A', letterSpacing: 0.5, textAlign: 'center' }}>
-                CENTRAL INSTITUTIONAL LIBRARY
-              </Text>
-              <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2, textAlign: 'center' }}>
-                Circulation Wing • Library Automation & Records
-              </Text>
-              <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6, marginTop: 8 }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#059669' }}>
-                  OFFICIAL NO-DUES CLEARANCE CERTIFICATE
-                </Text>
-              </View>
-            </View>
+          {(() => {
+            const activeIssued = libraryTransactions.filter((tx: any) => tx.status === 'Issued' || tx.status === 'Overdue');
+            const overdue = libraryTransactions.filter((tx: any) => tx.status === 'Overdue');
+            const pendingIssue = libraryTransactions.filter((tx: any) => tx.status === 'Pending' || tx.status === 'Approved');
+            const pendingReturn = libraryReturnRequests.filter((r: any) => r.status === 'Pending');
+            const fineDue = libraryTransactions.reduce((acc: number, tx: any) => {
+              const fine = Number(tx.fineAmount || 0);
+              const paid = Number(tx.finePaid || 0);
+              return acc + Math.max(0, fine - paid);
+            }, 0);
+            const isCleared = activeIssued.length === 0 && overdue.length === 0 && pendingIssue.length === 0 && pendingReturn.length === 0 && fineDue === 0;
 
-            <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14, gap: 6 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12, color: '#64748B' }}>Student Name:</Text>
-                <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>{profile.name || 'HEMA SREE H'}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12, color: '#64748B' }}>Roll / Membership ID:</Text>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>{profile.rollNo || 'RAM001'}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12, color: '#64748B' }}>Department:</Text>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A' }}>{profile.dept || 'TAMIL'}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12, color: '#64748B' }}>Issued Books in Hand:</Text>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#059669' }}>0 Books (All Cleared)</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12, color: '#64748B' }}>Overdue Penalty / Fines:</Text>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#059669' }}>₹0 (Zero Dues)</Text>
-              </View>
-            </View>
+            if (!isCleared) {
+              return (
+                <View style={[styles.modalCard, { maxHeight: 540 }]}>
+                  <View style={{ alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#FEE2E2', paddingBottom: 12, marginBottom: 14 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#991B1B', letterSpacing: 0.5, textAlign: 'center' }}>
+                      CENTRAL INSTITUTIONAL LIBRARY
+                    </Text>
+                    <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2, textAlign: 'center' }}>
+                      Circulation Wing • Library Automation & Records
+                    </Text>
+                    <View style={{ backgroundColor: '#FEF2F2', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6, marginTop: 8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#DC2626' }}>
+                        ⚠️ CLEARANCE BLOCKED — UNRETURNED BOOKS
+                      </Text>
+                    </View>
+                  </View>
 
-            <View style={{ backgroundColor: '#ECFDF5', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#A7F3D0', marginBottom: 14 }}>
-              <Text style={{ fontSize: 11, color: '#065F46', lineHeight: 16 }}>
-                ✓ Certified that the above candidate has returned all borrowed learning materials, journals, and holds zero outstanding institutional dues.
-              </Text>
-            </View>
+                  <View style={{ backgroundColor: '#FFF1F2', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#FECDD3', marginBottom: 14, gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 12, color: '#64748B' }}>Candidate:</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>{profile.name || 'Student'}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 12, color: '#64748B' }}>Roll Number:</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E3A8A' }}>{profile.rollNo || 'RAM001'}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 12, color: '#64748B' }}>Issued Books in Hand:</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: activeIssued.length > 0 ? '#DC2626' : '#059669' }}>
+                        {activeIssued.length > 0 ? `❌ ${activeIssued.length} Books to Return` : '✓ 0 Borrowed'}
+                      </Text>
+                    </View>
+                    {pendingReturn.length > 0 && (
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 12, color: '#64748B' }}>Returns Under Inspection:</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: '#D97706' }}>
+                          ⏳ {pendingReturn.length} Pending Librarian Check-in
+                        </Text>
+                      </View>
+                    )}
+                    {overdue.length > 0 && (
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 12, color: '#64748B' }}>Overdue Books:</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: '#DC2626' }}>
+                          ❌ {overdue.length} Overdue
+                        </Text>
+                      </View>
+                    )}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 12, color: '#64748B' }}>Outstanding Penalty:</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: fineDue > 0 ? '#DC2626' : '#059669' }}>
+                        {fineDue > 0 ? `❌ ₹${fineDue} Due` : '✓ ₹0 Due'}
+                      </Text>
+                    </View>
+                  </View>
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setNoDueModalVisible(false)}>
-                <Text style={styles.modalCancelText}>Close</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSubmit, { backgroundColor: '#059669' }]}
-                onPress={() => {
-                  Alert.alert('No-Dues Certificate', 'Library Clearance Certificate saved to local device documents.');
-                }}
-              >
-                <Text style={styles.modalSubmitText}>🖨️ Save Certificate</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+                  <View style={{ backgroundColor: '#FEF2F2', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#FCA5A5', marginBottom: 14 }}>
+                    <Text style={{ fontSize: 11, color: '#991B1B', lineHeight: 16 }}>
+                      Institutional policy prohibits library clearance while borrowed literature is held. Please return all physical copies to the library counter to clear your account.
+                    </Text>
+                  </View>
+
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity style={styles.modalCancel} onPress={() => setNoDueModalVisible(false)}>
+                      <Text style={styles.modalCancelText}>Close</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalSubmit, { backgroundColor: '#1E3A8A' }]}
+                      onPress={() => {
+                        setNoDueModalVisible(false);
+                        setActiveTab('academics');
+                        setAcademicsSubTab('library');
+                        setLibrarySubTab('issued');
+                      }}
+                    >
+                      <Text style={styles.modalSubmitText}>📚 View Issued Books</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            }
+
+            return (
+              <View style={[styles.modalCard, { maxHeight: 540 }]}>
+                <View style={{ alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingBottom: 12, marginBottom: 14 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#1E3A8A', letterSpacing: 0.5, textAlign: 'center' }}>
+                    CENTRAL INSTITUTIONAL LIBRARY
+                  </Text>
+                  <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2, textAlign: 'center' }}>
+                    Circulation Wing • Library Automation & Records
+                  </Text>
+                  <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6, marginTop: 8 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#059669' }}>
+                      OFFICIAL NO-DUES CLEARANCE CERTIFICATE
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14, gap: 6 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>Certificate Ref:</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#1E3A8A' }}>
+                      {libraryClearanceDoc?.certificateRef || `ERP/LIB-NDC/2026/${profile.rollNo || 'RAM001'}`}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>Student Name:</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>{profile.name || 'Student'}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>Roll / Membership ID:</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563EB' }}>{profile.rollNo || 'RAM001'}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>Department:</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A' }}>{profile.dept || 'TAMIL'}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>Issued Books in Hand:</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#059669' }}>0 Books (All Cleared)</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>Overdue Penalty / Fines:</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#059669' }}>₹0 (Zero Dues)</Text>
+                  </View>
+                </View>
+
+                <View style={{ backgroundColor: '#ECFDF5', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#A7F3D0', marginBottom: 14 }}>
+                  <Text style={{ fontSize: 11, color: '#065F46', lineHeight: 16 }}>
+                    ✓ Certified that the above candidate has returned all borrowed learning materials, journals, and holds zero outstanding institutional dues.
+                  </Text>
+                </View>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity style={styles.modalCancel} onPress={() => setNoDueModalVisible(false)}>
+                    <Text style={styles.modalCancelText}>Close</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalSubmit, { backgroundColor: '#059669' }]}
+                    onPress={() => {
+                      Alert.alert('No-Dues Certificate', 'Library Clearance Certificate saved to local device documents.');
+                    }}
+                  >
+                    <Text style={styles.modalSubmitText}>🖨️ Save Certificate</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })()}
         </View>
       </Modal>
 
@@ -6374,8 +6989,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   segmentSubTabPillActive: {
-    backgroundColor: '#0F766E',
-    borderColor: '#0F766E',
+    backgroundColor: '#1E3A8A',
+    borderColor: '#1E3A8A',
   },
   segmentSubTabPillText: {
     fontSize: 12,
@@ -6412,8 +7027,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   filterChipPillActive: {
-    backgroundColor: '#0F766E',
-    borderColor: '#0F766E',
+    backgroundColor: '#1E3A8A',
+    borderColor: '#1E3A8A',
   },
   filterChipPillText: {
     fontSize: 11,
@@ -6440,9 +7055,11 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 8,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#EFF6FF',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
   catalogBookTitle: {
     fontSize: 14,
@@ -6524,7 +7141,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   requestBookBtn: {
-    backgroundColor: '#0F766E',
+    backgroundColor: '#2563EB',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -7065,5 +7682,72 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
     color: '#15803D',
+  },
+  libReturnBtn: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  libReturnBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#2563EB',
+  },
+  libReturnPendingBadge: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  libReturnPendingBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  clearanceIneligibleCard: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    borderRadius: 14,
+    padding: 16,
+    gap: 12,
+  },
+  clearanceEligibleCard: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+    borderRadius: 14,
+    padding: 16,
+    gap: 12,
+  },
+  clearanceCheckRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
+  },
+  certBadgeSeal: {
+    backgroundColor: '#059669',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  certBadgeSealText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
   },
 });

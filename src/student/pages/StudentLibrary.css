@@ -34,13 +34,13 @@
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: rgba(13, 148, 136, 0.12);
+  background: rgba(30, 58, 138, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #0d9488;
+  color: #1e3a8a;
   box-shadow: none;
-  border: 1px solid rgba(13, 148, 136, 0.2);
+  border: 1px solid rgba(30, 58, 138, 0.2);
   flex-shrink: 0;
 }
 
@@ -82,8 +82,8 @@
 
 .btn-library-refresh:hover {
   background: var(--bg-secondary, #f8fafc);
-  border-color: #0d9488;
-  color: #0d9488;
+  border-color: #2563eb;
+  color: #2563eb;
   transform: translateY(-1px);
 }
 
@@ -240,10 +240,10 @@
 }
 
 .library-tab-btn.active {
-  background: #0d9488;
+  background: #1e3a8a;
   color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.28);
+  box-shadow: 0 2px 8px rgba(30, 58, 138, 0.28);
 }
 
 .tab-badge {
@@ -367,8 +367,8 @@
 }
 
 .search-box-wrapper:focus-within {
-  border-color: #0d9488;
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .search-box-wrapper input {
@@ -405,7 +405,7 @@
 }
 
 .filter-select:focus {
-  border-color: #0d9488;
+  border-color: #2563eb;
 }
 
 .view-mode-toggle {
@@ -432,7 +432,7 @@
 
 .view-btn.active {
   background: var(--bg-card, #ffffff);
-  color: #0d9488;
+  color: #2563eb;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -459,13 +459,13 @@
 }
 
 .chip-btn:hover {
-  border-color: #0d9488;
-  color: #0d9488;
+  border-color: #2563eb;
+  color: #2563eb;
 }
 
 .chip-btn.active {
-  background: #0d9488;
-  border-color: #0d9488;
+  background: #1e3a8a;
+  border-color: #1e3a8a;
   color: #ffffff;
 }
 
@@ -536,8 +536,8 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(13, 148, 136, 0.1);
-  color: #0d9488;
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -688,13 +688,13 @@
 }
 
 .btn-request-action.primary {
-  background: #0d9488;
+  background: #2563eb;
   color: #ffffff;
-  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.25);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
 }
 
 .btn-request-action.primary:hover:not(:disabled) {
-  background: #0f766e;
+  background: #1e3a8a;
   transform: translateY(-1px);
 }
 
@@ -787,9 +787,9 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.35rem 0.75rem;
-  background: rgba(13, 148, 136, 0.1);
-  color: #0d9488;
-  border: 1px solid rgba(13, 148, 136, 0.25);
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.25);
   border-radius: 6px;
   font-size: 0.75rem;
   font-weight: 700;
@@ -799,7 +799,7 @@
 }
 
 .btn-table-action:hover:not(:disabled) {
-  background: #0d9488;
+  background: #2563eb;
   color: #ffffff;
 }
 
@@ -831,7 +831,7 @@
 .book-card-item:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
-  border-color: #0d9488;
+  border-color: #2563eb;
 }
 
 .book-card-top {
@@ -1000,14 +1000,14 @@
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #0d9488 0%, #047857 100%);
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
   color: #ffffff;
   font-weight: 800;
   font-size: 1.05rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 10px rgba(13, 148, 136, 0.25);
+  box-shadow: 0 3px 10px rgba(30, 58, 138, 0.25);
   flex-shrink: 0;
   letter-spacing: 0.05em;
 }
@@ -1111,7 +1111,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.55rem 1.15rem;
-  background: linear-gradient(135deg, #0d9488 0%, #059669 100%);
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
   color: #ffffff;
   border: none;
   border-radius: 10px;
@@ -1119,13 +1119,13 @@
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 3px 10px rgba(13, 148, 136, 0.25);
+  box-shadow: 0 3px 10px rgba(30, 58, 138, 0.25);
   white-space: nowrap;
 }
 
 .btn-clearance-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+  box-shadow: 0 4px 14px rgba(30, 58, 138, 0.35);
 }
 
 .btn-clearance-primary:disabled {
@@ -1602,8 +1602,8 @@
 }
 
 .fine-input-wrapper:focus-within {
-  border-color: #0d9488;
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .fine-input-field {
@@ -1642,9 +1642,9 @@
 }
 
 .fine-gateway-card.active {
-  border-color: #0d9488;
-  background: rgba(13, 148, 136, 0.08);
-  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.2);
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
 .fine-gateway-card .gw-label {
@@ -1655,7 +1655,7 @@
 }
 
 .fine-gateway-card.active .gw-label {
-  color: #0d9488;
+  color: #2563eb;
 }
 
 .fine-gateway-card .gw-sub {
@@ -1668,9 +1668,9 @@
   border-radius: 12px;
   padding: 0.85rem 1rem;
   font-size: 0.8rem;
-  background: #f0fdfa;
-  border: 1px solid #99f6e4;
-  color: #134e4a;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1705,7 +1705,7 @@
   padding: 0.75rem 1.25rem;
   border-radius: 12px;
   border: none;
-  background: linear-gradient(135deg, #0d9488 0%, #059669 100%);
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
   color: #ffffff;
   font-size: 0.9rem;
   font-weight: 700;
@@ -1714,13 +1714,13 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
   transition: all 0.2s ease;
 }
 
 .btn-fine-submit:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.4);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
 }
 
 .btn-fine-submit:disabled {
@@ -1800,9 +1800,9 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.25rem 0.65rem;
-  background: rgba(13, 148, 136, 0.25);
-  border: 1px solid rgba(45, 212, 191, 0.4);
-  color: #5eead4;
+  background: rgba(30, 58, 138, 0.25);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  color: #93c5fd;
   border-radius: 9999px;
   font-size: 0.72rem;
   font-weight: 700;
@@ -1822,19 +1822,19 @@
   gap: 0.5rem;
   padding: 0.45rem 1rem;
   border-radius: 10px;
-  background: linear-gradient(135deg, #0d9488 0%, #059669 100%);
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
   color: #ffffff;
   font-weight: 700;
   font-size: 0.82rem;
   border: none;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.4);
+  box-shadow: 0 2px 6px rgba(30, 58, 138, 0.4);
   transition: all 0.15s ease;
 }
 
 .btn-receipt-print:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(13, 148, 136, 0.5);
+  box-shadow: 0 4px 10px rgba(30, 58, 138, 0.5);
 }
 
 .btn-receipt-close {
@@ -1938,7 +1938,7 @@
   display: inline-block;
   margin-top: 0.65rem;
   padding: 0.3rem 1.25rem;
-  background: #0d9488;
+  background: #1e3a8a;
   color: #ffffff;
   font-size: 0.78rem;
   font-weight: 800;
@@ -1979,7 +1979,7 @@
 }
 
 .receipt-meta-val.highlight {
-  color: #0d9488;
+  color: #2563eb;
   font-family: monospace;
   font-size: 0.95rem;
 }
@@ -2067,13 +2067,13 @@
 }
 
 .receipt-words-bar {
-  background: #f0fdfa;
-  border: 1px solid #99f6e4;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
   border-radius: 8px;
   padding: 0.65rem 1rem;
   margin-top: 0.75rem;
   font-size: 0.78rem;
-  color: #134e4a;
+  color: #1e3a8a;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2093,17 +2093,17 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  border: 2px solid #0d9488;
+  border: 2px solid #1e3a8a;
   border-radius: 10px;
   padding: 0.5rem 0.85rem;
-  background: rgba(13, 148, 136, 0.05);
+  background: rgba(30, 58, 138, 0.05);
 }
 
 .receipt-seal-icon {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #0d9488;
+  background: #1e3a8a;
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -2114,7 +2114,7 @@
 .receipt-seal-text h5 {
   font-size: 0.75rem;
   font-weight: 900;
-  color: #0f766e;
+  color: #1e3a8a;
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -2122,7 +2122,7 @@
 
 .receipt-seal-text p {
   font-size: 0.65rem;
-  color: #115e59;
+  color: #475569;
   margin: 0.1rem 0 0 0;
   font-weight: 600;
 }

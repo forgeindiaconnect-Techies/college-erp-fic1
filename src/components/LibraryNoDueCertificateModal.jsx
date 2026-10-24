@@ -97,9 +97,9 @@ const LibraryNoDueCertificateModal = ({ isOpen, onClose, clearance, student }) =
         {/* Certificate Paper Canvas */}
         <div style={{ padding: '24px 28px', background: '#f8fafc', overflowY: 'auto', maxHeight: 'calc(85vh - 130px)' }}>
           <div id="print-no-due-certificate-modal" style={{ padding: '28px', background: '#ffffff', color: '#0f172a', textAlign: 'center', borderRadius: '10px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
-            <div style={{ border: '3px double #0d9488', padding: '24px', borderRadius: '8px', background: '#fcfdfd' }}>
+            <div style={{ border: '3px double #1e3a8a', padding: '24px', borderRadius: '8px', background: '#fcfdfd' }}>
               
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0d9488', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '4px' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e3a8a', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '4px' }}>
                 Central Library & Information Division
               </div>
               

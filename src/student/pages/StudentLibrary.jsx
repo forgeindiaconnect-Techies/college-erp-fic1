@@ -68,9 +68,9 @@ const NoDueCertificate = ({ clearance, studentSession }) => {
 
   return (
     <div id="print-no-due-certificate" style={{ padding: '28px', background: '#ffffff', color: '#0f172a', textAlign: 'center', borderRadius: '10px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', maxWidth: '620px', margin: '0 auto' }}>
-      <div style={{ border: '3px double #0d9488', padding: '24px', borderRadius: '8px', background: '#fcfdfd' }}>
+      <div style={{ border: '3px double #1e3a8a', padding: '24px', borderRadius: '8px', background: '#fcfdfd' }}>
         
-        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0d9488', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '4px' }}>
+        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e3a8a', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '4px' }}>
           Central Library & Information Division
         </div>
         
@@ -2381,7 +2381,7 @@ const StudentLibrary = () => {
                       setPaySuccessReceipt(null);
                     }}
                     className="btn-fine-submit flex-1"
-                    style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)' }}
+                    style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)' }}
                   >
                     <Printer size={16} />
                     <span>View & Print Official Receipt</span>
@@ -2742,7 +2742,7 @@ const StudentLibrary = () => {
                         <td colSpan="3" style={{ textAlign: 'right', textTransform: 'uppercase', fontSize: '0.78rem' }}>
                           Total Amount Paid:
                         </td>
-                        <td style={{ textAlign: 'right', fontSize: '1.05rem', color: '#0d9488' }}>
+                        <td style={{ textAlign: 'right', fontSize: '1.05rem', color: '#1e3a8a' }}>
                           ₹{Number(receiptModalData.amount || 0)}.00
                         </td>
                       </tr>
