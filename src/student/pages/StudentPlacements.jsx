@@ -11,7 +11,7 @@ import {
   getPlacementJobs, getPlacementApplications, getPlacementInterviews,
   getPlacementSelections, applyForPlacement 
 } from '../../api/index';
-import './StudentMarks.css';
+import './StudentPlacements.css';
 
 const StudentPlacements = () => {
   const navigate = useNavigate();
@@ -374,33 +374,25 @@ const StudentPlacements = () => {
   const offersCount = selections.length;
 
   return (
-    <div className="student-marks-page animate-fade-in" style={{ padding: '24px', maxWidth: '1440px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="student-placements-page animate-fade-in">
       
-      {/* ── Top Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', borderBottom: '1px solid var(--border-color, #e2e8f0)', paddingBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button 
-            type="button" 
-            onClick={() => navigate('/student/dashboard')}
-            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', background: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main, #0f172a)' }}
-          >
-            <ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} /> Back
-          </button>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
-              Campus Placements & Corporate Recruitment
-            </h1>
-            <p style={{ margin: '3px 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>
-              Live job opportunities, eligibility evaluation, company applications, and interview schedules.
-            </p>
+      {/* ── Top Header Banner (Image 2 style) ── */}
+      <div className="placement-header-banner">
+        <div className="banner-content-left">
+          <div className="placement-icon-box">
+            <Briefcase size={26} />
+          </div>
+          <div className="banner-title-group">
+            <h1>Campus Placements & Corporate Recruitment</h1>
+            <p>Live job opportunities, eligibility evaluation, company applications, and interview schedules.</p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div className="banner-actions">
           <button 
             type="button"
             onClick={() => fetchPlacementData()}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+            className="btn-placement-sync"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Sync Drives
           </button>
@@ -408,39 +400,21 @@ const StudentPlacements = () => {
       </div>
 
       {/* ── Overall Placement Status Banner ── */}
-      <div 
-        style={{ 
-          background: isGloballyEligible ? 'linear-gradient(135deg, rgba(22, 163, 74, 0.08), rgba(22, 163, 74, 0.02))' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.02))', 
-          border: `1px solid ${isGloballyEligible ? '#bbf7d0' : '#fecaca'}`, 
-          borderRadius: '14px', 
-          padding: '18px 22px', 
-          display: 'flex', 
-          alignItems: 'flex-start', 
-          gap: '16px',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
-        }}
-      >
-        <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: isGloballyEligible ? '#dcfce7' : '#fee2e2', color: isGloballyEligible ? '#15803d' : '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', shrink: 0 }}>
+      <div className={`placement-status-banner ${isGloballyEligible ? 'eligible' : 'pending'}`}>
+        <div className="status-banner-icon">
           {isGloballyEligible ? <CheckCircle size={26} /> : <XCircle size={26} />}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+        <div className="status-banner-body">
+          <div className="status-banner-header">
+            <h2 className="status-banner-title">
               Overall Placement Status:
             </h2>
-            <span style={{ 
-              fontSize: '0.95rem', 
-              fontWeight: 800, 
-              color: isGloballyEligible ? '#15803d' : '#dc2626',
-              background: isGloballyEligible ? '#dcfce7' : '#fee2e2',
-              padding: '2px 10px',
-              borderRadius: '6px'
-            }}>
+            <span className="status-badge-chip">
               {isGloballyEligible ? 'Eligible for Campus Recruitment ✓' : 'Criteria Pending / Verification Required'}
             </span>
           </div>
 
-          <p style={{ margin: '6px 0 0', fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>
+          <p className="status-banner-text">
             {isGloballyEligible 
               ? `You meet the general academic eligibility criteria with CGPA ${studentDetails.cgpa}, ${studentDetails.attendance}% attendance, and zero active arrears.`
               : 'You can still view upcoming recruitment drives and evaluate company-specific eligibility requirements below.'
@@ -448,131 +422,159 @@ const StudentPlacements = () => {
           </p>
 
           {!isGloballyEligible && (
-            <div style={{ marginTop: '10px', display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '0.8rem', fontWeight: 600 }}>
-              {!criteria.cgpa.met && <span style={{ color: '#dc2626' }}>• Current CGPA ({criteria.cgpa.current}) below benchmark {criteria.cgpa.required.toFixed(1)}</span>}
-              {!criteria.arrears.met && <span style={{ color: '#dc2626' }}>• Active Arrears: {criteria.arrears.current}</span>}
-              {!criteria.attendance.met && <span style={{ color: '#dc2626' }}>• Attendance ({criteria.attendance.current}%) below 75%</span>}
+            <div className="status-banner-tags">
+              {!criteria.cgpa.met && <span className="status-banner-tag-item">• Current CGPA ({criteria.cgpa.current}) below benchmark {criteria.cgpa.required.toFixed(1)}</span>}
+              {!criteria.arrears.met && <span className="status-banner-tag-item">• Active Arrears: {criteria.arrears.current}</span>}
+              {!criteria.attendance.met && <span className="status-banner-tag-item">• Attendance ({criteria.attendance.current}%) below 75%</span>}
             </div>
           )}
         </div>
       </div>
 
-      {/* ── 4-Card Executive KPI Metrics Strip ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-        
+      {/* ── 4-Card Executive KPI Metrics Strip (Image 2 style) ── */}
+      <div className="placement-metrics-grid">
         {/* KPI 1: Live CGPA */}
-        <div style={{ background: 'var(--bg-card, #ffffff)', padding: '18px 20px', borderRadius: '14px', border: '1px solid #bfdbfe', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>Academic CGPA</span>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(37,99,235,0.1)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Award size={18} />
+        <div className="placement-kpi-card blue">
+          <div className="kpi-info">
+            <span className="kpi-label">Academic CGPA</span>
+            <div className="kpi-value">{studentDetails.cgpa ?? '0.0'}</div>
+            <div className="kpi-subtext">
+              {studentDetails.arrears === 0 ? 'Zero Active Arrears' : `${studentDetails.arrears} Active Arrears`}
             </div>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1d4ed8', marginTop: '6px' }}>
-            {studentDetails.cgpa ?? '0.0'}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)', marginTop: '2px' }}>
-            {studentDetails.arrears === 0 ? 'Zero Active Arrears' : `${studentDetails.arrears} Active Arrears`}
+          <div className="kpi-icon-wrap blue">
+            <Award size={22} />
           </div>
         </div>
 
-        {/* KPI 2: Active Drives */}
-        <div style={{ background: 'var(--bg-card, #ffffff)', padding: '18px 20px', borderRadius: '14px', border: '1px solid #bbf7d0', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>Campus Drives</span>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(22,163,74,0.1)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Building size={18} />
+        {/* KPI 2: Campus Drives */}
+        <div className="placement-kpi-card emerald">
+          <div className="kpi-info">
+            <span className="kpi-label">Campus Drives</span>
+            <div className="kpi-value">{jobs.length}</div>
+            <div className="kpi-subtext" style={{ color: '#16a34a' }}>
+              Open Recruitment Drives
             </div>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#15803d', marginTop: '6px' }}>
-            {jobs.length}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: '2px', fontWeight: 600 }}>
-            Open Recruitment Drives
+          <div className="kpi-icon-wrap emerald">
+            <Building size={22} />
           </div>
         </div>
 
-        {/* KPI 3: Applications Submitted */}
-        <div style={{ background: 'var(--bg-card, #ffffff)', padding: '18px 20px', borderRadius: '14px', border: '1px solid #ddd6fe', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' }}>Applied Drives</span>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(124,58,237,0.1)', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FileText size={18} />
+        {/* KPI 3: Applied Drives */}
+        <div className="placement-kpi-card purple">
+          <div className="kpi-info">
+            <span className="kpi-label">Applied Drives</span>
+            <div className="kpi-value">{appliedCount}</div>
+            <div className="kpi-subtext" style={{ color: '#7c3aed' }}>
+              {shortlistedCount > 0 ? `${shortlistedCount} Shortlisted` : 'Submitted to Placement Cell'}
             </div>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#6d28d9', marginTop: '6px' }}>
-            {appliedCount}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#7c3aed', marginTop: '2px', fontWeight: 600 }}>
-            {shortlistedCount > 0 ? `${shortlistedCount} Shortlisted` : 'Submitted to Placement Cell'}
+          <div className="kpi-icon-wrap purple">
+            <FileText size={22} />
           </div>
         </div>
 
         {/* KPI 4: Job Offers */}
-        <div style={{ background: 'var(--bg-card, #ffffff)', padding: '18px 20px', borderRadius: '14px', border: '1px solid #fde68a', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#d97706', textTransform: 'uppercase' }}>Verified Offers</span>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(217,119,6,0.1)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TrendingUp size={18} />
+        <div className="placement-kpi-card amber">
+          <div className="kpi-info">
+            <span className="kpi-label">Verified Offers</span>
+            <div className="kpi-value">{offersCount}</div>
+            <div className="kpi-subtext" style={{ color: '#d97706' }}>
+              Official Corporate Offers
             </div>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#b45309', marginTop: '6px' }}>
-            {offersCount}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#d97706', marginTop: '2px', fontWeight: 600 }}>
-            Official Corporate Offers
+          <div className="kpi-icon-wrap amber">
+            <TrendingUp size={22} />
           </div>
         </div>
-
       </div>
 
-      {/* ── Tab Navigation ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '2px solid var(--border-color, #e2e8f0)', paddingBottom: '2px' }}>
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto' }}>
-          {[
-            { key: 'drives', label: '🏢 Campus Recruitment Drives' },
-            { key: 'applications', label: `📝 My Applications (${applications.length})` },
-            { key: 'interviews', label: `📅 Interview Schedule (${interviews.length})` },
-            { key: 'eligibility', label: '🎓 Academic Eligibility Breakdown' }
-          ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{
-                padding: '10px 16px',
-                fontSize: '0.88rem',
-                fontWeight: 700,
-                color: tab === t.key ? '#2563eb' : 'var(--text-muted, #64748b)',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: tab === t.key ? '3px solid #2563eb' : '3px solid transparent',
-                cursor: 'pointer',
-                marginBottom: '-2px',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
+      {/* ── Modern ERP Tabs Navigation Container (Exact match to Image 2) ── */}
+      <div className="placement-tabs-container">
+        <div className="placement-tabs-list">
+          <button
+            type="button"
+            className={`placement-tab-btn ${tab === 'drives' ? 'active' : ''}`}
+            onClick={() => setTab('drives')}
+          >
+            <Building size={16} />
+            <span>Campus Recruitment Drives</span>
+            <span className="tab-badge">{jobs.length}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`placement-tab-btn ${tab === 'applications' ? 'active' : ''}`}
+            onClick={() => setTab('applications')}
+          >
+            <FileText size={16} />
+            <span>My Applications</span>
+            <span className="tab-badge">{applications.length}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`placement-tab-btn ${tab === 'interviews' ? 'active' : ''}`}
+            onClick={() => setTab('interviews')}
+          >
+            <Calendar size={16} />
+            <span>Interview Schedule</span>
+            <span className="tab-badge">{interviews.length}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`placement-tab-btn ${tab === 'eligibility' ? 'active' : ''}`}
+            onClick={() => setTab('eligibility')}
+          >
+            <Award size={16} />
+            <span>Academic Eligibility Breakdown</span>
+            <span className={`tab-clearance-pill ${isGloballyEligible ? 'eligible' : 'pending'}`}>
+              {isGloballyEligible ? 'Eligible' : 'Criteria Pending'}
+            </span>
+          </button>
         </div>
 
-        {tab === 'drives' && (
-          <div style={{ position: 'relative', width: '260px' }}>
-            <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+        <div className="placement-tabs-actions">
+          <div className="erp-sync-chip">
+            <span className="erp-sync-dot"></span>
+            <span>LIVE SYNC</span>
+          </div>
+          <button
+            type="button"
+            className="btn-tab-refresh"
+            onClick={() => fetchPlacementData()}
+            title="Sync latest placement records"
+          >
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Search & Filter Controls Bar ── */}
+      {tab === 'drives' && (
+        <div className="placement-controls-bar">
+          <div className="placement-search-input-wrap">
+            <Search size={16} className="placement-search-icon" />
             <input 
+              type="text"
               value={search} 
               onChange={e => setSearch(e.target.value)} 
-              placeholder="Search company or role..." 
-              style={{ padding: '7px 12px 7px 34px', borderRadius: 8, border: '1px solid var(--border-color, #cbd5e1)', background: 'var(--bg-card, #ffffff)', color: 'var(--text-main, #0f172a)', fontSize: '0.82rem', width: '100%', outline: 'none' }} 
+              placeholder="Search company, role, or location..." 
+              className="placement-search-input"
             />
           </div>
-        )}
-      </div>
+          <span className="placement-search-summary">
+            Showing {filteredJobs.length} of {jobs.length} open opportunities
+          </span>
+        </div>
+      )}
 
       {/* ── TAB 1: Campus Recruitment Drives ── */}
       {tab === 'drives' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+        <div className="placement-jobs-grid">
           {filteredJobs.map((job, idx) => {
             const minCgpa = Number(job.minCgpa ?? 0);
             const maxArrears = Number(job.maxArrears ?? 0);
@@ -592,116 +594,81 @@ const StudentPlacements = () => {
             return (
               <div 
                 key={job._id || job.id || idx}
-                style={{
-                  background: 'var(--bg-card, #ffffff)',
-                  borderRadius: '14px',
-                  border: '1px solid var(--border-color, #e2e8f0)',
-                  padding: '20px',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  gap: '14px'
-                }}
+                className="placement-job-card"
               >
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '3px 10px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb' }}>
+                  <div className="job-card-header">
+                    <span className="job-ctc-pill">
                       {job.ctc || 'Not Disclosed'}
                     </span>
-                    <span style={{ 
-                      fontSize: '0.72rem', 
-                      fontWeight: 700, 
-                      padding: '3px 8px', 
-                      borderRadius: '6px', 
-                      background: isEligibleForThisJob ? '#dcfce7' : '#fee2e2', 
-                      color: isEligibleForThisJob ? '#15803d' : '#991b1b' 
-                    }}>
+                    <span className={`job-eligibility-chip ${isEligibleForThisJob ? 'met' : 'not-met'}`}>
                       {isEligibleForThisJob ? '✓ Eligible to Apply' : `Min CGPA: ${minCgpa}`}
                     </span>
                   </div>
 
-                  <h3 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                  <h3 className="job-company-title">
                     {job.company}
                   </h3>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
-                    <Briefcase size={14} color="#2563eb" />
+                  <div className="job-role-info">
+                    <Briefcase size={15} color="#2563eb" />
                     <span>{job.role}</span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-muted, #64748b)' }}>
-                    <MapPin size={13} />
+                  <div className="job-location-info">
+                    <MapPin size={14} />
                     <span>{job.location || 'Campus / Multiple Locations'}</span>
+                  </div>
+
+                  <div className="job-card-criteria-box" style={{ marginTop: '0.85rem' }}>
+                    <div className="criteria-row">
+                      <span>Cutoff CGPA:</span>
+                      <strong>{minCgpa > 0 ? minCgpa : 'Any'}</strong>
+                    </div>
+                    <div className="criteria-row">
+                      <span>Max Arrears:</span>
+                      <strong>{maxArrears} Standing</strong>
+                    </div>
+                    <div className="criteria-row">
+                      <span>Application Deadline:</span>
+                      <strong>{job.deadline ? new Date(job.deadline).toLocaleDateString() : 'Open Recruitment'}</strong>
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ borderTop: '1px solid var(--border-color, #f1f5f9)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted, #64748b)' }}>
-                    <div>Min CGPA: <strong>{minCgpa > 0 ? minCgpa : 'Any'}</strong></div>
-                    <div style={{ fontSize: '0.72rem' }}>Deadline: {job.deadline ? new Date(job.deadline).toLocaleDateString() : 'Open'}</div>
-                  </div>
-
+                <div className="job-card-footer">
                   {hasApplied ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ 
-                        padding: '5px 12px', 
-                        borderRadius: '8px', 
-                        fontSize: '0.78rem', 
-                        fontWeight: 800,
-                        background: existingApp.status === 'Selected' ? '#dcfce7' : 
-                                    existingApp.status === 'Shortlisted' ? '#fef3c7' : 
-                                    existingApp.status === 'Rejected' ? '#fee2e2' : '#eff6ff',
-                        color: existingApp.status === 'Selected' ? '#15803d' : 
-                               existingApp.status === 'Shortlisted' ? '#b45309' : 
-                               existingApp.status === 'Rejected' ? '#dc2626' : '#2563eb',
-                        border: '1px solid var(--border-color, #e2e8f0)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', width: '100%', justifyContent: 'space-between' }}>
+                      <span className={`applied-status-pill ${
+                        existingApp.status === 'Selected' ? 'selected' : 
+                        existingApp.status === 'Shortlisted' ? 'shortlisted' : 
+                        existingApp.status === 'Rejected' ? 'rejected' : 'applied'
+                      }`}>
                         {existingApp.status === 'Selected' ? '🏆 Selected' : (existingApp.status === 'Rejected' ? '✕ Not Selected' : `✓ ${existingApp.status || 'Applied'}`)}
                       </span>
 
                       <button
                         type="button"
                         onClick={() => setSelectedAppForModal(existingApp)}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '8px',
-                          background: '#eff6ff',
-                          color: '#2563eb',
-                          border: '1px solid #bfdbfe',
-                          fontWeight: 700,
-                          fontSize: '0.78rem',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
+                        className="btn-view-stage"
                       >
                         <Eye size={13} /> View Stage Details
                       </button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleApply(job)}
-                      disabled={submitting}
-                      style={{
-                        padding: '6px 16px',
-                        borderRadius: '8px',
-                        background: '#2563eb',
-                        color: '#ffffff',
-                        fontWeight: 700,
-                        fontSize: '0.82rem',
-                        border: 'none',
-                        cursor: submitting ? 'not-allowed' : 'pointer',
-                        opacity: submitting ? 0.7 : 1
-                      }}
-                    >
-                      Apply Now
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <span style={{ fontSize: '0.74rem', color: isEligibleForThisJob ? '#15803d' : '#991b1b', fontWeight: 700 }}>
+                        {isEligibleForThisJob ? 'All criteria satisfied' : 'Criteria check pending'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleApply(job)}
+                        disabled={submitting}
+                        className="btn-placement-apply"
+                      >
+                        Apply Now
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -709,10 +676,12 @@ const StudentPlacements = () => {
           })}
 
           {filteredJobs.length === 0 && (
-            <div style={{ gridColumn: '1 / -1', padding: '3.5rem', textAlign: 'center', background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)' }}>
-              <Building size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
-              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>No Active Recruitment Drives</h4>
-              <p style={{ margin: '4px 0 0', fontSize: '0.82rem' }}>New corporate placement drives will appear here once published by the Placement Officer.</p>
+            <div className="placement-empty-state" style={{ gridColumn: '1 / -1' }}>
+              <div className="placement-empty-icon">
+                <Building size={28} />
+              </div>
+              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }}>No Active Recruitment Drives</h4>
+              <p style={{ margin: '4px 0 0', fontSize: '0.84rem' }}>New corporate placement drives will appear here once published by the Placement Officer.</p>
             </div>
           )}
         </div>
@@ -721,31 +690,31 @@ const StudentPlacements = () => {
       {/* ── TAB 2: My Applications ── */}
       {tab === 'applications' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div className="placement-table-wrapper">
+            <div className="placement-table-header">
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+                <h3>
                   Submitted Applications & Recruitment Stage Status ({applications.length})
                 </h3>
-                <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <p>
                   Transparent stage-by-stage evaluation, interview progression, and corporate offer status.
                 </p>
               </div>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, padding: '4px 12px', borderRadius: '8px', background: '#eff6ff', color: '#2563eb' }}>
+              <span className="table-count-badge">
                 {applications.length} Active Submissions
               </span>
             </div>
 
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <table className="placement-enterprise-table">
                 <thead>
-                  <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
-                    <th style={{ padding: '12px 18px', textAlign: 'left' }}>Company & Role</th>
-                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Total Rounds</th>
-                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Current Interview Stage</th>
-                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Application Date</th>
-                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>Recruitment Status</th>
-                    <th style={{ padding: '12px 18px', textAlign: 'right' }}>Stage Details</th>
+                  <tr>
+                    <th style={{ textAlign: 'left' }}>Company & Role</th>
+                    <th style={{ textAlign: 'center' }}>Total Rounds</th>
+                    <th style={{ textAlign: 'center' }}>Current Interview Stage</th>
+                    <th style={{ textAlign: 'center' }}>Application Date</th>
+                    <th style={{ textAlign: 'center' }}>Recruitment Status</th>
+                    <th style={{ textAlign: 'right' }}>Stage Details</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -769,17 +738,17 @@ const StudentPlacements = () => {
                     const isRejected = app.status === 'Rejected';
 
                     return (
-                      <tr key={app._id || app.applicationId || idx} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
-                        <td style={{ padding: '12px 18px' }}>
+                      <tr key={app._id || app.applicationId || idx}>
+                        <td>
                           <div style={{ fontWeight: 800, color: '#2563eb', fontSize: '0.92rem' }}>{app.company}</div>
                           <div style={{ fontWeight: 600, color: 'var(--text-main, #0f172a)', fontSize: '0.82rem' }}>{app.role}</div>
                         </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                        <td style={{ textAlign: 'center' }}>
                           <span style={{ fontSize: '0.78rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: '#f1f5f9', color: '#475569' }}>
                             {totalRounds} Rounds
                           </span>
                         </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                        <td style={{ textAlign: 'center' }}>
                           {isSelected ? (
                             <span style={{ padding: '4px 10px', borderRadius: '8px', background: '#dcfce7', color: '#15803d', fontWeight: 800, fontSize: '0.78rem' }}>
                               🏆 Cleared All {totalRounds} Rounds (Selected)
@@ -794,45 +763,23 @@ const StudentPlacements = () => {
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
                           {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : 'Active'}
                         </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'center' }}>
-                          <span style={{ 
-                            padding: '4px 12px', 
-                            borderRadius: '20px', 
-                            fontSize: '0.78rem', 
-                            fontWeight: 800,
-                            background: isSelected ? '#dcfce7' : 
-                                        app.status === 'Shortlisted' ? '#fef3c7' : 
-                                        isRejected ? '#fee2e2' : '#eff6ff',
-                            color: isSelected ? '#15803d' : 
-                                   app.status === 'Shortlisted' ? '#b45309' : 
-                                   isRejected ? '#dc2626' : '#2563eb',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}>
+                        <td style={{ textAlign: 'center' }}>
+                          <span className={`applied-status-pill ${
+                            isSelected ? 'selected' : 
+                            app.status === 'Shortlisted' ? 'shortlisted' : 
+                            isRejected ? 'rejected' : 'applied'
+                          }`}>
                             {isSelected ? '✓ Corporate Offer Issued' : (isRejected ? '✕ Evaluated (Rejected)' : (app.status || 'Applied'))}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                        <td style={{ textAlign: 'right' }}>
                           <button
                             type="button"
                             onClick={() => setSelectedAppForModal(app)}
-                            style={{
-                              padding: '5px 12px',
-                              borderRadius: '8px',
-                              background: '#eff6ff',
-                              color: '#2563eb',
-                              border: '1px solid #bfdbfe',
-                              fontWeight: 700,
-                              fontSize: '0.78rem',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
+                            className="btn-view-stage"
                           >
                             <Eye size={13} /> View Stepper
                           </button>
@@ -881,15 +828,9 @@ const StudentPlacements = () => {
                   return (
                     <div 
                       key={idx} 
+                      className="stage-progression-card"
                       style={{ 
-                        background: 'var(--bg-card, #ffffff)', 
-                        padding: '20px', 
-                        borderRadius: '16px', 
                         border: `1px solid ${isSelected ? '#bbf7d0' : (isRejected ? '#fecaca' : '#e2e8f0')}`, 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        gap: '14px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -900,16 +841,10 @@ const StudentPlacements = () => {
                             Package: <strong>{matchedJob?.ctc || 'Corporate Standard'}</strong> • Total: {totalRounds} Stages
                           </div>
                         </div>
-                        <span style={{ 
-                          fontSize: '0.74rem', 
-                          fontWeight: 800, 
-                          padding: '4px 10px', 
-                          borderRadius: '8px', 
-                          background: isSelected ? '#dcfce7' : (isRejected ? '#fee2e2' : '#eff6ff'), 
-                          color: isSelected ? '#15803d' : (isRejected ? '#dc2626' : '#2563eb'),
-                          border: '1px solid var(--border-color, #e2e8f0)'
-                        }}>
-                          {isSelected ? '🏆 OFFER ISSUED' : (isRejected ? '✕ EVALUATED (NOT SELECTED)' : `ROUND ${currRoundNum} OF ${totalRounds}`)}
+                        <span className={`applied-status-pill ${
+                          isSelected ? 'selected' : (isRejected ? 'rejected' : 'applied')
+                        }`}>
+                          {isSelected ? '🏆 OFFER ISSUED' : (isRejected ? '✕ NOT SELECTED' : `ROUND ${currRoundNum} OF ${totalRounds}`)}
                         </span>
                       </div>
 
@@ -941,15 +876,9 @@ const StudentPlacements = () => {
                           const isFailed = ev.status === 'Rejected' || (currRoundNum === rNum && isRejected);
 
                           return (
-                            <div key={rIdx} style={{
-                              padding: '10px 12px',
-                              borderRadius: '10px',
+                            <div key={rIdx} className="stage-step-item" style={{
                               background: isPassed ? 'rgba(22,163,74,0.06)' : (isCurrent ? 'rgba(37,99,235,0.06)' : (isFailed ? 'rgba(220,38,38,0.06)' : '#f8fafc')),
                               border: isPassed ? '1px solid #bbf7d0' : (isCurrent ? '1px solid #bfdbfe' : (isFailed ? '1px solid #fecaca' : '1px solid #e2e8f0')),
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              gap: '10px'
                             }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <span style={{ width: '24px', height: '24px', borderRadius: '50%', background: isPassed ? '#16a34a' : (isCurrent ? '#2563eb' : (isFailed ? '#dc2626' : '#cbd5e1')), color: '#fff', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
@@ -985,19 +914,7 @@ const StudentPlacements = () => {
                         <button
                           type="button"
                           onClick={() => setSelectedAppForModal(app)}
-                          style={{
-                            padding: '6px 14px',
-                            background: '#eff6ff',
-                            border: '1px solid #bfdbfe',
-                            borderRadius: '8px',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            color: '#2563eb',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px'
-                          }}
+                          className="btn-view-stage"
                         >
                           <Info size={14} /> Full Stage Timeline & Evaluation
                         </button>
@@ -1014,37 +931,40 @@ const StudentPlacements = () => {
 
       {/* ── TAB 3: Interview Schedule ── */}
       {tab === 'interviews' && (
-        <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
+        <div className="placement-table-wrapper">
+          <div className="placement-table-header">
+            <h3>
               Scheduled Interview Rounds & Assessments
             </h3>
+            <span className="table-count-badge">
+              {interviews.length} Scheduled Sessions
+            </span>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <table className="placement-enterprise-table">
               <thead>
-                <tr style={{ background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontSize: '0.72rem', fontWeight: 700 }}>
-                  <th style={{ padding: '12px 18px', textAlign: 'left' }}>Company</th>
-                  <th style={{ padding: '12px 18px', textAlign: 'left' }}>Interview Round</th>
-                  <th style={{ padding: '12px 18px', textAlign: 'center' }}>Date & Timing</th>
-                  <th style={{ padding: '12px 18px', textAlign: 'center' }}>Mode / Venue</th>
-                  <th style={{ padding: '12px 18px', textAlign: 'right' }}>Status</th>
+                <tr>
+                  <th style={{ textAlign: 'left' }}>Company</th>
+                  <th style={{ textAlign: 'left' }}>Interview Round</th>
+                  <th style={{ textAlign: 'center' }}>Date & Timing</th>
+                  <th style={{ textAlign: 'center' }}>Mode / Venue</th>
+                  <th style={{ textAlign: 'right' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {interviews.map((i, idx) => (
-                  <tr key={i._id || i.interviewId || idx} style={{ borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
-                    <td style={{ padding: '12px 18px', fontWeight: 800, color: '#2563eb' }}>{i.company}</td>
-                    <td style={{ padding: '12px 18px', fontWeight: 600 }}>{i.round}</td>
-                    <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                  <tr key={i._id || i.interviewId || idx}>
+                    <td style={{ fontWeight: 800, color: '#2563eb' }}>{i.company}</td>
+                    <td style={{ fontWeight: 600 }}>{i.round}</td>
+                    <td style={{ textAlign: 'center' }}>
                       {i.date ? new Date(i.date).toLocaleDateString() : 'TBA'} {i.time ? `• ${i.time}` : ''}
                     </td>
-                    <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                    <td style={{ textAlign: 'center' }}>
                       <span style={{ padding: '3px 8px', borderRadius: '6px', background: i.mode === 'Online' ? '#eff6ff' : '#f1f5f9', color: i.mode === 'Online' ? '#2563eb' : '#475569', fontWeight: 700, fontSize: '0.75rem' }}>
                         {i.mode || i.venue || 'Auditorium'}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                    <td style={{ textAlign: 'right' }}>
                       <span style={{ padding: '3px 8px', borderRadius: '6px', background: '#dcfce7', color: '#15803d', fontWeight: 700, fontSize: '0.75rem' }}>
                         Scheduled
                       </span>
@@ -1068,7 +988,7 @@ const StudentPlacements = () => {
       {tab === 'eligibility' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
           
-          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '24px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
               Core Academic Clearance Breakdown
             </h3>
@@ -1130,7 +1050,7 @@ const StudentPlacements = () => {
             </div>
           </div>
 
-          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '24px', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 6px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color, #e2e8f0)', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)' }}>
                 Placement Cell Guidelines
@@ -1146,7 +1066,7 @@ const StudentPlacements = () => {
             <button
               type="button"
               onClick={() => navigate('/student/marks')}
-              style={{ width: '100%', marginTop: '20px', padding: '10px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+              style={{ width: '100%', marginTop: '20px', padding: '10px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '10px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
             >
               View Full Semester Marks Sheet →
             </button>
@@ -1179,31 +1099,8 @@ const StudentPlacements = () => {
         );
 
         return (
-          <div style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '20px'
-          }}>
-            <div style={{
-              background: 'var(--bg-card, #ffffff)',
-              borderRadius: '20px',
-              maxWidth: '640px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              padding: '26px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '18px',
-              border: '1px solid var(--border-color, #e2e8f0)'
-            }}>
+          <div className="placement-modal-backdrop">
+            <div className="placement-modal-content">
               
               {/* Modal Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color, #e2e8f0)', paddingBottom: '16px' }}>
@@ -1313,7 +1210,6 @@ const StudentPlacements = () => {
                     const isPassed = ev.status === 'Qualified' || (currRoundNum > rNum) || isSelected;
                     const isCurrent = currRoundNum === rNum && !isSelected && !isRejected;
                     const isFailed = ev.status === 'Rejected' || (currRoundNum === rNum && isRejected);
-                    const isUpcoming = rNum > currRoundNum && !isSelected;
 
                     // Match schedule
                     const matchedInt = matchedInterviews.find(it => (it.round || '').toLowerCase().includes(`round ${rNum}`) || (it.round || '').toLowerCase().includes(r.name.toLowerCase()));
@@ -1397,7 +1293,7 @@ const StudentPlacements = () => {
                   onClick={() => setSelectedAppForModal(null)}
                   style={{
                     padding: '8px 22px',
-                    borderRadius: '8px',
+                    borderRadius: '10px',
                     background: '#2563eb',
                     color: '#ffffff',
                     fontWeight: 700,
@@ -1414,6 +1310,7 @@ const StudentPlacements = () => {
           </div>
         );
       })()}
+
 
       {/* Toast Notification */}
       {toastMsg && (
