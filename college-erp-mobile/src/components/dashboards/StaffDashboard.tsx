@@ -23,6 +23,7 @@ import ReferralHub from '../referrals/ReferralHub';
 import DashboardHeroBanner from './DashboardHeroBanner';
 import QuickAccessGrid from './QuickAccessGrid';
 import HighlightCard from './HighlightCard';
+import DailyDutyAttendanceCard from '../common/DailyDutyAttendanceCard';
 
 type Props = {
   user: MobileUser;
@@ -427,13 +428,22 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   const [classFilter, setClassFilter] = useState('All');
   const [searchStudent, setSearchStudent] = useState('');
 
-  // Take Attendance State
+  // Take Attendance State (Authorized Daily Attendance System)
+  const [attendanceDate, setAttendanceDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [attendancePeriod, setAttendancePeriod] = useState(1);
   const [attendanceSubject, setAttendanceSubject] = useState('Core Lecture');
-  const [attendanceClass, setAttendanceClass] = useState('CSE - Sem 6 (A)');
+  const [attendanceClass, setAttendanceClass] = useState('CSE - Sem 2 (A)');
+  const [selectedAttendanceSemester, setSelectedAttendanceSemester] = useState('Semester 2');
+  const [selectedAttendanceSection, setSelectedAttendanceSection] = useState('A');
+  const [availableAttendanceSemesters, setAvailableAttendanceSemesters] = useState<string[]>(['Semester 2']);
+  const [availableAttendanceSections, setAvailableAttendanceSections] = useState<string[]>(['A', 'B', 'All']);
+  const [availableAttendanceSubjects, setAvailableAttendanceSubjects] = useState<string[]>(['Core Lecture']);
   const [attendanceRoster, setAttendanceRoster] = useState<AttendanceStudent[]>([]);
   const [attendanceSearch, setAttendanceSearch] = useState('');
   const [submittingAttendance, setSubmittingAttendance] = useState(false);
+  const [attendanceTabMode, setAttendanceTabMode] = useState<'mark' | 'history'>('mark');
+  const [savedAttendanceRecords, setSavedAttendanceRecords] = useState<any[]>([]);
+  const [selectedAttendanceLogDetails, setSelectedAttendanceLogDetails] = useState<any | null>(null);
 
   // Upload Marks State (Fully synchronized with Web App StaffMarks)
   const [marksViewMode, setMarksViewMode] = useState<'cia' | 'semester'>('cia');
@@ -581,6 +591,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         placementAppsRes,
         placementInterviewsRes,
         placementSelectionsRes,
+        attendanceRecordsRes,
       ] = await Promise.all([
         apiGet<any>('auth/me').catch(() => null),
         apiGet<any>('staff/me').catch(() => null),
@@ -609,6 +620,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         apiGet<any>('placement/applications').catch(() => []),
         apiGet<any>('placement/interviews').catch(() => []),
         apiGet<any>('placement/selections').catch(() => []),
+        apiGet<any[]>('attendance').catch(() => []),
       ]);
 
       // 1. Profile Processing
@@ -706,6 +718,29 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       } else if (parsedStudents.length > 0 && parsedStudents[0].sem) {
         setSelectedMarksSemester(normalizeSem(parsedStudents[0].sem));
       }
+
+      // Process Saved Attendance Records & Options
+      const rawAtt = Array.isArray(attendanceRecordsRes) ? attendanceRecordsRes : ((attendanceRecordsRes as any)?.data || []);
+      setSavedAttendanceRecords(rawAtt);
+
+      const attSemSet = new Set<string>();
+      parsedStudents.forEach((s) => {
+        if (s.sem) attSemSet.add(normalizeSem(s.sem));
+      });
+      allocs.forEach((a: any) => {
+        if (a.semester) attSemSet.add(normalizeSem(a.semester));
+      });
+      const realSems = Array.from(attSemSet);
+      if (realSems.length > 0) {
+        setAvailableAttendanceSemesters(realSems);
+        setSelectedAttendanceSemester(realSems[0]);
+      }
+
+      if (allRealSubjectNames.length > 0) {
+        setAvailableAttendanceSubjects(allRealSubjectNames);
+        setAttendanceSubject(allRealSubjectNames[0]);
+      }
+      setAttendanceClass(`${deptName} - ${realSems[0] || 'Semester 2'} (A)`);
 
       // 4. Teaching Schedule & Period Master Processing (Real Database Records Only)
       const rawPeriods: PeriodStructure[] = Array.isArray(periodMasterRes) && periodMasterRes.length > 0
@@ -1066,8 +1101,40 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   }, [loadData]);
 
   // ----------------------------------------------------------------------
-  // ATTENDANCE SUBMISSION WORKFLOW
+  // AUTHORIZED ATTENDANCE WORKFLOW (Class selection, student sync, submission)
   // ----------------------------------------------------------------------
+  const syncAttendanceRoster = useCallback(
+    (sem: string, sec: string, subj: string, period: number, dateStr: string, attList: any[] = savedAttendanceRecords, allStudents: StudentItem[] = students) => {
+      const deptMatch = allStudents.filter((s) => isSameDepartment(s.dept, faculty.dept));
+      const pool = deptMatch.length > 0 ? deptMatch : allStudents;
+      const semMatch = pool.filter((s) => isSameSem(s.sem, sem));
+      const semPool = semMatch.length > 0 ? semMatch : pool;
+      const secMatch = sec === 'All' ? semPool : semPool.filter((s) => String(s.section || '').toUpperCase() === sec.toUpperCase());
+      const activeStudents = secMatch.length > 0 ? secMatch : semPool;
+
+      // Find matching attendance in saved records for this date, subject, period
+      const matchingSaved = (attList || []).filter((r: any) => {
+        const rDate = (r.attendanceDate || r.date || '').toString().split('T')[0];
+        const rSubj = (r.subjectId || r.subject || '').toString().toLowerCase();
+        const rPeriod = Number(r.periodId || r.period || 0);
+        return rDate === dateStr && (rSubj === subj.toLowerCase() || !subj) && (rPeriod === period || !period);
+      });
+
+      const roster: AttendanceStudent[] = activeStudents.map((s) => {
+        const match = matchingSaved.find((r: any) => r.studentId === s.id || r.studentId === s.rollNo || r.registerNo === s.rollNo);
+        return {
+          id: s.id,
+          name: s.name,
+          rollNo: s.rollNo,
+          status: match ? (match.status as any) : 'Present',
+        };
+      });
+      setAttendanceRoster(roster);
+      setAttendanceClass(`${faculty.dept} - ${sem} (${sec})`);
+    },
+    [faculty.dept, savedAttendanceRecords, students]
+  );
+
   const toggleAttendanceStatus = (id: string) => {
     setAttendanceRoster((prev) =>
       prev.map((s) => {
@@ -1090,13 +1157,18 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   };
 
   const handleConfirmSubmitAttendance = async () => {
+    if (attendanceRoster.length === 0) {
+      Alert.alert('Empty Roster', 'No students enrolled for the selected class and section.');
+      return;
+    }
+
     const presentCount = attendanceRoster.filter((s) => s.status === 'Present').length;
     const absentCount = attendanceRoster.filter((s) => s.status === 'Absent').length;
     const odCount = attendanceRoster.filter((s) => s.status === 'OD').length;
 
     Alert.alert(
       'Confirm Attendance Submission',
-      `Subject: ${attendanceSubject}\nPeriod: ${attendancePeriod}\n\nPresent: ${presentCount}\nAbsent: ${absentCount}\nOD/Leave: ${odCount}\n\nSubmit this verified record to the university database?`,
+      `Class: ${attendanceClass}\nSubject: ${attendanceSubject}\nPeriod: ${attendancePeriod}\nDate: ${attendanceDate}\n\nPresent: ${presentCount}\nAbsent: ${absentCount}\nOD/Leave: ${odCount}\n\nSubmit this verified record to the university database?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -1107,17 +1179,31 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               const payload = attendanceRoster.map((s) => ({
                 studentId: s.rollNo || s.id,
                 studentName: s.name,
+                registerNo: s.rollNo,
                 department: faculty.dept,
+                semester: selectedAttendanceSemester,
+                section: selectedAttendanceSection,
                 subjectId: attendanceSubject,
+                subjectName: attendanceSubject,
                 periodId: attendancePeriod,
-                date: new Date().toISOString(),
-                attendanceDate: new Date().toISOString(),
+                date: attendanceDate,
+                attendanceDate: attendanceDate,
                 status: s.status,
                 facultyName: faculty.name,
+                markedBy: faculty.name,
               }));
 
               await apiPost('attendance', payload);
-              Alert.alert('Success', 'Attendance records have been synchronized with the institution database.');
+
+              // Reload saved attendance records from backend
+              const updatedRecords = await apiGet<any[]>('attendance').catch(() => []);
+              const safeUpdated = Array.isArray(updatedRecords) ? updatedRecords : [];
+              setSavedAttendanceRecords(safeUpdated);
+
+              Alert.alert(
+                '✓ Attendance Synchronized',
+                `Attendance for ${attendanceSubject} (Period ${attendancePeriod}) has been saved to the central database.\n\nPresent: ${presentCount} | Absent: ${absentCount} | OD: ${odCount}`
+              );
             } catch (err: any) {
               Alert.alert('Attendance Submission', err?.message || 'Attendance submitted successfully.');
             } finally {
@@ -2068,6 +2154,9 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               tagline="Educate Empower Achieve"
             />
 
+            {/* Daily Duty Attendance Card (Punch In / Out synchronized with central ERP) */}
+            <DailyDutyAttendanceCard user={user} style={{ marginHorizontal: 0, marginBottom: 12 }} />
+
             {/* 2. Today's Classes Highlight Card (Matching Reference Design) */}
             <HighlightCard
               sectionTitle="Today's Classes"
@@ -2704,162 +2793,365 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               </View>
             )}
 
-            {/* SUB-VIEW 3: TAKE ATTENDANCE (Mobile-Optimized & 1-Tap Toggle) */}
+            {/* SUB-VIEW 3: TAKE ATTENDANCE & SAVED RECORDS */}
             {academicsTab === 'attendance' && (
               <View>
-                {/* Active Class & Subject Header Banner */}
-                <View style={styles.attendanceHeroBanner}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.attHeroSubject}>{attendanceSubject}</Text>
-                    <Text style={styles.attHeroClass}>{attendanceClass} • Period {attendancePeriod}</Text>
-                  </View>
-                  <View style={styles.attPeriodPill}>
-                    <Text style={styles.attPeriodPillText}>Period {attendancePeriod}</Text>
-                  </View>
+                {/* 1. Mode Switcher: Mark Attendance vs Saved Records */}
+                <View style={styles.marksModeSegment}>
+                  <TouchableOpacity
+                    style={[styles.marksModeTab, attendanceTabMode === 'mark' && styles.marksModeTabActive]}
+                    onPress={() => setAttendanceTabMode('mark')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.marksModeTabText, attendanceTabMode === 'mark' && styles.marksModeTabTextActive]}>
+                      ✍️ Mark Attendance
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.marksModeTab, attendanceTabMode === 'history' && styles.marksModeTabActive]}
+                    onPress={() => setAttendanceTabMode('history')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.marksModeTabText, attendanceTabMode === 'history' && styles.marksModeTabTextActive]}>
+                      📜 Saved Records ({savedAttendanceRecords.length})
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
-                <View style={styles.card}>
-                  {/* Search Bar */}
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="🔍 Search student name or roll no..."
-                    value={attendanceSearch}
-                    onChangeText={setAttendanceSearch}
-                  />
-
-                  {/* Quick Filter Status Chips */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.attFilterScroll}>
-                    <TouchableOpacity
-                      style={[styles.attFilterChip, attendanceFilterStatus === 'All' && styles.attFilterChipActive]}
-                      onPress={() => setAttendanceFilterStatus('All')}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.attFilterChipText, attendanceFilterStatus === 'All' && styles.attFilterChipTextActive]}>
-                        All ({attendanceRoster.length})
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.attFilterChip, attendanceFilterStatus === 'Present' && styles.attFilterChipActivePresent]}
-                      onPress={() => setAttendanceFilterStatus('Present')}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.attFilterChipText, attendanceFilterStatus === 'Present' && styles.attFilterChipTextActivePresent]}>
-                        ✓ Present ({attendanceRoster.filter((s) => s.status === 'Present').length})
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.attFilterChip, attendanceFilterStatus === 'Absent' && styles.attFilterChipActiveAbsent]}
-                      onPress={() => setAttendanceFilterStatus('Absent')}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.attFilterChipText, attendanceFilterStatus === 'Absent' && styles.attFilterChipTextActiveAbsent]}>
-                        ✕ Absent ({attendanceRoster.filter((s) => s.status === 'Absent').length})
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.attFilterChip, attendanceFilterStatus === 'OD' && styles.attFilterChipActiveOD]}
-                      onPress={() => setAttendanceFilterStatus('OD')}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.attFilterChipText, attendanceFilterStatus === 'OD' && styles.attFilterChipTextActiveOD]}>
-                        OD / Leave ({attendanceRoster.filter((s) => s.status === 'OD').length})
-                      </Text>
-                    </TouchableOpacity>
-                  </ScrollView>
-
-                  {/* Quick Bulk Actions */}
-                  <View style={styles.quickToggleRow}>
-                    <TouchableOpacity style={styles.quickToggleBtn} onPress={() => markAllAttendance('Present')}>
-                      <Text style={styles.quickToggleBtnText}>✓ Mark All Present</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.quickToggleBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => markAllAttendance('Absent')}>
-                      <Text style={[styles.quickToggleBtnText, { color: '#DC2626' }]}>✕ Mark All Absent</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Student Attendance List */}
-                  {filteredAttendance.length === 0 ? (
-                    <View style={styles.emptyStateContainer}>
-                      <Text style={styles.emptyStateEmoji}>🔍</Text>
-                      <Text style={styles.emptyStateTitle}>No Students in Filter</Text>
-                      <Text style={styles.emptyStateSubtitle}>Change your status filter or search keyword.</Text>
+                {/* MODE A: MARK ATTENDANCE */}
+                {attendanceTabMode === 'mark' && (
+                  <View>
+                    {/* Active Class & Subject Header Banner */}
+                    <View style={styles.attendanceHeroBanner}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.attHeroSubject}>{attendanceSubject}</Text>
+                        <Text style={styles.attHeroClass}>{attendanceClass} • Period {attendancePeriod}</Text>
+                        <Text style={[styles.attHeroClass, { color: '#BFDBFE', fontSize: 11, marginTop: 1 }]}>
+                          📅 Date: {attendanceDate}
+                        </Text>
+                      </View>
+                      <View style={styles.attPeriodPill}>
+                        <Text style={styles.attPeriodPillText}>Period {attendancePeriod}</Text>
+                      </View>
                     </View>
-                  ) : (
-                    filteredAttendance.map((s) => (
-                      <View key={s.id} style={styles.studentAttendanceCard}>
-                        {/* Student Avatar & Identity */}
-                        <View style={styles.studentRowAvatarCircle}>
-                          <Text style={styles.studentRowAvatarText}>
-                            {s.name.substring(0, 2).toUpperCase()}
+
+                    {/* Class & Subject Selector Card */}
+                    <View style={[styles.card, { marginBottom: 12 }]}>
+                      <Text style={[styles.cardHeaderTitle, { fontSize: 14, marginBottom: 4 }]}>
+                        🎯 Select Class, Subject & Period
+                      </Text>
+                      <Text style={[styles.sectionSubtitle, { marginBottom: 8 }]}>
+                        Pick class semester, section, subject, and teaching period:
+                      </Text>
+
+                      {/* Semester Selector - Blue Category */}
+                      <View style={styles.selectorLabelRow}>
+                        <Text style={styles.selectorLabelText}>📘 Semester</Text>
+                      </View>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                        {availableAttendanceSemesters.map((sem) => {
+                          const isActive = selectedAttendanceSemester === sem;
+                          return (
+                            <TouchableOpacity
+                              key={sem}
+                              style={[styles.attSemesterChip, isActive && styles.attSemesterChipActive]}
+                              onPress={() => {
+                                setSelectedAttendanceSemester(sem);
+                                syncAttendanceRoster(sem, selectedAttendanceSection, attendanceSubject, attendancePeriod, attendanceDate);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.attSemesterChipText, isActive && styles.attSemesterChipTextActive]}>
+                                {sem}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+
+                      {/* Section Selector - Purple Category */}
+                      <View style={styles.selectorLabelRow}>
+                        <Text style={styles.selectorLabelText}>🏷️ Section</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                        {['A', 'B', 'All'].map((sec) => {
+                          const isActive = selectedAttendanceSection === sec;
+                          return (
+                            <TouchableOpacity
+                              key={sec}
+                              style={[styles.attSectionChip, isActive && styles.attSectionChipActive]}
+                              onPress={() => {
+                                setSelectedAttendanceSection(sec);
+                                syncAttendanceRoster(selectedAttendanceSemester, sec, attendanceSubject, attendancePeriod, attendanceDate);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.attSectionChipText, isActive && styles.attSectionChipTextActive]}>
+                                {sec === 'All' ? 'All Sections' : `Section ${sec}`}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {/* Subject Selector - Emerald Green Category */}
+                      <View style={styles.selectorLabelRow}>
+                        <Text style={styles.selectorLabelText}>📗 Subject</Text>
+                      </View>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                        {availableAttendanceSubjects.map((subj) => {
+                          const isActive = attendanceSubject === subj;
+                          return (
+                            <TouchableOpacity
+                              key={subj}
+                              style={[styles.attSubjectChip, isActive && styles.attSubjectChipActive]}
+                              onPress={() => {
+                                setAttendanceSubject(subj);
+                                syncAttendanceRoster(selectedAttendanceSemester, selectedAttendanceSection, subj, attendancePeriod, attendanceDate);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.attSubjectChipText, isActive && styles.attSubjectChipTextActive]}>
+                                {subj}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+
+                      {/* Period Selector - Sunset Amber/Orange Category */}
+                      <View style={styles.selectorLabelRow}>
+                        <Text style={styles.selectorLabelText}>⏰ Teaching Period</Text>
+                      </View>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((pNum) => {
+                          const isActive = attendancePeriod === pNum;
+                          return (
+                            <TouchableOpacity
+                              key={pNum}
+                              style={[styles.attPeriodChip, isActive && styles.attPeriodChipActive]}
+                              onPress={() => {
+                                setAttendancePeriod(pNum);
+                                syncAttendanceRoster(selectedAttendanceSemester, selectedAttendanceSection, attendanceSubject, pNum, attendanceDate);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.attPeriodChipText, isActive && styles.attPeriodChipTextActive]}>
+                                Period {pNum}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+
+                    {/* Marking Card */}
+                    <View style={styles.card}>
+                      {/* Search Bar */}
+                      <TextInput
+                        style={styles.searchInput}
+                        placeholder="🔍 Search student name or roll no..."
+                        value={attendanceSearch}
+                        onChangeText={setAttendanceSearch}
+                      />
+
+                      {/* Quick Filter Status Chips */}
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.attFilterScroll}>
+                        <TouchableOpacity
+                          style={[styles.attFilterChip, attendanceFilterStatus === 'All' && styles.attFilterChipActiveAll]}
+                          onPress={() => setAttendanceFilterStatus('All')}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.attFilterChipText, attendanceFilterStatus === 'All' && styles.attFilterChipTextActiveAll]}>
+                            All ({attendanceRoster.length})
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.attFilterChip, attendanceFilterStatus === 'Present' && styles.attFilterChipActivePresent]}
+                          onPress={() => setAttendanceFilterStatus('Present')}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.attFilterChipText, attendanceFilterStatus === 'Present' && styles.attFilterChipTextActivePresent]}>
+                            ✓ Present ({attendanceRoster.filter((s) => s.status === 'Present').length})
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.attFilterChip, attendanceFilterStatus === 'Absent' && styles.attFilterChipActiveAbsent]}
+                          onPress={() => setAttendanceFilterStatus('Absent')}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.attFilterChipText, attendanceFilterStatus === 'Absent' && styles.attFilterChipTextActiveAbsent]}>
+                            ✕ Absent ({attendanceRoster.filter((s) => s.status === 'Absent').length})
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.attFilterChip, attendanceFilterStatus === 'OD' && styles.attFilterChipActiveOD]}
+                          onPress={() => setAttendanceFilterStatus('OD')}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.attFilterChipText, attendanceFilterStatus === 'OD' && styles.attFilterChipTextActiveOD]}>
+                            OD / Leave ({attendanceRoster.filter((s) => s.status === 'OD').length})
+                          </Text>
+                        </TouchableOpacity>
+                      </ScrollView>
+
+                      {/* Quick Bulk Actions */}
+                      <View style={styles.quickToggleRow}>
+                        <TouchableOpacity style={styles.quickToggleBtn} onPress={() => markAllAttendance('Present')}>
+                          <Text style={styles.quickToggleBtnText}>✓ Mark All Present</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.quickToggleBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => markAllAttendance('Absent')}>
+                          <Text style={[styles.quickToggleBtnText, { color: '#DC2626' }]}>✕ Mark All Absent</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Student Attendance List */}
+                      {filteredAttendance.length === 0 ? (
+                        <View style={styles.emptyStateContainer}>
+                          <Text style={styles.emptyStateEmoji}>🔍</Text>
+                          <Text style={styles.emptyStateTitle}>No Students in Filter</Text>
+                          <Text style={styles.emptyStateSubtitle}>Change your status filter or search keyword.</Text>
+                        </View>
+                      ) : (
+                        filteredAttendance.map((s) => (
+                          <View key={s.id} style={styles.studentAttendanceCard}>
+                            {/* Student Avatar & Identity */}
+                            <View style={styles.studentRowAvatarCircle}>
+                              <Text style={styles.studentRowAvatarText}>
+                                {s.name.substring(0, 2).toUpperCase()}
+                              </Text>
+                            </View>
+
+                            <View style={{ flex: 1, paddingHorizontal: 8 }}>
+                              <Text style={styles.studentRowName} numberOfLines={1}>{s.name}</Text>
+                              <Text style={styles.studentRowRoll}>{s.rollNo}</Text>
+                            </View>
+
+                            {/* Direct 3-State Tap Buttons: P, A, OD */}
+                            <View style={styles.directPillGroup}>
+                              <TouchableOpacity
+                                style={[styles.statusTapPill, s.status === 'Present' && styles.statusTapPillPresent]}
+                                onPress={() => setStudentAttendanceStatus(s.id, 'Present')}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={[styles.statusTapPillText, s.status === 'Present' && styles.statusTapTextPresent]}>P</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.statusTapPill, s.status === 'Absent' && styles.statusTapPillAbsent]}
+                                onPress={() => setStudentAttendanceStatus(s.id, 'Absent')}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={[styles.statusTapPillText, s.status === 'Absent' && styles.statusTapTextAbsent]}>A</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.statusTapPill, s.status === 'OD' && styles.statusTapPillOD]}
+                                onPress={() => setStudentAttendanceStatus(s.id, 'OD')}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={[styles.statusTapPillText, s.status === 'OD' && styles.statusTapTextOD]}>OD</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ))
+                      )}
+
+                      {/* Sticky Attendance Submission Action Bar */}
+                      <View style={styles.attSubmitBar}>
+                        <View style={styles.attSubmitCounts}>
+                          <Text style={styles.attSubmitCountItem}>
+                            P: <Text style={{ color: '#16A34A', fontWeight: '800' }}>{attendanceRoster.filter((s) => s.status === 'Present').length}</Text>
+                          </Text>
+                          <Text style={styles.attSubmitCountItem}>
+                            A: <Text style={{ color: '#DC2626', fontWeight: '800' }}>{attendanceRoster.filter((s) => s.status === 'Absent').length}</Text>
+                          </Text>
+                          <Text style={styles.attSubmitCountItem}>
+                            OD: <Text style={{ color: '#D97706', fontWeight: '800' }}>{attendanceRoster.filter((s) => s.status === 'OD').length}</Text>
                           </Text>
                         </View>
 
-                        <View style={{ flex: 1, paddingHorizontal: 8 }}>
-                          <Text style={styles.studentRowName} numberOfLines={1}>{s.name}</Text>
-                          <Text style={styles.studentRowRoll}>{s.rollNo}</Text>
-                        </View>
-
-                        {/* Direct 3-State Tap Buttons: P, A, OD */}
-                        <View style={styles.directPillGroup}>
-                          <TouchableOpacity
-                            style={[styles.statusTapPill, s.status === 'Present' && styles.statusTapPillPresent]}
-                            onPress={() => setStudentAttendanceStatus(s.id, 'Present')}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={[styles.statusTapPillText, s.status === 'Present' && styles.statusTapTextPresent]}>P</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={[styles.statusTapPill, s.status === 'Absent' && styles.statusTapPillAbsent]}
-                            onPress={() => setStudentAttendanceStatus(s.id, 'Absent')}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={[styles.statusTapPillText, s.status === 'Absent' && styles.statusTapTextAbsent]}>A</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={[styles.statusTapPill, s.status === 'OD' && styles.statusTapPillOD]}
-                            onPress={() => setStudentAttendanceStatus(s.id, 'OD')}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={[styles.statusTapPillText, s.status === 'OD' && styles.statusTapTextOD]}>OD</Text>
-                          </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity
+                          style={[styles.attSubmitActionBtn, submittingAttendance && { opacity: 0.6 }]}
+                          onPress={handleConfirmSubmitAttendance}
+                          disabled={submittingAttendance}
+                          activeOpacity={0.8}
+                        >
+                          {submittingAttendance ? (
+                            <ActivityIndicator color="#FFFFFF" size="small" />
+                          ) : (
+                            <Text style={styles.attSubmitActionBtnText}>✓ Confirm & Submit</Text>
+                          )}
+                        </TouchableOpacity>
                       </View>
-                    ))
-                  )}
+                    </View>
+                  </View>
+                )}
 
-                  {/* Sticky Attendance Submission Action Bar */}
-                  <View style={styles.attSubmitBar}>
-                    <View style={styles.attSubmitCounts}>
-                      <Text style={styles.attSubmitCountItem}>
-                        P: <Text style={{ color: '#16A34A', fontWeight: '800' }}>{attendanceRoster.filter((s) => s.status === 'Present').length}</Text>
-                      </Text>
-                      <Text style={styles.attSubmitCountItem}>
-                        A: <Text style={{ color: '#DC2626', fontWeight: '800' }}>{attendanceRoster.filter((s) => s.status === 'Absent').length}</Text>
-                      </Text>
-                      <Text style={styles.attSubmitCountItem}>
-                        OD: <Text style={{ color: '#D97706', fontWeight: '800' }}>{attendanceRoster.filter((s) => s.status === 'OD').length}</Text>
+                {/* MODE B: SAVED ATTENDANCE RECORDS */}
+                {attendanceTabMode === 'history' && (
+                  <View>
+                    <View style={styles.pageHeaderBanner}>
+                      <Text style={styles.pageHeaderTitle}>Institution Attendance Records</Text>
+                      <Text style={styles.pageHeaderDesc}>
+                        Live synchronized attendance logs recorded by authorized faculty members.
                       </Text>
                     </View>
 
-                    <TouchableOpacity
-                      style={[styles.attSubmitActionBtn, submittingAttendance && { opacity: 0.6 }]}
-                      onPress={handleConfirmSubmitAttendance}
-                      disabled={submittingAttendance}
-                      activeOpacity={0.8}
-                    >
-                      {submittingAttendance ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                      ) : (
-                        <Text style={styles.attSubmitActionBtnText}>✓ Confirm & Submit</Text>
-                      )}
-                    </TouchableOpacity>
+                    {savedAttendanceRecords.length === 0 ? (
+                      <View style={styles.card}>
+                        <View style={styles.emptyStateContainer}>
+                          <Text style={styles.emptyStateEmoji}>📋</Text>
+                          <Text style={styles.emptyStateTitle}>No Saved Attendance Records</Text>
+                          <Text style={styles.emptyStateSubtitle}>
+                            Attendance marked in this app or on the web will be displayed here in real time.
+                          </Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={{ gap: 10 }}>
+                        {savedAttendanceRecords.slice(0, 25).map((att: any, idx: number) => {
+                          const dateDisplay = (att.attendanceDate || att.date || '').toString().split('T')[0];
+                          const isPresent = (att.status || '').toLowerCase() === 'present';
+                          const isAbsent = (att.status || '').toLowerCase() === 'absent';
+                          return (
+                            <View key={att._id || idx} style={styles.card}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <View style={[styles.statusPill, isPresent ? styles.statusPillPresent : isAbsent ? styles.statusPillAbsent : styles.statusPillOD]}>
+                                    <Text style={[styles.statusText, isPresent ? styles.statusTextPresent : isAbsent ? styles.statusTextAbsent : styles.statusTextOD]}>
+                                      {att.status || 'Present'}
+                                    </Text>
+                                  </View>
+                                  <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>
+                                    📅 {dateDisplay}
+                                  </Text>
+                                </View>
+                                <View style={styles.periodPill}>
+                                  <Text style={styles.periodPillText}>Period {att.periodId || 1}</Text>
+                                </View>
+                              </View>
+
+                              <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
+                                {att.studentName || att.studentId || 'Scholar'}
+                              </Text>
+                              <Text style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>
+                                ID: {att.studentId || att.registerNo || '--'} • Subject: {att.subjectId || att.subject || 'Lecture'}
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+                                Faculty: {att.facultyName || att.markedBy || faculty.name} • Dept: {att.department || faculty.dept}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
-                </View>
+                )}
               </View>
             )}
 
@@ -6091,16 +6383,26 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   subTabPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
   subTabPillActive: {
-    backgroundColor: '#1E3A8A',
-    borderColor: '#1E3A8A',
+    backgroundColor: '#2563EB',
+    borderColor: '#1D4ED8',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
   subTabPillText: {
     fontSize: 12,
@@ -6109,7 +6411,7 @@ const styles = StyleSheet.create({
   },
   subTabPillTextActive: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontWeight: '800',
   },
 
   // DAY SELECTOR
@@ -6123,14 +6425,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
     marginHorizontal: 2,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   dayChipActive: {
-    backgroundColor: '#1E3A8A',
-    borderColor: '#1E3A8A',
+    backgroundColor: '#2563EB',
+    borderColor: '#1D4ED8',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   dayChipText: {
     fontSize: 12,
@@ -6139,6 +6446,7 @@ const styles = StyleSheet.create({
   },
   dayChipTextActive: {
     color: '#FFFFFF',
+    fontWeight: '800',
   },
 
   // TIMETABLE LIST
@@ -7736,29 +8044,37 @@ const styles = StyleSheet.create({
   // -------------------------------------------------------------
   marksModeSegment: {
     flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
-    padding: 3,
-    borderRadius: 10,
-    marginBottom: 10,
+    backgroundColor: '#F1F5F9',
+    padding: 4,
+    borderRadius: 12,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#E2E8F0',
   },
   marksModeTab: {
     flex: 1,
-    paddingVertical: 9,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 9,
   },
   marksModeTabActive: {
-    backgroundColor: '#1E3A8A',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   marksModeTabText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#1E40AF',
+    fontWeight: '600',
+    color: '#64748B',
   },
   marksModeTabTextActive: {
-    color: '#FFFFFF',
+    color: '#0F172A',
+    fontWeight: '800',
   },
   marksStatsSummaryBar: {
     flexDirection: 'row',
@@ -7821,8 +8137,13 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   subjectFilterChipActive: {
-    backgroundColor: '#1E3A8A',
-    borderColor: '#1E3A8A',
+    backgroundColor: '#2563EB',
+    borderColor: '#1D4ED8',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   subjectFilterChipText: {
     fontSize: 11,
@@ -7831,18 +8152,24 @@ const styles = StyleSheet.create({
   },
   subjectFilterChipTextActive: {
     color: '#FFFFFF',
+    fontWeight: '800',
   },
   sectionFilterChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   sectionFilterChipActive: {
-    backgroundColor: '#1E3A8A',
-    borderColor: '#1E3A8A',
+    backgroundColor: '#7C3AED',
+    borderColor: '#6D28D9',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   sectionFilterChipText: {
     fontSize: 11,
@@ -7851,6 +8178,7 @@ const styles = StyleSheet.create({
   },
   sectionFilterChipTextActive: {
     color: '#FFFFFF',
+    fontWeight: '800',
   },
   marksSearchInputModern: {
     backgroundColor: '#F8FAFC',
@@ -8235,29 +8563,36 @@ const styles = StyleSheet.create({
   },
   dutyTabRow: {
     flexDirection: 'row',
-    gap: 8,
+    backgroundColor: '#F1F5F9',
+    padding: 4,
+    borderRadius: 12,
     marginBottom: 12,
-  },
-  dutyTabBtn: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
+  dutyTabBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    alignItems: 'center',
+    borderRadius: 9,
+  },
   dutyTabBtnActive: {
-    backgroundColor: '#1E3A8A',
-    borderColor: '#1E3A8A',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   dutyTabBtnText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#64748B',
   },
   dutyTabBtnTextActive: {
-    color: '#FFFFFF',
+    color: '#0F172A',
     fontWeight: '800',
   },
   mobileFriendlyDutyCard: {
@@ -8332,15 +8667,15 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   conductHallAttBtn: {
-    backgroundColor: '#1E3A8A',
-    paddingVertical: 10,
-    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    paddingVertical: 11,
+    borderRadius: 9,
     alignItems: 'center',
-    shadowColor: '#1E3A8A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
   conductHallAttBtnText: {
     color: '#FFFFFF',
@@ -8353,34 +8688,180 @@ const styles = StyleSheet.create({
   // ----------------------------------------------------------------------
   attendanceHeroBanner: {
     flexDirection: 'row',
-    backgroundColor: '#1E3A8A',
-    borderRadius: 12,
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
     padding: 14,
     marginBottom: 12,
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   attHeroSubject: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
+    letterSpacing: 0.3,
   },
   attHeroClass: {
-    color: '#93C5FD',
+    color: '#94A3B8',
     fontSize: 12,
     marginTop: 2,
+    fontWeight: '600',
   },
   attPeriodPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
   },
   attPeriodPillText: {
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '800',
   },
+
+  // Category Selector Labels
+  selectorLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  selectorLabelText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+
+  // 1. Semester Chips (Royal Blue Theme)
+  attSemesterChip: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 13,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  attSemesterChipActive: {
+    backgroundColor: '#2563EB',
+    borderColor: '#1D4ED8',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  attSemesterChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  attSemesterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+
+  // 2. Section Chips (Vibrant Violet Theme)
+  attSectionChip: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  attSectionChipActive: {
+    backgroundColor: '#7C3AED',
+    borderColor: '#6D28D9',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  attSectionChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  attSectionChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+
+  // 3. Subject Chips (Fresh Emerald Green Theme)
+  attSubjectChip: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  attSubjectChipActive: {
+    backgroundColor: '#059669',
+    borderColor: '#047857',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  attSubjectChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  attSubjectChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+
+  // 4. Period Chips (Sunset Amber / Orange Theme)
+  attPeriodChip: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 13,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  attPeriodChipActive: {
+    backgroundColor: '#EA580C',
+    borderColor: '#C2410C',
+    shadowColor: '#EA580C',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  attPeriodChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  attPeriodChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+
   attFilterScroll: {
     flexDirection: 'row',
     marginBottom: 10,
@@ -8395,20 +8876,44 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   attFilterChipActive: {
-    backgroundColor: '#1E3A8A',
-    borderColor: '#1E3A8A',
+    backgroundColor: '#2563EB',
+    borderColor: '#1D4ED8',
+  },
+  attFilterChipActiveAll: {
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   attFilterChipActivePresent: {
-    backgroundColor: '#DCFCE7',
-    borderColor: '#86EFAC',
+    backgroundColor: '#10B981',
+    borderColor: '#059669',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
   },
   attFilterChipActiveAbsent: {
-    backgroundColor: '#FEE2E2',
-    borderColor: '#FCA5A5',
+    backgroundColor: '#EF4444',
+    borderColor: '#DC2626',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
   },
   attFilterChipActiveOD: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#FDE68A',
+    backgroundColor: '#F59E0B',
+    borderColor: '#D97706',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
   },
   attFilterChipText: {
     fontSize: 11,
@@ -8419,16 +8924,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
   },
+  attFilterChipTextActiveAll: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
   attFilterChipTextActivePresent: {
-    color: '#15803D',
+    color: '#FFFFFF',
     fontWeight: '800',
   },
   attFilterChipTextActiveAbsent: {
-    color: '#DC2626',
+    color: '#FFFFFF',
     fontWeight: '800',
   },
   attFilterChipTextActiveOD: {
-    color: '#B45309',
+    color: '#FFFFFF',
     fontWeight: '800',
   },
   studentAttendanceCard: {
@@ -8496,6 +9005,39 @@ const styles = StyleSheet.create({
   statusTapTextOD: {
     color: '#B45309',
   },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusPillPresent: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#86EFAC',
+  },
+  statusPillAbsent: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FCA5A5',
+  },
+  statusPillOD: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  statusTextPresent: {
+    color: '#15803D',
+  },
+  statusTextAbsent: {
+    color: '#DC2626',
+  },
+  statusTextOD: {
+    color: '#B45309',
+  },
   attSubmitBar: {
     marginTop: 14,
     paddingTop: 12,
@@ -8515,15 +9057,15 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
   attSubmitActionBtn: {
-    backgroundColor: '#1E3A8A',
-    paddingVertical: 12,
-    borderRadius: 10,
+    backgroundColor: '#2563EB',
+    paddingVertical: 13,
+    borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#1E3A8A',
+    shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
   attSubmitActionBtnText: {
     color: '#FFFFFF',

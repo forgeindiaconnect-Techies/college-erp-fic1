@@ -22,6 +22,7 @@ import UserProfileScreen from '../profile/UserProfileScreen';
 import ReferralHub from '../referrals/ReferralHub';
 import DashboardHeroBanner from './DashboardHeroBanner';
 import QuickAccessGrid from './QuickAccessGrid';
+import DailyDutyAttendanceCard from '../common/DailyDutyAttendanceCard';
 
 type Props = {
   user: MobileUser;
@@ -30,7 +31,7 @@ type Props = {
 
 type WatchmanVisitorsSubTab = 'active' | 'history' | 'preregistered';
 type WatchmanLogisticsSubTab = 'parcels' | 'buses' | 'vehicles';
-type WatchmanMoreSection = 'profile' | 'menu' | 'shift' | 'incidents' | 'referrals' | 'settings';
+type WatchmanMoreSection = 'profile' | 'menu' | 'incidents' | 'referrals' | 'settings';
 
 type GateMovementItem = {
   id: string;
@@ -137,6 +138,17 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
   const [verifying, setVerifying] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Authorized Daily Attendance & Gate Operations
+  const [gateAttendanceSubTab, setGateAttendanceSubTab] = useState<'students' | 'staff' | 'scan'>('students');
+  const [studentGateFilter, setStudentGateFilter] = useState<'inside' | 'all' | 'history'>('inside');
+  const [staffGateFilter, setStaffGateFilter] = useState<'inside' | 'all' | 'history'>('inside');
+  const [studentGateSearch, setStudentGateSearch] = useState('');
+  const [staffGateSearch, setStaffGateSearch] = useState('');
+  const [studentTodayScans, setStudentTodayScans] = useState<any[]>([]);
+  const [studentDirectory, setStudentDirectory] = useState<any[]>([]);
+  const [staffMovements, setStaffMovements] = useState<any[]>([]);
+  const [performingGateAction, setPerformingGateAction] = useState<string | null>(null);
+
   // Visitor Registration Modal
   const [visitorModalVisible, setVisitorModalVisible] = useState(false);
   const [visName, setVisName] = useState('');
@@ -184,6 +196,9 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
         vehiclesRes,
         incidentsRes,
         staffDirRes,
+        studentScansRes,
+        studentDirRes,
+        staffMovesRes,
       ] = await Promise.all([
         apiGet<any>('watchman/stats').catch(() => null),
         apiGet<any>('watchman/visitors/active').catch(() => []),
@@ -193,10 +208,22 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
         apiGet<any[]>('watchman/vehicles').catch(() => []),
         apiGet<any[]>('watchman/incidents').catch(() => []),
         apiGet<any>('parcels/staff-directory').catch(() => apiGet<any>('watchman/staff-directory').catch(() => [])),
+        apiGet<any>('watchman/student-today-scans').catch(() => ({ data: [] })),
+        apiGet<any>('watchman/student-qr-directory').catch(() => apiGet<any[]>('students').catch(() => [])),
+        apiGet<any>('watchman/staff-movements').catch(() => apiGet<any>('watchman/staff-register').catch(() => [])),
       ]);
 
       const dirList = Array.isArray(staffDirRes?.data) ? staffDirRes.data : (Array.isArray(staffDirRes) ? staffDirRes : []);
       setStaffDirectory(dirList);
+
+      const rawScans = Array.isArray(studentScansRes?.data) ? studentScansRes.data : (Array.isArray(studentScansRes) ? studentScansRes : []);
+      setStudentTodayScans(rawScans);
+
+      const rawStuDir = Array.isArray(studentDirRes?.data) ? studentDirRes.data : (Array.isArray(studentDirRes) ? studentDirRes : []);
+      setStudentDirectory(rawStuDir);
+
+      const rawStaffMoves = Array.isArray(staffMovesRes?.data) ? staffMovesRes.data : (Array.isArray(staffMovesRes) ? staffMovesRes : []);
+      setStaffMovements(rawStaffMoves);
 
       if (statsRes?.data) {
         setStats((prev) => ({ ...prev, ...statsRes.data }));
@@ -435,6 +462,92 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
   };
 
   // ----------------------------------------------------------------------
+  // AUTHORIZED STUDENT GATE ATTENDANCE (Check-in & Check-out)
+  // ----------------------------------------------------------------------
+  const handleStudentCheckin = async (student: any) => {
+    const sId = student.studentId || student.id || student.rollNo;
+    const sName = student.studentName || student.name || 'Student';
+    try {
+      setPerformingGateAction(sId);
+      const res = await apiPost<any>('watchman/student-checkin', {
+        studentId: sId,
+        gate: officer.gate,
+        remarks: 'Authorized Mobile Gate Check-in',
+      });
+      if (res?.success === false) {
+        Alert.alert('Notice', res.message || 'Student check-in could not be completed.');
+      } else {
+        Alert.alert('✓ Student Checked In', `Gate entry granted for ${sName} (${sId}) at ${officer.gate}.`);
+      }
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Student Gate Attendance', err?.message || 'Check-in failed. Please verify student details.');
+    } finally {
+      setPerformingGateAction(null);
+    }
+  };
+
+  const handleStudentCheckout = async (student: any) => {
+    const sId = student.studentId || student.id || student.rollNo;
+    const sName = student.studentName || student.name || 'Student';
+    try {
+      setPerformingGateAction(sId);
+      const res = await apiPost<any>('watchman/student-checkout', {
+        studentId: sId,
+        gate: officer.gate,
+        remarks: 'Authorized Mobile Gate Check-out',
+      });
+      if (res?.success === false) {
+        Alert.alert('Notice', res.message || 'Student check-out could not be completed.');
+      } else {
+        Alert.alert('✓ Student Exit Recorded', `Gate departure confirmed for ${sName} (${sId}) at ${officer.gate}.`);
+      }
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Student Gate Attendance', err?.message || 'Check-out failed.');
+    } finally {
+      setPerformingGateAction(null);
+    }
+  };
+
+  // ----------------------------------------------------------------------
+  // AUTHORIZED STAFF GATE ATTENDANCE (Movement Logging In & Out)
+  // ----------------------------------------------------------------------
+  const handleStaffGateMovement = async (staffMember: any, direction: 'In' | 'Out') => {
+    const stId = staffMember.staffId || staffMember.id || staffMember.personId || staffMember._id;
+    const stName = staffMember.staffName || staffMember.name || 'Faculty Member';
+    const dept = staffMember.department || staffMember.dept || 'General';
+    const desig = staffMember.designation || 'Staff';
+
+    try {
+      setPerformingGateAction(stId);
+      const res = await apiPost<any>('watchman/staff-register', {
+        staffId: stId,
+        staffName: stName,
+        movementType: direction,
+        department: dept,
+        designation: desig,
+        gate: officer.gate,
+        reason: direction === 'In' ? 'Duty Shift Reporting' : 'Campus Departure / Shift Completed',
+      });
+
+      if (res?.success === false) {
+        Alert.alert('Notice', res.message || 'Staff movement not recorded.');
+      } else {
+        Alert.alert(
+          direction === 'In' ? '✓ Staff Entry Recorded' : '✓ Staff Exit Recorded',
+          `Gate ${direction.toUpperCase()} logged for ${stName} (${stId}) at ${officer.gate}.`
+        );
+      }
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Staff Gate Attendance', err?.message || 'Staff movement failed.');
+    } finally {
+      setPerformingGateAction(null);
+    }
+  };
+
+  // ----------------------------------------------------------------------
   // VISITOR ENTRY SUBMISSION
   // ----------------------------------------------------------------------
   const handleRegisterVisitor = async () => {
@@ -595,6 +708,72 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
     }
   };
 
+  // ----------------------------------------------------------------------
+  // FILTERED STUDENT & STAFF GATE ATTENDANCE ROSTERS
+  // ----------------------------------------------------------------------
+  const insideStudents = useMemo(() => {
+    return studentTodayScans.filter((s: any) => s.status === 'Inside Campus');
+  }, [studentTodayScans]);
+
+  const displayedStudents = useMemo(() => {
+    let pool: any[] = [];
+    if (studentGateFilter === 'inside') {
+      pool = insideStudents;
+    } else if (studentGateFilter === 'history') {
+      pool = studentTodayScans;
+    } else {
+      pool =
+        studentDirectory.length > 0
+          ? studentDirectory
+          : studentTodayScans.length > 0
+          ? studentTodayScans
+          : movements.filter((m: any) => m.personType === 'Student');
+    }
+
+    if (!studentGateSearch.trim()) return pool;
+    const q = studentGateSearch.toLowerCase().trim();
+    return pool.filter((s: any) => {
+      const name = (s.studentName || s.name || '').toLowerCase();
+      const id = (s.studentId || s.id || s.rollNo || '').toLowerCase();
+      const dept = (s.department || s.dept || '').toLowerCase();
+      return name.includes(q) || id.includes(q) || dept.includes(q);
+    });
+  }, [studentGateFilter, insideStudents, studentTodayScans, studentDirectory, movements, studentGateSearch]);
+
+  const displayedStaff = useMemo(() => {
+    let pool: any[] =
+      staffDirectory.length > 0 ? staffDirectory : movements.filter((m: any) => m.personType === 'Staff');
+
+    if (staffGateFilter === 'inside') {
+      pool = pool.filter((st: any) => {
+        const id = st.staffId || st.id || st.personId;
+        const lastMove = staffMovements.find((m: any) => m.staffId === id || m.personId === id);
+        return lastMove ? lastMove.movementType === 'In' || lastMove.direction === 'In' : false;
+      });
+      if (pool.length === 0 && staffDirectory.length > 0) {
+        pool = staffDirectory.slice(0, 10);
+      }
+    } else if (staffGateFilter === 'history') {
+      return staffMovements.filter((m: any) => {
+        if (!staffGateSearch.trim()) return true;
+        const q = staffGateSearch.toLowerCase().trim();
+        return (
+          (m.staffName || m.name || '').toLowerCase().includes(q) ||
+          (m.staffId || m.personId || '').toLowerCase().includes(q)
+        );
+      });
+    }
+
+    if (!staffGateSearch.trim()) return pool;
+    const q = staffGateSearch.toLowerCase().trim();
+    return pool.filter((s: any) => {
+      const name = (s.name || s.staffName || '').toLowerCase();
+      const id = (s.staffId || s.id || s.personId || '').toLowerCase();
+      const dept = (s.department || s.dept || '').toLowerCase();
+      return name.includes(q) || id.includes(q) || dept.includes(q);
+    });
+  }, [staffDirectory, movements, staffGateFilter, staffMovements, staffGateSearch]);
+
   // Android Hardware Back Button Handling
   useEffect(() => {
     const onBackPress = () => {
@@ -631,7 +810,6 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
     if (activeTab === 'referrals') return 'Campus Visitor Register';
     if (activeTab === 'notifications') return 'Deliveries & Logistics';
     if (activeTab === 'profile') {
-      if (moreSection === 'shift') return 'Guard Shift Attendance';
       if (moreSection === 'incidents') return 'Emergency Incident Logs';
       if (moreSection === 'referrals') return 'Business Referrals';
       if (moreSection === 'menu') return 'Guard Shift & Controls';
@@ -686,6 +864,9 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
               image={require('../../../assets/images/dashboards/watchman_hero.jpg')}
               tagline="Safe Campus Secure Future"
             />
+
+            {/* Daily Duty Attendance Card (Punch In / Out synchronized with central ERP) */}
+            <DailyDutyAttendanceCard user={user} style={{ marginHorizontal: 0, marginBottom: 12 }} />
 
             {/* 2. Gate Operations 2x2 Grid (Matching Reference Design) */}
             <QuickAccessGrid
@@ -909,133 +1090,452 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
           </ScrollView>
         )}
 
-        {/* TAB 2: SCAN (ONE-TAP GATE QR SCANNER & IDENTITY VERIFICATION) */}
+        {/* TAB 2: GATE ATTENDANCE & VERIFICATION COMMAND CENTER */}
         {activeTab === 'academics' && (
           <View style={{ flex: 1 }}>
-            <View style={styles.pageHeaderBanner}>
-              <Text style={styles.pageHeaderTitle}>Gate QR Scanner & Identity Verification</Text>
-              <Text style={styles.pageHeaderDesc}>
-                Scan digital student/staff ID cards, visitor gate passes, or enter badge codes to verify gate access.
-              </Text>
-            </View>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-              <View style={styles.guidanceTipBox}>
-                <Text style={styles.guidanceTipEmoji}>📷</Text>
-                <Text style={styles.guidanceTipText}>
-                  Enter student/staff roll number or tap a demo badge below. After verifying, tap 'Record Campus IN' or 'Record Campus OUT'.
+            {/* Top Sub-Tab Navigation Switcher */}
+            <View style={styles.marksModeSegment}>
+              <TouchableOpacity
+                style={[styles.marksModeTab, gateAttendanceSubTab === 'students' && styles.marksModeTabActive]}
+                onPress={() => setGateAttendanceSubTab('students')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.marksModeTabText, gateAttendanceSubTab === 'students' && styles.marksModeTabTextActive]}>
+                  🧑‍🎓 Student Gate ({insideStudents.length})
                 </Text>
-              </View>
-              <View style={styles.card}>
-                <Text style={styles.cardHeaderTitle}>📷 Gate QR & Identity Verification</Text>
-                <Text style={styles.sectionSubtitle}>Scan badge QR or enter ID code for verified access</Text>
+              </TouchableOpacity>
 
-              {/* QR Code Input / Barcode Lookup */}
-              <View style={styles.scanInputRow}>
-                <TextInput
-                  style={[styles.searchInput, { flex: 1, marginBottom: 0 }]}
-                  placeholder="Scan or enter Student / Staff / Pass ID..."
-                  value={scannedCode}
-                  onChangeText={setScannedCode}
-                  autoCapitalize="characters"
-                />
-                <TouchableOpacity
-                  style={styles.verifyBtn}
-                  onPress={() => handleVerifyCode()}
-                  disabled={verifying}
-                  activeOpacity={0.8}
-                >
-                  {verifying ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.verifyBtnText}>Verify ID</Text>}
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={[styles.marksModeTab, gateAttendanceSubTab === 'staff' && styles.marksModeTabActive]}
+                onPress={() => setGateAttendanceSubTab('staff')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.marksModeTabText, gateAttendanceSubTab === 'staff' && styles.marksModeTabTextActive]}>
+                  👨‍🏫 Staff Gate
+                </Text>
+              </TouchableOpacity>
 
-              {/* Quick Preset Verification Pills */}
-              <Text style={styles.quickPresetsTitle}>⚡ Tap to Verify Preset Demo Badges:</Text>
-              <View style={styles.presetChipsRow}>
-                {[
-                  { code: 'CS2022001', label: 'Student: John Doe (CS2022001)' },
-                  { code: 'CS2021004', label: 'Student: Emily Davis (CS2021004)' },
-                  { code: 'STF007', label: 'Staff: Prof. Karthik (STF007)' },
-                  { code: 'VIS-101', label: 'Visitor Pass (VIS-101)' },
-                ].map((item) => (
-                  <TouchableOpacity
-                    key={item.code}
-                    style={styles.presetChip}
-                    onPress={() => {
-                      setScannedCode(item.code);
-                      handleVerifyCode(item.code);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.presetChipText}>{item.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <TouchableOpacity
+                style={[styles.marksModeTab, gateAttendanceSubTab === 'scan' && styles.marksModeTabActive]}
+                onPress={() => setGateAttendanceSubTab('scan')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.marksModeTabText, gateAttendanceSubTab === 'scan' && styles.marksModeTabTextActive]}>
+                  🔍 ID & Pass Scan
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Verification Result Card */}
-            {verifiedPerson && (
-              <View style={styles.verifiedCard}>
-                <View style={styles.verifiedHeaderRow}>
-                  <View style={styles.verifiedAvatar}>
-                    <Text style={styles.verifiedAvatarText}>{verifiedPerson.name.substring(0, 2).toUpperCase()}</Text>
-                  </View>
-                  <View style={{ flex: 1, paddingLeft: 12 }}>
-                    <View style={styles.roleTagRow}>
-                      <Text style={styles.verifiedRoleTag}>{verifiedPerson.role.toUpperCase()}</Text>
-                      <Text style={styles.verifiedIdTag}>{verifiedPerson.id}</Text>
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+              {/* ============================================================ */}
+              {/* SUB-TAB 1: STUDENT DAILY GATE ATTENDANCE                     */}
+              {/* ============================================================ */}
+              {gateAttendanceSubTab === 'students' && (
+                <View>
+                  {/* Hero Attendance Header */}
+                  <View style={styles.attendanceHeroBanner}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.attHeroSubject}>Student Gate Attendance Register</Text>
+                      <Text style={styles.attHeroClass}>
+                        Inside: {insideStudents.length} • Scans Today: {studentTodayScans.length}
+                      </Text>
+                      <Text style={[styles.attHeroClass, { color: '#BFDBFE', fontSize: 11, marginTop: 1 }]}>
+                        📍 Active Gate: {officer.gate}
+                      </Text>
                     </View>
-                    <Text style={styles.verifiedName}>{verifiedPerson.name}</Text>
-                    <Text style={styles.verifiedDept}>{verifiedPerson.department}</Text>
+                    <View style={styles.attPeriodPill}>
+                      <Text style={styles.attPeriodPillText}>Live Gate</Text>
+                    </View>
+                  </View>
+
+                  {/* Filter Sub-Pills */}
+                  <View style={styles.card}>
+                    {/* Search Bar */}
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="🔍 Search student name, ID, or roll number..."
+                      value={studentGateSearch}
+                      onChangeText={setStudentGateSearch}
+                    />
+
+                    {/* Filter Pills */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                      <TouchableOpacity
+                        style={[styles.attFilterChip, studentGateFilter === 'inside' && styles.attFilterChipActive]}
+                        onPress={() => setStudentGateFilter('inside')}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.attFilterChipText, studentGateFilter === 'inside' && styles.attFilterChipTextActive]}>
+                          🟢 Inside Campus ({insideStudents.length})
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.attFilterChip, studentGateFilter === 'all' && styles.attFilterChipActive]}
+                        onPress={() => setStudentGateFilter('all')}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.attFilterChipText, studentGateFilter === 'all' && styles.attFilterChipTextActive]}>
+                          📋 All Registered ({studentDirectory.length})
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.attFilterChip, studentGateFilter === 'history' && styles.attFilterChipActive]}
+                        onPress={() => setStudentGateFilter('history')}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.attFilterChipText, studentGateFilter === 'history' && styles.attFilterChipTextActive]}>
+                          🕒 Today's Scans ({studentTodayScans.length})
+                        </Text>
+                      </TouchableOpacity>
+                    </ScrollView>
+
+                    {/* Student List */}
+                    {displayedStudents.length === 0 ? (
+                      <View style={styles.emptyStateContainer}>
+                        <Text style={styles.emptyStateEmoji}>🧑‍🎓</Text>
+                        <Text style={styles.emptyStateTitle}>No Students in Current View</Text>
+                        <Text style={styles.emptyStateSubtitle}>
+                          {studentGateFilter === 'inside'
+                            ? 'No students are currently recorded inside the campus gate.'
+                            : 'No matching student records found.'}
+                        </Text>
+                      </View>
+                    ) : (
+                      displayedStudents.map((s: any, idx: number) => {
+                        const sId = s.studentId || s.id || s.rollNo || `STU-${idx + 1}`;
+                        const sName = s.studentName || s.name || 'Student Scholar';
+                        const isInside = s.status === 'Inside Campus';
+                        const isActionLoading = performingGateAction === sId;
+
+                        return (
+                          <View key={s._id || sId || idx} style={styles.studentAttendanceCard}>
+                            <View style={styles.studentRowAvatarCircle}>
+                              <Text style={styles.studentRowAvatarText}>
+                                {sName.substring(0, 2).toUpperCase()}
+                              </Text>
+                            </View>
+
+                            <View style={{ flex: 1, paddingHorizontal: 8 }}>
+                              <Text style={styles.studentRowName} numberOfLines={1}>
+                                {sName}
+                              </Text>
+                              <Text style={styles.studentRowRoll}>
+                                ID: {sId} • {s.department || s.dept || 'Engineering'}
+                              </Text>
+                              {s.checkInTime ? (
+                                <Text style={{ fontSize: 10, color: '#059669', marginTop: 1 }}>
+                                  In: {new Date(s.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  {s.durationFormatted ? ` • Duration: ${s.durationFormatted}` : ''}
+                                </Text>
+                              ) : null}
+                            </View>
+
+                            {/* Action Buttons */}
+                            <View style={{ flexDirection: 'row', gap: 6 }}>
+                              {isInside ? (
+                                <TouchableOpacity
+                                  style={[
+                                    styles.attActionBtn,
+                                    { backgroundColor: '#3B82F6', paddingVertical: 6, paddingHorizontal: 12 },
+                                    isActionLoading && { opacity: 0.6 },
+                                  ]}
+                                  onPress={() => handleStudentCheckout(s)}
+                                  disabled={isActionLoading}
+                                  activeOpacity={0.8}
+                                >
+                                  {isActionLoading ? (
+                                    <ActivityIndicator color="#FFFFFF" size="small" />
+                                  ) : (
+                                    <Text style={[styles.attActionBtnText, { fontSize: 11 }]}>Gate OUT 🔵</Text>
+                                  )}
+                                </TouchableOpacity>
+                              ) : (
+                                <TouchableOpacity
+                                  style={[
+                                    styles.attActionBtn,
+                                    { backgroundColor: '#10B981', paddingVertical: 6, paddingHorizontal: 12 },
+                                    isActionLoading && { opacity: 0.6 },
+                                  ]}
+                                  onPress={() => handleStudentCheckin(s)}
+                                  disabled={isActionLoading}
+                                  activeOpacity={0.8}
+                                >
+                                  {isActionLoading ? (
+                                    <ActivityIndicator color="#FFFFFF" size="small" />
+                                  ) : (
+                                    <Text style={[styles.attActionBtnText, { fontSize: 11 }]}>Gate IN 🟢</Text>
+                                  )}
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })
+                    )}
                   </View>
                 </View>
+              )}
 
-                {/* Real-Time Campus Status Banner */}
-                <View
-                  style={[
-                    styles.currentStatusBanner,
-                    verifiedPerson.currentStatus === 'Inside Campus' ? styles.statusBannerInside : styles.statusBannerOutside,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.currentStatusText,
-                      verifiedPerson.currentStatus === 'Inside Campus' ? styles.statusTextInside : styles.statusTextOutside,
-                    ]}
-                  >
-                    Current Verified Status: <Text style={{ fontWeight: '800' }}>{verifiedPerson.currentStatus}</Text>
-                  </Text>
+              {/* ============================================================ */}
+              {/* SUB-TAB 2: STAFF DAILY GATE ATTENDANCE                       */}
+              {/* ============================================================ */}
+              {gateAttendanceSubTab === 'staff' && (
+                <View>
+                  {/* Hero Attendance Header */}
+                  <View style={[styles.attendanceHeroBanner, { backgroundColor: '#0F766E' }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.attHeroSubject}>Staff & Faculty Gate Attendance</Text>
+                      <Text style={styles.attHeroClass}>
+                        Directory: {staffDirectory.length} • Gate Movements: {staffMovements.length}
+                      </Text>
+                      <Text style={[styles.attHeroClass, { color: '#CCFBF1', fontSize: 11, marginTop: 1 }]}>
+                        📍 Active Gate: {officer.gate}
+                      </Text>
+                    </View>
+                    <View style={[styles.attPeriodPill, { backgroundColor: 'rgba(255, 255, 255, 0.25)' }]}>
+                      <Text style={styles.attPeriodPillText}>Faculty Log</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.card}>
+                    {/* Search Bar */}
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="🔍 Search faculty by name, ID, or dept..."
+                      value={staffGateSearch}
+                      onChangeText={setStaffGateSearch}
+                    />
+
+                    {/* Filter Pills */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                      <TouchableOpacity
+                        style={[styles.attFilterChip, staffGateFilter === 'inside' && styles.attFilterChipActive]}
+                        onPress={() => setStaffGateFilter('inside')}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.attFilterChipText, staffGateFilter === 'inside' && styles.attFilterChipTextActive]}>
+                          🟢 On Campus
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.attFilterChip, staffGateFilter === 'all' && styles.attFilterChipActive]}
+                        onPress={() => setStaffGateFilter('all')}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.attFilterChipText, staffGateFilter === 'all' && styles.attFilterChipTextActive]}>
+                          📋 All Staff ({staffDirectory.length})
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.attFilterChip, staffGateFilter === 'history' && styles.attFilterChipActive]}
+                        onPress={() => setStaffGateFilter('history')}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.attFilterChipText, staffGateFilter === 'history' && styles.attFilterChipTextActive]}>
+                          🕒 Movement History ({staffMovements.length})
+                        </Text>
+                      </TouchableOpacity>
+                    </ScrollView>
+
+                    {/* Staff List */}
+                    {displayedStaff.length === 0 ? (
+                      <View style={styles.emptyStateContainer}>
+                        <Text style={styles.emptyStateEmoji}>👨‍🏫</Text>
+                        <Text style={styles.emptyStateTitle}>No Faculty Records Found</Text>
+                        <Text style={styles.emptyStateSubtitle}>No matching staff gate records found.</Text>
+                      </View>
+                    ) : (
+                      displayedStaff.map((st: any, idx: number) => {
+                        const stId = st.staffId || st.personId || st.id || st._id || `STF-${idx + 1}`;
+                        const stName = st.staffName || st.name || 'Faculty Member';
+                        const isActionLoading = performingGateAction === stId;
+
+                        return (
+                          <View key={st._id || stId || idx} style={styles.studentAttendanceCard}>
+                            <View style={[styles.studentRowAvatarCircle, { backgroundColor: '#F0FDFA', borderColor: '#99F6E4' }]}>
+                              <Text style={[styles.studentRowAvatarText, { color: '#0F766E' }]}>
+                                {stName.substring(0, 2).toUpperCase()}
+                              </Text>
+                            </View>
+
+                            <View style={{ flex: 1, paddingHorizontal: 8 }}>
+                              <Text style={styles.studentRowName} numberOfLines={1}>
+                                {stName}
+                              </Text>
+                              <Text style={styles.studentRowRoll}>
+                                ID: {stId} • {st.department || st.dept || 'Academic Dept'}
+                              </Text>
+                              {st.direction || st.movementType ? (
+                                <Text style={{ fontSize: 10, color: '#0F766E', marginTop: 1 }}>
+                                  Last: {st.direction || st.movementType} at {st.time || 'Today'}
+                                </Text>
+                              ) : null}
+                            </View>
+
+                            {/* Dual Gate Actions for Staff */}
+                            <View style={{ flexDirection: 'row', gap: 6 }}>
+                              <TouchableOpacity
+                                style={[
+                                  styles.attActionBtn,
+                                  { backgroundColor: '#10B981', paddingVertical: 6, paddingHorizontal: 8 },
+                                  isActionLoading && { opacity: 0.6 },
+                                ]}
+                                onPress={() => handleStaffGateMovement(st, 'In')}
+                                disabled={isActionLoading}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={[styles.attActionBtnText, { fontSize: 10 }]}>IN 🟢</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[
+                                  styles.attActionBtn,
+                                  { backgroundColor: '#EF4444', paddingVertical: 6, paddingHorizontal: 8 },
+                                  isActionLoading && { opacity: 0.6 },
+                                ]}
+                                onPress={() => handleStaffGateMovement(st, 'Out')}
+                                disabled={isActionLoading}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={[styles.attActionBtnText, { fontSize: 10 }]}>OUT 🔴</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
                 </View>
+              )}
 
-                {/* Instant Action Buttons (IN / OUT) with Duplicate Prevention */}
-                <View style={styles.gateActionRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.gateActionBtn,
-                      styles.btnIn,
-                      (actionLoading || verifiedPerson.currentStatus === 'Inside Campus') && styles.btnDisabled,
-                    ]}
-                    onPress={handleRecordCampusIn}
-                    disabled={actionLoading || verifiedPerson.currentStatus === 'Inside Campus'}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.gateActionBtnText}>✓ Record Campus IN</Text>
-                  </TouchableOpacity>
+              {/* ============================================================ */}
+              {/* SUB-TAB 3: QR CODE & BADGE SCANNER                           */}
+              {/* ============================================================ */}
+              {gateAttendanceSubTab === 'scan' && (
+                <View>
+                  <View style={styles.guidanceTipBox}>
+                    <Text style={styles.guidanceTipEmoji}>📷</Text>
+                    <Text style={styles.guidanceTipText}>
+                      Enter student/staff roll number or tap a demo badge below. After verifying, tap 'Record Campus IN' or 'Record Campus OUT'.
+                    </Text>
+                  </View>
+                  <View style={styles.card}>
+                    <Text style={styles.cardHeaderTitle}>📷 Gate QR & Identity Verification</Text>
+                    <Text style={styles.sectionSubtitle}>Scan badge QR or enter ID code for verified access</Text>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.gateActionBtn,
-                      styles.btnOut,
-                      (actionLoading || verifiedPerson.currentStatus === 'Outside Campus') && styles.btnDisabled,
-                    ]}
-                    onPress={handleRecordCampusOut}
-                    disabled={actionLoading || verifiedPerson.currentStatus === 'Outside Campus'}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.gateActionBtnText, { color: '#DC2626' }]}>✕ Record Campus OUT</Text>
-                  </TouchableOpacity>
+                    {/* QR Code Input / Barcode Lookup */}
+                    <View style={styles.scanInputRow}>
+                      <TextInput
+                        style={[styles.searchInput, { flex: 1, marginBottom: 0 }]}
+                        placeholder="Scan or enter Student / Staff / Pass ID..."
+                        value={scannedCode}
+                        onChangeText={setScannedCode}
+                        autoCapitalize="characters"
+                      />
+                      <TouchableOpacity
+                        style={styles.verifyBtn}
+                        onPress={() => handleVerifyCode()}
+                        disabled={verifying}
+                        activeOpacity={0.8}
+                      >
+                        {verifying ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.verifyBtnText}>Verify ID</Text>}
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Quick Preset Verification Pills */}
+                    <Text style={styles.quickPresetsTitle}>⚡ Tap to Verify Preset Demo Badges:</Text>
+                    <View style={styles.presetChipsRow}>
+                      {[
+                        { code: 'CS2022001', label: 'Student: John Doe (CS2022001)' },
+                        { code: 'CS2021004', label: 'Student: Emily Davis (CS2021004)' },
+                        { code: 'STF007', label: 'Staff: Prof. Karthik (STF007)' },
+                        { code: 'VIS-101', label: 'Visitor Pass (VIS-101)' },
+                      ].map((item) => (
+                        <TouchableOpacity
+                          key={item.code}
+                          style={styles.presetChip}
+                          onPress={() => {
+                            setScannedCode(item.code);
+                            handleVerifyCode(item.code);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.presetChipText}>{item.label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
+                  {/* Verification Result Card */}
+                  {verifiedPerson && (
+                    <View style={styles.verifiedCard}>
+                      <View style={styles.verifiedHeaderRow}>
+                        <View style={styles.verifiedAvatar}>
+                          <Text style={styles.verifiedAvatarText}>{verifiedPerson.name.substring(0, 2).toUpperCase()}</Text>
+                        </View>
+                        <View style={{ flex: 1, paddingLeft: 12 }}>
+                          <View style={styles.roleTagRow}>
+                            <Text style={styles.verifiedRoleTag}>{verifiedPerson.role.toUpperCase()}</Text>
+                            <Text style={styles.verifiedIdTag}>{verifiedPerson.id}</Text>
+                          </View>
+                          <Text style={styles.verifiedName}>{verifiedPerson.name}</Text>
+                          <Text style={styles.verifiedDept}>{verifiedPerson.department}</Text>
+                        </View>
+                      </View>
+
+                      {/* Real-Time Campus Status Banner */}
+                      <View
+                        style={[
+                          styles.currentStatusBanner,
+                          verifiedPerson.currentStatus === 'Inside Campus' ? styles.statusBannerInside : styles.statusBannerOutside,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.currentStatusText,
+                            verifiedPerson.currentStatus === 'Inside Campus' ? styles.statusTextInside : styles.statusTextOutside,
+                          ]}
+                        >
+                          Current Verified Status: <Text style={{ fontWeight: '800' }}>{verifiedPerson.currentStatus}</Text>
+                        </Text>
+                      </View>
+
+                      {/* Instant Action Buttons (IN / OUT) with Duplicate Prevention */}
+                      <View style={styles.gateActionRow}>
+                        <TouchableOpacity
+                          style={[
+                            styles.gateActionBtn,
+                            styles.btnIn,
+                            (actionLoading || verifiedPerson.currentStatus === 'Inside Campus') && styles.btnDisabled,
+                          ]}
+                          onPress={handleRecordCampusIn}
+                          disabled={actionLoading || verifiedPerson.currentStatus === 'Inside Campus'}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.gateActionBtnText}>✓ Record Campus IN</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.gateActionBtn,
+                            styles.btnOut,
+                            (actionLoading || verifiedPerson.currentStatus === 'Outside Campus') && styles.btnDisabled,
+                          ]}
+                          onPress={handleRecordCampusOut}
+                          disabled={actionLoading || verifiedPerson.currentStatus === 'Outside Campus'}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.gateActionBtnText, { color: '#DC2626' }]}>✕ Record Campus OUT</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
                 </View>
-              </View>
-            )}
+              )}
             </ScrollView>
           </View>
         )}
@@ -1347,7 +1847,7 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
                   { label: 'Assigned Gate / Post', value: officer.gate },
                   { label: 'Security Shift', value: officer.shift },
                   { label: 'Duty Status', value: officer.shiftStatus },
-                  { label: 'Shift Attendance Time', value: officer.lastPunchTime || 'On Duty' },
+                  { label: 'Assigned Schedule', value: officer.lastPunchTime || 'On Duty' },
                 ]}
               />
             )}
@@ -1383,7 +1883,6 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
 
                   <View style={styles.servicesList}>
                     {[
-                      { id: 'shift', label: 'Guard Shift Attendance', desc: 'Clock-in / Clock-out timestamp verification', icon: '⏰' },
                       { id: 'incidents', label: 'Emergency Incidents & Alerts', desc: 'Log security breaches, medical or fire emergencies', icon: '🚨' },
                       { id: 'referrals', label: 'Business Referral Hub', desc: 'Refer Banking, Cards, Insurance & Jobs for verified rewards', icon: '🎁' },
                       { id: 'settings', label: 'Security Gate Settings', desc: 'Gate assignment and officer verification records', icon: '⚙️' },
@@ -1414,38 +1913,7 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
               </View>
             )}
 
-            {/* SUB-SECTION 1: SHIFT ATTENDANCE */}
-            {moreSection === 'shift' && (
-              <View style={styles.card}>
-                <Text style={styles.cardHeaderTitle}>⏰ Guard Shift Attendance</Text>
-                <Text style={styles.sectionSubtitle}>Clock in/out verified with server time</Text>
-
-                <View style={styles.shiftCardBox}>
-                  <Text style={styles.shiftDutyStatusLabel}>Current Shift Duty Status:</Text>
-                  <Text style={styles.shiftDutyStatusValue}>{officer.shiftStatus}</Text>
-                  <Text style={styles.shiftStationText}>{officer.gate}</Text>
-
-                  <TouchableOpacity
-                    style={styles.clockInBtn}
-                    onPress={async () => {
-                      try {
-                        await apiPost('watchman/attendance/clock-in', { gate: officer.gate }).catch(() => null);
-                        Alert.alert('Shift Verified', `Clock-in recorded at ${new Date().toLocaleTimeString()} for ${officer.gate}`);
-                        setOfficer((prev) => ({ ...prev, shiftStatus: 'On Duty (Verified)' }));
-                      } catch {
-                        Alert.alert('Shift Verified', `Clock-in recorded at ${new Date().toLocaleTimeString()} for ${officer.gate}`);
-                        setOfficer((prev) => ({ ...prev, shiftStatus: 'On Duty (Verified)' }));
-                      }
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.clockInBtnText}>✓ Verify Guard Shift Check-In</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {/* SUB-SECTION 2: EMERGENCY INCIDENTS */}
+            {/* SUB-SECTION: EMERGENCY INCIDENTS */}
             {moreSection === 'incidents' && (
               <View style={styles.card}>
                 <View style={styles.cardHeaderRow}>
@@ -3091,5 +3559,133 @@ const styles = StyleSheet.create({
     width: 1,
     height: 28,
     backgroundColor: '#E2E8F0',
+  },
+  marksModeSegment: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 4,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 10,
+    gap: 4,
+  },
+  marksModeTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  marksModeTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  marksModeTabText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  marksModeTabTextActive: {
+    color: '#1E3A8A',
+    fontWeight: '800',
+  },
+  attendanceHeroBanner: {
+    backgroundColor: '#1E3A8A',
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  attHeroSubject: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  attHeroClass: {
+    fontSize: 12,
+    color: '#DBEAFE',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  attPeriodPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  attPeriodPillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  attFilterChip: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  attFilterChipActive: {
+    backgroundColor: '#1E3A8A',
+    borderColor: '#1E3A8A',
+  },
+  attFilterChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  attFilterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  studentAttendanceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  studentRowAvatarCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  studentRowAvatarText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1E40AF',
+  },
+  studentRowName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  studentRowRoll: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  attActionBtn: {
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attActionBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
 });

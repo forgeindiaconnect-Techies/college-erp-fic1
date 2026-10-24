@@ -22,6 +22,7 @@ import ReferralHub from '../referrals/ReferralHub';
 import DashboardHeroBanner from './DashboardHeroBanner';
 import QuickAccessGrid from './QuickAccessGrid';
 import HighlightCard from './HighlightCard';
+import DailyDutyAttendanceCard from '../common/DailyDutyAttendanceCard';
 
 type Props = {
   user: MobileUser;
@@ -29,7 +30,7 @@ type Props = {
 };
 
 type TransportSubTab = 'operations' | 'route' | 'students' | 'vehicle';
-type MoreSection = 'menu' | 'checklist' | 'payroll' | 'attendance' | 'safety' | 'notices' | 'profile';
+type MoreSection = 'menu' | 'checklist' | 'payroll' | 'safety' | 'notices' | 'profile';
 
 type Stop = {
   id: string;
@@ -468,27 +469,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     }
   };
 
-  // Mark Driver Attendance
-  const handleMarkAttendance = async (status: 'Present' | 'Check Out') => {
-    try {
-      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const today = new Date().toISOString().split('T')[0];
 
-      await apiPost('transport/attendance', {
-        driverId: user.userId || user.referenceId || 'DRV-001',
-        driverName: driverProfile.name,
-        date: today,
-        status: 'Present',
-        ...(status === 'Present' ? { checkInTime: now } : { checkOutTime: now }),
-        remarks: status === 'Present' ? 'Morning Campus Duty In' : 'Evening Duty Wrap Up',
-      });
-
-      Alert.alert('Attendance Updated', `Recorded ${status} at ${now}.`);
-      loadData();
-    } catch (err: any) {
-      Alert.alert('Attendance Error', err.message || 'Could not record attendance.');
-    }
-  };
 
   // Submit Vehicle Maintenance Task
   const handleReportMaintenance = async () => {
@@ -536,6 +517,8 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     return ['All', ...names];
   }, [passengers]);
 
+
+
   // Android Hardware Back Button Handling
   useEffect(() => {
     const onBackPress = () => {
@@ -573,7 +556,6 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     if (activeNavTab === 'profile') {
       if (moreSection === 'checklist') return 'Pre-Trip Inspection';
       if (moreSection === 'payroll') return 'Driver Payroll & Slips';
-      if (moreSection === 'attendance') return 'Duty Attendance';
       if (moreSection === 'notices') return 'Transit Notices';
       if (moreSection === 'safety') return 'Driver Safety Guidelines';
       if (moreSection === 'menu') return 'Fleet Services & Operations';
@@ -625,6 +607,9 @@ export default function DriverDashboard({ user, onLogout }: Props) {
               image={require('../../../assets/images/dashboards/driver_hero.jpg')}
               tagline="Safe Rides Happy Students"
             />
+
+            {/* Daily Duty Attendance Card (Punch In / Out synchronized with central ERP) */}
+            <DailyDutyAttendanceCard user={user} style={{ marginHorizontal: 0, marginBottom: 12 }} />
 
             {/* 2. Trip Status Highlight Card (Matching Reference Design) */}
             <HighlightCard
@@ -1368,7 +1353,6 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                   { id: 'profile', title: 'Driver Identity & Profile', sub: 'Verified employee details and route license', icon: '👤' },
                   { id: 'checklist', title: 'Daily Pre-Trip Inspection', sub: 'Brakes, tires, first-aid & emergency exit check', icon: '📋' },
                   { id: 'payroll', title: 'Salary Slips & Payroll', sub: 'View monthly earnings, allowances and net pay', icon: '💵' },
-                  { id: 'attendance', title: 'Duty Attendance Register', sub: 'Driver daily shift check-in and check-out records', icon: '🕒' },
                   { id: 'notices', title: 'Transport Notices & Advisories', sub: 'Campus transit notifications and road alerts', icon: '🔔' },
                   { id: 'safety', title: 'Driver Safety Guidelines & SOP', sub: 'Institutional safety protocols and speed limits', icon: '🛡️' },
                 ].map((item) => (
@@ -1536,57 +1520,6 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                         </View>
                       </View>
                     </TouchableOpacity>
-                  ))
-                )}
-              </View>
-            )}
-
-            {/* SUB-SECTION: ATTENDANCE */}
-            {moreSection === 'attendance' && (
-              <View style={styles.card}>
-                <View style={styles.backNavRow}>
-                  <TouchableOpacity onPress={() => setMoreSection('menu')}>
-                    <Text style={styles.backNavText}>← Back to Services</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.cardSectionTitle}>🕒 Duty Attendance Register</Text>
-                <Text style={styles.cardSectionDesc}>
-                  Register daily reporting time and shift completion.
-                </Text>
-
-                <View style={styles.attendanceActionButtonsRow}>
-                  <TouchableOpacity
-                    style={[styles.attActionBtn, { backgroundColor: '#10B981' }]}
-                    onPress={() => handleMarkAttendance('Present')}
-                  >
-                    <Text style={styles.attActionBtnText}>Check In Duty 🟢</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.attActionBtn, { backgroundColor: '#3B82F6' }]}
-                    onPress={() => handleMarkAttendance('Check Out')}
-                  >
-                    <Text style={styles.attActionBtnText}>Check Out Duty 🔵</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {attendanceLogs.length === 0 ? (
-                  <View style={styles.emptyCardBox}>
-                    <Text style={styles.emptyCardText}>No past attendance records found.</Text>
-                  </View>
-                ) : (
-                  attendanceLogs.slice(0, 10).map((att, idx) => (
-                    <View key={att._id || idx} style={styles.attLogRow}>
-                      <View>
-                        <Text style={styles.attLogDate}>{att.date}</Text>
-                        <Text style={styles.attLogTimes}>
-                          In: {att.checkInTime || '--'} • Out: {att.checkOutTime || '--'}
-                        </Text>
-                      </View>
-                      <View style={styles.attLogBadge}>
-                        <Text style={styles.attLogBadgeText}>{att.status || 'Present'}</Text>
-                      </View>
-                    </View>
                   ))
                 )}
               </View>

@@ -178,7 +178,7 @@ export async function loginUser(
       Accept: 'application/json',
     },
     body: JSON.stringify({
-      email: email.trim().toLowerCase(),
+      email: email.trim(),
       password: password.trim(),
     }),
   });
@@ -186,11 +186,15 @@ export async function loginUser(
   const data = (await response.json()) as LoginResponse;
 
   if (!response.ok) {
-    throw new Error(data.message || 'Login failed. Please verify credentials.');
+    let friendlyMessage = data.message || 'Login failed. Please verify your credentials.';
+    if (friendlyMessage.includes('[DEBUG]') || friendlyMessage.toLowerCase().includes('password mismatch') || friendlyMessage.toLowerCase().includes('not found')) {
+      friendlyMessage = 'Invalid credentials. Please check your College Email/ID and Password.';
+    }
+    throw new Error(friendlyMessage);
   }
 
   if (!data.token || !data.role) {
-    throw new Error('The server response is missing login authentication token.');
+    throw new Error('Authentication error: The server response is missing a valid security token or role.');
   }
 
   await SecureStore.setItemAsync('mobile_erp_token', data.token);
@@ -200,6 +204,26 @@ export async function loginUser(
   );
 
   return data;
+}
+
+export async function requestPasswordReset(email: string): Promise<string> {
+  const response = await fetchWithFailover('auth/forgot-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      email: email.trim().toLowerCase(),
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Unable to send reset instructions. Please check your email.');
+  }
+
+  return data.message || 'Password reset instructions have been dispatched to your email.';
 }
 
 export async function getSavedUser(): Promise<MobileUser | null> {

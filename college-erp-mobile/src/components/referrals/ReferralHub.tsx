@@ -1210,8 +1210,8 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
 
               {/* Offer Cards List */}
               <View style={{ gap: 12 }}>
-                {currentOffers.map((offer) => (
-                  <View key={offer.id} style={styles.offerCard}>
+                {currentOffers.map((offer, idx) => (
+                  <View key={`offer-${offer.id || idx}-${idx}`} style={styles.offerCard}>
                     {/* Top Row: Partner + Title + Reward Badge */}
                     <View style={styles.offerCardTopRow}>
                       <View style={{ flex: 1 }}>
@@ -1968,7 +1968,7 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
             </View>
           ) : (
             <View style={{ gap: 12 }}>
-              {filteredSubmissions.map((item) => {
+              {filteredSubmissions.map((item, idx) => {
                 const statusStyle = getStatusBadgeStyle(item.status);
                 const applicant =
                   item.creditCardDetails?.applicantName ||
@@ -1994,7 +1994,7 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
 
                 return (
                   <TouchableOpacity
-                    key={item._id}
+                    key={`sub-${item._id || idx}-${idx}`}
                     style={styles.submissionCard}
                     activeOpacity={0.85}
                     onPress={() => setSelectedSubmission(item)}
