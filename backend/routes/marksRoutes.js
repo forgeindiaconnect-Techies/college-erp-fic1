@@ -284,12 +284,12 @@ router.get('/student/:studentId', protect, collegeScope, async (req, res) => {
     let records = await Mark.find({
       ...studentFilter,
       ...collegeFilter,
-      resultStatus: 'Published'
+      resultStatus: { $in: ['Published', 'Approved', 'Approved by HOD', 'Submitted to HOD', 'Draft'] }
     })
       .populate('examId')
       .sort({ semester: 1, subject: 1 });
 
-    // Fallback: If no records marked strictly as 'Published', return all marks for this student
+    // Fallback: If no records found, return all marks for this student
     if (records.length === 0) {
       records = await Mark.find({
         ...studentFilter,
@@ -312,7 +312,7 @@ router.post('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff'), colle
       const processed = req.body.map(record =>
         processMarkPayload({
           ...record,
-          resultStatus: 'Draft',
+          resultStatus: record.resultStatus || 'Draft',
           enteredBy: req.user._id
         })
       );
@@ -353,7 +353,7 @@ router.post('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff'), colle
         processMarkPayload({
           ...req.body,
           collegeId: req.collegeId,
-          resultStatus: 'Draft',
+          resultStatus: req.body.resultStatus || 'Draft',
           enteredBy: req.user._id
         })
       );

@@ -46,6 +46,7 @@ const StudentDashboard = () => {
   const [liveClassSession, setLiveClassSession] = useState(null);
   const [todayMaterials, setTodayMaterials] = useState([]);
   const [activeDrives, setActiveDrives] = useState([]);
+  const [activeArrearDetails, setActiveArrearDetails] = useState([]);
 
   const loadLiveSession = useCallback(async () => {
     try {
@@ -280,6 +281,12 @@ const StudentDashboard = () => {
           external: studentMarksList[0]?.semesterMarks !== undefined ? studentMarksList[0].semesterMarks : 65,
           cgpa: trendList.length > 0 ? trendList[trendList.length - 1].gpa : (resolvedStudent.cgpa || 8.5)
         });
+
+        const arrearsFound = studentMarksList.filter(m => {
+          const tot = Number(m.totalMarks ?? (Number(m.internalMarks || 0) + Number(m.semesterMarks || 0)) ?? m.marksObtained ?? 0);
+          return m.arrearStatus === 'Arrear' || (m.totalMarks !== undefined && tot < 40);
+        });
+        setActiveArrearDetails(arrearsFound);
       } else {
         setGpaTrend([]);
         setStudentMarks({
@@ -287,6 +294,7 @@ const StudentDashboard = () => {
           external: null,
           cgpa: resolvedStudent.cgpa || 8.5
         });
+        setActiveArrearDetails([]);
       }
 
       // 8. Original Subjects for Student's Department
@@ -340,27 +348,29 @@ const StudentDashboard = () => {
 
       setTodaySchedule(mappedSchedule);
 
-      // 10. Active Placement Drives
+      // 10. Active Placement Drives with multi-key scanning
       try {
         const jobsRes = await getPlacementJobs().catch(() => ({ data: [] }));
         let rawJobs = Array.isArray(jobsRes?.data) ? jobsRes.data : (jobsRes?.data?.jobs || []);
         const jobMap = new Map();
         rawJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
 
-        const studentSession = JSON.parse(sessionStorage.getItem('student_session') || '{}');
-        const tenantId = sessionStorage.getItem('tenantId') || studentSession.tenantId || 'mock_college_id';
-
-        try {
-          const localItems = JSON.parse(localStorage.getItem(`erp_placement_jobs_${tenantId}`) || '[]');
-          if (Array.isArray(localItems)) {
-            localItems.forEach(lj => {
-              const ljId = String(lj._id || lj.jobId || lj.id);
-              if (ljId && !jobMap.has(ljId)) {
-                jobMap.set(ljId, lj);
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('erp_placement_jobs')) {
+            try {
+              const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+              if (Array.isArray(localItems)) {
+                localItems.forEach(lj => {
+                  const ljId = String(lj._id || lj.jobId || lj.id);
+                  if (ljId && !jobMap.has(ljId)) {
+                    jobMap.set(ljId, lj);
+                  }
+                });
               }
-            });
+            } catch (err) {}
           }
-        } catch (err) {}
+        }
         setActiveDrives(Array.from(jobMap.values()));
       } catch (e) {}
 
@@ -477,6 +487,35 @@ const StudentDashboard = () => {
           </div>
           <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 10px' }} onClick={() => navigate('/student/library')}>
             View Library
+          </button>
+        </div>
+      )}
+
+      {/* Active Standing Arrears Alert Banner */}
+      {activeArrearDetails.length > 0 && (
+        <div style={{ padding: '14px 18px', background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: '14px', color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', boxShadow: '0 2px 8px rgba(239, 68, 68, 0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: 36, height: 36, borderRadius: '10px', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626', flexShrink: 0 }}>
+              <AlertCircle size={22} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#991b1b' }}>
+                Academic Clearance Notice: {activeArrearDetails.length} Standing Arrear{activeArrearDetails.length > 1 ? 's' : ''}
+              </h4>
+              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#b91c1c' }}>
+                Subjects requiring re-examination:{' '}
+                <strong>
+                  {activeArrearDetails.map(a => `${a.subject || a.subjectName || a.code || 'Course'} (${a.semester || 'Semester'})`).join(', ')}
+                </strong>
+              </p>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            style={{ fontSize: '0.78rem', padding: '7px 16px', background: '#dc2626', color: '#ffffff', border: 'none', fontWeight: 700, borderRadius: '8px', cursor: 'pointer', boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)' }} 
+            onClick={() => navigate('/student/marks')}
+          >
+            View Arrear Details →
           </button>
         </div>
       )}

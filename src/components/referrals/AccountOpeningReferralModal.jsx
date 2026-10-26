@@ -203,14 +203,11 @@ export default function AccountOpeningReferralModal({
       ? formConfig.fieldsConfig
       : defaultAccountOpeningFields;
     const seenKeys = new Set();
-    const seenLabels = new Set();
     const uniqueList = [];
     for (const f of rawList) {
-      const normKey = (f.fieldKey || '').trim().toLowerCase();
-      const normLabel = (f.label || '').trim().toLowerCase();
-      if (!normKey || seenKeys.has(normKey) || (normLabel && seenLabels.has(normLabel))) continue;
+      const normKey = (f.fieldKey || f.name || '').trim().toLowerCase();
+      if (!normKey || seenKeys.has(normKey)) continue;
       seenKeys.add(normKey);
-      if (normLabel) seenLabels.add(normLabel);
       uniqueList.push(f);
     }
     return uniqueList.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
@@ -218,6 +215,7 @@ export default function AccountOpeningReferralModal({
 
   const step1Fields = allConfiguredFields.filter(f => f.isVisible !== false && (!f.step || f.step === 1));
   const step2Fields = allConfiguredFields.filter(f => f.isVisible !== false && f.step === 2);
+  const step3Fields = allConfiguredFields.filter(f => f.isVisible !== false && f.step === 3);
 
   const resolveField = (key) => allConfiguredFields.find(f => f.fieldKey === key) || null;
 
@@ -254,7 +252,9 @@ export default function AccountOpeningReferralModal({
 
   const validateStep = (stepNumber) => {
     const errors = {};
-    const fieldsToValidate = stepNumber === 1 ? step1Fields : (stepNumber === 2 ? step2Fields : []);
+    const fieldsToValidate = stepNumber === 1
+      ? step1Fields
+      : (stepNumber === 2 ? step2Fields : (stepNumber === 3 ? step3Fields : []));
 
     fieldsToValidate.forEach(field => {
       const val = formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : customFields[field.fieldKey];
@@ -631,6 +631,26 @@ export default function AccountOpeningReferralModal({
               {/* ── STEP 3: CONSENT & PRIVACY ── */}
               {currentStep === 3 && (
                 <div>
+                  {step3Fields.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+                      {step3Fields.map(field => {
+                        const computedField = {
+                          ...field,
+                          required: field.required !== undefined ? field.required : false
+                        };
+                        return (
+                          <DynamicFieldRenderer
+                            key={field.fieldKey}
+                            field={computedField}
+                            value={formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : (customFields[field.fieldKey] || '')}
+                            onChange={handleFieldChange}
+                            error={fieldErrors[field.fieldKey]}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div className="cc-consent-box">
                     <div className="cc-consent-notice-title">
                       <span>RBI & DPDP Banking Referral Disclosure</span>
@@ -729,6 +749,32 @@ export default function AccountOpeningReferralModal({
                       })}
                     </div>
                   </div>
+
+                  {/* Review Additional / Step 3 Details */}
+                  {step3Fields.length > 0 && (
+                    <div className="cc-review-card">
+                      <div className="cc-review-header">
+                        <div className="cc-review-title">
+                          <CheckCircle2 size={15} className="text-emerald-600" />
+                          <span>Additional Information</span>
+                        </div>
+                        <button type="button" className="cc-edit-btn" onClick={() => setCurrentStep(3)}>
+                          Edit
+                        </button>
+                      </div>
+                      <div className="cc-review-grid">
+                        {step3Fields.map(field => {
+                          const val = formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : customFields[field.fieldKey];
+                          return (
+                            <div key={field.fieldKey} className="cc-review-item">
+                              <span>{field.label}</span>
+                              <strong>{String(val || '—')}</strong>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Review Consent */}
                   <div className="cc-review-card">

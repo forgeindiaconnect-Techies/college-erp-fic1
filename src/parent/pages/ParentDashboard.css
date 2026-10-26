@@ -368,14 +368,13 @@
   }
 
   .parent-mobile-cards-view {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    padding: 0.85rem;
+    display: none !important;
   }
 
   .parent-desktop-table-view {
-    display: none;
+    display: block !important;
+    overflow-x: auto;
+    width: 100%;
   }
 }
 

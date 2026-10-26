@@ -24,6 +24,7 @@ import DashboardHeroBanner from './DashboardHeroBanner';
 import QuickAccessGrid from './QuickAccessGrid';
 import HighlightCard from './HighlightCard';
 import DailyDutyAttendanceCard from '../common/DailyDutyAttendanceCard';
+import StaffPlacementModule from '../placement/StaffPlacementModule';
 
 type Props = {
   user: MobileUser;
@@ -52,6 +53,7 @@ type StaffMoreSection =
   | 'announcements'
   | 'leaves'
   | 'support'
+  | 'complaints'
   | 'payroll'
   | 'settings';
 
@@ -255,27 +257,50 @@ type PlacementTrainingItem = {
 
 type ParcelItem = {
   id: string;
-  parcelId?: string;
+  parcelId: string;
   trackingNumber: string;
   courier: string;
+  deliveryCompany?: string;
   senderName: string;
   details: string;
   date: string;
+  receivedAt?: string;
+  collectedAt?: string;
+  collectedBy?: string;
+  handedOverAt?: string;
+  handedOverTo?: string;
   otp: string;
+  recipientName?: string;
   status: 'Pending Collection' | 'Collected' | string;
-  gate?: string;
-  type?: string;
+  gate: string;
+  type: string;
+  notes?: string;
 };
+
+type SupportCategoryType = 'Leave' | 'Salary Query' | 'Complaint' | 'Counseling' | 'IT Support';
+
+const SUPPORT_CATEGORIES: { id: SupportCategoryType; title: string; icon: string; color: string; bg: string; desc: string }[] = [
+  { id: 'Leave', title: 'Leave Management', icon: '📅', color: '#6366f1', bg: '#EEF2FF', desc: 'Casual, sick, on-duty & vacation leave' },
+  { id: 'Salary Query', title: 'Salary & Payroll', icon: '💳', color: '#10b981', bg: '#ECFDF5', desc: 'Payslip discrepancy, allowances & deductions' },
+  { id: 'Complaint', title: 'Complaints & Feedback', icon: '🚨', color: '#ef4444', bg: '#FEF2F2', desc: 'Campus facilities, grievances & administration' },
+  { id: 'Counseling', title: 'Wellness & Training', icon: '🧠', color: '#f59e0b', bg: '#FFFBEB', desc: 'Faculty counseling & FDP development' },
+  { id: 'IT Support', title: 'IT & Facilities', icon: '🖥️', color: '#3b82f6', bg: '#EFF6FF', desc: 'Classroom AV, projector, Wi-Fi & PC lab' },
+];
 
 type SupportTicketItem = {
   id: string;
-  requestType: string;
+  staffName?: string;
+  department?: string;
+  requestType: SupportCategoryType | string;
   subType?: string;
   subject?: string;
   description: string;
   priority: 'Low' | 'Medium' | 'High' | 'Critical';
-  status: 'Pending' | 'In Progress' | 'Under Review' | 'Resolved' | 'Approved' | 'Rejected';
+  status: 'Pending' | 'In Progress' | 'Under Review' | 'Resolved' | 'Approved' | 'Rejected' | string;
+  startDate?: string;
+  endDate?: string;
   date?: string;
+  createdAt?: string;
   timeline?: { date: string; text: string }[];
 };
 
@@ -477,12 +502,29 @@ export default function StaffDashboard({ user, onLogout }: Props) {
 
   // Campus Support Center & IT Helpdesk
   const [supportModalVisible, setSupportModalVisible] = useState(false);
-  const [supportType, setSupportType] = useState<'IT Support' | 'Salary Query' | 'General Query'>('IT Support');
+  const [supportType, setSupportType] = useState<SupportCategoryType>('IT Support');
   const [supportPriority, setSupportPriority] = useState<'Low' | 'Medium' | 'High' | 'Critical'>('Medium');
   const [supportSubject, setSupportSubject] = useState('');
+  const [supportStartDate, setSupportStartDate] = useState('');
+  const [supportEndDate, setSupportEndDate] = useState('');
   const [supportDescription, setSupportDescription] = useState('');
   const [supportTickets, setSupportTickets] = useState<SupportTicketItem[]>([]);
   const [submittingSupport, setSubmittingSupport] = useState(false);
+  const [supportCategoryFilter, setSupportCategoryFilter] = useState<'All' | SupportCategoryType>('All');
+  const [supportStatusFilter, setSupportStatusFilter] = useState<'All' | 'Pending' | 'Under Review' | 'In Progress' | 'Resolved' | 'Approved' | 'Rejected'>('All');
+  const [supportSearch, setSupportSearch] = useState('');
+  const [selectedSupportTicket, setSelectedSupportTicket] = useState<SupportTicketItem | null>(null);
+
+  // Dedicated Log Complaints State
+  const [complaintModalVisible, setComplaintModalVisible] = useState(false);
+  const [complaintCategory, setComplaintCategory] = useState('IT & Infrastructure');
+  const [complaintSubType, setComplaintSubType] = useState('');
+  const [complaintPriority, setComplaintPriority] = useState<'Low' | 'Medium' | 'High' | 'Critical'>('Medium');
+  const [complaintDescription, setComplaintDescription] = useState('');
+  const [complaintStatusFilter, setComplaintStatusFilter] = useState<'All' | 'Pending' | 'Under Review' | 'In Progress' | 'Resolved' | 'Rejected'>('All');
+  const [complaintSearch, setComplaintSearch] = useState('');
+  const [submittingComplaint, setSubmittingComplaint] = useState(false);
+  const [selectedComplaintTicket, setSelectedComplaintTicket] = useState<SupportTicketItem | null>(null);
 
   // Announcements & Updates
   const [notices, setNotices] = useState<any[]>([]);
@@ -492,6 +534,10 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   const [parcelFilter, setParcelFilter] = useState<'All' | 'Pending' | 'Collected'>('All');
   const [parcelSearch, setParcelSearch] = useState('');
   const [collectingParcelId, setCollectingParcelId] = useState<string | null>(null);
+  const [confirmCollectionModalVisible, setConfirmCollectionModalVisible] = useState(false);
+  const [selectedParcelForCollection, setSelectedParcelForCollection] = useState<ParcelItem | null>(null);
+  const [selectedParcelDetail, setSelectedParcelDetail] = useState<ParcelItem | null>(null);
+  const [handoverNote, setHandoverNote] = useState('');
 
   // Payroll Slips
   const [payrollList, setPayrollList] = useState<PayrollSlip[]>([]);
@@ -605,7 +651,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         apiGet<any[]>('exams').catch(() => []),
         apiGet<any[]>('assignments').catch(() => []),
         apiGet<any>('notifications').catch(() => []),
-        apiGet<any>('parcels').catch(() => ({ data: [] })),
+        apiGet<any>('parcels?my=true').catch(() => ({ data: [] })),
         apiGet<any>('staff-support').catch(() => []),
         apiGet<any>('salaries/my').catch(() =>
           apiGet<any>(`salaries/staff/${encodeURIComponent(staffEmpId)}`).catch(() =>
@@ -854,14 +900,22 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         id: p._id || p.id || String(idx),
         parcelId: p.parcelId || `P-${idx + 101}`,
         courier: p.deliveryCompany || p.courier || p.carrier || p.courierName || 'Gate Courier Desk',
+        deliveryCompany: p.deliveryCompany || p.courier || 'Gate Courier Desk',
         senderName: p.senderName || 'Authorized Sender',
         details: p.parcelDetails || p.type || 'Consignment Package',
         trackingNumber: p.trackingNumber || p.awb || `AWB-${p.parcelId || idx + 1001}`,
-        date: p.receivedAt || p.receivedTime || p.date || p.createdAt ? new Date(p.receivedAt || p.createdAt || Date.now()).toLocaleDateString('en-GB') : 'Today',
+        date: p.receivedAt || p.createdAt ? new Date(p.receivedAt || p.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Today',
+        receivedAt: p.receivedAt || p.createdAt,
+        collectedAt: p.collectedAt,
+        collectedBy: p.collectedBy,
+        handedOverAt: p.handedOverAt,
+        handedOverTo: p.handedOverTo,
         otp: p.otp || p.collectionOtp || '5821',
-        status: p.normalizedStatus || p.status || 'Pending Collection',
-        gate: p.gate || 'Campus Security Main Gate',
+        recipientName: p.recipientName || p.intendedFor || p.facultyName || p.staffName || '',
+        status: p.status || 'Pending Collection',
+        gate: p.gate || 'Gate 1 (Main Entrance)',
         type: p.type || 'Parcel',
+        notes: p.notes || '',
       }));
       setParcels(parsedParcels);
 
@@ -885,24 +939,28 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         }));
       setLeaves(staffLeaves);
 
-      const staffSupportTickets: SupportTicketItem[] = rawSupport
+      const allSupportTickets: SupportTicketItem[] = rawSupport
         .filter((r: any) => {
-          const reqType = (r.requestType || '').toLowerCase();
           const matchStaff = !prof.name || (r.staffName && r.staffName.toLowerCase().includes(prof.name.toLowerCase())) || r.staffId === prof.userId;
-          return reqType !== 'leave' && matchStaff;
+          return matchStaff;
         })
         .map((t: any, idx: number) => ({
           id: t._id || t.id || `TKT-${idx + 101}`,
+          staffName: t.staffName || prof.name,
+          department: t.department || prof.dept,
           requestType: t.requestType || 'IT Support',
-          subType: t.subType || t.subject || 'Institutional Assistance',
+          subType: t.subType || t.subject || 'Campus Request',
           subject: t.subType || t.subject || 'Campus Assistance',
           description: t.description || 'Assistance requested with campus amenities.',
           priority: t.priority || 'Medium',
           status: t.status || 'Pending',
-          date: t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : 'Recent',
+          startDate: t.startDate || '',
+          endDate: t.endDate || '',
+          date: t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent',
+          createdAt: t.createdAt,
           timeline: t.timeline || [],
         }));
-      setSupportTickets(staffSupportTickets);
+      setSupportTickets(allSupportTickets);
 
       // 9. Payroll Slips Processing
       const rawSalary = Array.isArray(salaryRes) ? salaryRes : (Array.isArray((salaryRes as any)?.data) ? (salaryRes as any).data : []);
@@ -1477,21 +1535,56 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   // ----------------------------------------------------------------------
   // PARCEL COLLECTION WORKFLOW
   // ----------------------------------------------------------------------
-  const handleCollectParcel = async (parcelId: string) => {
+  const handleOpenCollectParcelModal = (parcel: ParcelItem) => {
+    setSelectedParcelForCollection(parcel);
+    setHandoverNote('');
+    setConfirmCollectionModalVisible(true);
+  };
+
+  const handleConfirmCollection = async () => {
+    if (!selectedParcelForCollection) return;
+    const parcelId = selectedParcelForCollection.id;
     try {
       setCollectingParcelId(parcelId);
       await apiPatch(`parcels/${parcelId}/collect`, {
-        collectedBy: faculty.name || 'Staff Member'
+        collectedBy: faculty.name || user.name || 'Staff Member',
+        notes: handoverNote.trim() ? handoverNote.trim() : undefined,
       });
+      setConfirmCollectionModalVisible(false);
+      setSelectedParcelForCollection(null);
+      setHandoverNote('');
       Alert.alert(
-        'Collection Confirmed! 📦',
-        'Parcel receipt verified and logged in campus security gate records.'
+        '✓ Collection Confirmed! 📦',
+        `Delivery ${selectedParcelForCollection.parcelId} has been successfully acknowledged and verified in campus security gate records.`
       );
       await loadData();
     } catch (err: any) {
       Alert.alert('Collection Error', err?.message || 'Could not update collection status.');
     } finally {
       setCollectingParcelId(null);
+    }
+  };
+
+  const handleCollectParcel = async (parcelId: string) => {
+    const target = parcels.find(p => p.id === parcelId);
+    if (target) {
+      handleOpenCollectParcelModal(target);
+    } else {
+      try {
+        setCollectingParcelId(parcelId);
+        await apiPatch(`parcels/${parcelId}/collect`, {
+          collectedBy: faculty.name || user.name || 'Staff Member'
+        });
+        Alert.alert(
+          'Collection Confirmed! 📦',
+          'Parcel receipt verified and logged in campus security gate records.'
+        );
+        await loadData();
+      } catch (err: any) {
+        Alert.alert('Collection Error', err?.message || 'Could not update collection status.');
+      } finally {
+        setCollectingParcelId(null);
+      }
     }
   };
 
@@ -1538,37 +1631,93 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   };
 
   // ----------------------------------------------------------------------
-  // SUPPORT REQUEST WORKFLOW
+  // CAMPUS SUPPORT REQUEST WORKFLOW
   // ----------------------------------------------------------------------
   const handleSubmitSupport = async () => {
-    if (!supportSubject.trim() || !supportDescription.trim()) {
-      Alert.alert('Required Fields', 'Please provide a subject heading and issue description.');
+    const subType = supportSubject.trim();
+    const desc = supportDescription.trim();
+    const startDate = supportStartDate.trim();
+    const endDate = supportEndDate.trim();
+
+    if (!subType) {
+      Alert.alert('Required Field', 'Please provide a Specific Sub-Type or Subject Heading.');
       return;
     }
+    if (!desc) {
+      Alert.alert('Required Field', 'Please provide a detailed description of your request.');
+      return;
+    }
+    if (supportType === 'Leave' && (!startDate || !endDate)) {
+      Alert.alert('Required Field', 'Please specify both Start Date and End Date for Leave requests.');
+      return;
+    }
+
     try {
       setSubmittingSupport(true);
       await apiPost('staff-support', {
-        staffName: faculty.name,
-        staffId: faculty.empId,
-        staffEmail: faculty.email,
-        department: faculty.dept,
+        staffName: faculty.name || user.name,
+        department: faculty.dept || user.department || 'General',
         requestType: supportType,
-        subType: supportSubject.trim(),
-        subject: supportSubject.trim(),
-        description: supportDescription.trim(),
+        subType: subType,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        description: desc,
         priority: supportPriority,
       });
       setSupportModalVisible(false);
       setSupportSubject('');
       setSupportDescription('');
-      Alert.alert('Ticket Submitted', 'Your ticket has been registered with Campus Support & IT Admin.');
+      setSupportStartDate('');
+      setSupportEndDate('');
+      Alert.alert('✓ Ticket Registered', `Your ${supportType} ticket has been submitted to Campus Administration.`);
       await loadData();
     } catch (err: any) {
-      Alert.alert('Notice', err?.message || 'Support ticket generated successfully.');
+      Alert.alert('Notice', err?.message || 'Support ticket processed.');
       setSupportModalVisible(false);
       await loadData();
     } finally {
       setSubmittingSupport(false);
+    }
+  };
+
+  // ----------------------------------------------------------------------
+  // DEDICATED LOG COMPLAINT WORKFLOW
+  // ----------------------------------------------------------------------
+  const handleSubmitComplaint = async () => {
+    const subType = complaintSubType.trim();
+    const desc = complaintDescription.trim();
+
+    if (!subType) {
+      Alert.alert('Required Field', 'Please provide an issue title or grievance topic.');
+      return;
+    }
+    if (!desc) {
+      Alert.alert('Required Field', 'Please describe the complaint details.');
+      return;
+    }
+
+    try {
+      setSubmittingComplaint(true);
+      const categoryPrefix = complaintCategory ? `[${complaintCategory}] ` : '';
+      await apiPost('staff-support', {
+        staffName: faculty.name || user.name,
+        department: faculty.dept || user.department || 'General',
+        requestType: 'Complaint',
+        subType: `${categoryPrefix}${subType}`,
+        description: desc,
+        priority: complaintPriority,
+      });
+      setComplaintModalVisible(false);
+      setComplaintSubType('');
+      setComplaintDescription('');
+      Alert.alert('✓ Complaint Registered', 'Your grievance has been logged with the Campus Administration & Principal desk.');
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Notice', err?.message || 'Complaint recorded.');
+      setComplaintModalVisible(false);
+      await loadData();
+    } finally {
+      setSubmittingComplaint(false);
     }
   };
 
@@ -1792,8 +1941,11 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       const matchSearch =
         !q ||
         (p.courier && p.courier.toLowerCase().includes(q)) ||
+        (p.deliveryCompany && p.deliveryCompany.toLowerCase().includes(q)) ||
         (p.trackingNumber && p.trackingNumber.toLowerCase().includes(q)) ||
+        (p.parcelId && p.parcelId.toLowerCase().includes(q)) ||
         (p.senderName && p.senderName.toLowerCase().includes(q)) ||
+        (p.gate && p.gate.toLowerCase().includes(q)) ||
         (p.details && p.details.toLowerCase().includes(q));
 
       let matchStatus = true;
@@ -1810,6 +1962,10 @@ export default function StaffDashboard({ user, onLogout }: Props) {
     return parcels.filter((p) => p.status !== 'Collected' && p.status !== 'Handed Over').length;
   }, [parcels]);
 
+  const collectedParcelCount = useMemo(() => {
+    return parcels.filter((p) => p.status === 'Collected' || p.status === 'Handed Over').length;
+  }, [parcels]);
+
   // 4. Staff Leaves Filtered List
   const filteredLeaves = useMemo(() => {
     if (leaveStatusFilter === 'All') return leaves;
@@ -1818,7 +1974,57 @@ export default function StaffDashboard({ user, onLogout }: Props) {
 
   // 5. Campus Support Filtered Tickets
   const filteredSupportTickets = useMemo(() => {
-    return supportTickets;
+    return supportTickets.filter((t) => {
+      const q = supportSearch.trim().toLowerCase();
+      const matchSearch =
+        !q ||
+        (t.subType && t.subType.toLowerCase().includes(q)) ||
+        (t.subject && t.subject.toLowerCase().includes(q)) ||
+        (t.description && t.description.toLowerCase().includes(q)) ||
+        (t.requestType && t.requestType.toLowerCase().includes(q));
+
+      const matchCategory = supportCategoryFilter === 'All' || t.requestType === supportCategoryFilter;
+
+      let matchStatus = true;
+      if (supportStatusFilter !== 'All') {
+        matchStatus = t.status === supportStatusFilter;
+      }
+
+      return matchSearch && matchCategory && matchStatus;
+    });
+  }, [supportTickets, supportSearch, supportCategoryFilter, supportStatusFilter]);
+
+  // 6. Log Complaints Filtered List
+  const filteredComplaints = useMemo(() => {
+    return supportTickets
+      .filter((t) => t.requestType === 'Complaint')
+      .filter((c) => {
+        const q = complaintSearch.trim().toLowerCase();
+        const matchSearch =
+          !q ||
+          (c.subType && c.subType.toLowerCase().includes(q)) ||
+          (c.description && c.description.toLowerCase().includes(q)) ||
+          (c.department && c.department.toLowerCase().includes(q));
+
+        let matchStatus = true;
+        if (complaintStatusFilter !== 'All') {
+          matchStatus = c.status === complaintStatusFilter;
+        }
+
+        return matchSearch && matchStatus;
+      });
+  }, [supportTickets, complaintSearch, complaintStatusFilter]);
+
+  const totalComplaintsCount = useMemo(() => {
+    return supportTickets.filter((t) => t.requestType === 'Complaint').length;
+  }, [supportTickets]);
+
+  const pendingComplaintsCount = useMemo(() => {
+    return supportTickets.filter((t) => t.requestType === 'Complaint' && t.status !== 'Resolved' && t.status !== 'Approved').length;
+  }, [supportTickets]);
+
+  const resolvedComplaintsCount = useMemo(() => {
+    return supportTickets.filter((t) => t.requestType === 'Complaint' && (t.status === 'Resolved' || t.status === 'Approved')).length;
   }, [supportTickets]);
 
   // ----------------------------------------------------------------------
@@ -2097,10 +2303,11 @@ export default function StaffDashboard({ user, onLogout }: Props) {
     if (activeTab === 'profile') {
       if (moreSection === 'library') return 'Central Library';
       if (moreSection === 'placement') return 'Placement Drives';
-      if (moreSection === 'parcels') return 'Gate Deliveries';
+      if (moreSection === 'parcels') return 'Gate Deliveries & Parcels';
       if (moreSection === 'leaves') return 'Staff Leaves';
       if (moreSection === 'payroll') return 'Monthly Payroll';
-      if (moreSection === 'support') return 'Campus IT Support';
+      if (moreSection === 'support') return 'Campus Support & IT Desk';
+      if (moreSection === 'complaints') return 'Log Complaints & Feedback';
       if (moreSection === 'menu') return 'Faculty Services & Tools';
       return 'Faculty Profile';
     }
@@ -2236,6 +2443,67 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   onPress: () => {
                     setActiveTab('academics');
                     setAcademicsTab('myclass');
+                  },
+                },
+              ]}
+            />
+
+            {/* Campus Services & Logistics Quick Desk */}
+            <QuickAccessGrid
+              title="Campus Services & Logistics Desk"
+              seeAllText="All Desk Tools →"
+              onSeeAll={() => {
+                setActiveTab('profile');
+                setMoreSection('support');
+              }}
+              items={[
+                {
+                  id: 'parcels',
+                  label: 'Gate Parcels',
+                  icon: '📦',
+                  bg: '#F0FDF4',
+                  borderColor: '#DCFCE7',
+                  textColor: '#166534',
+                  badge: pendingParcelCount > 0 ? `${pendingParcelCount} Ready` : undefined,
+                  onPress: () => {
+                    setActiveTab('profile');
+                    setMoreSection('parcels');
+                  },
+                },
+                {
+                  id: 'support',
+                  label: 'Campus Support',
+                  icon: '🛟',
+                  bg: '#EFF6FF',
+                  borderColor: '#DBEAFE',
+                  textColor: '#1E40AF',
+                  onPress: () => {
+                    setActiveTab('profile');
+                    setMoreSection('support');
+                  },
+                },
+                {
+                  id: 'complaints',
+                  label: 'Log Complaints',
+                  icon: '🚨',
+                  bg: '#FEF2F2',
+                  borderColor: '#FEE2E2',
+                  textColor: '#991B1B',
+                  onPress: () => {
+                    setActiveTab('profile');
+                    setMoreSection('complaints');
+                  },
+                },
+                {
+                  id: 'leaves',
+                  label: 'Leave Desk',
+                  icon: '📄',
+                  bg: '#FAF5FF',
+                  borderColor: '#F3E8FF',
+                  textColor: '#6B21A8',
+                  onPress: () => {
+                    setActiveTab('profile');
+                    setMoreSection('leaves');
                   },
                 },
               ]}
@@ -3827,10 +4095,11 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                     {[
                       { id: 'library', label: 'Central Library Catalog', desc: 'Browse books, holdings & rack allocations', icon: '📚' },
                       { id: 'placement', label: 'Campus Placement Drives', desc: 'View recruitment companies, eligibility & CTC', icon: '💼' },
-                      { id: 'parcels', label: 'Gate Deliveries & Parcels', desc: 'Packages received at security gate with OTP', icon: '📦' },
+                      { id: 'parcels', label: 'Gate Deliveries & Parcels', desc: `Courier packages logged at security gate${pendingParcelCount > 0 ? ` (${pendingParcelCount} pending)` : ''}`, icon: '📦' },
+                      { id: 'support', label: 'Campus Support & IT Desk', desc: 'Raise leave, payroll queries, IT support & HR help', icon: '🛟' },
+                      { id: 'complaints', label: 'Log Complaints & Feedback', desc: 'File grievances regarding infrastructure, transport & facilities', icon: '🚨' },
                       { id: 'leaves', label: 'Staff Leaves & Balance', desc: `Casual: ${faculty.casualLeavesLeft} left • Sick: ${faculty.sickLeavesLeft} left`, icon: '📄' },
                       { id: 'payroll', label: 'Monthly Payroll & Payslips', desc: 'Net salary breakdown, allowances & tax records', icon: '💰' },
-                      { id: 'support', label: 'Campus Support & IT Helpdesk', desc: 'Report IT issues, classroom AV & infrastructure', icon: '🛟' },
                       { id: 'settings', label: 'Faculty Profile & Settings', desc: 'Review registered contact & account details', icon: '⚙️' },
                     ].map((item) => (
                       <TouchableOpacity
@@ -4099,566 +4368,209 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               </View>
             )}
 
-            {/* SUB-SECTION 2: PLACEMENT COORDINATION CENTER (FULL WEB-SYNCHRONIZED) */}
+            {/* SUB-SECTION 2: PLACEMENT COORDINATION CENTER */}
             {moreSection === 'placement' && (
-              <View style={styles.card}>
-                <View style={styles.cardHeaderRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardHeaderTitle}>💼 Placement Coordination Center</Text>
-                    <Text style={styles.sectionSubtitle}>
-                      Track {faculty.dept} department student eligibility, recruitment drives, applications, and training programs.
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.actionPillBtn}
-                    onPress={() => {
-                      Alert.alert(
-                        'Department Placement Report',
-                        `Department: ${faculty.dept}\nTotal Students: ${totalDeptStudents}\nEligible: ${eligibleDeptStudents.length}\nApplications: ${placementApplications.length}\nPlaced: ${uniquePlacedCount} (${placementPercentage}%)\n\nPlacement summary exported successfully in CSV format.`
-                      );
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.actionPillBtnText}>📥 Export CSV</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* 4 Dashboard Statistics Cards (Matching Web StaffPlacements.jsx) */}
-                <View style={styles.kpiGrid}>
-                  {/* Metric 1: Department Students */}
-                  <View style={[styles.kpiCard, { borderLeftColor: '#2563EB' }]}>
-                    <Text style={styles.kpiLabel}>Department Students</Text>
-                    <Text style={[styles.kpiValue, { color: '#2563EB' }]}>{totalDeptStudents}</Text>
-                    <Text style={styles.kpiSub}>Enrolled in {faculty.dept}</Text>
-                  </View>
-
-                  {/* Metric 2: Criteria Met (Eligible) */}
-                  <View style={[styles.kpiCard, { borderLeftColor: '#16A34A' }]}>
-                    <Text style={styles.kpiLabel}>Criteria Met (Eligible)</Text>
-                    <Text style={[styles.kpiValue, { color: '#15803D' }]}>{eligibleDeptStudents.length}</Text>
-                    <Text style={[styles.kpiSub, { color: '#16A34A', fontWeight: '700' }]}>CGPA ≥ 6.0 & Zero Arrears</Text>
-                  </View>
-
-                  {/* Metric 3: Participating / Applied */}
-                  <View style={[styles.kpiCard, { borderLeftColor: '#7C3AED' }]}>
-                    <Text style={styles.kpiLabel}>Participating / Applied</Text>
-                    <Text style={[styles.kpiValue, { color: '#6D28D9' }]}>{uniqueAppliedRegNos.length}</Text>
-                    <Text style={styles.kpiSub}>{placementApplications.length} Job Applications</Text>
-                  </View>
-
-                  {/* Metric 4: Students Placed */}
-                  <View style={[styles.kpiCard, { borderLeftColor: '#D97706' }]}>
-                    <Text style={styles.kpiLabel}>Students Placed</Text>
-                    <Text style={[styles.kpiValue, { color: '#B45309' }]}>
-                      {uniquePlacedCount} <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748B' }}>({placementPercentage}%)</Text>
-                    </Text>
-                    <Text style={styles.kpiSub}>{placementSelections.length || uniquePlacedCount} Corporate Offers</Text>
-                  </View>
-                </View>
-
-                {/* 6 Placement Management Sub-Tabs (Horizontal Scroll) */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-                  {[
-                    { id: 'drives', label: `Drives (${placementJobs.length})` },
-                    { id: 'roster', label: `Roster (${students.length})` },
-                    { id: 'applications', label: `Applications (${placementApplications.length})` },
-                    { id: 'interviews', label: `Interviews (${placementInterviews.length})` },
-                    { id: 'training', label: 'Training (4)' },
-                    { id: 'companies', label: `Partners (${placementCompanies.length})` },
-                  ].map((st) => (
-                    <TouchableOpacity
-                      key={st.id}
-                      style={[styles.filterPill, placementTab === st.id && styles.filterPillActive]}
-                      onPress={() => setPlacementTab(st.id as any)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.filterPillText, placementTab === st.id && styles.filterPillTextActive]}>
-                        {st.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-
-                {/* Common Search Bar */}
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="🔍 Search company, student, role, register no..."
-                  value={placementSearch}
-                  onChangeText={setPlacementSearch}
-                />
-
-                {/* TAB 1: CAMPUS RECRUITMENT DRIVES */}
-                {placementTab === 'drives' && (
-                  <View>
-                    {filteredPlacementJobs.length === 0 ? (
-                      <View style={styles.emptyStateContainer}>
-                        <Text style={styles.emptyStateEmoji}>🏢</Text>
-                        <Text style={styles.emptyStateTitle}>No Active Placement Drives</Text>
-                        <Text style={styles.emptyStateSubtitle}>Upcoming recruitment visits will appear here automatically.</Text>
-                      </View>
-                    ) : (
-                      filteredPlacementJobs.map((j) => (
-                        <View key={j.id} style={styles.serviceCardBox}>
-                          <View style={styles.serviceCardTopRow}>
-                            <View style={{ flex: 1, paddingRight: 8 }}>
-                              <Text style={styles.serviceCardTitle}>{j.company}</Text>
-                              <Text style={styles.jobRoleText}>{j.role}</Text>
-                            </View>
-                            <View style={styles.ctcBadge}>
-                              <Text style={styles.ctcBadgeText}>{j.ctc}</Text>
-                            </View>
-                          </View>
-
-                          <Text style={styles.jobEligibility}>🎯 Criteria: {j.eligibility}</Text>
-
-                          <View style={styles.driveScheduleRow}>
-                            <Text style={styles.jobDate}>📅 Drive Date: {j.driveDate}</Text>
-                            {j.deadline && <Text style={styles.driveDeadline}>⏰ Cut-off: {j.deadline}</Text>}
-                          </View>
-
-                          <View style={styles.roundsBadgeRow}>
-                            <Text style={styles.roundsBadgeLabel}>
-                              Selection Process: {j.totalRounds || (j.rounds ? j.rounds.length : 3)} Evaluation Rounds
-                            </Text>
-                          </View>
-
-                          <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                            <TouchableOpacity
-                              style={[styles.serviceActionPrimaryBtn, { flex: 1 }]}
-                              onPress={() => setSelectedPlacementJob(j)}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={styles.serviceActionPrimaryBtnText}>View Details & Rounds ›</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[styles.actionPillBtn, { justifyContent: 'center', alignItems: 'center' }]}
-                              onPress={() => {
-                                Alert.alert(
-                                  'Broadcast Sent! 📢',
-                                  `Recruitment circular for ${j.company} (${j.role}) has been dispatched to all ${eligibleDeptStudents.length} eligible students in ${faculty.dept} department.`
-                                );
-                              }}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={styles.actionPillBtnText}>📢 Notify Students</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ))
-                    )}
-                  </View>
-                )}
-
-                {/* TAB 2: STUDENTS PLACEMENT ELIGIBILITY ROSTER */}
-                {placementTab === 'roster' && (
-                  <View>
-                    {/* Eligibility Filter Pills */}
-                    <View style={styles.serviceFilterScrollRow}>
-                      {(['All', 'Eligible', 'Below Criteria'] as const).map((opt) => (
-                        <TouchableOpacity
-                          key={opt}
-                          style={[styles.serviceFilterPill, rosterEligibilityFilter === opt && styles.serviceFilterPillActive]}
-                          onPress={() => setRosterEligibilityFilter(opt)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.serviceFilterPillText, rosterEligibilityFilter === opt && styles.serviceFilterPillTextActive]}>
-                            {opt === 'Eligible' ? `Eligible (${eligibleDeptStudents.length})` : opt}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-
-                    {filteredPlacementRoster.length === 0 ? (
-                      <View style={styles.emptyStateContainer}>
-                        <Text style={styles.emptyStateEmoji}>🎓</Text>
-                        <Text style={styles.emptyStateTitle}>No Students Found</Text>
-                        <Text style={styles.emptyStateSubtitle}>Try searching by a different name or roll number.</Text>
-                      </View>
-                    ) : (
-                      filteredPlacementRoster.map((s) => {
-                        const isEligible = Number(s.cgpa ?? 0) >= 6.0;
-                        const studentApps = placementApplications.filter(
-                          (a) => a.regNo?.toLowerCase() === s.rollNo?.toLowerCase() || a.student?.toLowerCase() === s.name?.toLowerCase()
-                        );
-                        const isPlaced = placementSelections.some(
-                          (sel: any) => sel.regNo?.toLowerCase() === s.rollNo?.toLowerCase() || sel.student?.toLowerCase() === s.name?.toLowerCase()
-                        ) || studentApps.some((a) => a.status === 'Selected');
-
-                        return (
-                          <View key={s.id} style={styles.serviceCardBox}>
-                            <View style={styles.serviceCardTopRow}>
-                              <View style={{ flex: 1 }}>
-                                <Text style={styles.serviceCardTitle}>{s.name}</Text>
-                                <Text style={styles.serviceCardMeta}>Reg No: {s.rollNo} • {s.sem}</Text>
-                              </View>
-                              <View
-                                style={[
-                                  styles.statusBadge,
-                                  isPlaced
-                                    ? { backgroundColor: '#DCFCE7' }
-                                    : isEligible
-                                    ? { backgroundColor: '#EFF6FF' }
-                                    : { backgroundColor: '#FEF3C7' },
-                                ]}>
-                                <Text
-                                  style={[
-                                    styles.statusBadgeText,
-                                    isPlaced
-                                      ? { color: '#15803D' }
-                                      : isEligible
-                                      ? { color: '#1D4ED8' }
-                                      : { color: '#B45309' },
-                                  ]}>
-                                  {isPlaced ? '🎉 Placed' : isEligible ? '✓ Eligible' : 'Needs Review'}
-                                </Text>
-                              </View>
-                            </View>
-
-                            <View style={styles.specGrid}>
-                              <View style={styles.specItem}>
-                                <Text style={styles.specLabel}>Cumulative CGPA</Text>
-                                <Text style={[styles.specValue, { color: isEligible ? '#15803D' : '#DC2626', fontWeight: '800' }]}>
-                                  {s.cgpa.toFixed(2)}
-                                </Text>
-                              </View>
-                              <View style={styles.specItem}>
-                                <Text style={styles.specLabel}>Standing Arrears</Text>
-                                <Text style={[styles.specValue, { color: '#1E293B', fontWeight: '800' }]}>0 Arrears</Text>
-                              </View>
-                              <View style={styles.specItem}>
-                                <Text style={styles.specLabel}>Attendance</Text>
-                                <Text style={styles.specValue}>{s.attendancePct}%</Text>
-                              </View>
-                              <View style={styles.specItem}>
-                                <Text style={styles.specLabel}>Job Applications</Text>
-                                <Text style={[styles.specValue, { color: '#2563EB', fontWeight: '800' }]}>
-                                  {studentApps.length} Applied
-                                </Text>
-                              </View>
-                            </View>
-
-                            <TouchableOpacity
-                              style={[styles.cardSelectBtn, { marginTop: 8 }]}
-                              onPress={() => {
-                                setSelectedStudentPlacementProfile({
-                                  student: s,
-                                  apps: studentApps,
-                                  isEligible,
-                                  isPlaced,
-                                });
-                              }}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={styles.cardSelectBtnText}>View Student Placement Profile →</Text>
-                            </TouchableOpacity>
-                          </View>
-                        );
-                      })
-                    )}
-                  </View>
-                )}
-
-                {/* TAB 3: APPLICATIONS TRACKING */}
-                {placementTab === 'applications' && (
-                  <View>
-                    {/* Status Filter Pills */}
-                    <View style={styles.serviceFilterScrollRow}>
-                      {['All', 'Applied', 'Shortlisted', 'Selected', 'Rejected'].map((st) => (
-                        <TouchableOpacity
-                          key={st}
-                          style={[styles.serviceFilterPill, appStatusFilter === st && styles.serviceFilterPillActive]}
-                          onPress={() => setAppStatusFilter(st)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.serviceFilterPillText, appStatusFilter === st && styles.serviceFilterPillTextActive]}>
-                            {st}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-
-                    {filteredPlacementApplications.length === 0 ? (
-                      <View style={styles.emptyStateContainer}>
-                        <Text style={styles.emptyStateEmoji}>📝</Text>
-                        <Text style={styles.emptyStateTitle}>No Applications Found</Text>
-                        <Text style={styles.emptyStateSubtitle}>
-                          {appStatusFilter === 'All'
-                            ? 'Student recruitment applications will appear here.'
-                            : `No applications with status '${appStatusFilter}'.`}
-                        </Text>
-                      </View>
-                    ) : (
-                      filteredPlacementApplications.map((app) => (
-                        <View key={app.id} style={styles.serviceCardBox}>
-                          <View style={styles.serviceCardTopRow}>
-                            <View style={{ flex: 1, paddingRight: 8 }}>
-                              <Text style={styles.serviceCardTitle}>{app.student}</Text>
-                              <Text style={styles.serviceCardMeta}>Reg No: {app.regNo} • {app.dept || faculty.dept}</Text>
-                            </View>
-                            <View
-                              style={[
-                                styles.statusBadge,
-                                app.status === 'Selected'
-                                  ? { backgroundColor: '#DCFCE7' }
-                                  : app.status === 'Shortlisted'
-                                  ? { backgroundColor: '#EFF6FF' }
-                                  : app.status === 'Rejected'
-                                  ? { backgroundColor: '#FEE2E2' }
-                                  : { backgroundColor: '#FEF3C7' },
-                              ]}>
-                              <Text
-                                style={[
-                                  styles.statusBadgeText,
-                                  app.status === 'Selected'
-                                    ? { color: '#15803D' }
-                                    : app.status === 'Shortlisted'
-                                    ? { color: '#1D4ED8' }
-                                    : app.status === 'Rejected'
-                                    ? { color: '#DC2626' }
-                                    : { color: '#B45309' },
-                                ]}>
-                                {app.status}
-                              </Text>
-                            </View>
-                          </View>
-
-                          <Text style={styles.jobRoleText}>🏢 {app.company} • {app.role}</Text>
-                          <Text style={styles.jobDate}>📅 Applied on {app.appliedDate}</Text>
-                        </View>
-                      ))
-                    )}
-                  </View>
-                )}
-
-                {/* TAB 4: INTERVIEWS & EVALUATOR ROUND PROGRESSION */}
-                {placementTab === 'interviews' && (
-                  <View>
-                    {/* Round Selector */}
-                    <Text style={styles.sectionMinorTitle}>Select Evaluation Round</Text>
-                    <View style={styles.selectorChipRow}>
-                      {[
-                        { num: 1, label: 'Round 1: Aptitude' },
-                        { num: 2, label: 'Round 2: Technical' },
-                        { num: 3, label: 'Round 3: HR Interview' },
-                      ].map((r) => (
-                        <TouchableOpacity
-                          key={r.num}
-                          style={[styles.chipItem, selectedInterviewRound === r.num && styles.chipItemActive]}
-                          onPress={() => setSelectedInterviewRound(r.num)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.chipItemText, selectedInterviewRound === r.num && styles.chipItemTextActive]}>
-                            {r.label}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-
-                    {placementInterviews.length === 0 ? (
-                      <View style={styles.emptyStateContainer}>
-                        <Text style={styles.emptyStateEmoji}>🎙️</Text>
-                        <Text style={styles.emptyStateTitle}>No Interview Slots Scheduled</Text>
-                        <Text style={styles.emptyStateSubtitle}>
-                          Candidate interview schedules and evaluator progression will be displayed here.
-                        </Text>
-                      </View>
-                    ) : (
-                      placementInterviews
-                        .filter((it) => it.roundNumber === selectedInterviewRound || placementInterviews.length < 3)
-                        .map((it) => (
-                          <View key={it.id} style={styles.serviceCardBox}>
-                            <View style={styles.serviceCardTopRow}>
-                              <View style={{ flex: 1, paddingRight: 8 }}>
-                                <Text style={styles.serviceCardTitle}>{it.candidateName}</Text>
-                                <Text style={styles.serviceCardMeta}>Company: {it.company} • {it.role}</Text>
-                              </View>
-                              <View style={[styles.statusBadge, { backgroundColor: '#EFF6FF' }]}>
-                                <Text style={[styles.statusBadgeText, { color: '#1D4ED8' }]}>{it.status}</Text>
-                              </View>
-                            </View>
-
-                            <Text style={styles.jobRoleText}>📌 {it.roundName}</Text>
-                            <Text style={styles.jobDate}>📅 {it.date} at {it.time} • {it.mode}</Text>
-
-                            {/* Evaluator Status Action */}
-                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                              <TouchableOpacity
-                                style={[styles.serviceActionPrimaryBtn, { flex: 1, backgroundColor: '#15803D' }]}
-                                onPress={() => {
-                                  Alert.alert(
-                                    'Candidate Round Update',
-                                    `${it.candidateName} has been evaluated and advanced to the next selection round for ${it.company}.`
-                                  );
-                                }}
-                                activeOpacity={0.8}
-                              >
-                                <Text style={styles.serviceActionPrimaryBtnText}>✓ Advance Round</Text>
-                              </TouchableOpacity>
-
-                              <TouchableOpacity
-                                style={[styles.actionPillBtn, { backgroundColor: '#FEE2E2', justifyContent: 'center' }]}
-                                onPress={() => {
-                                  Alert.alert(
-                                    'Candidate Evaluation',
-                                    `Evaluation notes logged for ${it.candidateName}.`
-                                  );
-                                }}
-                                activeOpacity={0.7}
-                              >
-                                <Text style={[styles.actionPillBtnText, { color: '#DC2626' }]}>Feedback Notes</Text>
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        ))
-                    )}
-                  </View>
-                )}
-
-                {/* TAB 5: TRAINING PROGRAMS */}
-                {placementTab === 'training' && (
-                  <View>
-                    <Text style={styles.sectionSubtitle}>
-                      Pre-placement readiness curriculum for {faculty.dept} department scholars.
-                    </Text>
-
-                    {placementTrainingModules.map((tr) => (
-                      <View key={tr.id} style={styles.serviceCardBox}>
-                        <View style={styles.serviceCardTopRow}>
-                          <View style={{ flex: 1, paddingRight: 8 }}>
-                            <Text style={styles.serviceCardTitle}>{tr.title}</Text>
-                            <Text style={styles.serviceCardMeta}>Domain: {tr.category} • {tr.hours}</Text>
-                          </View>
-                          <View style={[styles.statusBadge, { backgroundColor: '#DCFCE7' }]}>
-                            <Text style={[styles.statusBadgeText, { color: '#15803D' }]}>{tr.status}</Text>
-                          </View>
-                        </View>
-
-                        <Text style={styles.jobRoleText}>👨‍🏫 Instructor: {tr.trainer}</Text>
-                        <Text style={styles.jobDate}>⏰ Schedule: {tr.schedule}</Text>
-                        <Text style={styles.jobEligibility}>👥 Enrolled: {tr.enrolledCount} Department Scholars</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {/* TAB 6: HIRING ENTERPRISE PARTNERS */}
-                {placementTab === 'companies' && (
-                  <View>
-                    {filteredPlacementCompanies.length === 0 ? (
-                      <View style={styles.emptyStateContainer}>
-                        <Text style={styles.emptyStateEmoji}>🤝</Text>
-                        <Text style={styles.emptyStateTitle}>No Corporate Partners Listed</Text>
-                        <Text style={styles.emptyStateSubtitle}>Recruiting partners and MOUs will be displayed here.</Text>
-                      </View>
-                    ) : (
-                      filteredPlacementCompanies.map((c) => (
-                        <View key={c.id} style={styles.serviceCardBox}>
-                          <View style={styles.serviceCardTopRow}>
-                            <Text style={styles.serviceCardTitle}>{c.name}</Text>
-                            <View style={styles.statusBadgeConfirmed}>
-                              <Text style={styles.statusBadgeConfirmedText}>{c.status || 'Active Partner'}</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.companySectorText}>Sector: {c.sector}</Text>
-                          <Text style={styles.companyLocationText}>📍 Headquarters: {c.location}</Text>
-                          {c.hrContact && <Text style={styles.companyContactText}>📧 HR: {c.hrContact}</Text>}
-                        </View>
-                      ))
-                    )}
-                  </View>
-                )}
-              </View>
+              <StaffPlacementModule
+                user={user}
+                facultyDept={faculty.dept || user.department || 'TAMIL'}
+                onRefreshParent={loadData}
+              />
             )}
 
             {/* SUB-SECTION 3: PARCELS & DELIVERIES */}
             {moreSection === 'parcels' && (
-              <View style={styles.card}>
-                <View style={styles.cardHeaderRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardHeaderTitle}>📦 Gate Deliveries & Parcels</Text>
-                    <Text style={styles.sectionSubtitle}>Personal packages and official deliveries received by Campus Security</Text>
-                  </View>
-                </View>
-
-                {/* Status Filter Pills */}
-                <View style={styles.serviceFilterScrollRow}>
-                  {(['All', 'Pending', 'Collected'] as const).map((filterOpt) => (
+              <View style={{ gap: 12 }}>
+                {/* Header Card */}
+                <View style={styles.card}>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardHeaderTitle}>📦 Gate Deliveries & Parcels</Text>
+                      <Text style={styles.sectionSubtitle}>
+                        Security custody ledger for {faculty.name} ({faculty.empId || 'Staff'})
+                      </Text>
+                    </View>
                     <TouchableOpacity
-                      key={filterOpt}
-                      style={[styles.serviceFilterPill, parcelFilter === filterOpt && styles.serviceFilterPillActive]}
-                      onPress={() => setParcelFilter(filterOpt)}
+                      style={styles.actionPillBtn}
+                      onPress={() => loadData()}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.serviceFilterPillText, parcelFilter === filterOpt && styles.serviceFilterPillTextActive]}>
-                        {filterOpt === 'Pending' ? `Pending Pickup (${pendingParcelCount})` : filterOpt}
-                      </Text>
+                      <Text style={styles.actionPillBtnText}>🔄 Refresh</Text>
                     </TouchableOpacity>
-                  ))}
+                  </View>
+
+                  {/* 3 Mobile KPI Cards */}
+                  <View style={styles.kpiTripleRow}>
+                    <View style={[styles.kpiTripleCard, { borderColor: '#DBEAFE', backgroundColor: '#EFF6FF' }]}>
+                      <Text style={[styles.kpiTripleValue, { color: '#1E40AF' }]}>{parcels.length}</Text>
+                      <Text style={styles.kpiTripleLabel}>Total Logged</Text>
+                    </View>
+                    <View style={[styles.kpiTripleCard, { borderColor: pendingParcelCount > 0 ? '#FCD34D' : '#E2E8F0', backgroundColor: pendingParcelCount > 0 ? '#FEF3C7' : '#F8FAFC' }]}>
+                      <Text style={[styles.kpiTripleValue, { color: pendingParcelCount > 0 ? '#B45309' : '#64748B' }]}>{pendingParcelCount}</Text>
+                      <Text style={styles.kpiTripleLabel}>Ready for Pickup</Text>
+                    </View>
+                    <View style={[styles.kpiTripleCard, { borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' }]}>
+                      <Text style={[styles.kpiTripleValue, { color: '#15803D' }]}>{collectedParcelCount}</Text>
+                      <Text style={styles.kpiTripleLabel}>Collected</Text>
+                    </View>
+                  </View>
+
+                  {/* Status Filter Pills */}
+                  <View style={[styles.serviceFilterScrollRow, { marginTop: 8 }]}>
+                    {(['All', 'Pending', 'Collected'] as const).map((filterOpt) => (
+                      <TouchableOpacity
+                        key={filterOpt}
+                        style={[styles.serviceFilterPill, parcelFilter === filterOpt && styles.serviceFilterPillActive]}
+                        onPress={() => setParcelFilter(filterOpt)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.serviceFilterPillText, parcelFilter === filterOpt && styles.serviceFilterPillTextActive]}>
+                          {filterOpt === 'Pending' ? `Ready Pickup (${pendingParcelCount})` : filterOpt === 'Collected' ? `Collected (${collectedParcelCount})` : `All (${parcels.length})`}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <TextInput
+                    style={[styles.searchInput, { marginTop: 6, marginBottom: 4 }]}
+                    placeholder="🔍 Search courier, AWB, gate or parcel ID..."
+                    value={parcelSearch}
+                    onChangeText={setParcelSearch}
+                  />
                 </View>
 
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="🔍 Search courier, AWB tracking or sender..."
-                  value={parcelSearch}
-                  onChangeText={setParcelSearch}
-                />
-
+                {/* Parcel Cards List */}
                 {filteredParcels.length === 0 ? (
-                  <View style={styles.emptyStateContainer}>
-                    <Text style={styles.emptyStateEmoji}>📬</Text>
-                    <Text style={styles.emptyStateTitle}>No Gate Deliveries Found</Text>
-                    <Text style={styles.emptyStateSubtitle}>
-                      {parcelFilter === 'Pending'
-                        ? 'All packages received at the security gate have been collected.'
-                        : 'No delivery packages match your search criteria.'}
-                    </Text>
+                  <View style={styles.card}>
+                    <View style={styles.emptyStateContainer}>
+                      <Text style={styles.emptyStateEmoji}>📬</Text>
+                      <Text style={styles.emptyStateTitle}>No Gate Deliveries Found</Text>
+                      <Text style={styles.emptyStateSubtitle}>
+                        {parcelFilter === 'Pending'
+                          ? 'All deliveries logged at the campus security gate have been acknowledged and collected.'
+                          : 'No delivery parcels match your active filter search.'}
+                      </Text>
+                    </View>
                   </View>
                 ) : (
                   filteredParcels.map((p) => {
                     const isCollected = p.status === 'Collected' || p.status === 'Handed Over';
                     const isCollecting = collectingParcelId === p.id;
+                    const isDelivery = p.type === 'Delivery';
 
                     return (
-                      <View key={p.id} style={styles.serviceCardBox}>
+                      <View key={p.id} style={styles.card}>
+                        {/* Top Row: Type, Parcel ID & Status */}
                         <View style={styles.serviceCardTopRow}>
-                          <Text style={styles.serviceCardTitle}>🚚 {p.courier}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+                            <View style={[styles.tagTypePill, isDelivery ? { backgroundColor: '#EFF6FF' } : { backgroundColor: '#F3E8FF' }]}>
+                              <Text style={[styles.tagTypePillText, isDelivery ? { color: '#1D4ED8' } : { color: '#6B21A8' }]}>
+                                {isDelivery ? '🚚 Delivery' : '📦 Parcel'}
+                              </Text>
+                            </View>
+                            <View style={styles.parcelIdChip}>
+                              <Text style={styles.parcelIdChipText}>{p.parcelId}</Text>
+                            </View>
+                          </View>
+
                           <View style={[styles.statusBadge, isCollected ? { backgroundColor: '#DCFCE7' } : { backgroundColor: '#FEF3C7' }]}>
                             <Text style={[styles.statusBadgeText, isCollected ? { color: '#15803D' } : { color: '#B45309' }]}>
-                              {isCollected ? '✓ Collected' : 'Pending Pickup'}
+                              {isCollected ? '✓ Collected' : '⏱ Ready for Pickup'}
                             </Text>
                           </View>
                         </View>
 
-                        <Text style={styles.parcelSenderText}>From: <Text style={{ fontWeight: '700' }}>{p.senderName}</Text></Text>
-                        <Text style={styles.parcelAwb}>AWB / Tracking: {p.trackingNumber}</Text>
-                        <Text style={styles.parcelDetailsText}>Details: {p.details}</Text>
-                        <Text style={styles.parcelDate}>📍 {p.gate} • Received on {p.date}</Text>
+                        {/* Title / Description */}
+                        <Text style={styles.parcelMainTitleText}>{p.details || 'Standard Consignment Package'}</Text>
 
-                        {/* Security OTP Verification Box */}
-                        <View style={styles.parcelOtpBoxModern}>
-                          <View>
-                            <Text style={styles.parcelOtpLabelModern}>Gate Security Verification OTP</Text>
-                            <Text style={styles.parcelOtpSubModern}>Present this code to the watchman at the campus gate</Text>
+                        {/* Key Details Grid */}
+                        <View style={styles.parcelDetailsGrid}>
+                          <View style={styles.parcelDetailRow}>
+                            <Text style={styles.parcelDetailKey}>Courier / Service:</Text>
+                            <Text style={styles.parcelDetailValueBold}>{p.courier || p.deliveryCompany || 'Security Gate Desk'}</Text>
                           </View>
-                          <Text style={styles.parcelOtpValueModern}>{p.otp}</Text>
+
+                          {p.trackingNumber ? (
+                            <View style={styles.parcelDetailRow}>
+                              <Text style={styles.parcelDetailKey}>Tracking / AWB #:</Text>
+                              <View style={styles.awbBadge}>
+                                <Text style={styles.awbBadgeText}>{p.trackingNumber}</Text>
+                              </View>
+                            </View>
+                          ) : null}
+
+                          <View style={styles.parcelDetailRow}>
+                            <Text style={styles.parcelDetailKey}>Received at Gate:</Text>
+                            <Text style={styles.parcelDetailValue}>
+                              📅 {p.receivedAt ? new Date(p.receivedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : p.date}
+                            </Text>
+                          </View>
+
+                          <View style={styles.parcelDetailRow}>
+                            <Text style={styles.parcelDetailKey}>Custody Location:</Text>
+                            <Text style={[styles.parcelDetailValue, { color: '#DC2626', fontWeight: '700' }]}>
+                              📍 {p.gate || 'Gate 1 (Main Entrance Desk)'}
+                            </Text>
+                          </View>
+
+                          {/* Handover Details for Collected Parcels */}
+                          {isCollected && p.collectedAt && (
+                            <View style={styles.handoverDetailsBox}>
+                              <Text style={styles.handoverDetailsTitle}>✓ Verified Handover Record</Text>
+                              <Text style={styles.handoverDetailsText}>
+                                Handed over on {new Date(p.collectedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                {p.collectedBy ? ` • Collected by ${p.collectedBy}` : ''}
+                              </Text>
+                            </View>
+                          )}
+
+                          {/* Notes if provided */}
+                          {p.notes ? (
+                            <View style={styles.securityNoteBubble}>
+                              <Text style={styles.securityNoteText}>ℹ️ Security Note: {p.notes}</Text>
+                            </View>
+                          ) : null}
                         </View>
 
-                        {/* Confirm Collection Action */}
-                        {!isCollected && (
-                          <TouchableOpacity
-                            style={styles.parcelCollectBtn}
-                            onPress={() => handleCollectParcel(p.id)}
-                            disabled={isCollecting}
-                            activeOpacity={0.8}
-                          >
-                            {isCollecting ? (
-                              <ActivityIndicator size="small" color="#FFFFFF" />
-                            ) : (
-                              <Text style={styles.parcelCollectBtnText}>✓ Confirm Parcel Collection</Text>
-                            )}
-                          </TouchableOpacity>
+                        {/* OTP Verification Info */}
+                        {!isCollected && p.otp && (
+                          <View style={styles.parcelOtpBoxModern}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.parcelOtpLabelModern}>Gate Handover Code</Text>
+                              <Text style={styles.parcelOtpSubModern}>Show to campus security guard upon collection</Text>
+                            </View>
+                            <Text style={styles.parcelOtpValueModern}>{p.otp}</Text>
+                          </View>
                         )}
+
+                        {/* Action Footer */}
+                        <View style={{ marginTop: 10, gap: 8 }}>
+                          {!isCollected ? (
+                            <TouchableOpacity
+                              style={styles.parcelConfirmCollectionBtn}
+                              onPress={() => handleOpenCollectParcelModal(p)}
+                              disabled={isCollecting}
+                              activeOpacity={0.8}
+                            >
+                              {isCollecting ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                              ) : (
+                                <Text style={styles.parcelConfirmCollectionBtnText}>✓ Confirm I Have Collected This</Text>
+                              )}
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={styles.verifiedStampBox}>
+                              <Text style={styles.verifiedStampText}>✓ Handover verified & ledger closed in gate security records</Text>
+                            </View>
+                          )}
+
+                          <TouchableOpacity
+                            style={styles.detailLinkBtn}
+                            onPress={() => setSelectedParcelDetail(p)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.detailLinkBtnText}>View Full Custody Details ›</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     );
                   })
@@ -4848,92 +4760,379 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               </View>
             )}
 
-            {/* SUB-SECTION 6: SUPPORT CENTER */}
+            {/* SUB-SECTION 6: CAMPUS SUPPORT & IT DESK */}
             {moreSection === 'support' && (
-              <View style={styles.card}>
-                <View style={styles.cardHeaderRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardHeaderTitle}>🛟 Campus Support Center</Text>
-                    <Text style={styles.sectionSubtitle}>Institutional IT helpdesk and administrative assistance</Text>
+              <View style={{ gap: 12 }}>
+                {/* Header Card */}
+                <View style={styles.card}>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardHeaderTitle}>🛟 Campus Support Desk</Text>
+                      <Text style={styles.sectionSubtitle}>
+                        Faculty helpdesk for IT, leave, payroll & campus administration
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.actionPillBtn}
+                      onPress={() => setSupportModalVisible(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.actionPillBtnText}>+ New Request</Text>
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    style={styles.actionPillBtn}
-                    onPress={() => setSupportModalVisible(true)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.actionPillBtnText}>+ New Ticket</Text>
-                  </TouchableOpacity>
+
+                  {/* Category Filter Horizontal Scroll */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 6 }}>
+                    <TouchableOpacity
+                      style={[styles.serviceFilterPill, supportCategoryFilter === 'All' && styles.serviceFilterPillActive]}
+                      onPress={() => setSupportCategoryFilter('All')}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.serviceFilterPillText, supportCategoryFilter === 'All' && styles.serviceFilterPillTextActive]}>
+                        All ({supportTickets.length})
+                      </Text>
+                    </TouchableOpacity>
+                    {SUPPORT_CATEGORIES.map((cat) => {
+                      const count = supportTickets.filter((t) => t.requestType === cat.id).length;
+                      const isActive = supportCategoryFilter === cat.id;
+                      return (
+                        <TouchableOpacity
+                          key={cat.id}
+                          style={[styles.serviceFilterPill, isActive && { backgroundColor: cat.bg, borderColor: cat.color }]}
+                          onPress={() => setSupportCategoryFilter(cat.id)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.serviceFilterPillText, isActive && { color: cat.color, fontWeight: '800' }]}>
+                            {cat.icon} {cat.title} ({count})
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+
+                  {/* Status Filter Horizontal Scroll */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                    {(['All', 'Pending', 'Under Review', 'In Progress', 'Resolved', 'Approved', 'Rejected'] as const).map((st) => (
+                      <TouchableOpacity
+                        key={st}
+                        style={[styles.serviceFilterPill, supportStatusFilter === st && styles.serviceFilterPillActive]}
+                        onPress={() => setSupportStatusFilter(st)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.serviceFilterPillText, supportStatusFilter === st && styles.serviceFilterPillTextActive]}>
+                          {st}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  <TextInput
+                    style={[styles.searchInput, { marginBottom: 2 }]}
+                    placeholder="🔍 Search requests by keyword or type..."
+                    value={supportSearch}
+                    onChangeText={setSupportSearch}
+                  />
                 </View>
 
-                {/* Logged-in Staff Member's Active Tickets */}
-                <Text style={styles.sectionMinorTitle}>My Support Tickets</Text>
-
+                {/* Support Tickets List */}
                 {filteredSupportTickets.length === 0 ? (
-                  <View style={styles.emptyStateContainerMini}>
-                    <Text style={styles.emptyStateSubtitle}>
-                      No open support tickets. Tap '+ New Ticket' above to report an issue or make a query.
-                    </Text>
+                  <View style={styles.card}>
+                    <View style={styles.emptyStateContainer}>
+                      <Text style={styles.emptyStateEmoji}>📭</Text>
+                      <Text style={styles.emptyStateTitle}>No Support Requests Found</Text>
+                      <Text style={styles.emptyStateSubtitle}>
+                        {supportCategoryFilter !== 'All' || supportStatusFilter !== 'All' || supportSearch
+                          ? 'No tickets match your active filter search. Tap "+ New Request" above to raise a query.'
+                          : 'You have not raised any active support tickets yet. Tap "+ New Request" to contact Campus IT or Administration.'}
+                      </Text>
+                    </View>
                   </View>
                 ) : (
-                  filteredSupportTickets.map((t) => (
-                    <View key={t.id} style={styles.serviceCardBox}>
-                      <View style={styles.serviceCardTopRow}>
-                        <View style={styles.ticketTypeBadge}>
-                          <Text style={styles.ticketTypeBadgeText}>{t.requestType}</Text>
-                        </View>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            t.status === 'Resolved' || t.status === 'Approved'
-                              ? { backgroundColor: '#DCFCE7' }
-                              : t.status === 'In Progress'
-                              ? { backgroundColor: '#EFF6FF' }
-                              : { backgroundColor: '#FEF3C7' },
-                          ]}
-                        >
-                          <Text
+                  filteredSupportTickets.map((t) => {
+                    const isDone = t.status === 'Resolved' || t.status === 'Approved';
+                    const isRejected = t.status === 'Rejected';
+                    const isInProgress = t.status === 'In Progress';
+                    const catDef = SUPPORT_CATEGORIES.find((c) => c.id === t.requestType);
+
+                    return (
+                      <TouchableOpacity
+                        key={t.id}
+                        style={styles.card}
+                        onPress={() => setSelectedSupportTicket(t)}
+                        activeOpacity={0.8}
+                      >
+                        {/* Top Badges Row */}
+                        <View style={styles.serviceCardTopRow}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+                            <View style={[styles.tagTypePill, { backgroundColor: catDef ? catDef.bg : '#EFF6FF' }]}>
+                              <Text style={[styles.tagTypePillText, { color: catDef ? catDef.color : '#1D4ED8' }]}>
+                                {catDef ? `${catDef.icon} ${catDef.title}` : t.requestType}
+                              </Text>
+                            </View>
+
+                            <View
+                              style={[
+                                styles.priorityPill,
+                                t.priority === 'Critical' || t.priority === 'High'
+                                  ? { backgroundColor: '#FEE2E2' }
+                                  : t.priority === 'Medium'
+                                  ? { backgroundColor: '#FEF3C7' }
+                                  : { backgroundColor: '#F1F5F9' },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.priorityPillText,
+                                  t.priority === 'Critical' || t.priority === 'High'
+                                    ? { color: '#DC2626' }
+                                    : t.priority === 'Medium'
+                                    ? { color: '#B45309' }
+                                    : { color: '#475569' },
+                                ]}
+                              >
+                                {t.priority} Priority
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View
                             style={[
-                              styles.statusBadgeText,
-                              t.status === 'Resolved' || t.status === 'Approved'
-                                ? { color: '#15803D' }
-                                : t.status === 'In Progress'
-                                ? { color: '#1D4ED8' }
-                                : { color: '#B45309' },
+                              styles.statusBadge,
+                              isDone
+                                ? { backgroundColor: '#DCFCE7' }
+                                : isRejected
+                                ? { backgroundColor: '#FEE2E2' }
+                                : isInProgress
+                                ? { backgroundColor: '#EFF6FF' }
+                                : { backgroundColor: '#FEF3C7' },
                             ]}
                           >
-                            {t.status}
-                          </Text>
+                            <Text
+                              style={[
+                                styles.statusBadgeText,
+                                isDone
+                                  ? { color: '#15803D' }
+                                  : isRejected
+                                  ? { color: '#DC2626' }
+                                  : isInProgress
+                                  ? { color: '#1D4ED8' }
+                                  : { color: '#B45309' },
+                              ]}
+                            >
+                              {t.status || 'Pending'}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
 
-                      <Text style={styles.ticketSubjectText}>{t.subject || t.subType}</Text>
-                      <Text style={styles.ticketDescText}>{t.description}</Text>
-                      <View style={styles.ticketFooterRow}>
-                        <Text style={styles.ticketDateText}>📅 {t.date}</Text>
-                        <View style={styles.priorityPill}>
-                          <Text style={styles.priorityPillText}>Priority: {t.priority}</Text>
+                        {/* Subject / Sub-Type */}
+                        <Text style={styles.parcelMainTitleText}>{t.subType || t.subject || 'Support Ticket'}</Text>
+
+                        {/* Description */}
+                        <Text style={styles.ticketDescText} numberOfLines={3}>
+                          {t.description}
+                        </Text>
+
+                        {/* Dates & Timeline Info */}
+                        <View style={{ marginTop: 8, gap: 4 }}>
+                          {t.startDate && t.endDate ? (
+                            <View style={styles.durationPillBox}>
+                              <Text style={styles.durationPillText}>
+                                📅 Duration: {t.startDate} to {t.endDate}
+                              </Text>
+                            </View>
+                          ) : null}
+
+                          <View style={styles.ticketFooterRow}>
+                            <Text style={styles.ticketDateText}>📅 Logged: {t.date}</Text>
+                            <Text style={styles.detailLinkBtnText}>View Timeline & Details ›</Text>
+                          </View>
                         </View>
-                      </View>
-                    </View>
-                  ))
+                      </TouchableOpacity>
+                    );
+                  })
                 )}
 
-                {/* Helplines Card */}
-                <Text style={[styles.sectionMinorTitle, { marginTop: 14 }]}>Institutional Helpline Extensions</Text>
-                <View style={styles.supportHelplines}>
-                  <View style={styles.helplineItem}>
-                    <Text style={styles.helplineTitle}>🖥️ IT & Smart Classroom Desk</Text>
-                    <Text style={styles.helplineNumber}>Ext: 104 • ithelpdesk@college.edu</Text>
-                  </View>
-                  <View style={styles.helplineItem}>
-                    <Text style={styles.helplineTitle}>🏢 Estate & Infrastructure</Text>
-                    <Text style={styles.helplineNumber}>Ext: 112 • maintenance@college.edu</Text>
-                  </View>
-                  <View style={styles.helplineItem}>
-                    <Text style={styles.helplineTitle}>📞 Principal's Secretarial Cell</Text>
-                    <Text style={styles.helplineNumber}>Ext: 101 • principal@college.edu</Text>
+                {/* Institutional Helpdesk Card */}
+                <View style={styles.card}>
+                  <Text style={styles.sectionMinorTitle}>🏛️ Institutional Helpline Directory</Text>
+                  <View style={styles.supportHelplines}>
+                    <View style={styles.helplineItem}>
+                      <Text style={styles.helplineTitle}>🖥️ IT & Smart Classroom Cell</Text>
+                      <Text style={styles.helplineNumber}>Ext: 104 • ithelpdesk@college.edu • Lab Complex Room 102</Text>
+                    </View>
+                    <View style={styles.helplineItem}>
+                      <Text style={styles.helplineTitle}>🏢 Estate & Facilities Office</Text>
+                      <Text style={styles.helplineNumber}>Ext: 112 • maintenance@college.edu • Admin Block Ground Floor</Text>
+                    </View>
+                    <View style={styles.helplineItem}>
+                      <Text style={styles.helplineTitle}>💰 Accounts & Payroll Section</Text>
+                      <Text style={styles.helplineNumber}>Ext: 108 • accounts@college.edu • Finance Wing Room 204</Text>
+                    </View>
                   </View>
                 </View>
+              </View>
+            )}
+
+            {/* SUB-SECTION 7: LOG COMPLAINTS & GRIEVANCES */}
+            {moreSection === 'complaints' && (
+              <View style={{ gap: 12 }}>
+                {/* Header Card */}
+                <View style={styles.card}>
+                  <View style={styles.cardHeaderRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardHeaderTitle}>🚨 Log Complaints & Feedback</Text>
+                      <Text style={styles.sectionSubtitle}>
+                        Direct grievance reporting for faculty, facilities & campus infrastructure
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.actionPillBtn, { backgroundColor: '#DC2626' }]}
+                      onPress={() => setComplaintModalVisible(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.actionPillBtnText}>+ Log Complaint</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* 3 KPI Counter Cards */}
+                  <View style={styles.kpiTripleRow}>
+                    <View style={[styles.kpiTripleCard, { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' }]}>
+                      <Text style={[styles.kpiTripleValue, { color: '#0F172A' }]}>{totalComplaintsCount}</Text>
+                      <Text style={styles.kpiTripleLabel}>Total Logged</Text>
+                    </View>
+                    <View style={[styles.kpiTripleCard, { borderColor: pendingComplaintsCount > 0 ? '#FCA5A5' : '#E2E8F0', backgroundColor: pendingComplaintsCount > 0 ? '#FEF2F2' : '#F8FAFC' }]}>
+                      <Text style={[styles.kpiTripleValue, { color: pendingComplaintsCount > 0 ? '#DC2626' : '#64748B' }]}>{pendingComplaintsCount}</Text>
+                      <Text style={styles.kpiTripleLabel}>Pending Review</Text>
+                    </View>
+                    <View style={[styles.kpiTripleCard, { borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' }]}>
+                      <Text style={[styles.kpiTripleValue, { color: '#15803D' }]}>{resolvedComplaintsCount}</Text>
+                      <Text style={styles.kpiTripleLabel}>Resolved</Text>
+                    </View>
+                  </View>
+
+                  {/* Status Filter Scroll */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
+                    {(['All', 'Pending', 'Under Review', 'In Progress', 'Resolved', 'Rejected'] as const).map((st) => (
+                      <TouchableOpacity
+                        key={st}
+                        style={[styles.serviceFilterPill, complaintStatusFilter === st && styles.serviceFilterPillActive]}
+                        onPress={() => setComplaintStatusFilter(st)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.serviceFilterPillText, complaintStatusFilter === st && styles.serviceFilterPillTextActive]}>
+                          {st}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  <TextInput
+                    style={[styles.searchInput, { marginBottom: 2 }]}
+                    placeholder="🔍 Search complaints by issue or description..."
+                    value={complaintSearch}
+                    onChangeText={setComplaintSearch}
+                  />
+                </View>
+
+                {/* Complaint Cards List */}
+                {filteredComplaints.length === 0 ? (
+                  <View style={styles.card}>
+                    <View style={styles.emptyStateContainer}>
+                      <Text style={styles.emptyStateEmoji}>🛡️</Text>
+                      <Text style={styles.emptyStateTitle}>No Complaints Logged</Text>
+                      <Text style={styles.emptyStateSubtitle}>
+                        {complaintStatusFilter !== 'All' || complaintSearch
+                          ? 'No grievances match your current search criteria.'
+                          : 'You have no open complaints on file. Tap "+ Log Complaint" above if you wish to report any campus, laboratory, transport, or administrative issue.'}
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  filteredComplaints.map((c) => {
+                    const isDone = c.status === 'Resolved' || c.status === 'Approved';
+                    const isRejected = c.status === 'Rejected';
+
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={styles.card}
+                        onPress={() => setSelectedComplaintTicket(c)}
+                        activeOpacity={0.8}
+                      >
+                        {/* Top Badges */}
+                        <View style={styles.serviceCardTopRow}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+                            <View style={[styles.tagTypePill, { backgroundColor: '#FEF2F2' }]}>
+                              <Text style={[styles.tagTypePillText, { color: '#DC2626' }]}>🚨 Grievance</Text>
+                            </View>
+
+                            <View
+                              style={[
+                                styles.priorityPill,
+                                c.priority === 'Critical' || c.priority === 'High'
+                                  ? { backgroundColor: '#FEE2E2' }
+                                  : c.priority === 'Medium'
+                                  ? { backgroundColor: '#FEF3C7' }
+                                  : { backgroundColor: '#F1F5F9' },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.priorityPillText,
+                                  c.priority === 'Critical' || c.priority === 'High'
+                                    ? { color: '#DC2626' }
+                                    : c.priority === 'Medium'
+                                    ? { color: '#B45309' }
+                                    : { color: '#475569' },
+                                ]}
+                              >
+                                {c.priority} Priority
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              isDone
+                                ? { backgroundColor: '#DCFCE7' }
+                                : isRejected
+                                ? { backgroundColor: '#FEE2E2' }
+                                : { backgroundColor: '#FEF3C7' },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.statusBadgeText,
+                                isDone
+                                  ? { color: '#15803D' }
+                                  : isRejected
+                                  ? { color: '#DC2626' }
+                                  : { color: '#B45309' },
+                              ]}
+                            >
+                              {c.status || 'Pending'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Title */}
+                        <Text style={styles.parcelMainTitleText}>{c.subType || 'General Grievance'}</Text>
+
+                        {/* Description */}
+                        <Text style={styles.ticketDescText} numberOfLines={3}>
+                          {c.description}
+                        </Text>
+
+                        {/* Footer */}
+                        <View style={[styles.ticketFooterRow, { marginTop: 10 }]}>
+                          <Text style={styles.ticketDateText}>📅 Submitted on {c.date}</Text>
+                          <Text style={[styles.detailLinkBtnText, { color: '#DC2626' }]}>Track Progress ›</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
               </View>
             )}
 
@@ -5088,66 +5287,589 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Support Ticket Modal */}
+      {/* ============================================================== */}
+      {/* CAMPUS SUPPORT & IT DESK REQUEST MODAL                          */}
+      {/* ============================================================== */}
       <Modal visible={supportModalVisible} transparent animationType="slide" onRequestClose={() => setSupportModalVisible(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Campus Support Ticket</Text>
-            <Text style={styles.modalSubtitle}>Direct assistance from Campus Administration & IT</Text>
-
-            <Text style={styles.inputLabel}>Category</Text>
-            <View style={styles.typeSelectorRow}>
-              {(['IT Support', 'Salary Query', 'General Query'] as const).map((t) => (
-                <TouchableOpacity
-                  key={t}
-                  style={[styles.typeChip, supportType === t && styles.typeChipActive]}
-                  onPress={() => setSupportType(t)}
-                >
-                  <Text style={[styles.typeChipText, supportType === t && styles.typeChipTextActive]}>{t}</Text>
+          <View style={[styles.modalCard, { maxHeight: '90%' }]}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 18 }}>🛠️</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.modalTitle}>Campus Support & Desk</Text>
+                    <Text style={styles.modalSubtitle}>Institutional Assistance & Requests</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setSupportModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Text style={{ fontSize: 18, color: '#94A3B8', fontWeight: 'bold' }}>✕</Text>
                 </TouchableOpacity>
-              ))}
+              </View>
+
+              <Text style={styles.inputLabel}>Select Category *</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                {SUPPORT_CATEGORIES.map((cat) => {
+                  const active = supportType === cat.id;
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[
+                        {
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          paddingVertical: 7,
+                          paddingHorizontal: 10,
+                          borderRadius: 8,
+                          borderWidth: 1.5,
+                          borderColor: active ? cat.color : '#E2E8F0',
+                          backgroundColor: active ? cat.bg : '#F8FAFC',
+                        },
+                      ]}
+                      onPress={() => setSupportType(cat.id)}
+                    >
+                      <Text style={{ fontSize: 14 }}>{cat.icon}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: active ? '700' : '600', color: active ? cat.color : '#475569' }}>
+                        {cat.title}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.inputLabel}>
+                {supportType === 'Leave'
+                  ? 'Leave Type / Specific Reason *'
+                  : supportType === 'Salary Query'
+                  ? 'Payroll Concern / Specific Topic *'
+                  : supportType === 'Complaint'
+                  ? 'Grievance Title / Location *'
+                  : supportType === 'Counseling'
+                  ? 'FDP / Counseling Subject *'
+                  : 'Facility / Equipment Sub-Type *'}
+              </Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder={
+                  supportType === 'Leave'
+                    ? 'e.g. Casual Leave, Duty Leave, Medical'
+                    : supportType === 'Salary Query'
+                    ? 'e.g. Month arrears, HRA deduction query'
+                    : supportType === 'Complaint'
+                    ? 'e.g. AC failure in Room 204, Water dispenser'
+                    : supportType === 'Counseling'
+                    ? 'e.g. FDP grant sponsorship, wellness session'
+                    : 'e.g. Projector HDMI port, Wi-Fi router LH-101'
+                }
+                value={supportSubject}
+                onChangeText={setSupportSubject}
+              />
+
+              {supportType === 'Leave' && (
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Start Date (YYYY-MM-DD) *</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="2026-10-27"
+                      value={supportStartDate}
+                      onChangeText={setSupportStartDate}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>End Date (YYYY-MM-DD) *</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="2026-10-28"
+                      value={supportEndDate}
+                      onChangeText={setSupportEndDate}
+                    />
+                  </View>
+                </View>
+              )}
+
+              <Text style={styles.inputLabel}>Priority Level</Text>
+              <View style={styles.typeSelectorRow}>
+                {(['Low', 'Medium', 'High', 'Critical'] as const).map((p) => {
+                  const active = supportPriority === p;
+                  const badgeColor =
+                    p === 'Critical' ? '#EF4444' : p === 'High' ? '#F97316' : p === 'Medium' ? '#2563EB' : '#10B981';
+                  return (
+                    <TouchableOpacity
+                      key={p}
+                      style={[
+                        styles.typeChip,
+                        active && { backgroundColor: badgeColor, borderColor: badgeColor },
+                      ]}
+                      onPress={() => setSupportPriority(p)}
+                    >
+                      <Text style={[styles.typeChipText, active && { color: '#FFFFFF', fontWeight: '800' }]}>{p}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.inputLabel}>Detailed Description *</Text>
+              <TextInput
+                style={[styles.modalInput, { height: 80, textAlignVertical: 'top' }]}
+                placeholder="Provide complete context, room number, or notes for the administrative officer..."
+                multiline
+                value={supportDescription}
+                onChangeText={setSupportDescription}
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalCancel} onPress={() => setSupportModalVisible(false)}>
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalSubmit} onPress={handleSubmitSupport} disabled={submittingSupport}>
+                  {submittingSupport ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modalSubmitText}>Submit Request</Text>}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* DEDICATED LOG COMPLAINT & GRIEVANCE MODAL                      */}
+      {/* ============================================================== */}
+      <Modal visible={complaintModalVisible} transparent animationType="slide" onRequestClose={() => setComplaintModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '90%' }]}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 18 }}>🚨</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.modalTitle}>Log Formal Complaint</Text>
+                    <Text style={styles.modalSubtitle}>Escalation to Campus Administration & HR</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setComplaintModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Text style={{ fontSize: 18, color: '#94A3B8', fontWeight: 'bold' }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.inputLabel}>Department / Area Category *</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                {[
+                  'IT & Infrastructure',
+                  'Academic Facilities',
+                  'Transport & Commute',
+                  'Hostel & Campus Life',
+                  'Administrative & HR',
+                  'Other Grievance',
+                ].map((cat) => {
+                  const active = complaintCategory === cat;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[
+                        {
+                          paddingVertical: 6,
+                          paddingHorizontal: 10,
+                          borderRadius: 8,
+                          borderWidth: 1.5,
+                          borderColor: active ? '#EF4444' : '#E2E8F0',
+                          backgroundColor: active ? '#FEF2F2' : '#F8FAFC',
+                        },
+                      ]}
+                      onPress={() => setComplaintCategory(cat)}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: active ? '700' : '600', color: active ? '#B91C1C' : '#475569' }}>
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.inputLabel}>Specific Subject / Location *</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g. Lab 3 Central Air Conditioning breakdown"
+                value={complaintSubType}
+                onChangeText={setComplaintSubType}
+              />
+
+              <Text style={styles.inputLabel}>Priority Level</Text>
+              <View style={styles.typeSelectorRow}>
+                {(['Low', 'Medium', 'High', 'Critical'] as const).map((p) => {
+                  const active = complaintPriority === p;
+                  const badgeColor =
+                    p === 'Critical' ? '#EF4444' : p === 'High' ? '#F97316' : p === 'Medium' ? '#2563EB' : '#10B981';
+                  return (
+                    <TouchableOpacity
+                      key={p}
+                      style={[
+                        styles.typeChip,
+                        active && { backgroundColor: badgeColor, borderColor: badgeColor },
+                      ]}
+                      onPress={() => setComplaintPriority(p)}
+                    >
+                      <Text style={[styles.typeChipText, active && { color: '#FFFFFF', fontWeight: '800' }]}>{p}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.inputLabel}>Detailed Description & Evidence *</Text>
+              <TextInput
+                style={[styles.modalInput, { height: 80, textAlignVertical: 'top' }]}
+                placeholder="Provide complete breakdown, date observed, and impact on lectures or operations..."
+                multiline
+                value={complaintDescription}
+                onChangeText={setComplaintDescription}
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalCancel} onPress={() => setComplaintModalVisible(false)}>
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalSubmit, { backgroundColor: '#EF4444' }]}
+                  onPress={handleSubmitComplaint}
+                  disabled={submittingComplaint}
+                >
+                  {submittingComplaint ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modalSubmitText}>Submit Complaint</Text>}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* CONFIRM PARCEL COLLECTION MODAL                                */}
+      {/* ============================================================== */}
+      <Modal
+        visible={confirmCollectionModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setConfirmCollectionModalVisible(false)}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '90%' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 18 }}>📦</Text>
+                </View>
+                <View>
+                  <Text style={styles.modalTitle}>Confirm Parcel Handover</Text>
+                  <Text style={styles.modalSubtitle}>Gate Security Custody Verification</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setConfirmCollectionModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text style={{ fontSize: 18, color: '#94A3B8', fontWeight: 'bold' }}>✕</Text>
+              </TouchableOpacity>
             </View>
 
-            <Text style={styles.inputLabel}>Priority Level</Text>
-            <View style={styles.typeSelectorRow}>
-              {(['Low', 'Medium', 'High', 'Critical'] as const).map((p) => (
-                <TouchableOpacity
-                  key={p}
-                  style={[styles.typeChip, supportPriority === p && styles.typeChipActive]}
-                  onPress={() => setSupportPriority(p)}
-                >
-                  <Text style={[styles.typeChipText, supportPriority === p && styles.typeChipTextActive]}>{p}</Text>
-                </TouchableOpacity>
-              ))}
+            {selectedParcelForCollection && (
+              <View style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
+                    {selectedParcelForCollection.deliveryCompany || 'Courier Service'}
+                  </Text>
+                  <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#4338CA' }}>
+                      {selectedParcelForCollection.parcelId || selectedParcelForCollection.id}
+                    </Text>
+                  </View>
+                </View>
+
+                {selectedParcelForCollection.trackingNumber ? (
+                  <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 4 }}>
+                    AWB / Tracking: <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: '700', color: '#1E293B' }}>{selectedParcelForCollection.trackingNumber}</Text>
+                  </Text>
+                ) : null}
+
+                <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 2 }}>
+                  Custody Location: <Text style={{ fontWeight: '700', color: '#0F172A' }}>{selectedParcelForCollection.gate || 'Main Gate Security Office'}</Text>
+                </Text>
+
+                <Text style={{ fontSize: 11, color: '#64748B' }}>
+                  Recipient Staff: <Text style={{ fontWeight: '700', color: '#0F172A' }}>{faculty.name || user.name}</Text>
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.inputLabel}>Handover Remarks / Verification Note (Optional)</Text>
+            <TextInput
+              style={[styles.modalInput, { height: 60, textAlignVertical: 'top' }]}
+              placeholder="e.g. Received intact at Faculty Desk by self"
+              value={handoverNote}
+              onChangeText={setHandoverNote}
+            />
+
+            <View style={{ backgroundColor: '#FEF3C7', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A', marginBottom: 16 }}>
+              <Text style={{ fontSize: 11, color: '#92400E', lineHeight: 16 }}>
+                ⚠️ By confirming, you acknowledge that you have physically collected this consignment from security custody. The status will update instantly across Campus Gate logs.
+              </Text>
             </View>
-
-            <Text style={styles.inputLabel}>Subject Heading *</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. Projector HDMI port malfunction in LH-101"
-              value={supportSubject}
-              onChangeText={setSupportSubject}
-            />
-
-            <Text style={styles.inputLabel}>Details & Location *</Text>
-            <TextInput
-              style={[styles.modalInput, { height: 70, textAlignVertical: 'top' }]}
-              placeholder="Describe the issue in detail..."
-              multiline
-              value={supportDescription}
-              onChangeText={setSupportDescription}
-            />
 
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setSupportModalVisible(false)}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setConfirmCollectionModalVisible(false)}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSubmit} onPress={handleSubmitSupport} disabled={submittingSupport}>
-                {submittingSupport ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modalSubmitText}>Submit Ticket</Text>}
+              <TouchableOpacity
+                style={[styles.modalSubmit, { backgroundColor: '#10B981' }]}
+                onPress={handleConfirmCollection}
+                disabled={collectingParcelId !== null}
+              >
+                {collectingParcelId ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Confirm Collection</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* SUPPORT & COMPLAINT TICKET DETAIL MODAL                        */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedSupportTicket !== null || selectedComplaintTicket !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setSelectedSupportTicket(null);
+          setSelectedComplaintTicket(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '85%' }]}>
+            {(() => {
+              const ticket = selectedSupportTicket || selectedComplaintTicket;
+              if (!ticket) return null;
+              const catDef = SUPPORT_CATEGORIES.find((c) => c.id === ticket.requestType);
+              const isResolved = ['Resolved', 'Approved'].includes(ticket.status);
+              const statusColor = isResolved ? '#10B981' : ticket.status === 'Rejected' ? '#EF4444' : '#F59E0B';
+              const statusBg = isResolved ? '#ECFDF5' : ticket.status === 'Rejected' ? '#FEF2F2' : '#FFFBEB';
+              return (
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: catDef?.bg || '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 18 }}>{catDef?.icon || '📋'}</Text>
+                      </View>
+                      <View>
+                        <Text style={styles.modalTitle}>{catDef?.title || ticket.requestType}</Text>
+                        <Text style={styles.modalSubtitle}>ID: {ticket.id}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedSupportTicket(null);
+                        setSelectedComplaintTicket(null);
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Text style={{ fontSize: 18, color: '#94A3B8', fontWeight: 'bold' }}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Status & Priority Pills */}
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                    <View style={{ backgroundColor: statusBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: statusColor + '40' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: statusColor }}>{ticket.status}</Text>
+                    </View>
+                    <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>Priority: {ticket.priority}</Text>
+                    </View>
+                  </View>
+
+                  {/* Subject */}
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 8 }}>
+                    {ticket.subType || ticket.subject || 'Institutional Request'}
+                  </Text>
+
+                  {/* Dates if Leave */}
+                  {ticket.startDate && (
+                    <View style={{ backgroundColor: '#EFF6FF', padding: 8, borderRadius: 8, marginBottom: 10 }}>
+                      <Text style={{ fontSize: 12, color: '#1E40AF', fontWeight: '600' }}>
+                        📅 Duration: {ticket.startDate} {ticket.endDate ? `to ${ticket.endDate}` : ''}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Description Box */}
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 4 }}>DETAILS & SPECIFICATIONS</Text>
+                  <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14 }}>
+                    <Text style={{ fontSize: 13, color: '#1E293B', lineHeight: 20 }}>{ticket.description}</Text>
+                  </View>
+
+                  {/* Timeline */}
+                  {ticket.timeline && ticket.timeline.length > 0 && (
+                    <View style={{ marginBottom: 14 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 8 }}>STATUS TIMELINE</Text>
+                      {ticket.timeline.map((item, idx) => (
+                        <View key={idx} style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#2563EB', marginTop: 5 }} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 11, color: '#64748B' }}>{item.date}</Text>
+                            <Text style={{ fontSize: 12, color: '#1E293B', fontWeight: '600' }}>{item.text}</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={[styles.modalSubmit, { width: '100%', marginTop: 8 }]}
+                    onPress={() => {
+                      setSelectedSupportTicket(null);
+                      setSelectedComplaintTicket(null);
+                    }}
+                  >
+                    <Text style={styles.modalSubmitText}>Close Details</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* PARCEL DETAIL MODAL                                            */}
+      {/* ============================================================== */}
+      <Modal
+        visible={selectedParcelDetail !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedParcelDetail(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '85%' }]}>
+            {selectedParcelDetail && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 18 }}>📦</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.modalTitle}>{selectedParcelDetail.deliveryCompany || 'Courier Consignment'}</Text>
+                      <Text style={styles.modalSubtitle}>Gate Custody Reference</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={() => setSelectedParcelDetail(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <Text style={{ fontSize: 18, color: '#94A3B8', fontWeight: 'bold' }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Status Badge */}
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                  <View
+                    style={{
+                      backgroundColor: selectedParcelDetail.status === 'Collected' ? '#ECFDF5' : '#FFFBEB',
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: selectedParcelDetail.status === 'Collected' ? '#10B981' : '#F59E0B',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: selectedParcelDetail.status === 'Collected' ? '#047857' : '#B45309' }}>
+                      {selectedParcelDetail.status === 'Collected' ? '✓ Collected' : '⏳ Ready for Pickup'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Detail Rows */}
+                <View style={{ backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14 }}>
+                  <View style={styles.parcelDetailRow}>
+                    <Text style={styles.parcelDetailKey}>Parcel ID:</Text>
+                    <Text style={styles.parcelDetailValueBold}>{selectedParcelDetail.parcelId || selectedParcelDetail.id}</Text>
+                  </View>
+
+                  {selectedParcelDetail.trackingNumber ? (
+                    <View style={styles.parcelDetailRow}>
+                      <Text style={styles.parcelDetailKey}>Tracking / AWB:</Text>
+                      <Text style={[styles.parcelDetailValueBold, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}>
+                        {selectedParcelDetail.trackingNumber}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.parcelDetailRow}>
+                    <Text style={styles.parcelDetailKey}>Courier Partner:</Text>
+                    <Text style={styles.parcelDetailValue}>{selectedParcelDetail.deliveryCompany || 'Registered Logistics'}</Text>
+                  </View>
+
+                  <View style={styles.parcelDetailRow}>
+                    <Text style={styles.parcelDetailKey}>Custody Gate:</Text>
+                    <Text style={styles.parcelDetailValueBold}>{selectedParcelDetail.gate || 'Main Gate Security Office'}</Text>
+                  </View>
+
+                  {selectedParcelDetail.receivedAt ? (
+                    <View style={styles.parcelDetailRow}>
+                      <Text style={styles.parcelDetailKey}>Received Timestamp:</Text>
+                      <Text style={styles.parcelDetailValue}>{selectedParcelDetail.receivedAt}</Text>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.parcelDetailRow}>
+                    <Text style={styles.parcelDetailKey}>Intended For:</Text>
+                    <Text style={styles.parcelDetailValue}>{selectedParcelDetail.recipientName || faculty.name || user.name}</Text>
+                  </View>
+                </View>
+
+                {/* Handover Details if Collected */}
+                {selectedParcelDetail.status === 'Collected' ? (
+                  <View style={{ backgroundColor: '#ECFDF5', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#A7F3D0', marginBottom: 14 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#065F46', marginBottom: 6 }}>
+                      ✓ HANDOVER SIGN-OFF COMPLETED
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#047857', marginBottom: 2 }}>
+                      Collected By: <Text style={{ fontWeight: '700' }}>{selectedParcelDetail.collectedBy || faculty.name || user.name}</Text>
+                    </Text>
+                    {selectedParcelDetail.collectedAt ? (
+                      <Text style={{ fontSize: 11, color: '#047857', marginBottom: 4 }}>
+                        Date & Time: {selectedParcelDetail.collectedAt}
+                      </Text>
+                    ) : null}
+                    {selectedParcelDetail.notes ? (
+                      <Text style={{ fontSize: 11, color: '#065F46', fontStyle: 'italic' }}>
+                        Remarks: "{selectedParcelDetail.notes}"
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.parcelConfirmCollectionBtn, { marginBottom: 12 }]}
+                    onPress={() => {
+                      if (selectedParcelDetail) {
+                        const p = selectedParcelDetail;
+                        setSelectedParcelDetail(null);
+                        handleOpenCollectParcelModal(p);
+                      }
+                    }}
+                  >
+                    <Text style={styles.parcelConfirmCollectionBtnText}>✓ Confirm I Have Collected This</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={[styles.modalSubmit, { width: '100%' }]}
+                  onPress={() => setSelectedParcelDetail(null)}
+                >
+                  <Text style={styles.modalSubmitText}>Close</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </View>
       </Modal>
 
       {/* Edit Profile Modal */}
@@ -9945,5 +10667,195 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#15803D',
+  },
+  kpiTripleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  kpiTripleCard: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kpiTripleValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  kpiTripleLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  parcelIdChip: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  parcelIdChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#4338CA',
+    letterSpacing: 0.5,
+  },
+  parcelMainTitleText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  parcelDetailsGrid: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginVertical: 10,
+  },
+  parcelDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
+  parcelDetailKey: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  parcelDetailValue: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  parcelDetailValueBold: {
+    fontSize: 12,
+    color: '#0F172A',
+    fontWeight: '800',
+  },
+  awbBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  awbBadgeText: {
+    fontSize: 11,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  handoverDetailsBox: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    marginTop: 8,
+  },
+  handoverDetailsTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#15803D',
+    marginBottom: 4,
+  },
+  handoverDetailsText: {
+    fontSize: 11,
+    color: '#166534',
+    lineHeight: 16,
+  },
+  securityNoteBubble: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginTop: 8,
+  },
+  securityNoteText: {
+    fontSize: 11,
+    color: '#92400E',
+    fontWeight: '600',
+  },
+  parcelConfirmCollectionBtn: {
+    backgroundColor: '#10B981',
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  parcelConfirmCollectionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  verifiedStampBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  verifiedStampText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  detailLinkBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  detailLinkBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  durationPillBox: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  durationPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1D4ED8',
+  },
+  tagTypePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  tagTypePillText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

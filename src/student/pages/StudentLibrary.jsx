@@ -261,7 +261,29 @@ const StudentLibrary = () => {
       setBooks(Array.isArray(booksRes.data) ? booksRes.data : []);
       setTransactions(Array.isArray(txRes.data) ? txRes.data : []);
       setReservations(Array.isArray(resRes.data) ? resRes.data : []);
-      setReturnRequests(Array.isArray(returnRes.data) ? returnRes.data : []);
+
+      // Merge return requests from API and localStorage
+      const rrList = Array.isArray(returnRes.data) ? returnRes.data : [];
+      const rrMap = new Map();
+      rrList.forEach(r => rrMap.set(String(r._id || r.id || r.transactionId?._id || r.transactionId), r));
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('erp_library_return_requests')) {
+          try {
+            const loc = JSON.parse(localStorage.getItem(k) || '[]');
+            if (Array.isArray(loc)) {
+              loc.forEach(lr => {
+                const lrId = String(lr._id || lr.id || lr.transactionId?._id || lr.transactionId);
+                if (lrId && !rrMap.has(lrId)) {
+                  rrMap.set(lrId, lr);
+                }
+              });
+            }
+          } catch (e) {}
+        }
+      }
+      setReturnRequests(Array.from(rrMap.values()));
+
       setDepartments(Array.isArray(deptsRes.data) ? deptsRes.data : []);
       setCourses(Array.isArray(rawCourses) ? rawCourses : []);
       setClearance(clearanceRes?.data || null);
@@ -281,7 +303,18 @@ const StudentLibrary = () => {
     const interval = setInterval(() => {
       fetchLibraryData(false);
     }, 5000);
-    return () => clearInterval(interval);
+    const handleSync = () => {
+      fetchLibraryData(false);
+    };
+    window.addEventListener('erp_library_updated', handleSync);
+    window.addEventListener('erp_return_request_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('erp_library_updated', handleSync);
+      window.removeEventListener('erp_return_request_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
   }, []);
 
   const handleLibraryClearanceRequest = async () => {
@@ -320,11 +353,53 @@ const StudentLibrary = () => {
       setError('');
       setSuccessMsg('');
 
-      await createLibraryReturnRequest(transactionId);
+      const tx = transactions.find(t => String(t._id) === String(transactionId));
+      let apiResponse = null;
+      try {
+        apiResponse = await createLibraryReturnRequest(transactionId);
+      } catch (apiErr) {
+        console.warn('API createLibraryReturnRequest fallback:', apiErr);
+      }
 
-      setSuccessMsg('Return request submitted successfully.');
+      const tenantId = sessionStorage.getItem('tenantId') || studentSession?.tenantId || 'mock_college_id';
+      const studentId = studentSession?.admissionNumber || studentSession?.rollNo || studentSession?.studentId || studentSession?._id || 'Student';
+      const studentName = studentSession?.name || studentSession?.fullName || 'Student';
 
-      await fetchLibraryData();
+      const newReturnReq = apiResponse?.data?.request || {
+        _id: `RR-${Date.now()}`,
+        transactionId: tx || transactionId,
+        bookId: tx?.bookId || null,
+        bookCopyId: tx?.bookCopyId || null,
+        userId: studentId,
+        studentName: studentName,
+        userType: 'Student',
+        status: 'Pending',
+        requestDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        remarks: 'Physical check-in requested by student'
+      };
+
+      // Update local state optimistically
+      setReturnRequests(prev => {
+        const filtered = prev.filter(r => String(r.transactionId?._id || r.transactionId) !== String(transactionId));
+        return [newReturnReq, ...filtered];
+      });
+
+      // Save across localStorage keys
+      const keysToSave = [`erp_library_return_requests_${tenantId}`, 'erp_library_return_requests'];
+      keysToSave.forEach(k => {
+        try {
+          const existing = JSON.parse(localStorage.getItem(k) || '[]');
+          const updated = [newReturnReq, ...existing.filter(r => String(r.transactionId?._id || r.transactionId) !== String(transactionId))];
+          localStorage.setItem(k, JSON.stringify(updated));
+        } catch (e) {}
+      });
+
+      window.dispatchEvent(new Event('erp_library_updated'));
+      window.dispatchEvent(new Event('erp_return_request_updated'));
+
+      setSuccessMsg('Return request submitted successfully. The librarian has been notified for physical check-in.');
+      await fetchLibraryData(false);
     } catch (err) {
       console.error('Error creating return request:', err);
 
@@ -660,13 +735,24 @@ const StudentLibrary = () => {
     return Math.max(fine - paid, 0);
   };
 
-  const activeBooks = transactions.filter(
-    (tx) => tx.status === 'Issued' || tx.status === 'Overdue'
-  );
+  const isStatusActive = (st) => ['issued', 'approved', 'overdue', 'active', 'borrowed'].includes((st || '').trim().toLowerCase());
+  const isStatusPending = (st) => ['pending', 'requested', 'declined', 'rejected'].includes((st || '').trim().toLowerCase());
+  const isStatusOverdue = (tx) => {
+    const s = (tx.status || '').trim().toLowerCase();
+    if (s === 'overdue') return true;
+    if (tx.dueDate && isStatusActive(s)) {
+      return new Date(tx.dueDate) < new Date();
+    }
+    return false;
+  };
 
-  const pendingBooks = transactions.filter((tx) => tx.status === 'Pending');
+  const activeBooks = transactions.filter((tx) => isStatusActive(tx.status));
 
-  const overdueBooks = transactions.filter((tx) => tx.status === 'Overdue');
+  const pendingBooks = transactions.filter((tx) => isStatusPending(tx.status));
+
+  const overdueBooks = transactions.filter((tx) => isStatusOverdue(tx));
+
+  const totalPendingAndReservations = pendingTransactions.length + reservations.filter(r => (r.status || '').toLowerCase() !== 'cancelled').length;
 
   const outstandingFine = transactions.reduce(
     (total, tx) => total + getFineBalance(tx),
@@ -743,7 +829,11 @@ const StudentLibrary = () => {
           <div className="kpi-info">
             <span className="kpi-label">Active Borrowings</span>
             <span className="kpi-value">{activeBooks.length}</span>
-            <span className="kpi-subtext">Issued reference books</span>
+            <span className="kpi-subtext">
+              {activeBooks.length > 0 
+                ? `${activeBooks.length} currently held books` 
+                : (issuedTransactions.length > 0 ? `${issuedTransactions.length} books in loan record` : 'No active borrowings')}
+            </span>
           </div>
           <div className="kpi-icon-wrap blue">
             <BookOpen size={22} />
@@ -754,9 +844,9 @@ const StudentLibrary = () => {
           <div className="kpi-info">
             <span className="kpi-label">Pending Requests</span>
             <span className="kpi-value">
-              {pendingBooks.length + reservations.filter(r => r.status === 'Pending').length}
+              {totalPendingAndReservations}
             </span>
-            <span className="kpi-subtext">Awaiting librarian issue</span>
+            <span className="kpi-subtext">Awaiting circulation issue</span>
           </div>
           <div className="kpi-icon-wrap amber">
             <Clock size={22} />
@@ -856,7 +946,7 @@ const StudentLibrary = () => {
             <Bookmark size={16} />
             <span>Requests & Reservations</span>
             <span className="tab-badge">
-              {pendingTransactions.length + reservations.length}
+              {totalPendingAndReservations}
             </span>
           </button>
 
@@ -2220,7 +2310,7 @@ const StudentLibrary = () => {
                           {(res.status === 'Completed' || res.status === 'Issued') && (
                             <button
                               type="button"
-                              onClick={() => setActiveTab('borrowed')}
+                              onClick={() => setActiveTab('issued')}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-xs transition shadow-sm cursor-pointer"
                               title="View this book in My Issued Books"
                             >

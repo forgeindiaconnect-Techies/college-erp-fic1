@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { getPublicReferralFormConfig, getPublishedOpportunities, createOpportunity } from '../../api';
 import InsuranceReferralModal from '../../components/referrals/InsuranceReferralModal';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { useCategoryConfig } from '../../utils/categoryConfig';
 import '../admin/UserManagementCommon.css';
 import '../referrals/AdminReferralManagement.css';
@@ -23,6 +24,8 @@ export default function BusinessReferralInsurance() {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submitCategory, setSubmitCategory] = useState('Health');
   const [submitProvider, setSubmitProvider] = useState('Star Health & Allied Insurance');
+  const [selectedOffering, setSelectedOffering] = useState('');
+  const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [providerFilter, setProviderFilter] = useState('ALL');
@@ -98,9 +101,16 @@ export default function BusinessReferralInsurance() {
     fetchOpportunities();
   }, [fetchConfig, fetchOpportunities]);
 
-  const handleOpenSubmit = (catKey, provider) => {
+  useRealtimeSync(['referral_config', 'opportunities', 'referrals'], () => {
+    fetchConfig();
+    fetchOpportunities();
+  });
+
+  const handleOpenSubmit = (catKey, provider, planTitle = '', rawOpp = null) => {
     setSubmitCategory(catKey || 'Health');
     setSubmitProvider(provider || 'Star Health & Allied Insurance');
+    setSelectedOffering(planTitle || '');
+    setSelectedOpportunity(rawOpp || null);
     setShowSubmitModal(true);
   };
 
@@ -228,7 +238,8 @@ export default function BusinessReferralInsurance() {
           eligibility: opp.description || 'Standard Underwriting & Medical Verification',
           requiredDocuments: opp.requiredDocuments || ['Aadhaar Card', 'PAN Card'],
           turnaroundTime: '2-3 business days',
-          isPublishedOpp: true
+          isPublishedOpp: true,
+          rawOpp: opp
         });
       }
     });
@@ -721,7 +732,7 @@ export default function BusinessReferralInsurance() {
                         type="button"
                         className="mgmt-btn-secondary"
                         style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem', background: '#059669', color: '#ffffff', borderColor: '#059669' }}
-                        onClick={() => handleOpenSubmit(plan.subCategory, plan.providerName)}
+                        onClick={() => handleOpenSubmit(plan.subCategory, plan.providerName, plan.title, plan.rawOpp)}
                       >
                         <span>Refer Now</span>
                         <ChevronRight size={13} />
@@ -741,6 +752,8 @@ export default function BusinessReferralInsurance() {
         onClose={() => setShowSubmitModal(false)}
         defaultCategory={submitCategory}
         defaultProvider={submitProvider}
+        defaultOffering={selectedOffering}
+        opportunity={selectedOpportunity}
         rootRole={rootRole}
       />
 

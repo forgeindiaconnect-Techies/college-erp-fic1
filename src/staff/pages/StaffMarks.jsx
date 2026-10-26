@@ -342,13 +342,16 @@ const StaffMarks = () => {
     const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
     try {
       const isSemMode = marksView === 'semester';
+      const isAlreadyApproved = submissionStatus === 'Approved by HOD' || submissionStatus === 'Approved & Published';
+      const currentStatus = isAlreadyApproved ? 'Approved by HOD' : (submissionStatus === 'Submitted to HOD' ? 'Submitted to HOD' : 'Draft');
+
       const payloadArray = filteredStudents.map(student => {
         const studentId = student.id || student._id;
         const marks = studentMarksData[studentId] || {};
         const c1 = Number(marks.cia1 || 0);
         const c2 = Number(marks.cia2 || 0);
         const c3 = Number(marks.cia3 || 0);
-        const sem = Number(marks.semester || 60);
+        const sem = Number(marks.semester !== undefined ? marks.semester : 60);
         const internalCalculated = Math.round((c1 + c2 + c3) / 3);
         const total100 = internalCalculated + sem; // Exact addition
         const cgpaVal = Number(((total100 / 100) * 10).toFixed(2));
@@ -369,7 +372,8 @@ const StaffMarks = () => {
           cgpa: cgpaVal,
           submissionType: isSemMode ? 'semester' : 'cia',
           examType: isSemMode ? 'End-Semester Results' : 'Continuous Internal Assessment (CIA)',
-          resultStatus: 'Draft',
+          resultStatus: currentStatus,
+          status: isAlreadyApproved ? 'Approved' : (submissionStatus === 'Submitted to HOD' ? 'Pending' : 'Draft'),
           updatedAt: new Date().toISOString()
         };
       });
@@ -377,16 +381,15 @@ const StaffMarks = () => {
       // 1. Post to backend
       await createMark(payloadArray).catch(() => {});
 
-      // 2. Persist to localStorage for immediate multi-tab / HOD sync
+      // 2. Persist to localStorage individual marks for immediate multi-tab sync
       const savedExisting = localStorage.getItem(`erp_marks_${tenantId}`);
       let allMarksList = savedExisting ? JSON.parse(savedExisting) : [];
       
-      // Update or append
       payloadArray.forEach(newM => {
         const idx = allMarksList.findIndex(m => 
           (m.studentId === newM.studentId || m.registerNo === newM.registerNo) && 
           m.subject === newM.subject && 
-          m.semester === newM.semester
+          isSameSem(m.semester, newM.semester)
         );
         if (idx >= 0) {
           allMarksList[idx] = { ...allMarksList[idx], ...newM };
@@ -398,8 +401,44 @@ const StaffMarks = () => {
       localStorage.setItem(`erp_marks_${tenantId}`, JSON.stringify(allMarksList));
       localStorage.setItem('erp_marks', JSON.stringify(allMarksList));
 
-      // 3. Dispatch cross-component realtime event
-      window.dispatchEvent(new CustomEvent('erp_marks_updated', { detail: { subject: selectedSubject, semester: targetSem } }));
+      // 3. Keep batch submission in sync so HOD, Student, and Parent dashboards receive the changed marks
+      const batchId = `BATCH_${isSemMode ? 'SEM' : 'CIA'}_${staffDept.replace(/[^a-zA-Z0-9]/g, '_')}_${targetSem.replace(/[^a-zA-Z0-9]/g, '_')}_${selectedSubject.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const rawSubmissions = localStorage.getItem(`erp_marks_submissions_${tenantId}`) || localStorage.getItem('erp_marks_submissions');
+      let submissionsList = rawSubmissions ? JSON.parse(rawSubmissions) : [];
+      const subIdx = submissionsList.findIndex(s => s.id === batchId || (s.subject === selectedSubject && isSameSem(s.semester, targetSem) && isSameDepartment(s.department, staffDept)));
+      
+      const existingBatch = subIdx >= 0 ? submissionsList[subIdx] : null;
+      const batchStatus = existingBatch?.status || (isAlreadyApproved ? 'Approved & Published' : 'Draft');
+
+      const updatedBatch = {
+        id: existingBatch?.id || batchId,
+        subject: selectedSubject,
+        semester: targetSem,
+        department: staffDept,
+        submittedBy: existingBatch?.submittedBy || staffSession?.name || 'Faculty Member',
+        submittedAt: existingBatch?.submittedAt || new Date().toISOString(),
+        status: batchStatus,
+        submissionType: isSemMode ? 'semester' : 'cia',
+        examType: isSemMode ? 'End-Semester Results' : 'Continuous Internal Assessment (CIA)',
+        studentCount: filteredStudents.length,
+        classAverage: isSemMode ? Math.round(payloadArray.reduce((acc, p) => acc + p.totalMarks, 0) / (payloadArray.length || 1)) : metrics.classAverage,
+        passPercentage: isSemMode ? Math.round((payloadArray.filter(p => p.totalMarks >= 40 && p.semesterMarks >= 30).length / (payloadArray.length || 1)) * 100) : metrics.passPercentage,
+        highScorers: metrics.highScorers,
+        records: payloadArray
+      };
+
+      if (subIdx >= 0) {
+        submissionsList[subIdx] = updatedBatch;
+      } else {
+        submissionsList.unshift(updatedBatch);
+      }
+      localStorage.setItem(`erp_marks_submissions_${tenantId}`, JSON.stringify(submissionsList));
+      localStorage.setItem('erp_marks_submissions', JSON.stringify(submissionsList));
+
+      // 4. Dispatch cross-component realtime events
+      window.dispatchEvent(new CustomEvent('erp_marks_updated', { detail: { subject: selectedSubject, semester: targetSem, status: currentStatus } }));
+      window.dispatchEvent(new CustomEvent('erp_marks_submitted', { detail: updatedBatch }));
+      window.dispatchEvent(new Event('storage'));
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);

@@ -35,16 +35,100 @@ type LoginResponse = MobileUser & {
  * 3. Android Emulator (10.0.2.2:5000) or Web (127.0.0.1:5000)
  * 4. Fallback to Cloud / Configured URL
  */
+// Robust in-memory storage fallback
+const memoryStore: Record<string, string> = {};
+
+/**
+ * Universal cross-platform storage adapter supporting Web (localStorage/sessionStorage)
+ * and Native (Expo SecureStore with graceful memory fallback)
+ */
+export const storage = {
+  async getItem(key: string): Promise<string | null> {
+    if (Platform.OS === 'web') {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const val = localStorage.getItem(key) || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(key) : null);
+          if (val) return val;
+        }
+      } catch {}
+      return memoryStore[key] || null;
+    }
+    try {
+      if (SecureStore && typeof SecureStore.getItemAsync === 'function') {
+        const isAvail = typeof SecureStore.isAvailableAsync === 'function' ? await SecureStore.isAvailableAsync().catch(() => false) : true;
+        if (isAvail) {
+          return await SecureStore.getItemAsync(key);
+        }
+      }
+    } catch {}
+    return memoryStore[key] || null;
+  },
+  async setItem(key: string, value: string): Promise<void> {
+    memoryStore[key] = value;
+    if (Platform.OS === 'web') {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(key, value);
+          if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(key, value);
+        }
+      } catch {}
+      return;
+    }
+    try {
+      if (SecureStore && typeof SecureStore.setItemAsync === 'function') {
+        const isAvail = typeof SecureStore.isAvailableAsync === 'function' ? await SecureStore.isAvailableAsync().catch(() => false) : true;
+        if (isAvail) {
+          await SecureStore.setItemAsync(key, value);
+        }
+      }
+    } catch {}
+  },
+  async deleteItem(key: string): Promise<void> {
+    delete memoryStore[key];
+    if (Platform.OS === 'web') {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem(key);
+          if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(key);
+        }
+      } catch {}
+      return;
+    }
+    try {
+      if (SecureStore && typeof SecureStore.deleteItemAsync === 'function') {
+        const isAvail = typeof SecureStore.isAvailableAsync === 'function' ? await SecureStore.isAvailableAsync().catch(() => false) : true;
+        if (isAvail) {
+          await SecureStore.deleteItemAsync(key);
+        }
+      }
+    } catch {}
+  },
+};
+
+/**
+ * Resolves the optimal API base URL:
+ * 1. Custom URL set by the user in settings
+ * 2. Web browser: directly to http://${hostname}:5000/api (same machine as local backend)
+ * 3. Mobile Device / Emulator: detected via Metro bundler hostUri or Android 10.0.2.2
+ * 4. Fallback to Cloud / Configured URL
+ */
 export async function getApiBaseUrl(): Promise<string> {
   try {
-    const custom = await SecureStore.getItemAsync('mobile_custom_api_url');
+    const custom = await storage.getItem('mobile_custom_api_url');
     if (custom && custom.trim()) {
       currentBaseUrl = custom.trim().replace(/\/+$/, '');
       return currentBaseUrl;
     }
   } catch {}
 
-  // In development, detect developer machine LAN IP from Expo's Metro hostUri
+  // 1. Web environment (Browser): always connect to localhost:5000/api
+  if (Platform.OS === 'web' || typeof window !== 'undefined') {
+    const host = (typeof window !== 'undefined' && window.location?.hostname) ? window.location.hostname : 'localhost';
+    currentBaseUrl = `http://${host}:5000/api`;
+    return currentBaseUrl;
+  }
+
+  // 2. In development, detect developer machine LAN IP from Expo's Metro hostUri
   const hostUri =
     Constants.expoConfig?.hostUri ||
     (Constants as any).manifest2?.extra?.expoClient?.hostUri ||
@@ -58,11 +142,6 @@ export async function getApiBaseUrl(): Promise<string> {
     }
   }
 
-  if (Platform.OS === 'web') {
-    currentBaseUrl = 'http://127.0.0.1:5000/api';
-    return currentBaseUrl;
-  }
-
   if (Platform.OS === 'android') {
     // If running on an emulator without hostUri
     currentBaseUrl = 'http://10.0.2.2:5000/api';
@@ -74,7 +153,7 @@ export async function getApiBaseUrl(): Promise<string> {
     return currentBaseUrl;
   }
 
-  currentBaseUrl = CLOUD_API_URL;
+  currentBaseUrl = 'http://127.0.0.1:5000/api';
   return currentBaseUrl;
 }
 
@@ -84,10 +163,10 @@ export function getCurrentBaseUrl(): string {
 
 export async function setCustomApiUrl(url: string | null): Promise<void> {
   if (url && url.trim()) {
-    await SecureStore.setItemAsync('mobile_custom_api_url', url.trim());
+    await storage.setItem('mobile_custom_api_url', url.trim());
     currentBaseUrl = url.trim().replace(/\/+$/, '');
   } else {
-    await SecureStore.deleteItemAsync('mobile_custom_api_url');
+    await storage.deleteItem('mobile_custom_api_url');
     await getApiBaseUrl();
   }
 }
@@ -127,10 +206,8 @@ export async function testApiConnection(testUrl?: string): Promise<{ ok: boolean
 }
 
 /**
- * Universal fetch with automatic failover between Local Dev server and Cloud server
+ * Universal fetch connecting reliably to backend
  */
-let isLocalServerUnreachable = false;
-
 async function fetchWithFailover(
   path: string,
   init: RequestInit,
@@ -138,25 +215,29 @@ async function fetchWithFailover(
   const primaryUrl = await getApiBaseUrl();
   const cleanPath = path.replace(/^\/+/, '');
 
-  // If local server previously failed to respond on this session, immediately use cloud URL to avoid lag
-  const targetUrl = (isLocalServerUnreachable && primaryUrl !== CLOUD_API_URL) ? CLOUD_API_URL : primaryUrl;
-
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-    const res = await fetch(`${targetUrl}/${cleanPath}`, {
+    const res = await fetch(`${primaryUrl}/${cleanPath}`, {
       ...init,
       signal: controller.signal,
     }).finally(() => clearTimeout(timeoutId));
 
-    if (targetUrl === primaryUrl) isLocalServerUnreachable = false;
     return res;
   } catch (primaryErr: any) {
-    if (targetUrl !== CLOUD_API_URL) {
-      isLocalServerUnreachable = true;
+    // If localhost failed and on web, try 127.0.0.1 fallback
+    if (primaryUrl.includes('localhost')) {
       try {
-        console.warn(`[API] Host ${targetUrl} unreachable (${primaryErr.message}). Failing over to Cloud URL: ${CLOUD_API_URL}`);
+        const fallbackUrl = primaryUrl.replace('localhost', '127.0.0.1');
+        const altRes = await fetch(`${fallbackUrl}/${cleanPath}`, init);
+        return altRes;
+      } catch {}
+    }
+
+    if (primaryUrl !== CLOUD_API_URL && process.env.EXPO_PUBLIC_API_URL) {
+      try {
+        console.warn(`[API] Host ${primaryUrl} unreachable. Falling back to: ${CLOUD_API_URL}`);
         const cloudRes = await fetch(`${CLOUD_API_URL}/${cleanPath}`, init);
         return cloudRes;
       } catch (cloudErr) {
@@ -197,11 +278,23 @@ export async function loginUser(
     throw new Error('Authentication error: The server response is missing a valid security token or role.');
   }
 
-  await SecureStore.setItemAsync('mobile_erp_token', data.token);
-  await SecureStore.setItemAsync(
-    'mobile_erp_user',
-    JSON.stringify(data),
-  );
+  await storage.setItem('mobile_erp_token', data.token);
+  await storage.setItem('mobile_erp_user', JSON.stringify(data));
+
+  // Sync to web storage keys so web and mobile share auth seamlessly
+  if (Platform.OS === 'web' || typeof window !== 'undefined') {
+    try {
+      const roleKey = (data.role || '').toLowerCase().replace(/\s+/g, '');
+      sessionStorage.setItem(`${roleKey}_token`, data.token);
+      sessionStorage.setItem('token', data.token);
+      if (data.tenantId || data.collegeId) {
+        sessionStorage.setItem('tenantId', data.tenantId || data.collegeId || '');
+      }
+      sessionStorage.setItem(`${roleKey}_session`, JSON.stringify(data));
+      localStorage.setItem('student_session', JSON.stringify(data));
+      localStorage.setItem('staff_session', JSON.stringify(data));
+    } catch {}
+  }
 
   return data;
 }
@@ -227,7 +320,20 @@ export async function requestPasswordReset(email: string): Promise<string> {
 }
 
 export async function getSavedUser(): Promise<MobileUser | null> {
-  const savedUser = await SecureStore.getItemAsync('mobile_erp_user');
+  let savedUser = await storage.getItem('mobile_erp_user');
+
+  // Fallback to active web sessions if on browser
+  if (!savedUser && (Platform.OS === 'web' || typeof window !== 'undefined')) {
+    try {
+      savedUser =
+        sessionStorage.getItem('student_session') ||
+        sessionStorage.getItem('staff_session') ||
+        sessionStorage.getItem('admin_session') ||
+        sessionStorage.getItem('user_session') ||
+        localStorage.getItem('student_session') ||
+        localStorage.getItem('staff_session');
+    } catch {}
+  }
 
   if (!savedUser) {
     return null;
@@ -242,12 +348,37 @@ export async function getSavedUser(): Promise<MobileUser | null> {
 }
 
 export async function getAuthToken(): Promise<string | null> {
-  return SecureStore.getItemAsync('mobile_erp_token');
+  let token = await storage.getItem('mobile_erp_token');
+
+  // Fallback to web session tokens if on browser
+  if (!token && (Platform.OS === 'web' || typeof window !== 'undefined')) {
+    try {
+      token =
+        sessionStorage.getItem('student_token') ||
+        sessionStorage.getItem('staff_token') ||
+        sessionStorage.getItem('admin_token') ||
+        sessionStorage.getItem('token') ||
+        localStorage.getItem('student_token') ||
+        localStorage.getItem('staff_token');
+    } catch {}
+  }
+
+  return token;
 }
 
 export async function logoutUser(): Promise<void> {
-  await SecureStore.deleteItemAsync('mobile_erp_token');
-  await SecureStore.deleteItemAsync('mobile_erp_user');
+  await storage.deleteItem('mobile_erp_token');
+  await storage.deleteItem('mobile_erp_user');
+  if (Platform.OS === 'web' || typeof window !== 'undefined') {
+    try {
+      sessionStorage.removeItem('student_token');
+      sessionStorage.removeItem('staff_token');
+      sessionStorage.removeItem('admin_token');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('student_session');
+      sessionStorage.removeItem('staff_session');
+    } catch {}
+  }
 }
 
 export async function apiGet<T>(path: string): Promise<T> {

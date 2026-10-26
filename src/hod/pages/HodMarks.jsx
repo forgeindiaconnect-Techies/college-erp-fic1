@@ -15,7 +15,8 @@ import {
   getExams,
   getStudents,
   getSubjects,
-  approveMark
+  approveMark,
+  createNotification
 } from '../../api/index';
 import './HodMarks.css';
 
@@ -261,22 +262,29 @@ const HodMarks = () => {
         await createMark(approvedRecords).catch(() => {});
       }
 
-      // Create and persist official notification for faculty / staff
+      // Create and persist official notification for faculty, students, and parents
       const notifItem = {
         id: `NOTIF_${Date.now()}`,
         _id: `NOTIF_${Date.now()}`,
-        title: `Marks Approved: ${batch.subject} (${batch.semester})`,
-        message: `HOD ${hodSession?.name || 'HOD'} has approved and published marks for ${batch.subject} (${batch.semester}).`,
+        title: `Marks Approved & Published: ${batch.subject} (${batch.semester})`,
+        message: `HOD ${hodSession?.name || 'HOD'} has officially approved and published examination marks for ${batch.subject} (${batch.semester}). Students and Parents can now view final scores in their academic dashboards.`,
         type: 'Success',
-        target: 'Staff',
+        target: 'All',
+        targetRoles: ['Student', 'student', 'Parent', 'parent', 'Staff', 'staff'],
+        receiverRole: 'Student',
+        category: 'academic',
         department: HOD_DEPT,
         subject: batch.subject,
         semester: batch.semester,
         isRead: false,
         createdAt: new Date().toISOString(),
         timestamp: new Date().toISOString(),
-        link: '/staff/marks'
+        link: '/student/marks'
       };
+
+      try {
+        await createNotification(notifItem);
+      } catch (e) {}
 
       try {
         const existingNotifsRaw = localStorage.getItem(`erp_notifications_${tenantId}`) || localStorage.getItem('erp_notifications');
@@ -289,6 +297,8 @@ const HodMarks = () => {
       setMarksSubmissions(updatedSubmissions.filter(s => isSameDepartment(s.department, HOD_DEPT)));
       window.dispatchEvent(new CustomEvent('erp_marks_updated', { detail: { subject: batch.subject, semester: batch.semester, status: 'Approved by HOD' } }));
       window.dispatchEvent(new CustomEvent('erp_notification_received', { detail: notifItem }));
+      window.dispatchEvent(new CustomEvent('erp_notification_updated', { detail: notifItem }));
+      window.dispatchEvent(new Event('storage'));
 
       alert(`✓ Successfully approved marks for ${batch.subject} (${batch.semester})!`);
       fetchMarksData();

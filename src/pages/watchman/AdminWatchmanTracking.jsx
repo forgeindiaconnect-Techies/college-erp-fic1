@@ -986,7 +986,6 @@ const AdminWatchmanTracking = () => {
               type="button"
               className="awt-action-card"
               onClick={() => setActiveTab('campus_movements')}
-              style={{ background: 'linear-gradient(135deg, #059669, #0d9488)', boxShadow: '0 2px 6px rgba(5,150,105,0.25)' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div className="icon-box"><ArrowLeftRight size={22} /></div>
@@ -995,7 +994,7 @@ const AdminWatchmanTracking = () => {
                   <div className="desc">1-Click entry & exit for registered people</div>
                 </div>
               </div>
-              <ChevronRight size={18} />
+              <ChevronRight size={18} className="action-chevron" />
             </button>
 
             {/* Action 2: Register New Person */}
@@ -1003,7 +1002,6 @@ const AdminWatchmanTracking = () => {
               type="button"
               className="awt-action-card"
               onClick={() => navigate('/watchman/register-person')}
-              style={{ background: 'linear-gradient(135deg, #0d9488, #14b8a6)', boxShadow: '0 2px 6px rgba(20,184,166,0.25)' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div className="icon-box"><UserPlus size={22} /></div>
@@ -1012,7 +1010,7 @@ const AdminWatchmanTracking = () => {
                   <div className="desc">Students, Staff, HODs & Guests + QR Pass</div>
                 </div>
               </div>
-              <ChevronRight size={18} />
+              <ChevronRight size={18} className="action-chevron" />
             </button>
 
             {/* Action 3: Gate QR Scanner */}
@@ -1020,7 +1018,6 @@ const AdminWatchmanTracking = () => {
               type="button"
               className="awt-action-card"
               onClick={() => { setScanModalOpen(true); setScanResult(null); setScanError(''); setScanSuccessMsg(''); }}
-              style={{ background: 'linear-gradient(135deg, #1d4ed8, #2563eb)', boxShadow: '0 2px 6px rgba(37,99,235,0.2)' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div className="icon-box"><QrCode size={22} /></div>
@@ -1029,7 +1026,7 @@ const AdminWatchmanTracking = () => {
                   <div className="desc">Webcam scan • Campus In & Out</div>
                 </div>
               </div>
-              <ChevronRight size={18} />
+              <ChevronRight size={18} className="action-chevron" />
             </button>
 
             {/* Action 4: Log Student Movement */}
@@ -1037,7 +1034,6 @@ const AdminWatchmanTracking = () => {
               type="button"
               className="awt-action-card"
               onClick={() => setActiveTab('student_tracking')}
-              style={{ background: 'linear-gradient(135deg, #4338ca, #3b82f6)', boxShadow: '0 2px 6px rgba(59,130,246,0.25)' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div className="icon-box"><GraduationCap size={22} /></div>
@@ -1046,7 +1042,7 @@ const AdminWatchmanTracking = () => {
                   <div className="desc">Identify by Roll No & track In/Out</div>
                 </div>
               </div>
-              <ChevronRight size={18} />
+              <ChevronRight size={18} className="action-chevron" />
             </button>
 
             {/* Action 5: Staff Gate Register */}
@@ -1054,7 +1050,6 @@ const AdminWatchmanTracking = () => {
               type="button"
               className="awt-action-card"
               onClick={() => setActiveTab('staff_movements')}
-              style={{ background: 'linear-gradient(135deg, #047857, #059669)', boxShadow: '0 2px 6px rgba(5,150,105,0.2)' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div className="icon-box"><UserCheck size={22} /></div>
@@ -1063,7 +1058,7 @@ const AdminWatchmanTracking = () => {
                   <div className="desc">Log faculty & staff movements</div>
                 </div>
               </div>
-              <ChevronRight size={18} />
+              <ChevronRight size={18} className="action-chevron" />
             </button>
 
             {/* Action 6: New Visitor Entry */}
@@ -1071,7 +1066,6 @@ const AdminWatchmanTracking = () => {
               type="button"
               className="awt-action-card"
               onClick={() => navigate('/watchman/visitor-entry')}
-              style={{ background: 'linear-gradient(135deg, #6d28d9, #7c3aed)', boxShadow: '0 2px 6px rgba(124,58,237,0.2)' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div className="icon-box"><Users size={22} /></div>
@@ -1080,7 +1074,7 @@ const AdminWatchmanTracking = () => {
                   <div className="desc">Issue QR badge & verify pass</div>
                 </div>
               </div>
-              <ChevronRight size={18} />
+              <ChevronRight size={18} className="action-chevron" />
             </button>
 
             {/* Action 7: Bus Entry Tracking */}
@@ -1088,7 +1082,6 @@ const AdminWatchmanTracking = () => {
               type="button"
               className="awt-action-card"
               onClick={() => navigate('/admin/bus-gate-tracking')}
-              style={{ background: 'linear-gradient(135deg, #0284c7, #0ea5e9)', boxShadow: '0 2px 6px rgba(14,165,233,0.25)' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div className="icon-box"><Bus size={22} /></div>
@@ -1097,7 +1090,7 @@ const AdminWatchmanTracking = () => {
                   <div className="desc">{busStats.insideCampus > 0 ? `${busStats.insideCampus} Buses Inside Campus` : 'Log Arrival & Departure'}</div>
                 </div>
               </div>
-              <ChevronRight size={18} />
+              <ChevronRight size={18} className="action-chevron" />
             </button>
           </div>
 

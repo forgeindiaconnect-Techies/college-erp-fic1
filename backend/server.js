@@ -63,6 +63,16 @@ try {
       console.log(`✅ Synced dashboard hero: ${img.dest}`);
     }
   });
+
+  // Sync new 3D student hero mascot
+  const mascotSrc = 'C:/Users/Forgeindiaconnect/.gemini/antigravity-ide/brain/0d9628c7-19c1-4dc0-ae4d-ab9fd3bf6d29/student_mascot_1792818658314.jpg';
+  const mobileMascotDest = path.join(__dirname, '../college-erp-mobile/assets/images/student_hero_mascot.jpg');
+  const publicMascotDest = path.join(__dirname, '../public/student_hero_mascot.jpg');
+  if (fs.existsSync(mascotSrc)) {
+    fs.copyFileSync(mascotSrc, mobileMascotDest);
+    fs.copyFileSync(mascotSrc, publicMascotDest);
+    console.log('✅ Synced 3D student mascot hero to mobile assets and public!');
+  }
 } catch (e) {
   console.warn('Campus image sync:', e.message);
 }
@@ -124,6 +134,7 @@ import watchmanRoutes from './routes/watchmanRoutes.js';
 import busTrackingRoutes from './routes/busTrackingRoutes.js';
 import parcelRoutes from './routes/parcelRoutes.js';
 import meetingRoutes from './routes/meetingRoutes.js';
+import leaveRoutes from './routes/leaveRoutes.js';
 import { verifyCloudinaryConnection } from './config/cloudinary.js';
 
 // Import Cron Jobs
@@ -218,6 +229,16 @@ io.on('connection', (socket) => {
   socket.on('joinRoom', (room) => {
     socket.join(room);
     console.log(`🔌 Socket ${socket.id} joined room: ${room}`);
+  });
+
+  // Rebroadcast client data updates across all web and mobile connections in real-time
+  socket.on('dataUpdate', (payload) => {
+    if (payload) {
+      io.emit('dataUpdated', payload);
+      if (payload.module) {
+        io.emit(`${payload.module}Updated`, payload.data);
+      }
+    }
   });
 
   socket.on('disconnect', () => {
@@ -1085,6 +1106,20 @@ app.use('/api/watchman', watchmanRoutes);
 app.use('/api/buses', busTrackingRoutes);
 app.use('/api/watchman/buses', busTrackingRoutes);
 app.use('/api/meetings', meetingRoutes);
+app.use('/api/leaves', leaveRoutes);
+
+// Universal real-time sync webhook for cross-application updates
+app.post('/api/realtime/broadcast', (req, res) => {
+  const { module, action, data } = req.body || {};
+  if (io) {
+    const payload = { module: module || 'all', action: action || 'updated', data, timestamp: Date.now() };
+    io.emit('dataUpdated', payload);
+    if (module) {
+      io.emit(`${module}Updated`, data);
+    }
+  }
+  res.json({ success: true, message: 'Real-time broadcast dispatched' });
+});
 
 app.get('/api/cloudinary/status', async (_req, res) => {
   const status = await verifyCloudinaryConnection();
@@ -1348,10 +1383,4 @@ const startServer = async () => {
 };
 
 startServer();
-
-
-
-
-
-
-
+// Placement application status routes updated: 2026-10-26T16:30:45

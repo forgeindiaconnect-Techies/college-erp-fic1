@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText, Calendar, Plus, Clock, CheckCircle2,
@@ -6,6 +6,8 @@ import {
   Award, Trash2, CheckCircle, RefreshCw, X
 } from 'lucide-react';
 import './StaffLeaves.css';
+import { getLeaves, createLeave, deleteLeave } from '../../api';
+import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
 
 const DEFAULT_SESSION = {
   id: 'STF001',
@@ -15,39 +17,6 @@ const DEFAULT_SESSION = {
   role: 'Staff',
   email: 'apple@college.edu'
 };
-
-const DEFAULT_MOCK_LEAVES = [
-  {
-    id: 'leave_101',
-    staffId: 'STF001',
-    staffName: 'APPLE',
-    email: 'apple@college.edu',
-    dept: 'Computer Science Engineering',
-    type: 'Casual Leave',
-    startDate: '2026-09-15',
-    endDate: '2026-09-16',
-    reason: 'Family wedding event attendance.',
-    status: 'Approved',
-    daysCount: 2,
-    approvedBy: 'HOD Computer Science',
-    createdAt: '2026-09-12'
-  },
-  {
-    id: 'leave_102',
-    staffId: 'STF001',
-    staffName: 'APPLE',
-    email: 'apple@college.edu',
-    dept: 'Computer Science Engineering',
-    type: 'Medical Leave',
-    startDate: '2026-08-20',
-    endDate: '2026-08-21',
-    reason: 'Viral fever rest as prescribed by physician.',
-    status: 'Approved',
-    daysCount: 2,
-    approvedBy: 'Principal Office',
-    createdAt: '2026-08-19'
-  }
-];
 
 const StaffLeaves = () => {
   const navigate = useNavigate();
@@ -61,35 +30,44 @@ const StaffLeaves = () => {
   // Form State
   const [form, setForm] = useState({ type: 'Casual Leave', startDate: '', endDate: '', reason: '' });
   const [success, setSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    const fetchLeaves = () => {
-      const session = sessionStorage.getItem('staff_session');
-      if (session) {
-        try {
-          setStaffSession(JSON.parse(session));
-        } catch (e) {}
-      }
+  const fetchLeaves = useCallback(async () => {
+    const session = sessionStorage.getItem('staff_session');
+    if (session) {
+      try {
+        setStaffSession(JSON.parse(session));
+      } catch (e) {}
+    }
 
+    try {
+      setLoading(true);
+      const res = await getLeaves();
+      const records = Array.isArray(res.data) ? res.data : [];
+      setLeaves(records);
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(records));
+    } catch (err) {
+      console.warn('API leave fetch fallback to local cache:', err.message);
       const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
       const saved = localStorage.getItem(`erp_leave_requests_${tenantId}`);
       if (saved) {
         try {
-          const parsed = JSON.parse(saved);
-          setLeaves(parsed.length > 0 ? parsed : DEFAULT_MOCK_LEAVES);
-        } catch (e) {
-          setLeaves(DEFAULT_MOCK_LEAVES);
-        }
-      } else {
-        localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(DEFAULT_MOCK_LEAVES));
-        setLeaves(DEFAULT_MOCK_LEAVES);
+          setLeaves(JSON.parse(saved));
+        } catch {}
       }
-    };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
     fetchLeaves();
     window.addEventListener('storage', fetchLeaves);
     return () => window.removeEventListener('storage', fetchLeaves);
-  }, []);
+  }, [fetchLeaves]);
+
+  useRealtimeSync(fetchLeaves, ['leaves', 'staffSupportUpdated']);
 
   const staffName = staffSession.name || 'Faculty Member';
   const staffEmail = staffSession.email || '';
@@ -102,9 +80,11 @@ const StaffLeaves = () => {
       const myName = staffName.toLowerCase();
       const sEmail = (l.email || '').toLowerCase();
       const myEmail = staffEmail.toLowerCase();
-      return sName === myName || sEmail === myEmail || !l.staffName;
+      const sId = (l.staffId || '').toLowerCase();
+      const myId = (staffSession.id || '').toLowerCase();
+      return (myId && sId === myId) || sName === myName || (myEmail && sEmail === myEmail) || !l.staffName;
     });
-  }, [leaves, staffName, staffEmail]);
+  }, [leaves, staffName, staffEmail, staffSession.id]);
 
   // Quota & balance metrics calculation
   const quota = useMemo(() => {
@@ -114,10 +94,11 @@ const StaffLeaves = () => {
 
     myLeaves.forEach(l => {
       if (l.status === 'Approved') {
-        const days = Number(l.daysCount || 1);
-        if (l.type === 'Casual Leave') clUsed += days;
-        else if (l.type === 'Medical Leave' || l.type === 'Sick Leave') mlUsed += days;
-        else if (l.type.includes('Duty') || l.type.includes('OD')) odUsed += days;
+        const days = Number(l.daysCount || l.days || 1);
+        const lType = l.type || l.leaveType || '';
+        if (lType === 'Casual Leave') clUsed += days;
+        else if (lType === 'Medical Leave' || lType === 'Sick Leave') mlUsed += days;
+        else if (lType.includes('Duty') || lType.includes('OD')) odUsed += days;
       }
     });
 
@@ -130,7 +111,7 @@ const StaffLeaves = () => {
   }, [myLeaves]);
 
   // Form Submit
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     let daysDiff = 1;
@@ -141,46 +122,49 @@ const StaffLeaves = () => {
       daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     }
 
-    const newLeave = {
-      id: `leave_${Date.now()}`,
+    const payload = {
       staffId: staffSession.id || 'STF001',
       name: staffName,
       staffName,
       role: 'Staff',
       email: staffEmail,
       dept: staffDept,
+      department: staffDept,
       type: form.type,
+      leaveType: form.type,
       startDate: form.startDate,
       endDate: form.endDate,
       daysCount: daysDiff,
       reason: form.reason,
-      status: 'Pending',
-      createdAt: new Date().toLocaleDateString('en-CA')
+      description: form.reason,
+      priority: 'Medium',
+      status: 'Pending'
     };
 
-    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
-    const saved = localStorage.getItem(`erp_leave_requests_${tenantId}`);
-    const existing = saved ? JSON.parse(saved) : DEFAULT_MOCK_LEAVES;
-    const updated = [newLeave, ...existing];
-    
-    setLeaves(updated);
-    localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(updated));
-    window.dispatchEvent(new Event('storage'));
-
-    setSuccess(true);
-    setForm({ type: 'Casual Leave', startDate: '', endDate: '', reason: '' });
-    setTimeout(() => setSuccess(false), 3000);
+    try {
+      setSubmitting(true);
+      const res = await createLeave(payload);
+      emitERPDataUpdate(['leaves', 'staffSupportUpdated'], 'created', res.data);
+      await fetchLeaves();
+      setSuccess(true);
+      setForm({ type: 'Casual Leave', startDate: '', endDate: '', reason: '' });
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to submit leave application to server.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleCancelLeave = (id) => {
+  const handleCancelLeave = async (id) => {
     if (window.confirm('Cancel this pending leave application?')) {
-      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
-      const saved = localStorage.getItem(`erp_leave_requests_${tenantId}`);
-      const existing = saved ? JSON.parse(saved) : leaves;
-      const updated = existing.filter(l => l.id !== id);
-      setLeaves(updated);
-      localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(updated));
-      window.dispatchEvent(new Event('storage'));
+      try {
+        await deleteLeave(id);
+        emitERPDataUpdate(['leaves', 'staffSupportUpdated'], 'deleted', { id });
+        await fetchLeaves();
+      } catch (err) {
+        alert(err.response?.data?.message || 'Failed to cancel leave application.');
+      }
     }
   };
 

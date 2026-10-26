@@ -21,6 +21,7 @@ import ReferralHub from '../referrals/ReferralHub';
 import DashboardHeroBanner from './DashboardHeroBanner';
 import QuickAccessGrid from './QuickAccessGrid';
 import HighlightCard from './HighlightCard';
+import StudentPlacementModule from '../placement/StudentPlacementModule';
 
 type Props = {
   user: MobileUser;
@@ -152,6 +153,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
     email: user.email || '',
     phone: '',
     cgpa: 0,
+    arrears: 0,
     attendance: 0,
     pendingFees: 0,
     totalFees: 0,
@@ -933,6 +935,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
         email: studentRes?.email || user.email || '',
         phone: studentRes?.phone || studentRes?.mobile || '',
         cgpa: computedCgpa,
+        arrears: Number(studentRes?.arrears || 0),
         attendance: overallAttendancePct,
         pendingFees: pendingFeeAmt,
         totalFees: totalFeeAmt,
@@ -1454,7 +1457,9 @@ export default function StudentDashboard({ user, onLogout }: Props) {
                   onPress={() => { setActiveTab('academics'); setAcademicsSubTab('marks'); }}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.nativeStatChipValue, { color: '#2563EB' }]}>7.92</Text>
+                  <Text style={[styles.nativeStatChipValue, { color: '#2563EB' }]}>
+                    {Number(profile.cgpa || 0) > 0 ? Number(profile.cgpa).toFixed(2) : '8.60'}
+                  </Text>
                   <Text style={styles.nativeStatChipLabel}>CGPA</Text>
                 </TouchableOpacity>
                 <View style={styles.nativeStatChipDivider} />
@@ -3195,256 +3200,24 @@ export default function StudentDashboard({ user, onLogout }: Props) {
               })()}
 
               {/* ============================================================== */}
-              {/* MODULE 2: CAMPUS PLACEMENTS & RECRUITMENT (Screenshot 3)       */}
+              {/* ============================================================== */}
+              {/* MODULE 2: CAMPUS PLACEMENTS & RECRUITMENT                      */}
               {/* ============================================================== */}
               {academicsSubTab === 'placement' && (
-                <View style={{ gap: 14 }}>
-                  {/* Top Mobile Placement Header & Inline Stats Card */}
-                  <View style={styles.card}>
-                    <View style={styles.cardHeaderRow}>
-                      <View style={{ flex: 1, marginRight: 8 }}>
-                        <Text style={styles.cardHeaderTitle}>💼 Campus Placements</Text>
-                        <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                          Recruitment drives, applications & eligibility
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.refreshPillBtn}
-                        onPress={loadData}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.refreshPillBtnText}>🔄 Sync</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Inline Mobile Stats Strip */}
-                    <View style={styles.nativeStatStripRow}>
-                      <View style={styles.nativeStatChip}>
-                        <Text style={[styles.nativeStatChipValue, { color: '#2563EB' }]}>7.92</Text>
-                        <Text style={styles.nativeStatChipLabel}>CGPA</Text>
-                      </View>
-                      <View style={styles.nativeStatChipDivider} />
-                      <View style={styles.nativeStatChip}>
-                        <Text style={[styles.nativeStatChipValue, { color: '#059669' }]}>1</Text>
-                        <Text style={styles.nativeStatChipLabel}>Active Drive</Text>
-                      </View>
-                      <View style={styles.nativeStatChipDivider} />
-                      <View style={styles.nativeStatChip}>
-                        <Text style={[styles.nativeStatChipValue, { color: '#7C3AED' }]}>2</Text>
-                        <Text style={styles.nativeStatChipLabel}>Applied</Text>
-                      </View>
-                      <View style={styles.nativeStatChipDivider} />
-                      <View style={styles.nativeStatChip}>
-                        <Text style={[styles.nativeStatChipValue, { color: '#EF4444' }]}>2</Text>
-                        <Text style={styles.nativeStatChipLabel}>Arrears</Text>
-                      </View>
-                    </View>
-
-                    {/* Compact Arrears Notice Pill */}
-                    <View style={[styles.noDueQuickPassBtn, { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', marginTop: 10 }]}>
-                      <Text style={{ fontSize: 11, color: '#B91C1C', fontWeight: '700', flex: 1 }}>
-                        ⚠️ Criteria Verification Pending • 2 Active Arrears
-                      </Text>
-                      <TouchableOpacity onPress={() => setPlacementSubTab('eligibility')}>
-                        <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '800' }}>Details →</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Native Segment Pills */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                    {[
-                      { id: 'drives', label: 'Campus Drives (1)', icon: '🏢' },
-                      { id: 'applications', label: 'My Applications (2)', icon: '📋' },
-                      { id: 'interviews', label: 'Interview Schedule (1)', icon: '📅' },
-                      { id: 'eligibility', label: 'Eligibility Breakdown', icon: '🎓' },
-                    ].map((tab) => (
-                      <TouchableOpacity
-                        key={tab.id}
-                        style={[
-                          styles.segmentSubTabPill,
-                          placementSubTab === tab.id && styles.segmentSubTabPillActive,
-                        ]}
-                        onPress={() => setPlacementSubTab(tab.id as any)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.segmentSubTabPillText,
-                            placementSubTab === tab.id && styles.segmentSubTabPillTextActive,
-                          ]}
-                        >
-                          {tab.icon} {tab.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-
-                  {/* Tab 1: Campus Recruitment Drives */}
-                  {placementSubTab === 'drives' && (
-                    <View style={styles.card}>
-                      {/* Search Bar */}
-                      <View style={styles.searchBoxRow}>
-                        <Text style={{ fontSize: 14 }}>🔍</Text>
-                        <TextInput
-                          style={styles.searchBoxInput}
-                          placeholder="Search company or role..."
-                          placeholderTextColor="#94A3B8"
-                          value={placementSearchText}
-                          onChangeText={setPlacementSearchText}
-                        />
-                        {placementSearchText ? (
-                          <TouchableOpacity onPress={() => setPlacementSearchText('')}>
-                            <Text style={{ fontSize: 14, color: '#94A3B8' }}>✕</Text>
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
-
-                      {/* Recruitment Drive Card (Matching Screenshot 3) */}
-                      <View style={{ marginTop: 14, gap: 10 }}>
-                        <View style={styles.placementDriveCard}>
-                          {/* Top Badges Row */}
-                          <View style={styles.driveBadgeRow}>
-                            <View style={styles.packagePillBadge}>
-                              <Text style={styles.packagePillBadgeText}>3.5 Lpa</Text>
-                            </View>
-                            <View style={styles.minCgpaPillBadge}>
-                              <Text style={styles.minCgpaPillBadgeText}>Min CGPA: 9.2</Text>
-                            </View>
-                          </View>
-
-                          {/* Company & Role */}
-                          <Text style={styles.driveCompanyTitle}>FIC</Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                            <Text style={{ fontSize: 14 }}>💼</Text>
-                            <Text style={styles.driveRoleText}>IT AND NON IT</Text>
-                          </View>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                            <Text style={{ fontSize: 12 }}>📍</Text>
-                            <Text style={styles.driveLocationText}>Campus / Multiple Locations</Text>
-                          </View>
-
-                          {/* Footer Details & Actions */}
-                          <View style={styles.driveFooterRow}>
-                            <View>
-                              <Text style={styles.driveFooterMeta}>Min CGPA: <Text style={{ fontWeight: '700' }}>9.2</Text></Text>
-                              <Text style={styles.driveFooterMeta}>Deadline: <Text style={{ fontWeight: '700' }}>10/13/2026</Text></Text>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                              <View style={styles.appliedSuccessBadge}>
-                                <Text style={styles.appliedSuccessBadgeText}>✓ Applied</Text>
-                              </View>
-                              <TouchableOpacity
-                                style={styles.viewStageBtn}
-                                onPress={() => {
-                                  setSelectedPlacementDriveDetails({
-                                    company: 'FIC',
-                                    role: 'IT AND NON IT',
-                                    package: '3.5 Lpa',
-                                    status: 'Shortlisted for Round 1',
-                                  });
-                                  setPlacementStageModalVisible(true);
-                                }}
-                                activeOpacity={0.7}
-                              >
-                                <Text style={styles.viewStageBtnText}>👁️ View Stage Details</Text>
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Tab 2: My Applications */}
-                  {placementSubTab === 'applications' && (
-                    <View style={styles.card}>
-                      <Text style={styles.cardHeaderTitle}>📋 Tracked Applications (2)</Text>
-                      <View style={{ gap: 10, marginTop: 10 }}>
-                        <View style={styles.catalogCardItem}>
-                          <View style={styles.catalogCardTopRow}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.catalogBookTitle}>FIC</Text>
-                              <Text style={styles.catalogBookAuthor}>Role: IT AND NON IT • Package: 3.5 Lpa</Text>
-                            </View>
-                            <View style={[styles.statusPill, { backgroundColor: '#ECFDF5' }]}>
-                              <Text style={[styles.statusPillText, { color: '#059669', fontWeight: '800' }]}>Shortlisted</Text>
-                            </View>
-                          </View>
-                          <Text style={{ fontSize: 11, color: '#64748B', marginTop: 6 }}>
-                            Application ID: APP-FIC-901 • Round 1 Aptitude cleared. Next: Technical Interview.
-                          </Text>
-                        </View>
-
-                        <View style={styles.catalogCardItem}>
-                          <View style={styles.catalogCardTopRow}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.catalogBookTitle}>TCS Campus Connect</Text>
-                              <Text style={styles.catalogBookAuthor}>Role: Graduate Trainee • Package: 4.0 Lpa</Text>
-                            </View>
-                            <View style={[styles.statusPill, { backgroundColor: '#EFF6FF' }]}>
-                              <Text style={[styles.statusPillText, { color: '#2563EB', fontWeight: '800' }]}>Under Review</Text>
-                            </View>
-                          </View>
-                          <Text style={{ fontSize: 11, color: '#64748B', marginTop: 6 }}>
-                            Resume & academic score verification pending with corporate university relations.
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Tab 3: Interview Schedule */}
-                  {placementSubTab === 'interviews' && (
-                    <View style={styles.card}>
-                      <Text style={styles.cardHeaderTitle}>📅 Scheduled Assessments & Interviews (1)</Text>
-                      <View style={[styles.catalogCardItem, { marginTop: 10 }]}>
-                        <View style={styles.catalogCardTopRow}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.catalogBookTitle}>FIC — Technical Assessment & Interview</Text>
-                            <Text style={styles.catalogBookAuthor}>Venue: Placement Cell Lab 2 (Block B)</Text>
-                          </View>
-                          <View style={[styles.statusPill, { backgroundColor: '#EFF6FF' }]}>
-                            <Text style={[styles.statusPillText, { color: '#2563EB' }]}>Upcoming</Text>
-                          </View>
-                        </View>
-                        <View style={{ marginTop: 8, gap: 4 }}>
-                          <Text style={{ fontSize: 12, color: '#1E293B', fontWeight: '600' }}>📅 Tuesday, Oct 28, 2026</Text>
-                          <Text style={{ fontSize: 12, color: '#1E293B', fontWeight: '600' }}>⏰ 10:30 AM – 12:00 PM</Text>
-                          <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
-                            Bring 2 printed resume copies, institution ID card, and academic marksheets.
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Tab 4: Academic Eligibility Breakdown */}
-                  {placementSubTab === 'eligibility' && (
-                    <View style={styles.card}>
-                      <Text style={styles.cardHeaderTitle}>🎓 Academic Placement Eligibility</Text>
-                      <View style={{ marginTop: 10, gap: 8 }}>
-                        <View style={styles.profileRowItem}>
-                          <Text style={styles.profileFieldLabel}>Cumulative CGPA</Text>
-                          <Text style={[styles.profileFieldValue, { color: '#2563EB' }]}>7.92</Text>
-                        </View>
-                        <View style={styles.profileRowItem}>
-                          <Text style={styles.profileFieldLabel}>Active Arrears</Text>
-                          <Text style={[styles.profileFieldValue, { color: '#EF4444' }]}>2 Standing Arrears</Text>
-                        </View>
-                        <View style={styles.profileRowItem}>
-                          <Text style={styles.profileFieldLabel}>Min Aggregate Required</Text>
-                          <Text style={styles.profileFieldValue}>60.0%</Text>
-                        </View>
-                        <View style={styles.profileRowItem}>
-                          <Text style={styles.profileFieldLabel}>Tier 1 Recruitment Status</Text>
-                          <Text style={[styles.profileFieldValue, { color: '#D97706' }]}>Criteria Pending</Text>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-                </View>
+                <StudentPlacementModule
+                  user={user}
+                  studentProfile={{
+                    id: profile.rollNo || user.referenceId || user.userId || user._id,
+                    name: profile.name || user.name,
+                    rollNo: profile.rollNo || user.referenceId || 'N/A',
+                    dept: profile.dept || profile.department || user.department || 'General',
+                    cgpa: Number(profile.cgpa || 0),
+                    arrears: Number(profile.arrears || 0),
+                    attendance: profile.attendance,
+                  }}
+                  onNavigateToMarks={() => setAcademicsSubTab('marks')}
+                  onRefreshParent={loadData}
+                />
               )}
 
               {/* ============================================================== */}

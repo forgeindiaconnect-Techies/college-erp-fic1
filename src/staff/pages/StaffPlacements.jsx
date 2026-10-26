@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, CheckCircle, FileText, Calendar, TrendingUp, BookOpen, Search, Bell, Briefcase, Award,
-  Download, Building, CheckCircle2, XCircle, MapPin, ExternalLink, Filter, ShieldCheck, ChevronRight
+  Download, Building, CheckCircle2, XCircle, MapPin, ExternalLink, Filter, ShieldCheck, ChevronRight, X
 } from 'lucide-react';
 import { 
   getStudents, getPlacementJobs, getPlacementApplications, 
   getPlacementInterviews, getPlacementSelections, getMyProfile,
-  updatePlacementApplicationStatus, getAllMarks, getAllAttendance
+  updatePlacementApplicationStatus, getAllMarks, getAllAttendance,
+  createNotification
 } from '../../api/index';
 import '../../pages/Dashboard.css';
 
@@ -36,10 +37,58 @@ export default function StaffPlacements() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [toastMsg, setToastMsg] = useState('');
+  const [notifiedJobIds, setNotifiedJobIds] = useState([]);
+  const [selectedStudentArrears, setSelectedStudentArrears] = useState(null);
 
   const showToast = (msg) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(''), 3000);
+    setTimeout(() => setToastMsg(''), 4000);
+  };
+
+  const handleNotifyStudents = async (job) => {
+    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+    const notifObj = {
+      _id: `NOTIF_STAFF_PLACE_${Date.now()}`,
+      id: `NOTIF_STAFF_PLACE_${Date.now()}`,
+      title: `Campus Recruitment Drive: ${job.company}`,
+      message: `Staff Coordinator (${myDept || 'Placement Cell'}) has announced recruitment drive updates for ${job.company} (${job.role || 'Graduates'}). Package CTC: ${job.ctc || job.package || '4.5 LPA'}. Registration deadline: ${job.deadline ? new Date(job.deadline).toLocaleDateString() : 'Open'}. Please review criteria and apply on your student placement portal.`,
+      type: 'Placement',
+      target: 'Students',
+      targetRoles: ['Student', 'student'],
+      receiverRole: 'Student',
+      category: 'placement',
+      department: myDept,
+      priority: 'High',
+      link: '/student/placements',
+      metadata: {
+        jobId: job._id || job.jobId || job.id,
+        company: job.company,
+        role: job.role,
+        ctc: job.ctc || job.package
+      },
+      createdAt: new Date().toISOString()
+    };
+
+    // 1. Post to backend DB so notifications endpoint returns it and Socket.IO pushes it
+    try {
+      await createNotification(notifObj);
+    } catch (e) {}
+
+    // 2. Persist to localStorage for multi-tab / immediate offline sync
+    try {
+      const exist = JSON.parse(localStorage.getItem(`erp_notifications_${tenantId}`) || '[]');
+      localStorage.setItem(`erp_notifications_${tenantId}`, JSON.stringify([notifObj, ...exist]));
+      const existGlobal = JSON.parse(localStorage.getItem('erp_notifications') || '[]');
+      localStorage.setItem('erp_notifications', JSON.stringify([notifObj, ...existGlobal]));
+    } catch (e) {}
+
+    // 3. Dispatch events for NotificationContext and storage listeners
+    window.dispatchEvent(new CustomEvent('erp_notification_received', { detail: notifObj }));
+    window.dispatchEvent(new CustomEvent('erp_notification_updated', { detail: notifObj }));
+    window.dispatchEvent(new Event('storage'));
+
+    setNotifiedJobIds(prev => [...prev, String(job._id || job.jobId || job.id)]);
+    showToast(`✓ Broadcasted notification to all ${myDept} students regarding ${job.company} drive!`);
   };
   
   const [myDept, setMyDept] = useState('');
@@ -179,6 +228,7 @@ export default function StaffPlacements() {
 
         let computedCgpa = Number(st.cgpa ?? 0);
         let computedArrears = Number(st.arrears ?? 0);
+        let failedMarks = [];
 
         if (stMarks.length > 0) {
           const validGpas = stMarks.map(m => {
@@ -190,10 +240,11 @@ export default function StaffPlacements() {
             computedCgpa = Number((validGpas.reduce((a, b) => a + b, 0) / validGpas.length).toFixed(2));
           }
 
-          computedArrears = stMarks.filter(m => {
+          failedMarks = stMarks.filter(m => {
             const tot = Number(m.totalMarks ?? (Number(m.internalMarks || 0) + Number(m.semesterMarks || 0)) ?? m.marksObtained ?? 0);
             return m.arrearStatus === 'Arrear' || (m.totalMarks !== undefined && tot < 40);
-          }).length;
+          });
+          computedArrears = failedMarks.length;
         }
 
         // 2. Attendance
@@ -212,7 +263,8 @@ export default function StaffPlacements() {
           ...st,
           cgpa: computedCgpa,
           arrears: computedArrears,
-          attendance: computedAttendance
+          attendance: computedAttendance,
+          arrearSubjects: failedMarks
         };
       });
 
@@ -220,19 +272,25 @@ export default function StaffPlacements() {
 
       const deptStudentRegNos = enrichedStudents.map(s => (s.id || s.rollNo || s.regNo || '').toLowerCase());
       
-      // Jobs strictly for this tenant
+      // Jobs with multi-key scanning across all localStorage keys
       let rawJobs = Array.isArray(jobsRes.data) ? jobsRes.data : (jobsRes.data?.jobs || []);
       const jobMap = new Map();
       rawJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
-      try {
-        const localItems = JSON.parse(localStorage.getItem(`erp_placement_jobs_${tenantId}`) || '[]');
-        if (Array.isArray(localItems)) {
-          localItems.forEach(lj => {
-            const ljId = String(lj._id || lj.jobId || lj.id);
-            if (ljId && !jobMap.has(ljId)) jobMap.set(ljId, lj);
-          });
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_jobs')) {
+          try {
+            const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(localItems)) {
+              localItems.forEach(lj => {
+                const ljId = String(lj._id || lj.jobId || lj.id);
+                if (ljId && !jobMap.has(ljId)) jobMap.set(ljId, lj);
+              });
+            }
+          } catch (e) {}
         }
-      } catch (e) {}
+      }
       setJobs(Array.from(jobMap.values()));
 
       // Applications strictly for this tenant
@@ -472,8 +530,32 @@ export default function StaffPlacements() {
                     <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 800, color: '#2563eb' }}>
                       {s.cgpa ?? 'N/A'}
                     </td>
-                    <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 700, color: Number(s.arrears ?? 0) > 0 ? '#ef4444' : '#10b981' }}>
-                      {s.arrears ?? '0'}
+                    <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                      {Number(s.arrears ?? 0) > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudentArrears(s)}
+                          style={{
+                            background: '#fee2e2',
+                            color: '#dc2626',
+                            border: '1px solid #fca5a5',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontWeight: 800,
+                            fontSize: '0.76rem',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Click to view standing arrear papers"
+                        >
+                          <span>{s.arrears} Arrear{Number(s.arrears) > 1 ? 's' : ''}</span>
+                          <ExternalLink size={11} />
+                        </button>
+                      ) : (
+                        <span style={{ fontWeight: 700, color: '#10b981' }}>0</span>
+                      )}
                     </td>
                     <td style={{ padding: '12px 18px', textAlign: 'center', fontWeight: 600, color: '#15803d' }}>
                       {s.attendance !== undefined && s.attendance !== null ? (typeof s.attendance === 'number' ? `${s.attendance}%` : s.attendance) : 'N/A'}
@@ -564,13 +646,32 @@ export default function StaffPlacements() {
               <div style={{ fontSize: '0.72rem' }}>Deadline: {job.deadline ? new Date(job.deadline).toLocaleDateString() : 'Open'}</div>
             </div>
 
-            <button 
-              type="button"
-              onClick={() => showToast(`Notified ${myDept} students about ${job.company} drive`)}
-              style={{ padding: '5px 12px', borderRadius: '6px', background: '#2563eb', color: '#ffffff', fontWeight: 700, fontSize: '0.75rem', border: 'none', cursor: 'pointer' }}
-            >
-              Notify Students
-            </button>
+            {(() => {
+              const jobId = String(job._id || job.jobId || job.id);
+              const isNotified = notifiedJobIds.includes(jobId);
+              return (
+                <button 
+                  type="button"
+                  onClick={() => handleNotifyStudents(job)}
+                  style={{ 
+                    padding: '6px 14px', 
+                    borderRadius: '8px', 
+                    background: isNotified ? '#059669' : '#2563eb', 
+                    color: '#ffffff', 
+                    fontWeight: 700, 
+                    fontSize: '0.75rem', 
+                    border: 'none', 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  {isNotified ? '✓ Students Notified' : 'Notify Students'}
+                </button>
+              );
+            })()}
           </div>
         </div>
       ))}
@@ -1144,6 +1245,81 @@ export default function StaffPlacements() {
         }}>
           <CheckCircle size={18} />
           <span>{toastMsg}</span>
+        </div>
+      )}
+      {/* Student Arrears Dossier Modal */}
+      {selectedStudentArrears && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '640px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                  Student Arrear Dossier — {selectedStudentArrears.name}
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                  Roll No: <strong>{selectedStudentArrears.id || selectedStudentArrears.rollNo}</strong> • Semester: <strong>{selectedStudentArrears.sem || selectedStudentArrears.semester || 'N/A'}</strong> • Total Standing Arrears: <strong style={{ color: '#ef4444' }}>{selectedStudentArrears.arrears}</strong>
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedStudentArrears(null)}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {Array.isArray(selectedStudentArrears.arrearSubjects) && selectedStudentArrears.arrearSubjects.length > 0 ? (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase' }}>
+                      <th style={{ padding: '10px 14px', textAlign: 'left' }}>Subject Code</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'left' }}>Course Title</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'center' }}>Semester</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'center' }}>Total Marks</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'center' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedStudentArrears.arrearSubjects.map((sub, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
+                          {sub.subjectCode || sub.code || 'SUB401'}
+                        </td>
+                        <td style={{ padding: '10px 14px', fontWeight: 700, color: '#1e293b' }}>
+                          {sub.subject || sub.subjectName || 'Course'}
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center', color: '#64748b' }}>
+                          {sub.semester || 'Semester'}
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 800, color: '#dc2626' }}>
+                          {sub.totalMarks ?? (Number(sub.internalMarks || 0) + Number(sub.semesterMarks || 0))} / 100
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                          <span style={{ background: '#fee2e2', color: '#dc2626', padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800 }}>
+                            RA (Arrear)
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                <p>This student has {selectedStudentArrears.arrears} standing arrear(s) recorded on their student master record.</p>
+              </div>
+            )}
+
+            <div style={{ marginTop: '20px', paddingTop: '14px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setSelectedStudentArrears(null)}
+                style={{ padding: '8px 18px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
+              >
+                Close Dossier
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

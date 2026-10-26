@@ -451,6 +451,7 @@ export default function MobileApp() {
                   blurOnSubmit={false}
                   cursorColor="#2563EB"
                   selectionColor="#BFDBFE"
+                  
                 />
                 {email.length > 0 && !isSubmitting && (
                   <TouchableOpacity

@@ -465,6 +465,62 @@ export const ensureWatchmanRealtimeData = async () => {
         }
       ]);
     }
+
+    // 7. Ensure Parcel & Delivery entries exist for staff
+    const parcelCount = await ParcelLog.countDocuments({});
+    if (parcelCount < 2) {
+      let renukaUser = await User.findOne({ email: 'renuka.stf008@college.edu' });
+      await ParcelLog.create([
+        {
+          parcelId: `PCL-${todayStr.replace(/-/g, '')}-001`,
+          type: 'Parcel',
+          deliveryCompany: 'Blue Dart Express',
+          senderName: 'TechBooks Publishers Ltd',
+          recipientId: renukaUser?._id || null,
+          staffId: 'STF008',
+          recipientName: 'Renuka [STF008]',
+          recipientEmail: 'renuka.stf008@college.edu',
+          recipientPhone: '9876543208',
+          recipientType: 'Staff',
+          department: 'Computer Science',
+          trackingNumber: 'BLUEDART-88291045',
+          parcelDetails: 'Cloud Computing & Distributed Systems Textbooks (2 Qty)',
+          receivedAt: new Date(Date.now() - 3 * 3600000),
+          status: 'Pending Collection',
+          gate: 'Gate 1 (Main Entrance)',
+          watchmanName: ramesh?.name || 'Ramesh Kumar (Chief Watchman)',
+          notes: 'Deposited on Faculty Shelf A-3 at security desk.',
+          collegeId: 'COL001',
+          tenantId: 'COL001'
+        },
+        {
+          parcelId: `DEL-${todayStr.replace(/-/g, '')}-002`,
+          type: 'Delivery',
+          deliveryCompany: 'Amazon Prime Logistics',
+          senderName: 'Electronics & Robotics Lab Supplies',
+          recipientId: renukaUser?._id || null,
+          staffId: 'STF008',
+          recipientName: 'Renuka [STF008]',
+          recipientEmail: 'renuka.stf008@college.edu',
+          recipientPhone: '9876543208',
+          recipientType: 'Staff',
+          department: 'Computer Science',
+          trackingNumber: 'AMZN-IN-90812734',
+          parcelDetails: 'Arduino Sensor Kits & Microcontroller Board',
+          receivedAt: new Date(Date.now() - 28 * 3600000),
+          status: 'Collected',
+          collectedAt: new Date(Date.now() - 20 * 3600000),
+          collectedBy: 'Renuka',
+          handedOverAt: new Date(Date.now() - 20 * 3600000),
+          handedOverTo: 'Renuka',
+          gate: 'Gate 1 (Main Entrance)',
+          watchmanName: ramesh?.name || 'Ramesh Kumar (Chief Watchman)',
+          notes: 'Handover verified and signed at security desk',
+          collegeId: 'COL001',
+          tenantId: 'COL001'
+        }
+      ]);
+    }
   } catch (err) {
     console.warn('ensureWatchmanRealtimeData notice:', err.message);
   }
@@ -1209,17 +1265,32 @@ const handleVerifyVisitorPass = async (req, res) => {
       orConditions.push({ vehicleNumber: exactRegex });
     }
 
-    // Direct global search (pass numbers and visitor IDs are unique)
-    let visitor = await VisitorLog.findOne({ $or: orConditions }).lean();
+    // Direct global search (prioritizing active inside visitors first, then latest records)
+    let visitor = await VisitorLog.findOne({ $or: orConditions, status: 'Inside' }).sort({ createdAt: -1 }).lean();
+    if (!visitor) {
+      visitor = await VisitorLog.findOne({ $or: orConditions }).sort({ createdAt: -1 }).lean();
+    }
 
     // Secondary fallback: partial substring match if not found
     if (!visitor && rawQuery.length >= 4) {
       visitor = await VisitorLog.findOne({
         $or: [
           { passNumber: { $regex: escapeRegex(rawQuery), $options: 'i' } },
-          { phone: { $regex: escapeRegex(rawQuery), $options: 'i' } }
-        ]
+          { phone: { $regex: escapeRegex(rawQuery), $options: 'i' } },
+          { name: { $regex: escapeRegex(rawQuery), $options: 'i' } }
+        ],
+        status: 'Inside'
       }).sort({ createdAt: -1 }).lean();
+
+      if (!visitor) {
+        visitor = await VisitorLog.findOne({
+          $or: [
+            { passNumber: { $regex: escapeRegex(rawQuery), $options: 'i' } },
+            { phone: { $regex: escapeRegex(rawQuery), $options: 'i' } },
+            { name: { $regex: escapeRegex(rawQuery), $options: 'i' } }
+          ]
+        }).sort({ createdAt: -1 }).lean();
+      }
     }
 
     if (!visitor) {
@@ -4268,24 +4339,28 @@ const handleLookupCampusPerson = async (req, res) => {
 
       if (visitor) {
         const pId = (visitor.passNumber || visitor.visitorId).toUpperCase();
-        const created = await CampusPerson.create({
-          personId: pId,
-          name: visitor.name,
-          personType: 'Visitor',
-          phone: visitor.phone || '',
-          email: visitor.email || '',
-          department: visitor.department || 'General',
-          designation: visitor.purpose || 'Campus Visitor',
-          vehicleNumber: visitor.vehicleNumber || '',
-          idProofType: visitor.idProofType || 'Aadhaar Card',
-          idProofNumber: visitor.idProofNumber || '',
-          currentStatus: visitor.status === 'Inside' ? 'Inside Campus' : 'Outside Campus',
-          lastEntryTime: visitor.entryTime || null,
-          lastExitTime: visitor.exitTime || null,
-          collegeId: tenantId,
-          tenantId
-        });
-        person = created.toObject ? created.toObject() : created;
+        person = await CampusPerson.findOneAndUpdate(
+          { personId: pId },
+          {
+            $set: {
+              name: visitor.name,
+              personType: 'Visitor',
+              phone: visitor.phone || '',
+              email: visitor.email || '',
+              department: visitor.department || 'General',
+              designation: visitor.purpose || 'Campus Visitor',
+              vehicleNumber: visitor.vehicleNumber || '',
+              idProofType: visitor.idProofType || 'Aadhaar Card',
+              idProofNumber: visitor.idProofNumber || '',
+              currentStatus: visitor.status === 'Inside' ? 'Inside Campus' : 'Outside Campus',
+              lastEntryTime: visitor.entryTime || null,
+              lastExitTime: visitor.exitTime || null,
+              collegeId: tenantId,
+              tenantId
+            }
+          },
+          { upsert: true, new: true }
+        ).lean();
       }
     }
 

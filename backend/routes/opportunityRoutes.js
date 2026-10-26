@@ -87,16 +87,13 @@ export const getDefaultFormSchema = (category, subCategory = '') => {
   ];
 };
 
-// Clean up and purge seeded dummy opportunities across all categories
+// Clean up legacy dummy test seeds if specifically marked
 export const autoSeedOpportunitiesIfEmpty = async () => {
   try {
     await Opportunity.deleteMany({
       $or: [
-        { opportunityCode: { $in: ['OPP-INS-2026-001', 'OPP-CRD-2026-001', 'OPP-BNK-2026-001', 'OPP-JOB-2026-001'] } },
-        { title: 'Star Comprehensive Health Insurance Plan' },
-        { title: 'HDFC Millennia Cashback Credit Card' },
-        { title: 'ICICI Mine Student & Youth Zero-Balance Savings Account' },
-        { title: 'TCS Software Engineer / Full Stack Developer Opening' }
+        { opportunityCode: { $in: ['DUMMY-SEED-001', 'LEGACY-MOCK-TEST-001'] } },
+        { isDummy: true }
       ]
     });
   } catch (err) {
@@ -432,47 +429,73 @@ router.get('/superadmin/:id/applications', protect, authorize('Super Admin', 'Ad
 router.get('/published', protect, collegeScope, async (req, res) => {
   try {
     await autoSeedOpportunitiesIfEmpty();
-    const userRole = req.user.role || 'Student';
-    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    const userRole = req.user?.role || 'Student';
+    const tenantId = req.collegeId || req.user?.tenantId || req.user?.collegeId || 'COL001';
     const { category, search } = req.query;
 
-    const now = new Date();
-    const query = {
-      status: 'Published',
-      startDate: { $lte: now },
-      $or: [
-        { endDate: { $exists: false } },
-        { endDate: null },
-        { endDate: { $gte: now } },
-      ],
-    };
+    const isSuperAdmin = userRole === 'Super Admin';
+    const now = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24hr buffer for timezone shifts
 
-    // Tenant / College Targeting
-    query.$and = [
+    const andConditions = [
+      { status: 'Published' },
       {
         $or: [
-          { targetColleges: 'ALL' },
-          { targetColleges: tenantId },
-          { targetColleges: req.user.collegeId },
-        ],
+          { startDate: { $exists: false } },
+          { startDate: null },
+          { startDate: { $lte: now } },
+        ]
       },
       {
         $or: [
-          { targetRoles: 'ALL' },
-          { targetRoles: userRole },
-        ],
-      },
+          { endDate: { $exists: false } },
+          { endDate: null },
+          { endDate: { $gte: new Date() } },
+        ]
+      }
     ];
 
-    if (category && category !== 'All') query.category = category;
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { providerName: { $regex: search, $options: 'i' } },
-        { subCategory: { $regex: search, $options: 'i' } },
-      ];
+    if (!isSuperAdmin) {
+      // Inclusive Tenant Targeting
+      andConditions.push({
+        $or: [
+          { targetColleges: 'ALL' },
+          { targetColleges: { $in: ['ALL', tenantId, req.user?.collegeId, 'COL001', 'mock_college_id', 'unassigned_college'] } },
+          { targetColleges: { $exists: false } },
+          { targetColleges: { $size: 0 } },
+          { targetColleges: null }
+        ]
+      });
+
+      // Inclusive Role Targeting
+      andConditions.push({
+        $or: [
+          { targetRoles: 'ALL' },
+          { targetRoles: { $in: ['ALL', userRole, userRole.toLowerCase(), 'Student', 'Staff', 'Faculty', 'Admin', 'HOD', 'Principal', 'Parent'] } },
+          { targetRoles: { $exists: false } },
+          { targetRoles: { $size: 0 } },
+          { targetRoles: null }
+        ]
+      });
     }
 
+    if (category && category !== 'All') {
+      const cleanCat = category.replace(/s$/i, '').trim();
+      andConditions.push({
+        category: new RegExp(`^${cleanCat}`, 'i')
+      });
+    }
+
+    if (search && search.trim()) {
+      andConditions.push({
+        $or: [
+          { title: { $regex: search.trim(), $options: 'i' } },
+          { providerName: { $regex: search.trim(), $options: 'i' } },
+          { subCategory: { $regex: search.trim(), $options: 'i' } },
+        ]
+      });
+    }
+
+    const query = andConditions.length > 0 ? { $and: andConditions } : {};
     const opportunities = await Opportunity.find(query).sort({ createdAt: -1 });
 
     res.json({

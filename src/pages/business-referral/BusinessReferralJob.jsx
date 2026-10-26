@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getPublicReferralFormConfig, getPublishedOpportunities } from '../../api';
 import JobReferralModal from '../../components/referrals/JobReferralModal';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { useCategoryConfig } from '../../utils/categoryConfig';
 import '../admin/UserManagementCommon.css';
 import './BusinessReferralCategory.css';
@@ -65,6 +66,11 @@ export default function BusinessReferralJob() {
     fetchConfig();
     fetchJobs();
   }, [fetchConfig, fetchJobs]);
+
+  useRealtimeSync(['referral_config', 'opportunities', 'referrals'], () => {
+    fetchConfig();
+    fetchJobs();
+  });
 
   const handleOpenSubmit = (sectorTitle, companyName) => {
     setSubmitSector(sectorTitle || 'IT & Software');

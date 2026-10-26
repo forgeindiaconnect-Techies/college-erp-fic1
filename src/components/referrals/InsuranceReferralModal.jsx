@@ -199,14 +199,11 @@ export default function InsuranceReferralModal({
       ? formConfig.fieldsConfig
       : defaultInsuranceFields;
     const seenKeys = new Set();
-    const seenLabels = new Set();
     const uniqueList = [];
     for (const f of rawList) {
-      const normKey = (f.fieldKey || '').trim().toLowerCase();
-      const normLabel = (f.label || '').trim().toLowerCase();
-      if (!normKey || seenKeys.has(normKey) || (normLabel && seenLabels.has(normLabel))) continue;
+      const normKey = (f.fieldKey || f.name || '').trim().toLowerCase();
+      if (!normKey || seenKeys.has(normKey)) continue;
       seenKeys.add(normKey);
-      if (normLabel) seenLabels.add(normLabel);
       uniqueList.push(f);
     }
     return uniqueList.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
@@ -218,6 +215,10 @@ export default function InsuranceReferralModal({
 
   const step2Fields = useMemo(() => {
     return allConfiguredFields.filter(f => f.step === 2 && f.isVisible !== false);
+  }, [allConfiguredFields]);
+
+  const step3Fields = useMemo(() => {
+    return allConfiguredFields.filter(f => f.step === 3 && f.isVisible !== false);
   }, [allConfiguredFields]);
 
   const resolveField = (f) => {
@@ -312,13 +313,15 @@ export default function InsuranceReferralModal({
   };
 
   const validateStep = (stepNumber) => {
-    const targetFields = stepNumber === 1 ? step1Fields : step2Fields;
+    const targetFields = stepNumber === 1
+      ? step1Fields
+      : (stepNumber === 2 ? step2Fields : (stepNumber === 3 ? step3Fields : []));
     const errors = {};
 
     targetFields.forEach(f => {
       if (f.isVisible === false) return;
       const key = f.fieldKey;
-      let val = formData[key];
+      let val = formData[key] !== undefined && formData[key] !== null ? formData[key] : customFields[key];
 
       if (val === undefined || val === null || val === '') {
         if (key === 'applicantName') val = formData.name;
@@ -719,9 +722,26 @@ export default function InsuranceReferralModal({
                 </div>
               )}
 
-              {/* ── STEP 3: CONSENT & PRIVACY ── */}
+              {/* ── STEP 3: CONSENT & PRIVACY & ADDITIONAL FIELDS ── */}
               {currentStep === 3 && (
                 <div>
+                  {step3Fields.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+                      {step3Fields.map(field => {
+                        const resolvedField = resolveField(field);
+                        return (
+                          <DynamicFieldRenderer
+                            key={field.fieldKey}
+                            field={resolvedField}
+                            value={formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : (customFields[field.fieldKey] || '')}
+                            onChange={handleFieldChange}
+                            error={fieldErrors[field.fieldKey]}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div className="cc-consent-box">
                     <div className="cc-consent-notice-title">
                       <span>Statutory Insurance Privacy Notice</span>
@@ -790,7 +810,7 @@ export default function InsuranceReferralModal({
                     </div>
                     <div className="cc-review-grid">
                       {step1Fields.map(f => {
-                        const val = formData[f.fieldKey];
+                        const val = formData[f.fieldKey] !== undefined ? formData[f.fieldKey] : customFields[f.fieldKey];
                         if (val === undefined || val === null || val === '') return null;
                         return (
                           <div key={f.fieldKey} className="cc-review-item">
@@ -817,7 +837,7 @@ export default function InsuranceReferralModal({
                     </div>
                     <div className="cc-review-grid">
                       {step2Fields.map(f => {
-                        const val = formData[f.fieldKey];
+                        const val = formData[f.fieldKey] !== undefined ? formData[f.fieldKey] : customFields[f.fieldKey];
                         if (val === undefined || val === null || val === '') return null;
                         return (
                           <div key={f.fieldKey} className="cc-review-item">
@@ -830,6 +850,35 @@ export default function InsuranceReferralModal({
                       })}
                     </div>
                   </div>
+
+                  {/* Review Additional Details */}
+                  {step3Fields.length > 0 && (
+                    <div className="cc-review-card">
+                      <div className="cc-review-header">
+                        <div className="cc-review-title">
+                          <CheckCircle2 size={15} className="text-blue-600" />
+                          <span>Step 3: Additional Information</span>
+                        </div>
+                        <button type="button" className="cc-edit-btn" onClick={() => setCurrentStep(3)}>
+                          Edit
+                        </button>
+                      </div>
+                      <div className="cc-review-grid">
+                        {step3Fields.map(f => {
+                          const val = formData[f.fieldKey] !== undefined ? formData[f.fieldKey] : customFields[f.fieldKey];
+                          if (val === undefined || val === null || val === '') return null;
+                          return (
+                            <div key={f.fieldKey} className="cc-review-item">
+                              <span>{f.label}</span>
+                              <strong>
+                                {Array.isArray(val) ? val.join(', ') : (typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val))}
+                              </strong>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Review Consent */}
                   <div className="cc-review-card">

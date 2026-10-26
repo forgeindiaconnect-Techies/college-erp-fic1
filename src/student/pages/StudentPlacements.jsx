@@ -26,6 +26,7 @@ const StudentPlacements = () => {
   const [search, setSearch] = useState('');
   const [toastMsg, setToastMsg] = useState('');
   const [selectedAppForModal, setSelectedAppForModal] = useState(null);
+  const [selectedJobForDetailsModal, setSelectedJobForDetailsModal] = useState(null);
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -136,47 +137,63 @@ const StudentPlacements = () => {
           computedCgpa = Number((validGpas.reduce((a, b) => a + b, 0) / validGpas.length).toFixed(2));
         }
 
-        const arrearsCount = allMarks.filter(m => {
+        const arrearDetails = allMarks.filter(m => {
           const tot = Number(m.totalMarks ?? (Number(m.internalMarks || 0) + Number(m.semesterMarks || 0)) ?? m.marksObtained ?? 0);
           return m.arrearStatus === 'Arrear' || (m.totalMarks !== undefined && tot < 40);
-        }).length;
-        computedArrears = arrearsCount;
-      }
-
-      // Default baseline if newly enrolled student
-      if (computedCgpa === 0 && (!allMarks || allMarks.length === 0)) {
-        computedCgpa = Number(dbStudent.cgpa || activeStud.cgpa || 0);
-      }
-
-      setStudentDetails({
-        ...dbStudent,
-        id: dbStudent.id || dbStudent.rollNo || sId,
-        referenceId: sId,
-        name: dbStudent.name || activeStud.name || 'Student',
-        dept: dbStudent.dept || dbStudent.department || activeStud.dept || activeStud.department || 'General',
-        cgpa: computedCgpa,
-        arrears: computedArrears,
-        attendance: computedAttendance
-      });
-
-      // 3. Jobs / Drives (strictly this tenant)
-      let rawJobs = Array.isArray(jobsRes.data) ? jobsRes.data : (jobsRes.data?.jobs || []);
-      try {
-        const localJobMap = new Map();
-        rawJobs.forEach(j => localJobMap.set(String(j._id || j.jobId || j.id), j));
-        
-        const items = JSON.parse(localStorage.getItem(`erp_placement_jobs_${tenantId}`) || '[]');
-        if (Array.isArray(items)) {
-          items.forEach(j => {
-            const id = String(j._id || j.jobId || j.id);
-            if (id && !localJobMap.has(id)) {
-              localJobMap.set(id, j);
-            }
-          });
+        });
+        computedArrears = arrearDetails.length;
+        setStudentDetails({
+          ...dbStudent,
+          id: dbStudent.id || dbStudent.rollNo || sId,
+          referenceId: sId,
+          name: dbStudent.name || activeStud.name || 'Student',
+          dept: dbStudent.dept || dbStudent.department || activeStud.dept || activeStud.department || 'General',
+          cgpa: computedCgpa,
+          arrears: computedArrears,
+          attendance: computedAttendance,
+          arrearSubjects: arrearDetails
+        });
+      } else {
+        // Default baseline if newly enrolled student
+        if (computedCgpa === 0) {
+          computedCgpa = Number(dbStudent.cgpa || activeStud.cgpa || 0);
         }
-        rawJobs = Array.from(localJobMap.values());
-      } catch {}
-      setJobs(rawJobs);
+
+        setStudentDetails({
+          ...dbStudent,
+          id: dbStudent.id || dbStudent.rollNo || sId,
+          referenceId: sId,
+          name: dbStudent.name || activeStud.name || 'Student',
+          dept: dbStudent.dept || dbStudent.department || activeStud.dept || activeStud.department || 'General',
+          cgpa: computedCgpa,
+          arrears: computedArrears,
+          attendance: computedAttendance,
+          arrearSubjects: []
+        });
+      }
+
+      // 3. Jobs / Drives with multi-key scanning across all localStorage keys
+      let rawJobs = Array.isArray(jobsRes.data) ? jobsRes.data : (jobsRes.data?.jobs || []);
+      const localJobMap = new Map();
+      rawJobs.forEach(j => localJobMap.set(String(j._id || j.jobId || j.id), j));
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_jobs')) {
+          try {
+            const items = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(items)) {
+              items.forEach(j => {
+                const id = String(j._id || j.jobId || j.id);
+                if (id && !localJobMap.has(id)) {
+                  localJobMap.set(id, j);
+                }
+              });
+            }
+          } catch {}
+        }
+      }
+      setJobs(Array.from(localJobMap.values()));
 
       // 4. Applications for this student (strictly this tenant)
       let rawApps = Array.isArray(appsRes.data) ? appsRes.data : (appsRes.data?.applications || []);
@@ -424,7 +441,17 @@ const StudentPlacements = () => {
           {!isGloballyEligible && (
             <div className="status-banner-tags">
               {!criteria.cgpa.met && <span className="status-banner-tag-item">• Current CGPA ({criteria.cgpa.current}) below benchmark {criteria.cgpa.required.toFixed(1)}</span>}
-              {!criteria.arrears.met && <span className="status-banner-tag-item">• Active Arrears: {criteria.arrears.current}</span>}
+              {!criteria.arrears.met && (
+                <button 
+                  type="button" 
+                  onClick={() => setTab('eligibility')} 
+                  className="status-banner-tag-item"
+                  style={{ cursor: 'pointer', border: '1px solid #f87171', background: '#fee2e2', color: '#991b1b', fontWeight: 800, padding: '3px 10px', borderRadius: '14px' }}
+                  title="Click to view which subjects are standing arrears"
+                >
+                  • Active Arrears: {criteria.arrears.current} (Click to View Details)
+                </button>
+              )}
               {!criteria.attendance.met && <span className="status-banner-tag-item">• Attendance ({criteria.attendance.current}%) below 75%</span>}
             </div>
           )}
@@ -637,29 +664,34 @@ const StudentPlacements = () => {
                 </div>
 
                 <div className="job-card-footer">
-                  {hasApplied ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', width: '100%', justifyContent: 'space-between' }}>
-                      <span className={`applied-status-pill ${
-                        existingApp.status === 'Selected' ? 'selected' : 
-                        existingApp.status === 'Shortlisted' ? 'shortlisted' : 
-                        existingApp.status === 'Rejected' ? 'rejected' : 'applied'
-                      }`}>
-                        {existingApp.status === 'Selected' ? '🏆 Selected' : (existingApp.status === 'Rejected' ? '✕ Not Selected' : `✓ ${existingApp.status || 'Applied'}`)}
-                      </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', width: '100%', justifyContent: 'space-between' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedJobForDetailsModal(job)}
+                      className="btn-view-stage"
+                      style={{ background: '#f1f5f9', color: '#1e293b', border: '1px solid #cbd5e1' }}
+                    >
+                      <Info size={13} /> View Drive Details
+                    </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setSelectedAppForModal(existingApp)}
-                        className="btn-view-stage"
-                      >
-                        <Eye size={13} /> View Stage Details
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <span style={{ fontSize: '0.74rem', color: isEligibleForThisJob ? '#15803d' : '#991b1b', fontWeight: 700 }}>
-                        {isEligibleForThisJob ? 'All criteria satisfied' : 'Criteria check pending'}
-                      </span>
+                    {hasApplied ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span className={`applied-status-pill ${
+                          existingApp.status === 'Selected' ? 'selected' : 
+                          existingApp.status === 'Shortlisted' ? 'shortlisted' : 
+                          existingApp.status === 'Rejected' ? 'rejected' : 'applied'
+                        }`}>
+                          {existingApp.status === 'Selected' ? '🏆 Selected' : (existingApp.status === 'Rejected' ? '✕ Not Selected' : `✓ ${existingApp.status || 'Applied'}`)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAppForModal(existingApp)}
+                          className="btn-view-stage"
+                        >
+                          <Eye size={13} /> Stage Status
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         type="button"
                         onClick={() => handleApply(job)}
@@ -668,8 +700,8 @@ const StudentPlacements = () => {
                       >
                         Apply Now
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -1023,6 +1055,31 @@ const StudentPlacements = () => {
                 </div>
               </div>
 
+              {studentDetails.arrears > 0 && Array.isArray(studentDetails.arrearSubjects) && studentDetails.arrearSubjects.length > 0 && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', marginTop: '-4px' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#991b1b', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Standing Arrear Courses ({studentDetails.arrearSubjects.length}):</span>
+                    <button 
+                      type="button" 
+                      onClick={() => navigate('/student/marks')}
+                      style={{ background: 'none', border: 'none', color: '#2563eb', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      View Full Marksheet →
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {studentDetails.arrearSubjects.map((s, idx) => (
+                      <div key={idx} style={{ fontSize: '0.76rem', color: '#b91c1c', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #fee2e2' }}>
+                        <span>• <strong>{s.subject || s.subjectName || s.subjectCode || 'Course'}</strong> ({s.semester || 'Semester'})</span>
+                        <span style={{ fontWeight: 800, color: '#dc2626', background: '#fee2e2', padding: '2px 6px', borderRadius: '4px' }}>
+                          Total: {s.totalMarks ?? (Number(s.internalMarks || 0) + Number(s.semesterMarks || 0))} (RA)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
                 <div>
                   <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>Classroom Attendance Rate</div>
@@ -1306,6 +1363,169 @@ const StudentPlacements = () => {
                 </button>
               </div>
 
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Corporate Recruitment Drive Details Modal ── */}
+      {selectedJobForDetailsModal && (() => {
+        const job = selectedJobForDetailsModal;
+        const minCgpa = Number(job.eligibility?.cgpa ?? job.minCgpa ?? 6.0);
+        const maxArrears = Number(job.eligibility?.maxArrears ?? job.maxBacklogs ?? 0);
+        const deadlineStr = job.deadline ? new Date(job.deadline).toLocaleDateString() : 'Open Recruitment';
+        const meetsCgpa = (studentDetails?.cgpa || 0) >= minCgpa;
+        const meetsArrears = (studentDetails?.arrears || 0) <= maxArrears;
+        const isEligible = meetsCgpa && meetsArrears;
+        const hasApplied = applications.some(a => 
+          (a.jobId && String(a.jobId) === String(job._id || job.jobId || job.id)) ||
+          ((a.company || '').toLowerCase() === (job.company || '').toLowerCase() && (a.role || '').toLowerCase() === (job.role || '').toLowerCase())
+        );
+
+        const rounds = Array.isArray(job.rounds) && job.rounds.length > 0
+          ? job.rounds
+          : [
+              { name: 'Round 1: Online Aptitude Assessment', type: 'Aptitude' },
+              { name: 'Round 2: Technical Interview', type: 'Technical' },
+              { name: 'Round 3: HR Fitment', type: 'HR' }
+            ];
+
+        return (
+          <div className="placement-modal-backdrop" onClick={() => setSelectedJobForDetailsModal(null)}>
+            <div className="placement-modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px' }}>
+              <div className="modal-header">
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span className="badge-package" style={{ background: '#eff6ff', color: '#2563eb', fontWeight: 800, padding: '3px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>
+                      {job.ctc || job.package || '4.5 LPA'}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: '12px' }}>
+                      Active Corporate Drive
+                    </span>
+                  </div>
+                  <h2 style={{ margin: '4px 0', fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-main, #0f172a)' }}>
+                    {job.company}
+                  </h2>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>
+                    {job.role || 'Graduate Engineer Trainee'} • {job.location || 'Campus / Multiple Locations'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedJobForDetailsModal(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#64748b' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', margin: '16px 0' }}>
+                {/* Key Specifications Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>Min CGPA</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 900, color: meetsCgpa ? '#15803d' : '#dc2626' }}>
+                      {minCgpa} {meetsCgpa ? '✓' : '⚠️'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>Max Backlogs</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 900, color: meetsArrears ? '#15803d' : '#dc2626' }}>
+                      {maxArrears === 0 ? '0 Backlogs' : maxArrears} {meetsArrears ? '✓' : '⚠️'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>Deadline</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                      {deadlineStr}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Job Description / Overview */}
+                <div style={{ background: '#ffffff', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                    📄 Role Overview & Description
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.82rem', lineHeight: 1.5, color: '#475569' }}>
+                    {job.description || `${job.company} is hiring candidates for the position of ${job.role || 'Graduates'}. Selected scholars will undergo specialized technical onboarding followed by live project deployment. Competitive salary and benefits included.`}
+                  </p>
+                </div>
+
+                {/* Selection Process / Rounds */}
+                <div style={{ background: '#ffffff', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                    🎯 Selection Process ({rounds.length} Evaluation Rounds)
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {rounds.map((r, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.8rem' }}>
+                        <span style={{ fontWeight: 700, color: '#1e293b' }}>
+                          Round {i + 1}: {r.name || `Round ${i + 1}`}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px' }}>
+                          {r.type || 'Assessment'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Academic Eligibility Status */}
+                <div style={{ padding: '12px', borderRadius: '8px', background: isEligible ? '#ecfdf5' : '#fffbeb', border: `1px solid ${isEligible ? '#a7f3d0' : '#fde68a'}`, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '1.2rem' }}>{isEligible ? '✅' : '⚠️'}</span>
+                  <div style={{ fontSize: '0.8rem', color: isEligible ? '#065f46' : '#92400e' }}>
+                    <strong>{isEligible ? 'Academic Eligibility Satisfied' : 'Action Required / Criteria Review'}</strong>
+                    <div>Your live CGPA is {studentDetails?.cgpa ?? 0} (Required: {minCgpa}) with {studentDetails?.arrears ?? 0} standing arrears.</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid var(--border-color, #e2e8f0)', paddingTop: '14px' }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedJobForDetailsModal(null)}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '8px',
+                    background: '#f1f5f9',
+                    color: '#475569',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    border: '1px solid #cbd5e1',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+                {hasApplied ? (
+                  <span style={{ padding: '8px 18px', borderRadius: '8px', background: '#dcfce7', color: '#15803d', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    ✓ Already Registered
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedJobForDetailsModal(null);
+                      handleApply(job);
+                    }}
+                    disabled={submitting}
+                    style={{
+                      padding: '8px 22px',
+                      borderRadius: '8px',
+                      background: '#2563eb',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Apply for this Drive →
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         );

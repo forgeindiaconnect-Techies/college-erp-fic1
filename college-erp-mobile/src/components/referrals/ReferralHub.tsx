@@ -144,6 +144,11 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
   const [rules, setRules] = useState<IncentiveRuleItem[]>([]);
   const [selectedSubmission, setSelectedSubmission] = useState<ReferralItem | null>(null);
 
+  // Live Super Admin Form Settings & Published Opportunities
+  const [formConfigs, setFormConfigs] = useState<Record<string, any>>({});
+  const [publishedOpportunities, setPublishedOpportunities] = useState<any[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
+
   // Filter states
   const [offerFilterPartner, setOfferFilterPartner] = useState('All');
   const [offerFilterTag, setOfferFilterTag] = useState('All');
@@ -470,10 +475,15 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
     try {
       setLoading(true);
 
-      const [statsRes, listRes, rulesRes] = await Promise.all([
+      const [statsRes, listRes, rulesRes, ccConfigRes, insConfigRes, baConfigRes, jobConfigRes, oppsRes] = await Promise.all([
         apiGet<any>('referrals/my-stats').catch(() => null),
         apiGet<any>('referrals/my-referrals').catch(() => null),
         apiGet<any>('referrals/rules').catch(() => null),
+        apiGet<any>('referrals/config/public/Credit Card').catch(() => null),
+        apiGet<any>('referrals/config/public/Insurance').catch(() => null),
+        apiGet<any>('referrals/config/public/Bank Account').catch(() => null),
+        apiGet<any>('referrals/config/public/Job').catch(() => null),
+        apiGet<any>('opportunities/published').catch(() => null),
       ]);
 
       if (statsRes?.data) {
@@ -501,6 +511,20 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
         ? rulesRes
         : [];
       setRules(rawRules);
+
+      const configsMap: Record<string, any> = {};
+      if (ccConfigRes?.data) configsMap['Credit Card'] = ccConfigRes.data;
+      if (insConfigRes?.data) configsMap['Insurance'] = insConfigRes.data;
+      if (baConfigRes?.data) configsMap['Bank Account'] = baConfigRes.data;
+      if (jobConfigRes?.data) configsMap['Job'] = jobConfigRes.data;
+      setFormConfigs(configsMap);
+
+      const rawOpps = Array.isArray(oppsRes?.data)
+        ? oppsRes.data
+        : Array.isArray(oppsRes)
+        ? oppsRes
+        : [];
+      setPublishedOpportunities(rawOpps);
     } catch (err) {
       console.warn('Referrals load error:', err);
     } finally {
@@ -545,6 +569,7 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
     setInsNotes('');
     setBaNotes('');
     setJobNotes('');
+    setCustomFieldValues({});
   };
 
   // Validate Step 1
@@ -590,6 +615,7 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
       const payload: any = {
         category: selectedCategory,
         formData: baseFormData,
+        customFields: Object.keys(customFieldValues).length > 0 ? customFieldValues : undefined,
       };
 
       if (selectedCategory === 'Credit Card') {
@@ -732,20 +758,99 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
     });
   }, [submissions, subCategoryFilter, subStatusFilter, subSearchQuery]);
 
-  // Current category offer pool
+  // Dynamic available partners based on Super Admin Form Settings
+  const availablePartners = useMemo<string[]>(() => {
+    const cfg = formConfigs[selectedCategory];
+    if (cfg?.partners && Array.isArray(cfg.partners) && cfg.partners.length > 0) {
+      const active = cfg.partners.filter((p: any) => p.isActive !== false).map((p: any) => String(p.name || ''));
+      if (active.length > 0) return active;
+    }
+    if (selectedCategory === 'Credit Card') return ['HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank', 'Kotak Mahindra Bank'];
+    if (selectedCategory === 'Insurance') return ['Star Health & Allied Insurance', 'HDFC ERGO General Insurance', 'ICICI Lombard General Insurance', 'Tata AIG General Insurance'];
+    if (selectedCategory === 'Bank Account') return ['HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank', 'Kotak Mahindra Bank'];
+    return ['Tata Consultancy Services (TCS)', 'Infosys Limited', 'Cognizant Technology Solutions', 'Zoho Corporation', 'Wipro Limited'];
+  }, [formConfigs, selectedCategory]);
+
+  // Dynamic custom fields from Super Admin Form Settings
+  const dynamicCustomFields = useMemo(() => {
+    const cfg = formConfigs[selectedCategory];
+    if (!cfg?.fieldsConfig || !Array.isArray(cfg.fieldsConfig)) return [];
+    return cfg.fieldsConfig.filter((f: any) => !f.isSystem && f.isActive !== false && f.isVisible !== false);
+  }, [formConfigs, selectedCategory]);
+
+  // Current category offer pool merged with Super Admin live partner products and published opportunities
   const currentOffers = useMemo(() => {
     let pool: OfferProduct[] = [];
-    if (selectedCategory === 'Credit Card') pool = creditCardOffers;
-    else if (selectedCategory === 'Insurance') pool = insuranceOffers;
-    else if (selectedCategory === 'Bank Account') pool = bankAccountOffers;
-    else if (selectedCategory === 'Job') pool = jobOffers;
+    if (selectedCategory === 'Credit Card') pool = [...creditCardOffers];
+    else if (selectedCategory === 'Insurance') pool = [...insuranceOffers];
+    else if (selectedCategory === 'Bank Account') pool = [...bankAccountOffers];
+    else if (selectedCategory === 'Job') pool = [...jobOffers];
+
+    // Merge in live partner products from Super Admin Form Settings
+    const activeCfg = formConfigs[selectedCategory];
+    if (activeCfg?.partners && Array.isArray(activeCfg.partners)) {
+      activeCfg.partners.forEach((partner: any) => {
+        if (partner.isActive === false) return;
+        (partner.products || []).forEach((prod: any) => {
+          if (prod.isActive === false) return;
+          const exists = pool.some(
+            (item) => item.title.toLowerCase() === (prod.name || '').toLowerCase()
+          );
+          if (!exists) {
+            pool.push({
+              id: prod.id || `${partner.code || 'PRT'}-${prod.name}`,
+              partnerName: partner.name,
+              title: prod.name,
+              categoryTag: prod.productCategory || selectedCategory,
+              reward: prod.rewardAmount ? `₹${prod.rewardAmount}` : '₹1,000+',
+              turnaround: prod.turnaroundTime || '2-3 Business Days',
+              annualFee: prod.annualFee || 'Approved Campus Scheme',
+              perks: prod.description || (Array.isArray(prod.features) ? prod.features.join('; ') : 'Official Campus Partner Scheme'),
+              eligibility: prod.eligibilityConditions || 'College students, faculty members, and verified staff.',
+              requiredDocuments: Array.isArray(prod.requiredDocuments) ? prod.requiredDocuments : ['Aadhaar Card', 'PAN Card'],
+            });
+          }
+        });
+      });
+    }
+
+    // Merge in published opportunities from Super Admin
+    publishedOpportunities.forEach((opp: any) => {
+      const oppCat = (opp.category || '').toLowerCase();
+      const selCat = selectedCategory.toLowerCase();
+      const isMatch = oppCat === selCat ||
+        (selCat === 'credit card' && oppCat.includes('credit')) ||
+        (selCat === 'insurance' && oppCat.includes('insur')) ||
+        (selCat === 'bank account' && (oppCat.includes('bank') || oppCat.includes('account'))) ||
+        (selCat === 'job' && oppCat.includes('job'));
+
+      if (isMatch) {
+        const exists = pool.some(
+          (item) => item.title.toLowerCase() === (opp.title || '').toLowerCase()
+        );
+        if (!exists) {
+          pool.push({
+            id: opp._id || opp.opportunityCode || `opp-${opp.title}`,
+            partnerName: opp.providerName || 'Campus Partner',
+            title: opp.title,
+            categoryTag: opp.subCategory || selectedCategory,
+            reward: opp.incentiveConfig?.amount ? `₹${opp.incentiveConfig.amount}` : '₹1,000',
+            turnaround: '2-3 Business Days',
+            annualFee: opp.keyHighlights?.[0] || 'Verified Institutional Scheme',
+            perks: Array.isArray(opp.benefits) ? opp.benefits.join('; ') : (opp.description || 'Verified Campus Referral Program'),
+            eligibility: opp.eligibilityCriteria || opp.description || 'Verified College Members',
+            requiredDocuments: Array.isArray(opp.requirements) ? opp.requirements : ['Aadhaar Card', 'PAN Card'],
+          });
+        }
+      }
+    });
 
     return pool.filter((item) => {
       const matchPartner = offerFilterPartner === 'All' || item.partnerName.toLowerCase().includes(offerFilterPartner.toLowerCase());
       const matchTag = offerFilterTag === 'All' || item.categoryTag.toLowerCase().includes(offerFilterTag.toLowerCase());
       return matchPartner && matchTag;
     });
-  }, [selectedCategory, creditCardOffers, insuranceOffers, bankAccountOffers, jobOffers, offerFilterPartner, offerFilterTag]);
+  }, [selectedCategory, formConfigs, publishedOpportunities, creditCardOffers, insuranceOffers, bankAccountOffers, jobOffers, offerFilterPartner, offerFilterTag]);
 
   // --------------------------------------------------------------------------
   // SCREEN 1: BUSINESS REFERRAL HOME
@@ -1393,7 +1498,7 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
                       <View style={styles.formGroup}>
                         <Text style={styles.fieldLabel}>Partner Bank *</Text>
                         <View style={styles.optionPillRow}>
-                          {['HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank', 'Kotak Mahindra Bank'].map((b) => (
+                          {availablePartners.map((b: string) => (
                             <TouchableOpacity
                               key={b}
                               style={[styles.selectorPill, ccBank === b && styles.selectorPillActive]}
@@ -1485,7 +1590,7 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
                       <View style={styles.formGroup}>
                         <Text style={styles.fieldLabel}>Insurance Provider *</Text>
                         <View style={styles.optionPillRow}>
-                          {['Star Health & Allied Insurance', 'HDFC ERGO General Insurance', 'ICICI Lombard General Insurance', 'Tata AIG General Insurance'].map((p) => (
+                          {availablePartners.map((p: string) => (
                             <TouchableOpacity
                               key={p}
                               style={[styles.selectorPill, insProvider === p && styles.selectorPillActive]}
@@ -1545,7 +1650,7 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
                       <View style={styles.formGroup}>
                         <Text style={styles.fieldLabel}>Partner Bank *</Text>
                         <View style={styles.optionPillRow}>
-                          {['HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank', 'Kotak Mahindra Bank'].map((b) => (
+                          {availablePartners.map((b: string) => (
                             <TouchableOpacity
                               key={b}
                               style={[styles.selectorPill, baBank === b && styles.selectorPillActive]}
@@ -1713,6 +1818,64 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
                     </>
                   )}
 
+                  {/* Dynamic Custom Fields from Super Admin Form Settings */}
+                  {dynamicCustomFields.length > 0 && (
+                    <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: Colors.surfaceBorder }}>
+                      <Text style={[styles.fieldLabel, { fontSize: 13, fontWeight: '700', color: Colors.primaryAccent, marginBottom: 10 }]}>
+                        ✨ Additional Form Fields ({dynamicCustomFields.length})
+                      </Text>
+                      {dynamicCustomFields.map((f: any) => {
+                        const fKey = f.fieldKey || f.fieldName;
+                        const fVal = customFieldValues[fKey] ?? '';
+                        return (
+                          <View key={fKey} style={styles.formGroup}>
+                            <Text style={styles.fieldLabel}>
+                              {f.label || fKey} {f.isRequired ? '*' : ''}
+                            </Text>
+                            {f.fieldType === 'select' && Array.isArray(f.options) && f.options.length > 0 ? (
+                              <View style={styles.optionPillRow}>
+                                {f.options.map((opt: any) => {
+                                  const optVal = typeof opt === 'string' ? opt : (opt.value || opt.label);
+                                  const isSelected = fVal === optVal;
+                                  return (
+                                    <TouchableOpacity
+                                      key={optVal}
+                                      style={[styles.selectorPill, isSelected && styles.selectorPillActive]}
+                                      onPress={() => setCustomFieldValues((prev) => ({ ...prev, [fKey]: optVal }))}
+                                      activeOpacity={0.7}
+                                    >
+                                      <Text style={[styles.selectorPillText, isSelected && styles.selectorPillTextActive]}>
+                                        {typeof opt === 'string' ? opt : (opt.label || opt.value)}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            ) : f.fieldType === 'textarea' ? (
+                              <TextInput
+                                style={[styles.inputField, { height: 60, textAlignVertical: 'top' }]}
+                                multiline
+                                placeholder={f.placeholder || `Enter ${f.label || fKey}...`}
+                                placeholderTextColor={Colors.textLight}
+                                value={String(fVal)}
+                                onChangeText={(text) => setCustomFieldValues((prev) => ({ ...prev, [fKey]: text }))}
+                              />
+                            ) : (
+                              <TextInput
+                                style={styles.inputField}
+                                placeholder={f.placeholder || `Enter ${f.label || fKey}...`}
+                                placeholderTextColor={Colors.textLight}
+                                keyboardType={f.fieldType === 'number' ? 'numeric' : 'default'}
+                                value={String(fVal)}
+                                onChangeText={(text) => setCustomFieldValues((prev) => ({ ...prev, [fKey]: text }))}
+                              />
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+
                   {/* Form Action Buttons */}
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                     <TouchableOpacity
@@ -1835,6 +1998,18 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
                         </View>
                       </>
                     )}
+
+                    {/* Review Dynamic Custom Fields */}
+                    {Object.entries(customFieldValues).map(([k, v]) => {
+                      if (v === undefined || v === null || v === '') return null;
+                      const matchField = dynamicCustomFields.find((f: any) => (f.fieldKey || f.fieldName) === k);
+                      return (
+                        <View key={k} style={styles.reviewRow}>
+                          <Text style={styles.reviewLabel}>{matchField?.label || k}:</Text>
+                          <Text style={styles.reviewValue}>{Array.isArray(v) ? v.join(', ') : String(v)}</Text>
+                        </View>
+                      );
+                    })}
 
                     <View style={styles.reviewRow}>
                       <Text style={styles.reviewLabel}>Consent Status:</Text>

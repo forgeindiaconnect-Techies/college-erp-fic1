@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getPublicReferralFormConfig, getPublishedOpportunities } from '../../api';
 import AccountOpeningReferralModal from '../../components/referrals/AccountOpeningReferralModal';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { useCategoryConfig } from '../../utils/categoryConfig';
 import '../admin/UserManagementCommon.css';
 import './BusinessReferralCategory.css';
@@ -65,6 +66,11 @@ export default function BusinessReferralAccountOpening() {
     fetchConfig();
     fetchAccounts();
   }, [fetchConfig, fetchAccounts]);
+
+  useRealtimeSync(['referral_config', 'opportunities', 'referrals'], () => {
+    fetchConfig();
+    fetchAccounts();
+  });
 
   const handleOpenSubmit = (accountType, bankName) => {
     setSubmitAccountType(accountType || 'Savings Account');

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LogOut as ExitIcon, Search, CheckCircle2, Clock, MapPin,
-  Phone, User, Car, AlertTriangle, RefreshCw, X, QrCode, UserPlus
+  Phone, User, Car, AlertTriangle, RefreshCw, X, QrCode, UserPlus,
+  Printer, ExternalLink, ShieldCheck
 } from 'lucide-react';
 import { getActiveVisitors, recordVisitorExit } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
@@ -14,6 +15,7 @@ const VisitorExitPage = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedVisitor, setSelectedVisitor] = useState(null);
+  const [qrModalVisitor, setQrModalVisitor] = useState(null);
   const [exitNotes, setExitNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -55,6 +57,25 @@ const VisitorExitPage = () => {
         setSelectedVisitor(null);
         setExitNotes('');
         fetchActive();
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Checkout failed', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleQuickCheckout = async (visitor) => {
+    if (!visitor) return;
+    try {
+      setSubmitting(true);
+      const res = await recordVisitorExit(visitor._id, { notes: 'Scanned exit departure checkout' });
+      if (res.data?.success) {
+        showToast(`Visitor ${visitor.name} (${visitor.passNumber}) checked out successfully!`);
+        setQrModalVisitor(null);
+        fetchActive();
+      } else {
+        showToast(res.data?.message || 'Checkout failed', 'error');
       }
     } catch (err) {
       showToast(err.response?.data?.message || 'Checkout failed', 'error');
@@ -239,8 +260,8 @@ const VisitorExitPage = () => {
                             alignItems: 'center',
                             gap: '4px'
                           }}
-                          onClick={() => navigate(`/watchman/qr-verification?type=visitor&code=${encodeURIComponent(v.passNumber)}`)}
-                          title="Open visitor pass in Gate QR Scanner"
+                          onClick={() => setQrModalVisitor(v)}
+                          title={`Scan & verify pass for ${v.name}`}
                         >
                           <QrCode size={13} style={{ color: '#2563eb' }} />
                           <span>Scan</span>
@@ -333,6 +354,170 @@ const VisitorExitPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Visitor Pass QR Code Badge & Scanner Modal */}
+      {qrModalVisitor && (
+        <div className="wmn-modal-overlay">
+          <div className="wmn-modal-card" style={{ maxWidth: '520px' }}>
+            <div className="wmn-modal-header">
+              <div className="wmn-modal-title">
+                <QrCode size={20} style={{ color: '#2563eb' }} />
+                <h3>Visitor Gate Pass & QR Clearance</h3>
+              </div>
+              <button
+                type="button"
+                className="wmn-modal-close-btn"
+                onClick={() => setQrModalVisitor(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="wmn-modal-body">
+              {/* Pass Header Badge */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '10px 14px',
+                background: '#eff6ff',
+                borderRadius: '8px',
+                border: '1px solid #bfdbfe',
+                marginBottom: '16px'
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.72rem', color: '#1e40af', fontWeight: 700, textTransform: 'uppercase' }}>Official Gate Pass</span>
+                  <div style={{ fontFamily: 'monospace', fontSize: '1.05rem', fontWeight: 800, color: '#1e40af' }}>
+                    {qrModalVisitor.passNumber}
+                  </div>
+                </div>
+                <div style={{
+                  background: '#dcfce7',
+                  color: '#15803d',
+                  border: '1px solid #86efac',
+                  padding: '4px 10px',
+                  borderRadius: '20px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }}></span>
+                  <span>Currently Inside Campus</span>
+                </div>
+              </div>
+
+              {/* QR Code and Visitor Summary Card */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '170px 1fr',
+                gap: '16px',
+                padding: '16px',
+                background: '#f8fafc',
+                borderRadius: '10px',
+                border: '1px solid #e2e8f0',
+                alignItems: 'center'
+              }}>
+                {/* Real-time QR Code generated specifically for this visitor's pass */}
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{
+                    padding: '8px',
+                    background: '#ffffff',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    display: 'inline-block',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+                  }}>
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrModalVisitor.passNumber)}`}
+                      alt={`QR for ${qrModalVisitor.name}`}
+                      style={{ width: '136px', height: '136px', display: 'block' }}
+                    />
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '6px', fontWeight: 600 }}>
+                    Scan with barcode gun or mobile
+                  </div>
+                </div>
+
+                {/* Visitor Details */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                      {qrModalVisitor.name}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Phone size={12} />
+                      <span>{qrModalVisitor.phone}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '0.82rem', color: '#334155' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Host: </span>
+                    <strong>{qrModalVisitor.personToMeet}</strong> {qrModalVisitor.department ? `(${qrModalVisitor.department})` : ''}
+                  </div>
+
+                  <div style={{ fontSize: '0.82rem', color: '#334155' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Purpose: </span>
+                    <span>{qrModalVisitor.purpose}</span>
+                  </div>
+
+                  {qrModalVisitor.vehicleNumber && (
+                    <div style={{ fontSize: '0.82rem', color: '#334155' }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Vehicle: </span>
+                      <strong style={{ fontFamily: 'monospace' }}>{qrModalVisitor.vehicleNumber}</strong>
+                    </div>
+                  )}
+
+                  <div style={{ fontSize: '0.82rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Clock size={12} style={{ color: '#64748b' }} />
+                    <span style={{ color: '#64748b' }}>Entry: </span>
+                    <span>{new Date(qrModalVisitor.entryTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="wmn-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <button
+                type="button"
+                className="wmn-btn-sec"
+                style={{ fontSize: '0.82rem', padding: '8px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                onClick={() => {
+                  const pNum = qrModalVisitor.passNumber;
+                  setQrModalVisitor(null);
+                  navigate(`/watchman/qr-verification?type=visitor&code=${encodeURIComponent(pNum)}`);
+                }}
+                title="Open this pass directly in Gate Camera Scanner"
+              >
+                <ExternalLink size={14} style={{ color: '#2563eb' }} />
+                <span>Open in Gate Scanner</span>
+              </button>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="wmn-btn-sec"
+                  onClick={() => setQrModalVisitor(null)}
+                  disabled={submitting}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="wmn-btn-primary"
+                  style={{ background: '#dc2626' }}
+                  onClick={() => handleQuickCheckout(qrModalVisitor)}
+                  disabled={submitting}
+                >
+                  <ExitIcon size={14} />
+                  <span>{submitting ? 'Checking Out...' : 'Record Exit & Checkout'}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

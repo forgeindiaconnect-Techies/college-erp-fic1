@@ -284,6 +284,10 @@ const DriverDashboard = () => {
         </div>
       </div>
 
+      {/* ── Daily Duty Attendance (Single Source of Truth Check-In / Check-Out) ── */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <EmployeeAttendanceCard layout="bar" />
+      </div>
 
       {/* ── 4 KPI Status Cards (Single Source of Truth) ── */}
       <div className="driver-kpi-grid">

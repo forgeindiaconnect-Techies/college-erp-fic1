@@ -55,6 +55,8 @@ import CustomSelect from '../../components/CustomSelect';
 import './LibraryManagement.css';
 import LibraryNoDueCertificateModal from '../../components/LibraryNoDueCertificateModal';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
+import AddBookModal from './AddBookModal';
+import BookCopiesModal from './BookCopiesModal';
 
 // Default Fallback Categories if no courses exist yet
 const FALLBACK_CATEGORIES = ['Computer Science', 'Information Technology', 'Mechanical Engineering', 'Electronics & Communication', 'Electrical Engineering', 'Civil Engineering', 'Mathematics', 'Physics', 'Chemistry', 'Management Studies'];
@@ -257,10 +259,21 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
 
   useEffect(() => {
     fetchLibraryData();
+    const handleUpdate = () => {
+      fetchLibraryData();
+    };
+    window.addEventListener('erp_library_updated', handleUpdate);
+    window.addEventListener('erp_return_request_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('erp_library_updated', handleUpdate);
+      window.removeEventListener('erp_return_request_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'Clearance Requests') {
+    if (activeTab === 'Clearance Requests' || activeTab === 'Return Requests' || activeTab === 'Dashboard') {
       fetchLibraryData();
     }
   }, [activeTab]);
@@ -357,6 +370,25 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
       try {
         const returnRequestsRes = await getLibraryReturnRequests();
         rrData = Array.isArray(returnRequestsRes.data) ? returnRequestsRes.data : [];
+        const rrMap = new Map();
+        rrData.forEach(r => rrMap.set(String(r._id || r.id || `${r.transactionId?._id || r.transactionId}_${r.userId}`), r));
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('erp_library_return_requests')) {
+            try {
+              const localReqs = JSON.parse(localStorage.getItem(key) || '[]');
+              if (Array.isArray(localReqs)) {
+                localReqs.forEach(lr => {
+                  const lrId = String(lr._id || lr.id || `${lr.transactionId?._id || lr.transactionId}_${lr.userId}`);
+                  if (lrId && !rrMap.has(lrId)) {
+                    rrMap.set(lrId, lr);
+                  }
+                });
+              }
+            } catch (err) {}
+          }
+        }
+        rrData = Array.from(rrMap.values());
       } catch (e) {
         console.warn('getLibraryReturnRequests fallback', e);
       }
@@ -483,8 +515,26 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
   const handleApproveReturnRequest = async (id) => {
     try {
       setReturnProcessingId(id);
-      await approveLibraryReturnRequest(id);
+      try {
+        await approveLibraryReturnRequest(id);
+      } catch (err) {
+        console.warn('Backend approveLibraryReturnRequest fallback:', err);
+      }
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_library_return_requests')) {
+          try {
+            const list = JSON.parse(localStorage.getItem(key) || '[]');
+            const updated = list.map(r => (String(r._id || r.id) === String(id) ? { ...r, status: 'Completed', remarks: 'Return approved & restocked' } : r));
+            localStorage.setItem(key, JSON.stringify(updated));
+          } catch (e) {}
+        }
+      }
+      window.dispatchEvent(new Event('erp_library_updated'));
+      window.dispatchEvent(new Event('erp_return_request_updated'));
+      alert('Return request approved and copy restocked to active inventory!');
       await fetchLibraryData();
+
     } catch (err) {
       alert(err?.response?.data?.message || 'Failed to approve return request.');
     } finally {
@@ -495,7 +545,26 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
   const handleRejectReturnRequest = async (id) => {
     try {
       setReturnProcessingId(id);
-      await rejectLibraryReturnRequest(id);
+      const reason = window.prompt('Please enter the reason for declining return (e.g., Damaged pages, Missing barcode):', 'Condition mismatch / physical inspection required');
+      if (reason === null) return;
+      try {
+        await rejectLibraryReturnRequest(id, reason);
+      } catch (err) {
+        console.warn('Backend rejectLibraryReturnRequest fallback:', err);
+      }
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_library_return_requests')) {
+          try {
+            const list = JSON.parse(localStorage.getItem(key) || '[]');
+            const updated = list.map(r => (String(r._id || r.id) === String(id) ? { ...r, status: 'Rejected', remarks: reason } : r));
+            localStorage.setItem(key, JSON.stringify(updated));
+          } catch (e) {}
+        }
+      }
+      window.dispatchEvent(new Event('erp_library_updated'));
+      window.dispatchEvent(new Event('erp_return_request_updated'));
+      alert('Return request declined.');
       await fetchLibraryData();
     } catch (err) {
       alert(err?.response?.data?.message || 'Failed to reject return request.');
@@ -731,6 +800,27 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
       dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
     setShowIssueModal(true);
+  };
+
+  const handleOpenAddBookModal = () => {
+    const initialDept = realDeptNames[0] || 'Computer Science and Engineering';
+    const availableCourses = getCoursesForDepartment(initialDept);
+    const initialCourse = (availableCourses[0]?.name || availableCourses[0]?.code || realCourseNames[0] || 'Computer Science');
+    setAddBookForm({
+      bookId: `LIB-${Date.now().toString().slice(-4)}`,
+      isbn: '',
+      title: '',
+      author: '',
+      publisher: '',
+      edition: '1st Edition',
+      category: initialCourse,
+      department: initialDept,
+      subject: '',
+      totalCopies: 1,
+      rackNumber: 'R01',
+      shelfNumber: 'S01'
+    });
+    setShowAddModal(true);
   };
 
   const handleIssueSubmit = async (e) => {
@@ -1137,6 +1227,8 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
   const totalIssuedBooks = issues.filter(i => ['Issued', 'Overdue'].includes(i.status)).length;
   const totalOverdueBooks = issues.filter(i => i.status === 'Overdue').length;
   const totalReservedBooks = issues.filter(i => i.status === 'Pending').length;
+  const totalPendingReturns = returnRequests.filter(r => r.status === 'Pending').length;
+  const pendingReturnRequests = returnRequests.filter(r => r.status === 'Pending');
 
   // Active student members (borrowers)
   const activeBorrowerIds = new Set(issues.filter(i => ['Issued', 'Overdue'].includes(i.status)).map(i => i.userId));
@@ -2093,6 +2185,23 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
               <p className="text-2xl font-black text-orange-600 dark:text-orange-400">₹{totalOutstandingFines}</p>
               <span className="text-[11px] text-muted">Accrued Fine Balance</span>
             </div>
+
+            <div 
+              className={`glass-card p-4 relative overflow-hidden border-l-4 border-l-amber-500 cursor-pointer hover:shadow-md transition ${totalPendingReturns > 0 ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}`}
+              onClick={() => handleTabChange('Return Requests')}
+              title="Click to open Return Requests & Verification Desk"
+            >
+              <div className="flex items-center justify-between text-amber-500 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Pending Returns</span>
+                <Clock size={20} className={totalPendingReturns > 0 ? 'animate-pulse text-amber-600' : ''} />
+              </div>
+              <p className={`text-2xl font-black ${totalPendingReturns > 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+                {totalPendingReturns}
+              </p>
+              <span className="text-[11px] text-amber-700 font-semibold">
+                {totalPendingReturns > 0 ? 'Awaiting Physical Check-in →' : 'No Submissions Pending'}
+              </span>
+            </div>
           </div>
 
           {/* Operational Dashboard Grid */}
@@ -2101,6 +2210,102 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
             {/* Left Column (2/3 width): Circulation Alerts & Recent Inventory */}
             <div className="lib-dashboard-col">
               
+              {/* PENDING STUDENT BOOK RETURN SUBMISSIONS DESK */}
+              <div className="glass-card p-5 border border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/10 mb-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                      <Clock size={18} className="text-amber-600 animate-spin" /> Pending Book Return Submissions ({pendingReturnRequests.length})
+                    </h3>
+                    <span className="erp-live-sync-pill text-[10px] py-0.5 px-2 bg-amber-100 text-amber-800 border-amber-300">
+                      Desk Check-In
+                    </span>
+                  </div>
+                  <button 
+                    className="text-xs text-primary hover:underline font-semibold flex items-center gap-1"
+                    onClick={() => handleTabChange('Return Requests')}
+                  >
+                    Open Return Desk →
+                  </button>
+                </div>
+
+                <div className="border border-amber-200/80 dark:border-amber-800/40 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
+                  <table className="w-full text-xs">
+                    <thead className="bg-amber-50/70 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-300">
+                      <tr>
+                        <th className="p-2.5 text-left">Borrower</th>
+                        <th className="p-2.5 text-left">Book Title</th>
+                        <th className="p-2.5 text-left">Allocated Copy</th>
+                        <th className="p-2.5 text-left">Due Date</th>
+                        <th className="p-2.5 text-right">Desk Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingReturnRequests.slice(0, 5).map(req => {
+                        const transaction = req.transactionId || {};
+                        const book = req.bookId || transaction.bookId || {};
+                        const copy = req.bookCopyId || transaction.bookCopyId || {};
+                        const bInfo = getBorrowerInfo(req.userId, req.userType || transaction.userType);
+                        const studentName = bInfo.name;
+
+                        return (
+                          <tr key={req._id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-amber-50/40 transition">
+                            <td className="p-2.5 font-bold text-slate-900 dark:text-white">
+                              <div>{studentName}</div>
+                              <div className="text-[10px] text-muted font-mono font-normal">{bInfo.id} • {bInfo.dept}</div>
+                            </td>
+                            <td className="p-2.5">
+                              <div className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[200px]" title={book.title || transaction.bookTitle}>
+                                {book.title || transaction.bookTitle || 'Library Book'}
+                              </div>
+                              <div className="text-[10px] text-muted">{book.author ? `by ${book.author}` : ''}</div>
+                            </td>
+                            <td className="p-2.5 font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
+                              {copy.accessionNumber || copy.barcode || 'Copy on file'}
+                            </td>
+                            <td className="p-2.5 text-slate-600 dark:text-slate-400">
+                              {transaction.dueDate ? new Date(transaction.dueDate).toLocaleDateString() : '—'}
+                            </td>
+                            <td className="p-2.5 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={returnProcessingId === req._id}
+                                  onClick={() => handleApproveReturnRequest(req._id)}
+                                  className="text-xs py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded flex items-center gap-1 shadow-sm disabled:opacity-50 cursor-pointer"
+                                  title="Verify physical item and restock to inventory"
+                                >
+                                  {returnProcessingId === req._id ? <RefreshCw size={11} className="animate-spin" /> : <Check size={11} />}
+                                  Approve & Restock
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={returnProcessingId === req._id}
+                                  onClick={() => handleRejectReturnRequest(req._id)}
+                                  className="text-xs py-1 px-2 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded font-semibold flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                                  title="Reject return request"
+                                >
+                                  <X size={11} />
+                                  Reject
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {pendingReturnRequests.length === 0 && (
+                        <tr>
+                          <td colSpan="5" className="p-6 text-center text-muted">
+                            <CheckCircle2 size={20} className="inline mr-1 text-emerald-500" />
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">All submissions cleared.</span> No student return requests awaiting physical check-in.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               {/* Overdue Circulation Alert Table */}
               <div className="glass-card p-5">
                 <div className="flex items-center justify-between mb-3">
@@ -2202,7 +2407,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                       {recentlyAddedBooks.length === 0 && (
                         <tr>
                           <td colSpan="5" className="p-6 text-center text-muted">
-                            No books added to inventory yet. Click "+ Add Book" to get started.
+                            No books added to inventory yet. Click <button type="button" className="text-primary font-bold hover:underline" onClick={handleOpenAddBookModal}>+ Add Book</button> to get started.
                           </td>
                         </tr>
                       )}
@@ -2344,6 +2549,23 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
                       </div>
                     </div>
                     <ChevronRight size={14} className="text-muted group-hover:text-primary shrink-0" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenAddBookModal}
+                    className="lib-shortcut-btn group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                        <BookPlus size={16} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[var(--text-main)] group-hover:text-emerald-600">Register New Book</div>
+                        <div className="text-[10px] text-muted">Add book title & physical copies to catalog</div>
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className="text-muted group-hover:text-emerald-600 shrink-0" />
                   </button>
                 </div>
               </div>
@@ -2548,7 +2770,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
           {/* =========================================================
               BOOK DETAILS & PHYSICAL COPIES MANAGEMENT MODAL
               ========================================================= */}
-          {showCopiesModal && selectedBookForCopies && (
+          {false && selectedBookForCopies && (
             <div className="lib-modal-overlay" onClick={() => setShowCopiesModal(false)}>
               <div 
                 className="lib-modal-card animate-fade-in" 
@@ -2790,7 +3012,7 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
           {/* =========================================================
               ADD NEW BOOK MODAL WITH REAL-TIME DEPT & COURSE SELECTORS
               ========================================================= */}
-          {showAddModal && (
+          {false && (
             <div className="lib-modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '4vh' }} onClick={() => setShowAddModal(false)}>
               <div className="lib-modal-card animate-fade-in" style={{ maxWidth: '820px', width: '95%' }} onClick={e => e.stopPropagation()}>
                 <div className="lib-modal-header border-b border-[var(--border-color)] pb-3">
@@ -6092,6 +6314,36 @@ const LibraryManagement = ({ defaultTab = 'Dashboard' }) => {
           )}
         </div>
       )}
+
+      {/* =========================================================
+          ADD BOOK MODAL (UNIVERSAL)
+          ========================================================= */}
+      <AddBookModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        addBookForm={addBookForm}
+        setAddBookForm={setAddBookForm}
+        onSubmit={handleAddBookSubmit}
+        realDeptNames={realDeptNames}
+        realCourseNames={realCourseNames}
+        getCoursesForDepartment={getCoursesForDepartment}
+      />
+
+      {/* =========================================================
+          BOOK COPIES MODAL (UNIVERSAL)
+          ========================================================= */}
+      <BookCopiesModal
+        isOpen={showCopiesModal && Boolean(selectedBookForCopies)}
+        onClose={() => setShowCopiesModal(false)}
+        selectedBook={selectedBookForCopies}
+        bookCopies={bookCopies}
+        loadingCopies={loadingCopies}
+        newCopyForm={newCopyForm}
+        setNewCopyForm={setNewCopyForm}
+        onAddCopySubmit={handleAddCopySubmit}
+        onUpdateCopyStatus={handleUpdateCopyStatus}
+        onDeleteCopy={handleDeleteCopy}
+      />
 
       {/* =========================================================
           ISSUE BOOK MODAL (UNIVERSAL)

@@ -12,6 +12,6 @@ const placementApplicationSchema = new mongoose.Schema({
   status: { type: String, default: 'Applied' },
   currentRound: { type: Number, default: 1 },
   roundEvaluations: { type: mongoose.Schema.Types.Mixed, default: {} }
-, collegeId: { type: String } }, { timestamps: true });
+, collegeId: { type: String }, tenantId: { type: String } }, { timestamps: true });
 
 export default mongoose.model('PlacementApplication', placementApplicationSchema);

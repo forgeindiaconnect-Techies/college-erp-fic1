@@ -53,8 +53,15 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // 1. Find User
-    let user = await User.findOne({ email: { $regex: new RegExp(`^${email.trim()}$`, 'i') } });
+    // 1. Find User by email, employee referenceId, or studentId
+    const searchIdentifier = email.trim();
+    let user = await User.findOne({
+      $or: [
+        { email: { $regex: new RegExp(`^${searchIdentifier}$`, 'i') } },
+        { referenceId: { $regex: new RegExp(`^${searchIdentifier}$`, 'i') } },
+        { studentId: { $regex: new RegExp(`^${searchIdentifier}$`, 'i') } }
+      ]
+    });
     if (!user) {
       // Auto-provision if demo Librarian credentials
       if (email.trim().toLowerCase() === 'meena@gmail.com') {

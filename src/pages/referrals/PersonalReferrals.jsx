@@ -133,15 +133,7 @@ export default function PersonalReferrals() {
       if (listRes?.data?.success) setReferrals(listRes.data.data);
       if (oppsRes?.data?.success) {
         const clean = (oppsRes.data.data || []).filter(
-          (o) =>
-            o.opportunityCode !== 'OPP-INS-2026-001' &&
-            o.opportunityCode !== 'OPP-CRD-2026-001' &&
-            o.opportunityCode !== 'OPP-BNK-2026-001' &&
-            o.opportunityCode !== 'OPP-JOB-2026-001' &&
-            o.title !== 'Star Comprehensive Health Insurance Plan' &&
-            o.title !== 'HDFC Millennia Cashback Credit Card' &&
-            o.title !== 'ICICI Mine Student & Youth Zero-Balance Savings Account' &&
-            o.title !== 'TCS Software Engineer / Full Stack Developer Opening'
+          (o) => !o.isDummy && o.opportunityCode !== 'DUMMY-SEED-001'
         );
         setPublishedOpps(clean);
       }

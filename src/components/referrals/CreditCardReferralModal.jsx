@@ -12,6 +12,8 @@ export default function CreditCardReferralModal({
   isOpen,
   onClose,
   defaultBank = 'HDFC Bank',
+  defaultCardProduct = '',
+  opportunity = null,
   onSuccess = null,
   rootRole = 'admin'
 }) {
@@ -140,17 +142,18 @@ export default function CreditCardReferralModal({
       setSuccessReferral(null);
       setCopiedCode(false);
 
-      const targetBank = defaultBank || 'HDFC Bank';
+      const targetBank = opportunity?.providerName || defaultBank || 'HDFC Bank';
       const availableProducts = bankProductCatalog[targetBank] || Object.values(bankProductCatalog)[0] || ['Millennia Cashback Credit Card'];
+      const targetProduct = opportunity?.title || defaultCardProduct || availableProducts[0];
 
       setFormData({
         applicantName: '',
         applicantPhone: '',
         applicantEmail: '',
         city: '',
-        cardCategory: 'Cashback & Rewards',
+        cardCategory: opportunity?.subCategory || 'Cashback & Rewards',
         bankName: targetBank,
-        cardProduct: availableProducts[0],
+        cardProduct: targetProduct,
         employmentType: 'Salaried',
         monthlyIncome: '₹25,000 - ₹50,000',
         referralSource: 'Direct Recommendation',
@@ -161,7 +164,7 @@ export default function CreditCardReferralModal({
         consentTimestamp: null,
       });
     }
-  }, [isOpen, defaultBank]);
+  }, [isOpen, defaultBank, defaultCardProduct, opportunity]);
 
   useEffect(() => {
     if (configLoaded) {
@@ -177,11 +180,11 @@ export default function CreditCardReferralModal({
         return {
           ...prev,
           bankName: activeBank,
-          cardProduct: currentProdValid ? prev.cardProduct : prods[0]
+          cardProduct: currentProdValid ? prev.cardProduct : (opportunity?.title || defaultCardProduct || prods[0])
         };
       });
     }
-  }, [configLoaded, bankProductCatalog, formConfig]);
+  }, [configLoaded, bankProductCatalog, formConfig, opportunity, defaultCardProduct]);
 
   const defaultCreditCardFields = useMemo(() => [
     { fieldKey: 'applicantName', label: 'Applicant Full Name', fieldType: 'text', step: 1, isRequired: true, isVisible: true, placeholder: 'e.g. Ramesh Kumar', sortOrder: 1 },
@@ -199,22 +202,36 @@ export default function CreditCardReferralModal({
   ], []);
 
   const allConfiguredFields = useMemo(() => {
-    const rawList = (formConfig?.fieldsConfig && formConfig.fieldsConfig.length > 0)
+    let rawList = (formConfig?.fieldsConfig && formConfig.fieldsConfig.length > 0)
       ? formConfig.fieldsConfig
       : defaultCreditCardFields;
+
+    // If an opportunity has custom formSchema, blend those fields in as well
+    if (opportunity?.formSchema && Array.isArray(opportunity.formSchema) && opportunity.formSchema.length > 0) {
+      const oppFields = opportunity.formSchema.map((item, idx) => ({
+        fieldKey: item.name || item.fieldKey || `custom_${idx}`,
+        label: item.label || item.name,
+        fieldType: item.type === 'select' ? 'dropdown' : (item.type || 'text'),
+        step: item.step || 2,
+        isRequired: Boolean(item.required),
+        isVisible: true,
+        placeholder: item.placeholder || '',
+        options: item.options || [],
+        sortOrder: 100 + idx
+      }));
+      rawList = [...rawList, ...oppFields];
+    }
+
     const seenKeys = new Set();
-    const seenLabels = new Set();
     const uniqueList = [];
     for (const f of rawList) {
-      const normKey = (f.fieldKey || '').trim().toLowerCase();
-      const normLabel = (f.label || '').trim().toLowerCase();
-      if (!normKey || seenKeys.has(normKey) || (normLabel && seenLabels.has(normLabel))) continue;
+      const normKey = (f.fieldKey || f.name || '').trim().toLowerCase();
+      if (!normKey || seenKeys.has(normKey)) continue;
       seenKeys.add(normKey);
-      if (normLabel) seenLabels.add(normLabel);
       uniqueList.push(f);
     }
     return uniqueList.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-  }, [formConfig, defaultCreditCardFields]);
+  }, [formConfig, defaultCreditCardFields, opportunity]);
 
   const step1Fields = useMemo(() => {
     return allConfiguredFields.filter(f => (!f.step || f.step === 1) && f.isVisible !== false);
@@ -222,6 +239,10 @@ export default function CreditCardReferralModal({
 
   const step2Fields = useMemo(() => {
     return allConfiguredFields.filter(f => f.step === 2 && f.isVisible !== false);
+  }, [allConfiguredFields]);
+
+  const step3Fields = useMemo(() => {
+    return allConfiguredFields.filter(f => f.step === 3 && f.isVisible !== false);
   }, [allConfiguredFields]);
 
   const resolveField = (f) => {
@@ -313,13 +334,15 @@ export default function CreditCardReferralModal({
   };
 
   const validateStep = (stepNumber) => {
-    const targetFields = stepNumber === 1 ? step1Fields : step2Fields;
+    const targetFields = stepNumber === 1
+      ? step1Fields
+      : (stepNumber === 2 ? step2Fields : (stepNumber === 3 ? step3Fields : []));
     const errors = {};
 
     targetFields.forEach(f => {
       if (f.isVisible === false) return;
       const key = f.fieldKey;
-      let val = formData[key];
+      let val = formData[key] !== undefined && formData[key] !== null ? formData[key] : customFields[key];
 
       if (val === undefined || val === null || val === '') {
         if (key === 'applicantName') val = formData.name;
@@ -697,9 +720,26 @@ export default function CreditCardReferralModal({
                 </div>
               )}
 
-              {/* ── STEP 3: CONSENT & PRIVACY ── */}
+              {/* ── STEP 3: CONSENT & PRIVACY & ADDITIONAL FIELDS ── */}
               {currentStep === 3 && (
                 <div>
+                  {step3Fields.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+                      {step3Fields.map(field => {
+                        const resolvedField = resolveField(field);
+                        return (
+                          <DynamicFieldRenderer
+                            key={field.fieldKey}
+                            field={resolvedField}
+                            value={formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : (customFields[field.fieldKey] || '')}
+                            onChange={handleFieldChange}
+                            error={fieldErrors[field.fieldKey]}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div className="cc-consent-box">
                     <div className="cc-consent-notice-title">
                       <span>Statutory Banking Privacy Notice</span>
@@ -802,6 +842,32 @@ export default function CreditCardReferralModal({
                       })}
                     </div>
                   </div>
+
+                  {/* Review Additional / Step 3 Details */}
+                  {step3Fields.length > 0 && (
+                    <div className="cc-review-card">
+                      <div className="cc-review-header">
+                        <div className="cc-review-title">
+                          <CheckCircle2 size={15} className="text-emerald-600" />
+                          <span>Additional Information</span>
+                        </div>
+                        <button type="button" className="cc-edit-btn" onClick={() => setCurrentStep(3)}>
+                          Edit
+                        </button>
+                      </div>
+                      <div className="cc-review-grid">
+                        {step3Fields.map(field => {
+                          const val = formData[field.fieldKey] !== undefined ? formData[field.fieldKey] : customFields[field.fieldKey];
+                          return (
+                            <div key={field.fieldKey} className="cc-review-item">
+                              <span>{field.label}</span>
+                              <strong>{String(val || '—')}</strong>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Review Consent */}
                   <div className="cc-review-card">

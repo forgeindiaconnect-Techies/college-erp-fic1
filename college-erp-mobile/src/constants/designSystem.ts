@@ -23,6 +23,8 @@ export const Colors = {
   background: '#F8FAFC',      // Clean Slate / Very Light Blue-Grey Screen Background
   surface: '#FFFFFF',         // Pure White Cards & Panels
   surfaceBorder: '#E2E8F0',   // Subtle Card & Row Borders
+  borderLight: '#E2E8F0',
+  border: '#E2E8F0',
   surfaceHover: '#F1F5F9',
 
   // Typography Palette

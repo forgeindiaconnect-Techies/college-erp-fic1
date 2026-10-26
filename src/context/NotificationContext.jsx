@@ -108,6 +108,7 @@ export const NotificationProvider = ({ children }) => {
     };
 
     window.addEventListener('erp_notification_received', handleLocalNotifEvent);
+    window.addEventListener('erp_notification_updated', handleLocalNotifEvent);
     window.addEventListener('storage', () => fetchNotifications());
 
     // Determine target socket server URL
@@ -174,6 +175,7 @@ socket.on('dataUpdated', (payload) => {
 
     return () => {
       window.removeEventListener('erp_notification_received', handleLocalNotifEvent);
+      window.removeEventListener('erp_notification_updated', handleLocalNotifEvent);
       socket.disconnect();
     };
   }, [user]);

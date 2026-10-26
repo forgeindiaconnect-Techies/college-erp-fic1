@@ -1,12 +1,36 @@
 import React, {
   useState,
   useEffect,
-  useCallback
+  useCallback,
+  useMemo
 } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAssignments, submitAssignment as apiSubmitAssignment, getStudentSubmissions } from '../../api/index';
+import {
+  getAssignments,
+  submitAssignment as apiSubmitAssignment,
+  getStudentSubmissions
+} from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
-import { ClipboardList, Calendar, Users, X, CheckCircle, FileText, ArrowLeft, UploadCloud } from 'lucide-react';
+import {
+  ClipboardList,
+  Calendar,
+  CheckCircle,
+  FileText,
+  UploadCloud,
+  Clock,
+  Search,
+  RefreshCw,
+  Award,
+  ChevronRight,
+  XCircle,
+  X,
+  BookOpen,
+  GraduationCap,
+  AlertTriangle,
+  User,
+  CheckCircle2,
+  FileCheck
+} from 'lucide-react';
 import './StudentAssignments.css';
 
 const StudentAssignments = () => {
@@ -14,17 +38,19 @@ const StudentAssignments = () => {
   const [loading, setLoading] = useState(true);
   const [studentSession, setStudentSession] = useState(null);
   const [assignments, setAssignments] = useState([]);
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'pending' | 'submitted' | 'cia'
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Submission popup state
   const [submitOpen, setSubmitOpen] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
   const [fileName, setFileName] = useState('');
   const [submittedTasks, setSubmittedTasks] = useState({});
+  const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const loadAssignments = useCallback(async () => {
-    const session =
-      sessionStorage.getItem('student_session');
+    const session = sessionStorage.getItem('student_session');
 
     if (!session) {
       navigate('/student/login');
@@ -45,27 +71,25 @@ const StudentAssignments = () => {
     try {
       setLoading(true);
 
-      const [assignmentResponse, submissionResponse] =
-        await Promise.all([
-          getAssignments(),
-          getStudentSubmissions(studentId).catch(() => ({ data: [] }))
-        ]);
+      const [assignmentResponse, submissionResponse] = await Promise.all([
+        getAssignments(),
+        getStudentSubmissions(studentId).catch(() => ({ data: [] }))
+      ]);
 
-      const assignmentData =
-        Array.isArray(assignmentResponse?.data)
-          ? assignmentResponse.data
-          : [];
+      const assignmentData = Array.isArray(assignmentResponse?.data)
+        ? assignmentResponse.data
+        : [];
 
-      const submissionData =
-        Array.isArray(submissionResponse?.data)
-          ? submissionResponse.data
-          : [];
+      const submissionData = Array.isArray(submissionResponse?.data)
+        ? submissionResponse.data
+        : [];
 
       const submissionMap = {};
-
       submissionData.forEach(submission => {
-        submissionMap[submission.assignmentId] =
-          submission;
+        const aId = submission.assignmentId?._id || submission.assignmentId || submission.id;
+        if (aId) {
+          submissionMap[aId] = submission;
+        }
       });
 
       const studentDept = (activeStudent.dept || activeStudent.department || '').toLowerCase().trim();
@@ -77,13 +101,21 @@ const StudentAssignments = () => {
         const aSem = (a.class || a.semester || a.sem || '').toLowerCase().trim();
         const aSemNum = aSem.replace(/\D/g, '');
 
-        // If assignment is for all departments / general language course / core curriculum
         const isGeneral = !aDept || aDept === 'all' || aDept === 'general' || aDept === 'core curriculum';
-        const deptMatch = isGeneral || !studentDept || aDept.includes(studentDept) || studentDept.includes(aDept) || (a.subject && (studentDept.includes(a.subject.toLowerCase()) || a.subject.toLowerCase().includes(studentDept)));
+        const deptMatch =
+          isGeneral ||
+          !studentDept ||
+          aDept.includes(studentDept) ||
+          studentDept.includes(aDept) ||
+          (a.subject && (studentDept.includes(a.subject.toLowerCase()) || a.subject.toLowerCase().includes(studentDept)));
 
-        // Semester match
         const isAllSem = !aSem || aSem === 'all' || !studentSem;
-        const semMatch = isAllSem || aSem === studentSem || (studentSemNum && aSemNum && studentSemNum === aSemNum) || aSem.includes(studentSem) || studentSem.includes(aSem);
+        const semMatch =
+          isAllSem ||
+          aSem === studentSem ||
+          (studentSemNum && aSemNum && studentSemNum === aSemNum) ||
+          aSem.includes(studentSem) ||
+          studentSem.includes(aSem);
 
         return deptMatch && semMatch;
       });
@@ -91,10 +123,7 @@ const StudentAssignments = () => {
       setAssignments(filteredAssignments.length > 0 ? filteredAssignments : assignmentData);
       setSubmittedTasks(submissionMap);
     } catch (error) {
-      console.error(
-        'Failed to load student assignments:',
-        error
-      );
+      console.error('Failed to load student assignments:', error);
       setAssignments([]);
       setSubmittedTasks({});
     } finally {
@@ -106,11 +135,54 @@ const StudentAssignments = () => {
     loadAssignments();
   }, [loadAssignments]);
 
-  useRealtimeSync(
-    loadAssignments,
-    'assignments'
-  );
+  useRealtimeSync(loadAssignments, 'assignments');
 
+  // Computed metrics
+  const pendingAssignments = useMemo(() => {
+    return assignments.filter(a => !submittedTasks[a._id || a.id]);
+  }, [assignments, submittedTasks]);
+
+  const submittedAssignments = useMemo(() => {
+    return assignments.filter(a => !!submittedTasks[a._id || a.id]);
+  }, [assignments, submittedTasks]);
+
+  const overdueAssignments = useMemo(() => {
+    return pendingAssignments.filter(a => {
+      if (!a.dueDate) return false;
+      const d = new Date(a.dueDate);
+      return !isNaN(d.getTime()) && d < new Date();
+    });
+  }, [pendingAssignments]);
+
+  const isAllCleared = pendingAssignments.length === 0 && assignments.length > 0;
+  const onTimeRate = assignments.length > 0
+    ? Math.round((submittedAssignments.length / assignments.length) * 100)
+    : 100;
+
+  // Filtered list based on active tab and search query
+  const displayedAssignments = useMemo(() => {
+    let list = assignments;
+
+    if (activeTab === 'pending') {
+      list = pendingAssignments;
+    } else if (activeTab === 'submitted') {
+      list = submittedAssignments;
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(a =>
+        (a.title || '').toLowerCase().includes(q) ||
+        (a.subject || '').toLowerCase().includes(q) ||
+        (a.faculty || '').toLowerCase().includes(q) ||
+        (a.description || '').toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }, [assignments, activeTab, pendingAssignments, submittedAssignments, searchQuery]);
+
+  // Submission Modal Handlers
   const openSubmit = (task) => {
     setActiveTask(task);
     setFileName('');
@@ -121,6 +193,7 @@ const StudentAssignments = () => {
   const closeSubmit = () => {
     setSubmitOpen(false);
     setActiveTask(null);
+    setSubmitting(false);
   };
 
   const handleFileSelect = (e) => {
@@ -134,17 +207,19 @@ const StudentAssignments = () => {
     if (!activeTask) return;
 
     try {
+      setSubmitting(true);
       const studentId =
         studentSession?.id ||
-        studentSession?.referenceId;
+        studentSession?.referenceId ||
+        studentSession?._id;
 
       if (!studentId || !studentSession?.name) {
         alert('Student session is incomplete.');
         return;
       }
 
-      if (!fileName) {
-        alert('Please select a submission file.');
+      if (!fileName.trim()) {
+        alert('Please choose a file or type a filename for submission.');
         return;
       }
 
@@ -154,130 +229,460 @@ const StudentAssignments = () => {
         department:
           studentSession.dept ||
           studentSession.department ||
-          '',
-        fileName
+          activeTask.department ||
+          'General',
+        fileName: fileName.trim()
       };
-      
+
       const res = await apiSubmitAssignment(activeTask._id || activeTask.id, payload);
-      
+
       setSubmittedTasks(prev => ({
         ...prev,
-        [activeTask._id || activeTask.id]: res.data
+        [activeTask._id || activeTask.id]: res.data || {
+          fileName: fileName.trim(),
+          submittedAt: new Date().toISOString()
+        }
       }));
 
       setSuccess(true);
       setTimeout(() => {
         closeSubmit();
         setSuccess(false);
-      }, 800);
+      }, 700);
     } catch (err) {
       console.error('Submission error:', err);
       alert(err.response?.data?.message || 'Error submitting assignment');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
     <div className="student-assignments-page animate-fade-in">
-      <div className="page-header-student">
-        <div className="header-left-s">
-          
-          <div>
-            <h1>Course Assignments</h1>
-            <p className="text-muted">Stay up to date with tasks assigned by your instructors and upload submissions.</p>
+      {/* ── Top Header Bar ── */}
+      <div className="assignments-top-header">
+        <div className="assignments-header-left">
+          <button
+            type="button"
+            className="btn-erp-back"
+            onClick={() => navigate('/student/dashboard')}
+          >
+            <ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} /> Back
+          </button>
+          <div className="assignments-title-group">
+            <h1>Course Assignments & Continuous Assessments</h1>
+            <p>
+              Continuous internal assessments (CIA), coursework guidelines, due dates, and digital submissions.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <button
+            type="button"
+            className="btn-erp-sync"
+            onClick={loadAssignments}
+            disabled={loading}
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Sync Assignments
+          </button>
+        </div>
+      </div>
+
+      {/* ── Overall Assignment Compliance / Status Banner ── */}
+      <div
+        className={`assignments-status-banner ${
+          isAllCleared ? 'banner-success' : 'banner-warning'
+        }`}
+      >
+        <div
+          className={`banner-icon-box-status ${
+            isAllCleared ? 'icon-success' : 'icon-warning'
+          }`}
+        >
+          {isAllCleared ? <CheckCircle size={26} /> : <XCircle size={26} />}
+        </div>
+        <div className="banner-info-body">
+          <div className="banner-headline-row">
+            <h2>Overall Assignment Status:</h2>
+            <span
+              className={`banner-badge-pill ${
+                isAllCleared ? 'pill-success' : 'pill-warning'
+              }`}
+            >
+              {isAllCleared
+                ? 'All Coursework Cleared ✓'
+                : 'Criteria Pending / Action Required'}
+            </span>
+          </div>
+
+          <p className="banner-desc">
+            {isAllCleared
+              ? `All semester continuous assessments have been submitted on schedule. Your submissions are recorded for final Continuous Internal Assessment (CIA) credit.`
+              : `Please ensure your coursework solutions are submitted before the scheduled due dates for continuous assessment evaluation.`}
+          </p>
+
+          <div className="banner-bullets-row">
+            <span className="banner-bullet-item" style={{ color: pendingAssignments.length > 0 ? '#dc2626' : '#15803d' }}>
+              • {pendingAssignments.length} Pending Submissions
+            </span>
+            <span className="banner-bullet-item" style={{ color: '#15803d' }}>
+              • {submittedAssignments.length} Submitted Under Review
+            </span>
+            {overdueAssignments.length > 0 && (
+              <span className="banner-bullet-item" style={{ color: '#dc2626', fontWeight: 800 }}>
+                • ⚠️ {overdueAssignments.length} Overdue Task(s)
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="student-assignments-grid">
-        {loading ? (
-          Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="glass-card assignment-skeleton-card">
-              <div className="skeleton" style={{ height: '24px', width: '40%', marginBottom: '1rem' }}></div>
-              <div className="skeleton" style={{ height: '16px', width: '80%', marginBottom: '0.6rem' }}></div>
-              <div className="skeleton" style={{ height: '36px', width: '100%' }}></div>
+      {/* ── 4-Card Executive KPI Metrics Strip ── */}
+      <div className="assignments-kpi-grid">
+        {/* KPI 1: Total Assignments */}
+        <div className="assignment-kpi-card blue">
+          <div className="kpi-header-line">
+            <span className="kpi-title-label blue">Total Coursework</span>
+            <div className="kpi-icon-bubble blue">
+              <BookOpen size={18} />
             </div>
-          ))
-        ) : assignments.length === 0 ? (
-          <div className="glass-card no-assignments-banner-s col-span-full">
-            <ClipboardList size={40} className="text-muted" style={{ marginBottom: '1rem' }} />
-            <h3>No Pending Assignments</h3>
-            <p className="text-muted">Your semester courses do not have active homework tasks assigned.</p>
           </div>
-        ) : (
-          assignments.map(a => {
-            const assignmentId = a._id || a.id;
-            const isSubmitted = !!submittedTasks[assignmentId];
-            const subData = submittedTasks[assignmentId];
+          <div className="kpi-number-display blue">{assignments.length}</div>
+          <div className="kpi-subtitle-note">
+            {studentSession?.department || studentSession?.dept || 'Core Curriculum'} • Sem {studentSession?.sem || '1'}
+          </div>
+        </div>
 
-            return (
-              <div key={assignmentId} className="glass-card s-assignment-card">
-                <div className="s-assignment-header">
-                  <span className="subject-code-tag" style={{ background: 'rgba(55, 48, 165, 0.1)', color: '#3730A5', border: '1px solid rgba(55, 48, 165, 0.2)' }}>{a.subject}</span>
-                  <span className={`status-pill ${isSubmitted ? 'submitted' : 'pending'}`}>
-                    {isSubmitted ? '✓ Submitted' : 'Pending Submission'}
-                  </span>
-                </div>
+        {/* KPI 2: Pending Submissions */}
+        <div className="assignment-kpi-card amber">
+          <div className="kpi-header-line">
+            <span className="kpi-title-label amber">Pending Submission</span>
+            <div className="kpi-icon-bubble amber">
+              <Clock size={18} />
+            </div>
+          </div>
+          <div className="kpi-number-display amber">{pendingAssignments.length}</div>
+          <div className="kpi-subtitle-note" style={{ color: pendingAssignments.length > 0 ? '#b45309' : '#15803d' }}>
+            {pendingAssignments.length > 0 ? 'Requires Student Upload' : 'Zero Pending Tasks ✓'}
+          </div>
+        </div>
 
-                <div className="s-assignment-body">
-                  <h3>{a.title}</h3>
-                  <p className="instructor-label">Instructor: <strong>{a.faculty}</strong></p>
-                  <p className="guideline-text">"{a.description}"</p>
-                </div>
+        {/* KPI 3: Submitted Coursework */}
+        <div className="assignment-kpi-card green">
+          <div className="kpi-header-line">
+            <span className="kpi-title-label green">Submitted Tasks</span>
+            <div className="kpi-icon-bubble green">
+              <CheckCircle size={18} />
+            </div>
+          </div>
+          <div className="kpi-number-display green">{submittedAssignments.length}</div>
+          <div className="kpi-subtitle-note" style={{ color: '#15803d' }}>
+            Under Faculty Evaluation
+          </div>
+        </div>
 
-                <div className="s-assignment-footer">
-                  <div className="footer-details-row">
-                    <div className="detail-item">
-                      <Calendar size={14} />
-                      <span>Due Date: <strong>{a.dueDate}</strong></span>
-                    </div>
-                  </div>
+        {/* KPI 4: CIA Completion Rate */}
+        <div className="assignment-kpi-card purple">
+          <div className="kpi-header-line">
+            <span className="kpi-title-label purple">CIA Completion</span>
+            <div className="kpi-icon-bubble purple">
+              <Award size={18} />
+            </div>
+          </div>
+          <div className="kpi-number-display purple">{onTimeRate}%</div>
+          <div className="kpi-subtitle-note" style={{ color: '#6d28d9' }}>
+            Internal Assessment Weightage
+          </div>
+        </div>
+      </div>
 
-                  {isSubmitted ? (
-                    <div className="submitted-file-info" style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-main)', background: 'var(--bg-secondary)', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem' }}>
-                        <FileText size={14} className="text-primary-s" />
-                        <span>{subData.fileName}</span>
-                      </div>
-                      <button className="btn-ghost" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', color: 'var(--primary)' }} onClick={() => openSubmit(a)}>
-                        Resubmit
-                      </button>
-                    </div>
-                  ) : (
-                    <button className="btn-submit-task" style={{ background: '#3730A5', color: 'white', boxShadow: '0 4px 10px rgba(55, 48, 165, 0.25)', border: 'none' }} onClick={() => openSubmit(a)}>
-                      <UploadCloud size={14} /> Submit Task
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })
+      {/* ── Tab Navigation & Search Bar ── */}
+      <div className="assignments-tabs-bar">
+        <div className="assignments-tabs-list">
+          {[
+            { key: 'all', label: `📋 All Coursework (${assignments.length})` },
+            { key: 'pending', label: `⏳ Pending (${pendingAssignments.length})` },
+            { key: 'submitted', label: `✓ Submitted (${submittedAssignments.length})` },
+            { key: 'cia', label: '🎓 Continuous Assessment (CIA) Guidelines' }
+          ].map(t => (
+            <button
+              key={t.key}
+              type="button"
+              className={`tab-nav-btn ${activeTab === t.key ? 'active' : 'inactive'}`}
+              onClick={() => setActiveTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab !== 'cia' && (
+          <div className="assignments-search-wrapper">
+            <Search
+              size={15}
+              style={{
+                position: 'absolute',
+                left: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-muted, #94a3b8)'
+              }}
+            />
+            <input
+              type="text"
+              className="assignments-search-input"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search subject, topic, or instructor..."
+            />
+          </div>
         )}
       </div>
 
-      {/* Mock Submit Dialog */}
-      {submitOpen && (
-        <div className="modal-overlay" onClick={closeSubmit}>
-          <div className="modal-card glass-card" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <h2>Upload Coursework</h2>
-                <p className="text-muted" style={{ fontSize: '0.85rem' }}>{activeTask?.title}</p>
+      {/* ── TAB 1 / 2 / 3: Coursework Cards Grid ── */}
+      {activeTab !== 'cia' && (
+        <>
+          {loading ? (
+            <div className="assignments-cards-grid">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="assignment-erp-card" style={{ minHeight: 220, opacity: 0.6 }}>
+                  <div style={{ height: 20, width: '40%', background: '#e2e8f0', borderRadius: 4 }} />
+                  <div style={{ height: 28, width: '75%', background: '#e2e8f0', borderRadius: 6, margin: '10px 0' }} />
+                  <div style={{ height: 16, width: '50%', background: '#e2e8f0', borderRadius: 4 }} />
+                  <div style={{ height: 38, width: '100%', background: '#e2e8f0', borderRadius: 8, marginTop: 'auto' }} />
+                </div>
+              ))}
+            </div>
+          ) : displayedAssignments.length === 0 ? (
+            <div className="empty-assignments-box">
+              <div className="empty-assignments-icon">
+                <ClipboardList size={28} />
               </div>
-              <button className="btn-icon" onClick={closeSubmit}><X size={20} /></button>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+                No Assignments Found
+              </h3>
+              <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b', maxWidth: 420 }}>
+                {searchQuery
+                  ? `No coursework matched your search term "${searchQuery}". Clear your search or try another query.`
+                  : activeTab === 'pending'
+                  ? 'Great job! You have submitted all assigned coursework for your active semester courses.'
+                  : activeTab === 'submitted'
+                  ? 'No completed submissions yet. Choose a pending task to submit your solution.'
+                  : 'Your department instructors have not scheduled active assignments at this moment.'}
+              </p>
+            </div>
+          ) : (
+            <div className="assignments-cards-grid">
+              {displayedAssignments.map(a => {
+                const assignmentId = a._id || a.id;
+                const isSubmitted = !!submittedTasks[assignmentId];
+                const subData = submittedTasks[assignmentId];
+                const isOverdue = !isSubmitted && a.dueDate && new Date(a.dueDate) < new Date();
+
+                const formattedDueDate = a.dueDate
+                  ? new Date(a.dueDate).toLocaleDateString('en-IN', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric'
+                    })
+                  : 'Flexible Schedule';
+
+                return (
+                  <div key={assignmentId} className="assignment-erp-card">
+                    {/* Top Row: Subject Chip & Status Pill */}
+                    <div className="assignment-card-top">
+                      <span className="subject-tag-chip">
+                        {a.subject || 'GENERAL'}
+                      </span>
+                      <span
+                        className={`status-indicator-badge ${
+                          isSubmitted ? 'submitted' : isOverdue ? 'overdue' : 'pending'
+                        }`}
+                      >
+                        {isSubmitted
+                          ? '✓ Submitted'
+                          : isOverdue
+                          ? '⚠️ Overdue'
+                          : 'Pending Submission'}
+                      </span>
+                    </div>
+
+                    {/* Card Body */}
+                    <div className="assignment-card-body">
+                      <h3 className="assignment-card-title">{a.title}</h3>
+                      <div className="assignment-faculty-row">
+                        <User size={13} />
+                        <span>
+                          Instructor: <strong>{a.faculty || 'Course Faculty'}</strong>
+                        </span>
+                      </div>
+                      {a.description && (
+                        <p className="assignment-guideline-quote">
+                          "{a.description}"
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Metadata Strip */}
+                    <div className="assignment-card-meta-row">
+                      <div className={`meta-chip-item ${isOverdue ? 'overdue' : ''}`}>
+                        <Calendar size={13} />
+                        <span>
+                          Due Date: <strong>{formattedDueDate}</strong>
+                        </span>
+                      </div>
+                      <div className="meta-chip-item">
+                        <GraduationCap size={13} />
+                        <span>CIA Weight: <strong>25 Marks</strong></span>
+                      </div>
+                    </div>
+
+                    {/* Card Action Footer */}
+                    <div className="assignment-card-footer">
+                      {isSubmitted ? (
+                        <div className="submitted-receipt-pill">
+                          <span className="submitted-file-name" title={subData?.fileName}>
+                            <FileCheck size={14} color="#15803d" />
+                            {subData?.fileName || 'solution_submission.pdf'}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn-resubmit-link"
+                            onClick={() => openSubmit(a)}
+                          >
+                            Resubmit
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-submit-coursework"
+                          onClick={() => openSubmit(a)}
+                        >
+                          <UploadCloud size={15} /> Upload & Submit Solution
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── TAB 4: Continuous Assessment (CIA) Guidelines ── */}
+      {activeTab === 'cia' && (
+        <div className="cia-guidelines-container">
+          <div className="cia-card-policy">
+            <div className="cia-policy-header">
+              <div className="cia-policy-icon">
+                <GraduationCap size={22} />
+              </div>
+              <div className="cia-policy-title">
+                <h3>Institutional Continuous Internal Assessment (CIA) Regulations</h3>
+                <p>Arignar Anna College of Arts & Science • Academic Evaluation Framework</p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.88rem', color: '#334155', lineHeight: 1.6, margin: '0 0 16px' }}>
+              The Continuous Internal Assessment (CIA) represents a vital component (25% to 40% weighting) of your consolidated semester grade. Regular and authentic submission of periodic homework, seminar papers, and research case studies is compulsory for semester exam hall ticket eligibility.
+            </p>
+
+            <div className="cia-breakdown-grid">
+              <div className="cia-breakdown-item">
+                <h4>1. Assignment & Case Studies</h4>
+                <p>Minimum 2 comprehensive submissions per registered semester course, evaluated on conceptual depth and clarity.</p>
+                <span className="weight-tag">Weightage: 10 Marks</span>
+              </div>
+
+              <div className="cia-breakdown-item">
+                <h4>2. Periodic CIA Mid-Term Tests</h4>
+                <p>Two continuous internal assessments conducted mid-semester to track syllabus progression.</p>
+                <span className="weight-tag">Weightage: 10 Marks</span>
+              </div>
+
+              <div className="cia-breakdown-item">
+                <h4>3. Classroom Attendance & Viva</h4>
+                <p>Minimum 75% attendance threshold in lecture sessions and active seminar presentations.</p>
+                <span className="weight-tag">Weightage: 5 Marks</span>
+              </div>
+
+              <div className="cia-breakdown-item">
+                <h4>4. Submission Deadlines & Review</h4>
+                <p>Digital uploads must be made in standard PDF format. Late submissions after deadline attract letter grade deductions.</p>
+                <span className="weight-tag">Deadline: Strict Due Date</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Submit Assignment Modal Dialog ── */}
+      {submitOpen && (
+        <div className="erp-assignment-modal-overlay" onClick={closeSubmit}>
+          <div
+            className="erp-assignment-modal-card"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="erp-modal-header">
+              <div>
+                <h3 className="erp-modal-title">Upload Coursework Solution</h3>
+                <p className="erp-modal-subtitle">
+                  {activeTask?.subject} • {activeTask?.title}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-close-modal"
+                onClick={closeSubmit}
+              >
+                <X size={20} />
+              </button>
             </div>
 
             {success && (
-              <div className="modal-success-flash">
+              <div
+                style={{
+                  margin: '16px 22px 0',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  background: '#dcfce7',
+                  border: '1px solid #bbf7d0',
+                  color: '#15803d',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}
+              >
                 <CheckCircle size={18} /> Assignment submitted successfully!
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="modal-form">
-              <div className="form-group">
-                <label>File Upload</label>
+            <form onSubmit={handleSubmit}>
+              <div className="erp-modal-body">
+                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.8rem', color: '#475569' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span>Candidate Name:</span>
+                    <strong style={{ color: '#0f172a' }}>{studentSession?.name || 'Student Scholar'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span>Department / Class:</span>
+                    <strong style={{ color: '#0f172a' }}>{studentSession?.dept || 'Tamil'} • Sem {studentSession?.sem || '1'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Scheduled Due Date:</span>
+                    <strong style={{ color: '#1e3a8a' }}>
+                      {activeTask?.dueDate ? new Date(activeTask.dueDate).toLocaleDateString('en-IN') : 'Standard'}
+                    </strong>
+                  </div>
+                </div>
+
                 <div
-                  className="mock-upload-zone"
-                  style={{ position: 'relative', cursor: 'pointer', padding: '1.5rem', border: '2px dashed var(--border-color)', borderRadius: '10px', textAlign: 'center' }}
+                  className="upload-dropzone-box"
                   onClick={() => document.getElementById('file-upload-input')?.click()}
                 >
                   <input
@@ -286,23 +691,61 @@ const StudentAssignments = () => {
                     style={{ display: 'none' }}
                     onChange={handleFileSelect}
                   />
-                  <UploadCloud size={36} className="text-primary-s" style={{ margin: '0 auto 0.5rem' }} />
-                  <p className="text-sm text-muted">Click to select a file or type a filename below</p>
-                  <div style={{ marginTop: '0.8rem' }} onClick={e => e.stopPropagation()}>
-                    <input
-                      type="text"
-                      placeholder="e.g. dbms_assignment_john.pdf"
-                      value={fileName}
-                      onChange={e => setFileName(e.target.value)}
-                      style={{ background: 'var(--bg-secondary)', width: '100%', textAlign: 'center', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}
-                    />
-                  </div>
+                  <UploadCloud size={38} color="#2563eb" style={{ margin: '0 auto 6px' }} />
+                  <p style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>
+                    {fileName ? fileName : 'Click to Browse Solution Document'}
+                  </p>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                    Supports PDF, DOCX, ZIP files up to 25MB
+                  </p>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: 6 }}>
+                    Submission Filename *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. assignment1_solution_ram.pdf"
+                    value={fileName}
+                    onChange={e => setFileName(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.85rem',
+                      color: '#0f172a',
+                      outline: 'none'
+                    }}
+                  />
                 </div>
               </div>
 
-              <div className="modal-actions">
-                <button type="button" className="btn-ghost" onClick={closeSubmit}>Cancel</button>
-                <button type="submit" className="btn-primary">Upload File</button>
+              <div className="erp-modal-footer">
+                <button
+                  type="button"
+                  className="btn-modal-cancel"
+                  onClick={closeSubmit}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-modal-submit"
+                  disabled={submitting || !fileName.trim()}
+                >
+                  {submitting ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" /> Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud size={14} /> Submit Coursework
+                    </>
+                  )}
+                </button>
               </div>
             </form>
           </div>

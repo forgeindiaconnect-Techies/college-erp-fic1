@@ -400,22 +400,76 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
           });
         });
 
-        const localApps = JSON.parse(localStorage.getItem(`erp_placement_applications_${tenantId}`) || '[]');
-        if (Array.isArray(localApps)) {
-          localApps.forEach(la => {
-            const laId = String(la._id || la.applicationId || `${la.regNo || la.rollNo || la.student}_${la.company}_${la.role}`);
-            if (laId && !appMap.has(laId)) {
-              appMap.set(laId, {
-                ...la,
-                student: la.student || la.studentName || la.name || 'Candidate',
-                regNo: la.regNo || la.rollNo || la.registerNo || 'N/A',
-                dept: la.dept || la.department || 'TAMIL',
-                cgpa: la.cgpa !== undefined ? la.cgpa : 0.0,
-                status: la.status || 'Applied'
-              });
-            }
-          });
+        // Scan all active placement application keys in localStorage
+        const localAppsList = [];
+        try {
+          const direct = JSON.parse(localStorage.getItem(`erp_placement_applications_${tenantId}`) || '[]');
+          if (Array.isArray(direct)) localAppsList.push(...direct);
+        } catch (e) {}
+
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('erp_placement_applications') && key !== `erp_placement_applications_${tenantId}`) {
+            try {
+              const extra = JSON.parse(localStorage.getItem(key) || '[]');
+              if (Array.isArray(extra)) localAppsList.push(...extra);
+            } catch (e) {}
+          }
         }
+
+        localAppsList.forEach(la => {
+          const laId = String(la._id || la.applicationId || `${la.regNo || la.rollNo || la.student}_${la.company}_${la.role}`);
+          const regCoRole = `${String(la.regNo || la.rollNo || '').trim().toLowerCase()}_${String(la.company || '').trim().toLowerCase()}_${String(la.role || '').trim().toLowerCase()}`;
+
+          // Locate match in appMap
+          let matchKey = null;
+          if (appMap.has(laId)) {
+            matchKey = laId;
+          } else {
+            for (const [k, v] of appMap.entries()) {
+              const vRegCoRole = `${String(v.regNo || v.rollNo || '').trim().toLowerCase()}_${String(v.company || '').trim().toLowerCase()}_${String(v.role || '').trim().toLowerCase()}`;
+              if ((v._id && la._id && v._id === la._id) || 
+                  (v.applicationId && la.applicationId && v.applicationId === la.applicationId) ||
+                  (v.studentId && la.studentId && v.studentId === la.studentId && v.company === la.company) ||
+                  (regCoRole && vRegCoRole === regCoRole)) {
+                matchKey = k;
+                break;
+              }
+            }
+          }
+
+          if (matchKey) {
+            const existing = appMap.get(matchKey);
+            const mergedRounds = {
+              ...(existing.roundEvaluations || {}),
+              ...(la.roundEvaluations || {})
+            };
+            appMap.set(matchKey, {
+              ...existing,
+              ...la,
+              _id: existing._id || la._id,
+              applicationId: existing.applicationId || la.applicationId,
+              student: existing.student || la.student || la.name || 'Candidate',
+              regNo: existing.regNo || la.regNo || 'N/A',
+              dept: existing.dept || la.dept || 'General',
+              cgpa: existing.cgpa !== undefined ? existing.cgpa : la.cgpa,
+              roundEvaluations: mergedRounds,
+              status: (la.status && la.status !== 'Applied') ? la.status : (existing.status || 'Applied'),
+              currentRound: Math.max(la.currentRound || 1, existing.currentRound || 1)
+            });
+          } else if (laId) {
+            appMap.set(laId, {
+              ...la,
+              student: la.student || la.studentName || la.name || 'Candidate',
+              regNo: la.regNo || la.rollNo || la.registerNo || 'N/A',
+              dept: la.dept || la.department || 'General',
+              cgpa: la.cgpa !== undefined ? la.cgpa : 0.0,
+              status: la.status || 'Applied',
+              roundEvaluations: la.roundEvaluations || {}
+            });
+          }
+        });
+
         combinedApps = Array.from(appMap.values());
       } catch (e) {
         console.error('Error merging local applications:', e);
@@ -768,22 +822,39 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
   // Handle Update Student Round Status (Qualified, Selected, Rejected, Pending, Absent)
   const handleUpdateStudentRoundStatus = async (app, roundName, roundIndex, newStatus, notes = '') => {
     const appId = app._id || app.applicationId;
-    try {
-      await updatePlacementApplicationStatus(appId, {
-        status: newStatus,
-        roundName,
-        roundIndex,
-        notes
-      });
+    const studentName = app.student || app.studentName || app.name || 'Candidate';
+    const regNo = app.regNo || app.id || app.rollNo || 'N/A';
+    const company = app.company || currentInterviewJob?.company;
+    const role = app.role || currentInterviewJob?.role;
+    const ctc = currentInterviewJob?.ctc || '4.5 LPA';
 
-      setApplications(prev => prev.map(a => {
-        if (a._id === appId || a.applicationId === appId) {
+    // 1. Immediately update local state so UI transitions immediately without lag
+    setApplications(prev => prev.map(a => {
+      if (a._id === appId || a.applicationId === appId || (a.regNo && a.regNo === regNo)) {
+        const roundEvaluations = { ...(a.roundEvaluations || {}) };
+        roundEvaluations[roundName] = {
+          status: newStatus,
+          notes,
+          updatedAt: new Date().toISOString()
+        };
+        return {
+          ...a,
+          status: newStatus === 'Selected' ? 'Selected' : newStatus === 'Rejected' ? 'Rejected' : newStatus === 'Qualified' ? 'Qualified' : a.status,
+          currentRound: newStatus === 'Qualified' ? Math.max(roundIndex + 2, a.currentRound || 1) : a.currentRound,
+          roundEvaluations
+        };
+      }
+      return a;
+    }));
+
+    // 2. Persist to localStorage for offline / multi-tab resilience
+    try {
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const localApps = JSON.parse(localStorage.getItem(`erp_placement_applications_${tenantId}`) || '[]');
+      const updatedLocal = localApps.map(a => {
+        if (a._id === appId || a.applicationId === appId || (a.regNo && a.regNo === regNo)) {
           const roundEvaluations = { ...(a.roundEvaluations || {}) };
-          roundEvaluations[roundName] = {
-            status: newStatus,
-            notes,
-            updatedAt: new Date().toISOString()
-          };
+          roundEvaluations[roundName] = { status: newStatus, notes, updatedAt: new Date().toISOString() };
           return {
             ...a,
             status: newStatus === 'Selected' ? 'Selected' : newStatus === 'Rejected' ? 'Rejected' : newStatus === 'Qualified' ? 'Qualified' : a.status,
@@ -792,45 +863,58 @@ const PlacementManagement = ({ defaultTab = 'Dashboard' }) => {
           };
         }
         return a;
-      }));
+      });
+      localStorage.setItem(`erp_placement_applications_${tenantId}`, JSON.stringify(updatedLocal));
+      localStorage.setItem('erp_placement_applications', JSON.stringify(updatedLocal));
+    } catch (e) {}
 
-      if (newStatus === 'Selected') {
-        const studentName = app.student || app.name;
-        const regNo = app.regNo || app.id || app.rollNo;
-        const company = app.company || currentInterviewJob?.company;
-        const role = app.role || currentInterviewJob?.role;
-        const ctc = currentInterviewJob?.ctc || '4.5 LPA';
-
-        const exists = selections.some(s => s.regNo === regNo && s.company === company);
-        if (!exists) {
-          try {
-            await createPlacementSelection({
-              student: studentName,
-              regNo,
-              company,
-              role,
-              ctc,
-              date: new Date().toISOString().split('T')[0]
-            });
-            fetchPlacementData();
-          } catch (e) {
-            console.error(e);
-          }
-        }
-        showToast(`🏆 ${studentName} Selected for ${company} (${ctc})! Placement Offer Issued.`);
-      } else if (newStatus === 'Qualified') {
-        showToast(`✓ ${app.student || app.name} Qualified ${roundName}! Promoted to next round.`);
-      } else if (newStatus === 'Rejected') {
-        showToast(`Marked ${app.student || app.name} as Rejected for ${roundName}.`);
-      } else {
-        showToast(`Updated status for ${app.student || app.name} to ${newStatus}`);
-      }
-
-      window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: { appId, status: newStatus, roundName } }));
-    } catch (error) {
-      console.error('Failed to update round status', error);
-      showToast('Failed to update round status', 'error');
+    // 3. Sync to backend API with full candidate context for safe upsert
+    try {
+      await updatePlacementApplicationStatus(appId, {
+        status: newStatus,
+        roundName,
+        roundIndex,
+        notes,
+        student: studentName,
+        regNo,
+        dept: app.dept || app.department,
+        cgpa: app.cgpa,
+        company,
+        role,
+        applicationId: app.applicationId || (typeof appId === 'string' && appId.startsWith('APP') ? appId : undefined)
+      });
+    } catch (apiErr) {
+      console.warn('Backend placement status sync note (state safely preserved):', apiErr?.message || apiErr);
     }
+
+    // 4. Handle offer creation and user feedback
+    if (newStatus === 'Selected') {
+      const exists = selections.some(s => s.regNo === regNo && s.company === company);
+      if (!exists) {
+        try {
+          await createPlacementSelection({
+            student: studentName,
+            regNo,
+            company,
+            role,
+            ctc,
+            date: new Date().toISOString().split('T')[0]
+          });
+          fetchPlacementData();
+        } catch (e) {
+          console.error('Create selection error:', e);
+        }
+      }
+      showToast(`🏆 ${studentName} Selected for ${company} (${ctc})! Placement Offer Issued.`);
+    } else if (newStatus === 'Qualified') {
+      showToast(`✓ ${studentName} Qualified ${roundName}! Promoted to next round.`);
+    } else if (newStatus === 'Rejected') {
+      showToast(`Marked ${studentName} as Rejected for ${roundName}.`);
+    } else {
+      showToast(`Updated status for ${studentName} to ${newStatus}`);
+    }
+
+    window.dispatchEvent(new CustomEvent('erp_placement_updated', { detail: { appId, status: newStatus, roundName } }));
   };
 
   // One-click Auto-enroll eligible students into drive

@@ -144,6 +144,17 @@ const ParentDashboard = () => {
     }).catch(() => {});
   }, [fetchParentData]);
 
+  useEffect(() => {
+    window.addEventListener('erp_marks_updated', fetchParentData);
+    window.addEventListener('erp_marks_submitted', fetchParentData);
+    window.addEventListener('storage', fetchParentData);
+    return () => {
+      window.removeEventListener('erp_marks_updated', fetchParentData);
+      window.removeEventListener('erp_marks_submitted', fetchParentData);
+      window.removeEventListener('storage', fetchParentData);
+    };
+  }, [fetchParentData]);
+
   // Auto-refresh when relevant data changes
   useRealtimeSync(fetchParentData, ['fees', 'marks', 'exams', 'users', 'students']);
 

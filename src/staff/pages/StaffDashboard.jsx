@@ -4,7 +4,7 @@ import {
   BookOpen, Users, CalendarCheck, CheckCircle, Clock,
   ArrowRight, Activity, Plus, AlertCircle, GraduationCap, Play, CheckCircle2,
   Calendar, FileText, Bookmark, Sparkles, Award, ShieldAlert, Zap,
-  TrendingUp, RefreshCw, ChevronRight, Bell, Briefcase, Package, Truck
+  TrendingUp, RefreshCw, ChevronRight, Bell, Briefcase, Package, Truck, X
 } from 'lucide-react';
 import {
   getStudents,
@@ -70,6 +70,7 @@ const StaffDashboard = () => {
   const [advisingClass, setAdvisingClass] = useState(null);
   const [placementJobs, setPlacementJobs] = useState([]);
   const [parcels, setParcels] = useState([]);
+  const [arrearModalStudent, setArrearModalStudent] = useState(null);
 
   // Day filter for schedule hub
   const currentDayIndex = new Date().getDay();
@@ -131,17 +132,22 @@ const StaffDashboard = () => {
       let rawJobs = Array.isArray(jobsRes?.data) ? jobsRes.data : (jobsRes?.data?.jobs || []);
       const jobMap = new Map();
       rawJobs.forEach(j => jobMap.set(String(j._id || j.jobId || j.id), j));
-      try {
-        const localItems = JSON.parse(localStorage.getItem(`erp_placement_jobs_${tenantId}`) || '[]');
-        if (Array.isArray(localItems)) {
-          localItems.forEach(lj => {
-            const ljId = String(lj._id || lj.jobId || lj.id);
-            if (ljId && !jobMap.has(ljId)) {
-              jobMap.set(ljId, lj);
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('erp_placement_jobs')) {
+          try {
+            const localItems = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(localItems)) {
+              localItems.forEach(lj => {
+                const ljId = String(lj._id || lj.jobId || lj.id);
+                if (ljId && !jobMap.has(ljId)) {
+                  jobMap.set(ljId, lj);
+                }
+              });
             }
-          });
+          } catch (err) {}
         }
-      } catch (err) {}
+      }
       setPlacementJobs(Array.from(jobMap.values()));
 
       if (notifRes?.data && Array.isArray(notifRes.data)) setNotifications(notifRes.data);
@@ -189,18 +195,25 @@ const StaffDashboard = () => {
       setMySubjects(combinedSubjects);
       setLoadingSchedule(false);
 
-      if (marksRes?.data) {
-        const mappedMarks = marksRes.data.map(m => ({
-          id: m.studentId,
-          name: m.studentName,
-          dept: m.department,
-          sem: m.semester,
-          internal: m.internalMarks,
-          external: m.semesterMarks,
-          arrears: m.arrearStatus === 'Arrear' ? 1 : 0
-        }));
-        setMarks(mappedMarks);
-      }
+      const allMarksRaw = Array.isArray(marksRes?.data) ? marksRes.data : (marksRes?.data?.marks || []);
+      let localMarksList = [];
+      try {
+        const rawM = localStorage.getItem(`erp_marks_${tenantId}`) || localStorage.getItem('erp_marks');
+        if (rawM) localMarksList = JSON.parse(rawM);
+      } catch {}
+      try {
+        const rawSubs = localStorage.getItem(`erp_marks_submissions_${tenantId}`) || localStorage.getItem('erp_marks_submissions');
+        if (rawSubs) {
+          const subs = JSON.parse(rawSubs);
+          subs.forEach(b => {
+            if (b.records && Array.isArray(b.records)) {
+              b.records.forEach(r => localMarksList.push({ ...r, resultStatus: b.status || r.resultStatus }));
+            }
+          });
+        }
+      } catch {}
+      const combinedMarks = [...allMarksRaw, ...localMarksList];
+      setMarks(combinedMarks);
 
       if (attRes?.data) {
         const dailyMap = {};
@@ -261,14 +274,52 @@ const StaffDashboard = () => {
   const staffName = staffSession.name || 'Faculty Member';
   const staffDept = staffSession.dept || staffSession.department || 'Computer Science Engineering';
 
-  // Derived Department Students
-  const departmentStudents = useMemo(() => {
-    return students.filter(s => {
-      const d = (s.department || s.dept || '').toLowerCase();
-      const target = staffDept.toLowerCase();
-      return d === target || d.includes('computer') || target.includes(d);
+  // Derived Department Students with Live Marks & Standing Arrears Analysis
+  const enrichedDepartmentStudents = useMemo(() => {
+    const targetDept = (staffSession.dept || staffSession.department || staffDept || '').toLowerCase().trim();
+    const filtered = students.filter(s => {
+      const d = (s.department || s.dept || '').toLowerCase().trim();
+      if (!targetDept || targetDept === 'all') return true;
+      return d === targetDept || (d && targetDept && (d.includes(targetDept) || targetDept.includes(d)));
     });
-  }, [students, staffDept]);
+
+    const studentListToUse = filtered.length > 0 ? filtered : students;
+
+    return studentListToUse.map(st => {
+      const sRoll = String(st.id || st.rollNo || st.regNo || '').toLowerCase();
+      const sName = String(st.name || '').toLowerCase();
+
+      const stMarks = marks.filter(m => {
+        const mId = String(m.studentId || m._id || m.id || '').toLowerCase();
+        const mRoll = String(m.registerNo || m.rollNo || '').toLowerCase();
+        const mName = String(m.studentName || m.name || '').toLowerCase();
+        return (mId && sRoll && mId === sRoll) || (mRoll && sRoll && mRoll === sRoll) || (mName && sName && (mName === sName || mName.includes(sName)));
+      });
+
+      let failedMarks = [];
+      let computedArrears = Number(st.arrears ?? 0);
+
+      if (stMarks.length > 0) {
+        failedMarks = stMarks.filter(m => {
+          const tot = Number(m.totalMarks ?? (Number(m.internalMarks || 0) + Number(m.semesterMarks || 0)) ?? m.marksObtained ?? 0);
+          return m.arrearStatus === 'Arrear' || (m.totalMarks !== undefined && tot < 40) || m.grade === 'RA' || m.result === 'RA';
+        });
+        computedArrears = failedMarks.length;
+      }
+
+      return {
+        ...st,
+        arrears: computedArrears,
+        arrearSubjects: failedMarks
+      };
+    });
+  }, [students, marks, staffSession, staffDept]);
+
+  const departmentStudents = enrichedDepartmentStudents;
+
+  const departmentStudentsWithArrears = useMemo(() => {
+    return enrichedDepartmentStudents.filter(s => Number(s.arrears) > 0);
+  }, [enrichedDepartmentStudents]);
 
   const myInvigilationDuties = useMemo(() => {
     if (!staffSession) return [];
@@ -1053,6 +1104,84 @@ const StaffDashboard = () => {
 
       </div>
 
+      {/* ACADEMIC STANDING & STUDENT ARREARS TRACKER */}
+      <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #fee2e2', padding: '20px', boxShadow: '0 2px 8px rgba(220,38,38,0.04)', marginTop: '4px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertCircle size={18} color="#dc2626" /> Department Academic Standing & Student Arrears Tracker
+            </h3>
+            <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+              Active standing arrears monitoring across {staffDept} students. Click to inspect subject-wise failure breakdown.
+            </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#dc2626', background: '#fee2e2', padding: '4px 10px', borderRadius: '6px' }}>
+              {departmentStudentsWithArrears.length} Students with Standing Arrears
+            </span>
+            <button
+              onClick={() => navigate('/staff/marks')}
+              style={{ padding: '5px 12px', background: '#f8fafc', color: '#2563eb', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Upload / Edit Marks →
+            </button>
+          </div>
+        </div>
+
+        {departmentStudentsWithArrears.length === 0 ? (
+          <div style={{ padding: '24px', textAlign: 'center', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0', color: '#16a34a', fontSize: '0.85rem', fontWeight: 700 }}>
+            🎉 Excellent! All active students in {staffDept} currently have 0 standing arrears.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+              <thead>
+                <tr style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca', color: '#991b1b', fontSize: '0.72rem', textTransform: 'uppercase' }}>
+                  <th style={{ padding: '10px 14px', textAlign: 'left' }}>Student Name</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'left' }}>Register / Roll No</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'center' }}>Department</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'center' }}>Active Arrears</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'center' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {departmentStudentsWithArrears.map((st, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '10px 14px', fontWeight: 800, color: '#0f172a' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.72rem' }}>
+                          {(st.name || 'S').charAt(0).toUpperCase()}
+                        </div>
+                        {st.name || 'Student'}
+                      </div>
+                    </td>
+                    <td style={{ padding: '10px 14px', fontFamily: 'monospace', color: '#475569', fontWeight: 600 }}>
+                      {st.regNo || st.rollNo || st.id || 'N/A'}
+                    </td>
+                    <td style={{ padding: '10px 14px', textAlign: 'center', color: '#64748b' }}>
+                      {st.department || st.dept || staffDept}
+                    </td>
+                    <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                      <span style={{ background: '#fee2e2', color: '#dc2626', padding: '3px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 800 }}>
+                        {st.arrears} Arrear{st.arrears > 1 ? 's' : ''}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => setArrearModalStudent(st)}
+                        style={{ padding: '5px 12px', background: '#dc2626', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        Inspect Arrear Subjects
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* LIVE CLASS MODAL CONTROL PANEL */}
       {activeClassSlot && (
         <LiveClassModal 
@@ -1141,6 +1270,91 @@ const StaffDashboard = () => {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* STUDENT ARREAR DOSSIER MODAL */}
+      {arrearModalStudent && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
+          <div style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '600px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: '0 0 4px', fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+                  Student Arrear Dossier
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
+                  {arrearModalStudent.name} • {arrearModalStudent.regNo || arrearModalStudent.rollNo || arrearModalStudent.id} • {arrearModalStudent.department || arrearModalStudent.dept || staffDept}
+                </p>
+              </div>
+              <button 
+                onClick={() => setArrearModalStudent(null)}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '6px', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {Array.isArray(arrearModalStudent.arrearSubjects) && arrearModalStudent.arrearSubjects.length > 0 ? (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase' }}>
+                      <th style={{ padding: '10px 14px', textAlign: 'left' }}>Subject Code</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'left' }}>Course Title</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'center' }}>Semester</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'center' }}>Marks</th>
+                      <th style={{ padding: '10px 14px', textAlign: 'center' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {arrearModalStudent.arrearSubjects.map((sub, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
+                          {sub.subjectCode || sub.code || 'SUB401'}
+                        </td>
+                        <td style={{ padding: '10px 14px', fontWeight: 700, color: '#1e293b' }}>
+                          {sub.subject || sub.subjectName || 'Course'}
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center', color: '#64748b' }}>
+                          {sub.semester || 'Semester'}
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 800, color: '#dc2626' }}>
+                          {sub.totalMarks ?? (Number(sub.internalMarks || 0) + Number(sub.semesterMarks || 0))} / 100
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                          <span style={{ background: '#fee2e2', color: '#dc2626', padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800 }}>
+                            RA (Arrear)
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                <p>This student has {arrearModalStudent.arrears} standing arrear(s) recorded in academic records.</p>
+              </div>
+            )}
+
+            <div style={{ marginTop: '20px', paddingTop: '14px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button 
+                onClick={() => {
+                  setArrearModalStudent(null);
+                  navigate('/staff/marks');
+                }}
+                style={{ padding: '8px 14px', background: '#f1f5f9', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: '8px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
+              >
+                Go to Marks Center
+              </button>
+              <button 
+                onClick={() => setArrearModalStudent(null)}
+                style={{ padding: '8px 18px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
+              >
+                Close Dossier
+              </button>
+            </div>
           </div>
         </div>
       )}

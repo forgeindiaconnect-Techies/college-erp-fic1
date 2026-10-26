@@ -14,6 +14,6 @@ const placementJobSchema = new mongoose.Schema({
   applicants: { type: Number, required: true, default: 0 },
   totalRounds: { type: Number, default: 3 },
   rounds: { type: [mongoose.Schema.Types.Mixed], default: [] }
-, collegeId: { type: String } }, { timestamps: true });
+, collegeId: { type: String }, tenantId: { type: String } }, { timestamps: true });
 
 export default mongoose.model('PlacementJob', placementJobSchema);

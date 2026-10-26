@@ -46,7 +46,9 @@ const QrVerificationPage = () => {
   const initialCode = initialParams.get('code') || initialParams.get('id');
 
   const [activeMode, setActiveMode] = useState(
-    initialType === 'visitor' && initialCode?.startsWith('PASS-') ? 'visitor_pass' : 'unified_scanner'
+    initialType === 'visitor' || initialCode?.startsWith('PASS-') || initialCode?.startsWith('V-')
+      ? 'visitor_pass'
+      : 'unified_scanner'
   );
 
   // Selected Gate
@@ -148,16 +150,35 @@ const QrVerificationPage = () => {
   }, [fetchStats, fetchActivePeople, fetchActiveVisitors, activeMode]);
 
   // Real-time synchronization
-  useRealtimeSync({
-    modules: ['campus_movement', 'campus_people', 'watchman', 'student_tracking'],
-    onSync: () => {
-      fetchStats();
-      fetchActivePeople();
-      if (identifiedPerson?.personId) {
-        handleLookupUnified(identifiedPerson.personId, true);
+  useRealtimeSync(() => {
+    fetchStats();
+    fetchActivePeople();
+    if (activeMode === 'visitor_pass') {
+      fetchActiveVisitors();
+    }
+  }, ['campus_movement', 'campus_people', 'watchman', 'student_tracking', 'visitors', 'visitor']);
+
+  // Auto-sync visitorResult if activeVisitorsList loads or updates and matches current passQuery
+  useEffect(() => {
+    if (activeMode === 'visitor_pass' && passQuery && activeVisitorsList.length > 0) {
+      const clean = passQuery.trim().toLowerCase();
+      const matched = activeVisitorsList.find(
+        v => (v.passNumber && v.passNumber.toLowerCase() === clean) ||
+             (v.visitorId && v.visitorId.toLowerCase() === clean) ||
+             (v.phone && v.phone === clean)
+      );
+      if (matched && (!visitorResult || (visitorResult?.data?.passNumber || visitorResult?.passNumber) !== matched.passNumber)) {
+        setVisitorResult({
+          success: true,
+          valid: true,
+          validationStatus: matched.status === 'Inside' ? 'INSIDE' : 'VALID',
+          statusMessage: 'Visitor is currently inside campus (Active Pass). Ready for departure checkout.',
+          data: matched,
+          visitor: matched
+        });
       }
     }
-  });
+  }, [activeVisitorsList, passQuery, activeMode]);
 
   // Auto-lookup on URL parameter change
   useEffect(() => {
@@ -172,13 +193,20 @@ const QrVerificationPage = () => {
       } catch (_) {}
     }
 
-    if (type === 'visitor' && code && (code.startsWith('PASS-') || code.startsWith('V-'))) {
+    if (type === 'visitor' || (code && (code.startsWith('PASS-') || code.startsWith('V-')))) {
       setActiveMode('visitor_pass');
-      setPassQuery(code);
-      handleLookupVisitorDirect(code);
+      setIdentifiedPerson(null); // Clear previous unified scanner person (e.g. Rahul)
+      if (code) {
+        setPassQuery(code);
+        setSearchInput(code);
+        setVisitorResult(null); // Clear previous visitor immediately to prevent showing wrong person
+        handleLookupVisitorDirect(code);
+      }
     } else if (code) {
       setActiveMode('unified_scanner');
       setSearchInput(code);
+      setIdentifiedPerson(null); // Clear previous person before looking up
+      setVisitorResult(null);
       handleLookupUnified(code);
     }
   }, [location.search]);
@@ -417,6 +445,29 @@ const QrVerificationPage = () => {
   // ══════════════════════════════════════════════════════════
   // VISITOR PASS ACTIONS (Preserved)
   // ══════════════════════════════════════════════════════════
+  const handleSelectActiveVisitor = (v) => {
+    if (!v) return;
+    const pNum = (v.passNumber || v.visitorId || '').trim();
+    setPassQuery(pNum);
+    setErrorMsg('');
+    setSuccessMsg('');
+    // Instantly set the visitor clearance card with the real-time active visitor data
+    setVisitorResult({
+      success: true,
+      valid: true,
+      validationStatus: v.status === 'Inside' ? 'INSIDE' : 'VALID',
+      statusMessage: v.status === 'Inside'
+        ? 'Visitor is currently inside campus (Active Pass). Ready for departure checkout.'
+        : 'Pass verified against campus security registry.',
+      data: v,
+      visitor: v
+    });
+    // Asynchronously perform background verification to ensure live sync
+    if (pNum) {
+      handleLookupVisitorDirect(pNum, true);
+    }
+  };
+
   const handleVerifyVisitor = async (e) => {
     if (e) e.preventDefault();
     let query = (passQuery || '').trim();
@@ -435,12 +486,31 @@ const QrVerificationPage = () => {
       } catch (_) {}
     }
 
+    // Direct active visitor match from live state
+    const matchedActive = (activeVisitorsList || []).find(
+      v => (v.passNumber && v.passNumber.toLowerCase() === query.toLowerCase()) ||
+           (v.visitorId && v.visitorId.toLowerCase() === query.toLowerCase()) ||
+           (v.phone && v.phone === query) ||
+           (v.name && v.name.toLowerCase() === query.toLowerCase())
+    );
+
+    if (matchedActive) {
+      handleSelectActiveVisitor(matchedActive);
+      return;
+    }
+
     try {
       setVisitorLoading(true);
       setErrorMsg('');
       setSuccessMsg('');
+      setVisitorResult(null); // Clear previous visitor result to prevent showing stale records
       const res = await verifyVisitorPass(query);
-      setVisitorResult(res.data);
+      if (res.data?.success && res.data?.data) {
+        setVisitorResult(res.data);
+      } else {
+        setVisitorResult(null);
+        setErrorMsg(res.data?.message || 'Pass record not found.');
+      }
     } catch (err) {
       setVisitorResult(null);
       setErrorMsg(err.response?.data?.message || 'Verification failed. Pass record not found.');
@@ -449,7 +519,7 @@ const QrVerificationPage = () => {
     }
   };
 
-  const handleLookupVisitorDirect = async (code) => {
+  const handleLookupVisitorDirect = async (code, silentPreload = false) => {
     if (!code) return;
     let cleanCode = code.toString().trim();
     if (cleanCode.includes('code=')) {
@@ -461,14 +531,44 @@ const QrVerificationPage = () => {
       } catch (_) {}
     }
     setPassQuery(cleanCode);
+
+    // If matching active visitor is already loaded in memory, sync immediately
+    if (!silentPreload) {
+      const matched = (activeVisitorsList || []).find(
+        v => (v.passNumber && v.passNumber.toLowerCase() === cleanCode.toLowerCase()) ||
+             (v.visitorId && v.visitorId.toLowerCase() === cleanCode.toLowerCase())
+      );
+      if (matched) {
+        setVisitorResult({
+          success: true,
+          valid: true,
+          validationStatus: matched.status === 'Inside' ? 'INSIDE' : 'VALID',
+          statusMessage: 'Visitor is currently inside campus (Active Pass). Ready for departure checkout.',
+          data: matched,
+          visitor: matched
+        });
+        silentPreload = true;
+      }
+    }
+
     try {
       setVisitorLoading(true);
       setErrorMsg('');
       setSuccessMsg('');
+      if (!silentPreload) {
+        setVisitorResult(null); // Clear stale previous visitor
+      }
       const res = await verifyVisitorPass(cleanCode);
-      setVisitorResult(res.data);
+      if (res.data?.success && res.data?.data) {
+        setVisitorResult(res.data);
+      } else if (!silentPreload) {
+        setVisitorResult(null);
+        setErrorMsg(res.data?.message || 'Pass record not found.');
+      }
     } catch (err) {
-      setVisitorResult(null);
+      if (!silentPreload) {
+        setVisitorResult(null);
+      }
       setErrorMsg(err.response?.data?.message || 'Verification failed. Pass record not found.');
     } finally {
       setVisitorLoading(false);
@@ -668,6 +768,10 @@ const QrVerificationPage = () => {
             setActiveMode('visitor_pass');
             setErrorMsg('');
             setSuccessMsg('');
+            if (!passQuery) {
+              setVisitorResult(null);
+            }
+            fetchActiveVisitors();
           }}
         >
           <ShieldCheck size={18} />
@@ -1329,23 +1433,32 @@ const QrVerificationPage = () => {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {activeVisitorsList.map((v) => (
-                    <button
-                      key={v._id || v.passNumber}
-                      type="button"
-                      className="wmn-btn-sec"
-                      style={{
-                        fontSize: '0.78rem',
-                        padding: '6px 12px',
-                        background: passQuery === v.passNumber ? '#eff6ff' : '#ffffff',
-                        border: passQuery === v.passNumber ? '2px solid #2563eb' : '1px solid #cbd5e1'
-                      }}
-                      onClick={() => handleLookupVisitorDirect(v.passNumber)}
-                    >
-                      <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#2563eb' }}>{v.passNumber}</span>
-                      <span>: {v.name}</span>
-                    </button>
-                  ))}
+                  {activeVisitorsList.map((v) => {
+                    const isSelected = (passQuery === v.passNumber || passQuery === v.visitorId || visitorResult?.data?.passNumber === v.passNumber || visitorResult?.data?._id === v._id);
+                    return (
+                      <button
+                        key={v._id || v.passNumber}
+                        type="button"
+                        className="wmn-btn-sec"
+                        style={{
+                          fontSize: '0.78rem',
+                          padding: '6px 12px',
+                          background: isSelected ? '#eff6ff' : '#ffffff',
+                          border: isSelected ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                          fontWeight: isSelected ? 700 : 500,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                        onClick={() => handleSelectActiveVisitor(v)}
+                        title={`Click to verify and checkout ${v.name}`}
+                      >
+                        <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#2563eb' }}>{v.passNumber}</span>
+                        <span style={{ color: '#0f172a' }}>: {v.name}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>

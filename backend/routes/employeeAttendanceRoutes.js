@@ -248,9 +248,9 @@ router.post('/checkin', protect, collegeScope, async (req, res) => {
   }
 });
 
-// PUT /api/employee-attendance/checkout
+// PUT /api/employee-attendance/checkout & POST /api/employee-attendance/checkout
 // Check out for today
-router.put('/checkout', protect, collegeScope, async (req, res) => {
+const handleEmployeeCheckout = async (req, res) => {
   try {
     const dayStart = new Date();
     dayStart.setUTCHours(0, 0, 0, 0);
@@ -317,7 +317,10 @@ router.put('/checkout', protect, collegeScope, async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-});
+};
+
+router.put('/checkout', protect, collegeScope, handleEmployeeCheckout);
+router.post('/checkout', protect, collegeScope, handleEmployeeCheckout);
 
 // GET /api/employee-attendance/history
 // Fetch history for the logged-in user

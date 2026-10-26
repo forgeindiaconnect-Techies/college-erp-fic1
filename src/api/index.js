@@ -3,9 +3,21 @@ import axios from 'axios';
 // In production (Vercel), use the Render backend URL.
 // In local dev, use localhost via the Vite proxy.
 const getBaseURL = () => {
-  // In local dev, connect to IPv4 127.0.0.1:5000 to prevent Windows IPv6 [::1] connection refusal
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://127.0.0.1:5000/api';
+  // In local dev and local network (LAN IP), connect directly to the local backend
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    const port = window.location.port;
+    if (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host.startsWith('192.168.') ||
+      host.startsWith('10.') ||
+      host.startsWith('172.') ||
+      port === '5173' ||
+      port === '3000'
+    ) {
+      return `http://${host || '127.0.0.1'}:5000/api`;
+    }
   }
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
@@ -451,9 +463,27 @@ export const getEligibleStudentsForJob = (id) => api.get(`/placement/jobs/${id}/
 }));
 
 export const getPlacementApplications = () => api.get('/placement/applications');
-export const updatePlacementApplicationStatus = (id, data) => {
+export const updatePlacementApplicationStatus = async (id, data) => {
   const payload = typeof data === 'string' ? { status: data } : data;
-  return api.put(`/placement/applications/${id}/status`, payload);
+  try {
+    return await api.put(`/placement/applications/${id}/status`, payload);
+  } catch (err) {
+    if (err.response?.status === 404) {
+      try {
+        return await api.put(`/placement/applications/${id}`, payload);
+      } catch (err2) {
+        if (payload.company || payload.regNo) {
+          try {
+            return await api.post(`/placement/applications`, {
+              ...payload,
+              applicationId: id
+            });
+          } catch (err3) {}
+        }
+      }
+    }
+    throw err;
+  }
 };
 export const bulkApplyPlacementApplications = (data) => api.post('/placement/applications/bulk-apply', data);
 export const getPlacementInterviews = () => api.get('/placement/interviews');
@@ -956,6 +986,14 @@ export const lookupCampusPerson = (query) => {
   }
   return api.get('/watchman/campus-people/lookup', { params: { query: cleanQuery, code: cleanQuery } });
 };
+
+// ── Real-Time Leave Management APIs ──────────────────────────────────────────
+export const getLeaves = (params = {}) => api.get('/leaves', { params });
+export const getStudentLeaves = (studentId) => api.get(`/leaves/student/${studentId}`);
+export const createLeave = (data) => api.post('/leaves', data);
+export const updateLeaveStatus = (id, data) => api.patch(`/leaves/${id}`, data);
+export const deleteLeave = (id) => api.delete(`/leaves/${id}`);
+
 
 
 

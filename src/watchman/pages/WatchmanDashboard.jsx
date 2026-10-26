@@ -72,6 +72,7 @@ const WatchmanDashboard = () => {
 
   // QR Pass Modal state (to view scannable student or visitor QR card)
   const [qrPassModal, setQrPassModal] = useState(null); // { type: 'student' | 'visitor', data: ... }
+  const [qrDisplayMode, setQrDisplayMode] = useState('raw'); // 'raw' | 'url'
 
   // Quick Scanner / Gate Pass Lookup Modal
   const [scanModalOpen, setScanModalOpen] = useState(false);
@@ -494,6 +495,11 @@ const WatchmanDashboard = () => {
       </div>
 
 
+      {/* ── Daily Duty Attendance (Single Source of Truth Check-In / Check-Out) ── */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <EmployeeAttendanceCard layout="bar" />
+      </div>
+
       {/* ── 3 Distinct Quick Action Buttons Separated by Role ── */}
       <div style={{
         display: 'grid',
@@ -505,213 +511,128 @@ const WatchmanDashboard = () => {
         <button
           type="button"
           onClick={() => navigate('/watchman/campus-in-out')}
-          style={{
-            background: 'linear-gradient(135deg, #059669, #0d9488)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '12px',
-            padding: '14px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(5,150,105,0.25)',
-            transition: 'transform 0.15s ease'
-          }}
+          className="wmn-action-card"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '8px' }}>
+            <div className="icon-box">
               <ArrowLeftRight size={22} />
             </div>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Campus In & Out Gate</div>
-              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>1-Click entry & exit for registered people</div>
+            <div>
+              <div className="title">Campus In & Out Gate</div>
+              <div className="desc">1-Click entry & exit for registered people</div>
             </div>
           </div>
-          <ChevronRight size={18} />
-          
+          <ChevronRight size={18} className="action-chevron" />
         </button>
 
         {/* Action: Register Student / Staff */}
         <button
           type="button"
           onClick={() => navigate('/watchman/register-person?type=Student')}
-          style={{
-            background: 'linear-gradient(135deg, #0d9488, #14b8a6)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '12px',
-            padding: '14px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(20,184,166,0.25)',
-            transition: 'transform 0.15s ease'
-          }}
+          className="wmn-action-card"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '8px' }}>
+            <div className="icon-box">
               <UserCheck size={22} />
             </div>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Register Student / Staff</div>
-              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Students, Faculty & Staff + QR ID Pass</div>
+            <div>
+              <div className="title">Register Student / Staff</div>
+              <div className="desc">Students, Faculty & Staff + QR ID Pass</div>
             </div>
           </div>
-          <ChevronRight size={18} />
+          <ChevronRight size={18} className="action-chevron" />
         </button>
 
         {/* Action: Gate QR Scanner */}
         <button
           type="button"
           onClick={() => navigate('/watchman/qr-verification')}
-          style={{
-            background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '12px',
-            padding: '14px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(37,99,235,0.2)',
-            transition: 'transform 0.15s ease'
-          }}
+          className="wmn-action-card"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '8px' }}>
+            <div className="icon-box">
               <QrCode size={22} />
             </div>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Gate QR Scanner</div>
-              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Webcam scan • Campus In & Out</div>
+            <div>
+              <div className="title">Gate QR Scanner</div>
+              <div className="desc">Webcam scan • Campus In & Out</div>
             </div>
           </div>
-          <ChevronRight size={18} />
+          <ChevronRight size={18} className="action-chevron" />
         </button>
 
         {/* Action: Log Student Movement */}
         <button
           type="button"
           onClick={() => navigate('/watchman/student-register')}
-          style={{
-            background: 'linear-gradient(135deg, #4338ca, #3b82f6)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '12px',
-            padding: '14px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(59,130,246,0.25)',
-            transition: 'transform 0.15s ease'
-          }}
+          className="wmn-action-card"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '8px' }}>
+            <div className="icon-box">
               <GraduationCap size={22} />
             </div>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Log Student Movement</div>
-              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Identify by Roll No & track In/Out</div>
+            <div>
+              <div className="title">Log Student Movement</div>
+              <div className="desc">Identify by Roll No & track In/Out</div>
             </div>
           </div>
-          <ChevronRight size={18} />
+          <ChevronRight size={18} className="action-chevron" />
         </button>
 
         {/* Action 2: Staff Gate Register */}
         <button
           type="button"
           onClick={() => navigate('/watchman/staff-register')}
-          style={{
-            background: 'linear-gradient(135deg, #047857, #059669)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '12px',
-            padding: '14px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(5,150,105,0.2)',
-            transition: 'transform 0.15s ease'
-          }}
+          className="wmn-action-card"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '8px' }}>
+            <div className="icon-box">
               <UserCheck size={22} />
             </div>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Staff Gate Register</div>
-              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Log faculty & staff movements</div>
+            <div>
+              <div className="title">Staff Gate Register</div>
+              <div className="desc">Log faculty & staff movements</div>
             </div>
           </div>
-          <ChevronRight size={18} />
+          <ChevronRight size={18} className="action-chevron" />
         </button>
 
         {/* Action 3: New Visitor Pass */}
         <button
           type="button"
           onClick={() => navigate('/watchman/visitor-entry')}
-          style={{
-            background: 'linear-gradient(135deg, #6d28d9, #7c3aed)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '12px',
-            padding: '14px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(124,58,237,0.2)',
-            transition: 'transform 0.15s ease'
-          }}
+          className="wmn-action-card"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '8px' }}>
+            <div className="icon-box">
               <UserPlus size={22} />
             </div>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>New Visitor Entry</div>
-              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Guest check-in, host meeting & Gate Pass</div>
+            <div>
+              <div className="title">New Visitor Entry</div>
+              <div className="desc">Guest check-in, host meeting & Gate Pass</div>
             </div>
           </div>
-          <ChevronRight size={18} />
+          <ChevronRight size={18} className="action-chevron" />
         </button>
 
         {/* Action 4: Bus Entry & Exit Tracking */}
         <button
           type="button"
           onClick={() => navigate('/watchman/bus-tracking')}
-          style={{
-            background: 'linear-gradient(135deg, #0284c7, #0ea5e9)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '12px',
-            padding: '14px 18px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(14,165,233,0.25)',
-            transition: 'transform 0.15s ease'
-          }}
+          className="wmn-action-card"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px', borderRadius: '8px' }}>
+            <div className="icon-box">
               <Bus size={22} />
             </div>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Bus Entry Tracking</div>
-              <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>
+            <div>
+              <div className="title">Bus Entry Tracking</div>
+              <div className="desc">
                 {busStats.insideCampus > 0 ? `${busStats.insideCampus} Buses Inside Campus` : 'Log Arrival & Departure'}
               </div>
             </div>
           </div>
-          <ChevronRight size={18} />
+          <ChevronRight size={18} className="action-chevron" />
         </button>
       </div>
 

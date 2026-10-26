@@ -3,11 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   CreditCard, Building2, Shield, Clock, Plus, Search, CheckCircle2,
   ChevronRight, ArrowLeft, Sliders, FileText, Award, Sparkles,
-  Filter, Check, ExternalLink, AlertCircle, RefreshCw
+  Filter, Check, ExternalLink, AlertCircle, RefreshCw, Send,
+  SlidersHorizontal, CheckCircle, Info, Lock
 } from 'lucide-react';
 import { getPublicReferralFormConfig, getPublishedOpportunities } from '../../api';
 import CreditCardReferralModal from '../../components/referrals/CreditCardReferralModal';
 import { useCategoryConfig } from '../../utils/categoryConfig';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import '../admin/UserManagementCommon.css';
 import './BusinessReferralCategory.css';
 
@@ -20,8 +22,11 @@ export default function BusinessReferralCreditCard() {
   const { config: categoryConfig } = useCategoryConfig('credit-card');
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [selectedBank, setSelectedBank] = useState('HDFC Bank');
+  const [selectedCardProduct, setSelectedCardProduct] = useState('');
+  const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [bankFilter, setBankFilter] = useState('ALL');
+  const [viewMode, setViewMode] = useState('catalog'); // 'catalog' | 'form'
 
   // Live Database Configuration from Super Admin ReferralFormConfig
   const [dbConfig, setDbConfig] = useState(null);
@@ -64,8 +69,15 @@ export default function BusinessReferralCreditCard() {
     fetchCreditCards();
   }, [fetchConfig, fetchCreditCards]);
 
-  const handleOpenSubmit = (bankName) => {
+  useRealtimeSync(['referral_config', 'opportunities', 'referrals'], () => {
+    fetchConfig();
+    fetchCreditCards();
+  });
+
+  const handleOpenSubmit = (bankName = 'HDFC Bank', cardName = '', opp = null) => {
     setSelectedBank(bankName || 'HDFC Bank');
+    setSelectedCardProduct(cardName || '');
+    setSelectedOpportunity(opp || null);
     setShowSubmitModal(true);
   };
 
@@ -100,20 +112,27 @@ export default function BusinessReferralCreditCard() {
       });
     });
 
-    // Merge any distinct published opportunities
+    // Merge published opportunities and enrich matching items
     publishedCards.forEach((opp) => {
-      if (!list.some((item) => item.cardName.toLowerCase() === (opp.title || '').toLowerCase())) {
+      const existing = list.find((item) => item.cardName.toLowerCase() === (opp.title || '').toLowerCase());
+      if (existing) {
+        existing.rawOpp = opp;
+        if (opp.incentiveConfig?.amount) {
+          existing.annualFee = `Reward: ₹${opp.incentiveConfig.amount} (${opp.incentiveConfig.milestone || 'Issuance'})`;
+        }
+      } else {
         list.push({
           id: opp._id || opp.opportunityCode,
           partnerName: opp.providerName || 'Partner Bank',
           partnerCode: 'OPP',
           cardName: opp.title,
           productCategory: opp.subCategory || 'Featured',
-          annualFee: 'Institutional Exclusive',
+          annualFee: opp.incentiveConfig?.amount ? `Reward: ₹${opp.incentiveConfig.amount}` : 'Institutional Exclusive',
           eligibilityConditions: opp.description || 'Standard Underwriting Criteria',
           requiredDocuments: opp.requiredDocuments || ['PAN Card', 'Aadhaar Card'],
           turnaroundTime: '2-3 business days',
-          isPublishedOpp: true
+          isPublishedOpp: true,
+          rawOpp: opp
         });
       }
     });
@@ -199,7 +218,81 @@ export default function BusinessReferralCreditCard() {
         </div>
       </div>
 
-      {/* ── Standard ERP KPI Stat Cards ── */}
+      {/* ── Sub-Navigation Tabs: Catalog & Directory vs Live Referral Form ── */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+          <button
+            type="button"
+            className={`mgmt-btn-secondary ${viewMode === 'catalog' ? 'active' : ''}`}
+            style={{
+              background: viewMode === 'catalog' ? '#ffffff' : 'transparent',
+              borderColor: viewMode === 'catalog' ? '#cbd5e1' : 'transparent',
+              color: viewMode === 'catalog' ? '#1e293b' : '#64748b',
+              fontWeight: viewMode === 'catalog' ? 800 : 600,
+              boxShadow: viewMode === 'catalog' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+              padding: '8px 16px',
+              fontSize: '0.85rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            onClick={() => setViewMode('catalog')}
+          >
+            <CreditCard size={15} />
+            <span>Cards & Partners Directory</span>
+            <span style={{ fontSize: '0.72rem', background: '#dbeafe', color: '#1e40af', padding: '1px 6px', borderRadius: '10px', fontWeight: 800 }}>
+              {cardProductsMatrix.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={`mgmt-btn-secondary ${viewMode === 'form' ? 'active' : ''}`}
+            style={{
+              background: viewMode === 'form' ? '#ffffff' : 'transparent',
+              borderColor: viewMode === 'form' ? '#cbd5e1' : 'transparent',
+              color: viewMode === 'form' ? '#1e293b' : '#64748b',
+              fontWeight: viewMode === 'form' ? 800 : 600,
+              boxShadow: viewMode === 'form' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+              padding: '8px 16px',
+              fontSize: '0.85rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            onClick={() => setViewMode('form')}
+          >
+            <SlidersHorizontal size={15} />
+            <span>Referral Form Settings & Fields</span>
+            <span style={{
+              fontSize: '0.72rem',
+              background: dbConfig?.status === 'published' ? '#dcfce7' : '#fef3c7',
+              color: dbConfig?.status === 'published' ? '#15803d' : '#92400e',
+              padding: '1px 6px',
+              borderRadius: '10px',
+              fontWeight: 800
+            }}>
+              {dbConfig?.status === 'published' ? `Live v${dbConfig.version || 1}` : 'Draft'}
+            </span>
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="mgmt-btn-primary"
+            style={{ background: '#2563eb', borderColor: '#2563eb', fontSize: '0.82rem', padding: '7px 14px' }}
+            onClick={() => handleOpenSubmit('HDFC Bank')}
+          >
+            <Send size={14} />
+            <span>Apply / Refer Now</span>
+          </button>
+        </div>
+      </div>
+
+      {viewMode === 'catalog' && (
+        <>
+          {/* ── Standard ERP KPI Stat Cards ── */}
       <div className="mgmt-kpi-grid" style={{ marginBottom: '24px' }}>
         <div className="mgmt-kpi-card">
           <div className="mgmt-kpi-icon" style={{ background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb' }}>
@@ -499,7 +592,7 @@ export default function BusinessReferralCreditCard() {
                         type="button"
                         className="mgmt-btn-secondary"
                         style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem', background: '#2563eb', color: '#ffffff', borderColor: '#2563eb' }}
-                        onClick={() => handleOpenSubmit(card.partnerName)}
+                        onClick={() => handleOpenSubmit(card.partnerName, card.cardName, card.rawOpp)}
                       >
                         <span>Refer Now</span>
                         <ChevronRight size={13} />
@@ -512,12 +605,151 @@ export default function BusinessReferralCreditCard() {
           </table>
         </div>
       </div>
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* VIEW MODE 2: LIVE REFERRAL FORM SETTINGS & SCHEMA VIEW                 */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {viewMode === 'form' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Header Card */}
+          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '24px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '14px', marginBottom: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    padding: '3px 10px',
+                    borderRadius: '20px',
+                    background: dbConfig?.status === 'published' ? '#dcfce7' : '#fef3c7',
+                    color: dbConfig?.status === 'published' ? '#15803d' : '#92400e',
+                    border: `1px solid ${dbConfig?.status === 'published' ? '#bbf7d0' : '#fde68a'}`
+                  }}>
+                    ● {dbConfig?.status === 'published' ? `Live Published (v${dbConfig.version || 1})` : 'Draft Mode'}
+                  </span>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    Category: <strong>Credit Card Referral Form</strong>
+                  </span>
+                </div>
+                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                  {dbConfig?.displayName || 'Credit Card Referral Form'}
+                </h2>
+                <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: '#64748b' }}>
+                  {dbConfig?.description || 'Institutional partner banks, credit card products, eligibility rules, and applicant details.'}
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {rootRole === 'superadmin' && (
+                  <button
+                    type="button"
+                    className="mgmt-btn-secondary"
+                    onClick={() => navigate('/superadmin/referral-settings')}
+                    style={{ fontSize: '0.82rem', padding: '8px 14px' }}
+                  >
+                    <Sliders size={14} />
+                    <span>Edit in Form Settings</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="mgmt-btn-primary"
+                  style={{ background: '#2563eb', borderColor: '#2563eb', fontSize: '0.82rem', padding: '8px 16px' }}
+                  onClick={() => handleOpenSubmit('HDFC Bank')}
+                >
+                  <Send size={14} />
+                  <span>Open 4-Step Referral Wizard</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 3 Steps Schema Summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginTop: '16px' }}>
+              {/* Step 1 */}
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', background: '#f8fafc' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800 }}>
+                    1
+                  </div>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#1e293b' }}>
+                    Step 1: Applicant Information
+                  </h4>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(dbConfig?.fieldsConfig || []).filter(f => !f.step || f.step === 1).map((f) => (
+                    <div key={f.fieldKey} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', padding: '6px 10px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <span style={{ fontWeight: 600, color: '#334155' }}>{f.label}</span>
+                      <span style={{ fontSize: '0.72rem', color: f.isRequired ? '#dc2626' : '#64748b', fontWeight: 700 }}>
+                        {f.isRequired ? '* Required' : 'Optional'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', background: '#f8fafc' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800 }}>
+                    2
+                  </div>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#1e293b' }}>
+                    Step 2: Card & Bank Details
+                  </h4>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(dbConfig?.fieldsConfig || []).filter(f => f.step === 2).map((f) => (
+                    <div key={f.fieldKey} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', padding: '6px 10px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <span style={{ fontWeight: 600, color: '#334155' }}>{f.label}</span>
+                      <span style={{ fontSize: '0.72rem', color: f.isRequired ? '#dc2626' : '#64748b', fontWeight: 700 }}>
+                        {f.isRequired ? '* Required' : 'Optional'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', background: '#f8fafc' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800 }}>
+                    3
+                  </div>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#1e293b' }}>
+                    Step 3: Consent & Privacy
+                  </h4>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(dbConfig?.fieldsConfig || []).filter(f => f.step === 3).map((f) => (
+                    <div key={f.fieldKey} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', padding: '6px 10px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <span style={{ fontWeight: 600, color: '#334155' }}>{f.label}</span>
+                      <span style={{ fontSize: '0.72rem', color: f.isRequired ? '#dc2626' : '#64748b', fontWeight: 700 }}>
+                        {f.isRequired ? '* Required' : 'Optional'}
+                      </span>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: '0.8rem', color: '#475569', padding: '8px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <strong>Statutory Privacy Notice:</strong> Explicit consent checkbox is mandatory under RBI & DPDP guidelines.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Multi-Step Credit Card Referral Modal ── */}
       <CreditCardReferralModal
         isOpen={showSubmitModal}
-        onClose={() => setShowSubmitModal(false)}
+        onClose={() => {
+          setShowSubmitModal(false);
+          setSelectedOpportunity(null);
+        }}
         defaultBank={selectedBank}
+        defaultCardProduct={selectedCardProduct}
+        opportunity={selectedOpportunity}
         rootRole={rootRole}
       />
     </div>
