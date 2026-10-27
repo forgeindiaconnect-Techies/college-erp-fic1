@@ -1902,8 +1902,8 @@ function normalizePurpose(rawPurpose) {
   return 'Other';
 }
 
-// GET /api/watchman/vehicles or /api/vehicles - List vehicles
-router.get(['/vehicles', '/vehicles/all', '/'], protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+// GET /api/watchman/vehicles - List vehicles
+router.get(['/vehicles', '/vehicles/all'], protect, authorize('Watchman', 'Admin', 'Super Admin', 'Security', 'Guard', 'Sub Admin', 'Principal'), async (req, res) => {
   try {
     const filter = await buildTenantOrAllFilter(req, SecurityVehicleLog);
 
@@ -1925,8 +1925,8 @@ router.get(['/vehicles', '/vehicles/all', '/'], protect, authorize('Watchman', '
   }
 });
 
-// POST /api/watchman/vehicles/entry or /api/vehicles/entry - Record vehicle entry
-router.post(['/vehicles/entry', '/entry'], protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+// POST /api/watchman/vehicles/entry - Record vehicle entry
+router.post('/vehicles/entry', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Security', 'Guard', 'Sub Admin', 'Principal'), async (req, res) => {
   try {
     const rawNumber = req.body.vehicleNumber || req.body.vehicleNo;
     const rawDriver = req.body.driverName || req.body.driver;
@@ -2002,8 +2002,8 @@ router.post(['/vehicles/entry', '/entry'], protect, authorize('Watchman', 'Admin
   }
 });
 
-// PATCH /api/watchman/vehicles/:id/exit or /api/vehicles/:id/exit - Record vehicle exit
-router.patch(['/vehicles/:id/exit', '/:id/exit'], protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+// PATCH /api/watchman/vehicles/:id/exit - Record vehicle exit
+router.patch('/vehicles/:id/exit', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Security', 'Guard', 'Sub Admin', 'Principal'), async (req, res) => {
   try {
     let vehicle = null;
     if (mongoose.Types.ObjectId.isValid(req.params.id)) {

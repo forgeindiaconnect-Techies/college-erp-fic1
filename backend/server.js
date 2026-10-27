@@ -1103,9 +1103,11 @@ app.use('/api/referrals/config', referralConfigRoutes);
 app.use('/api/opportunities', opportunityRoutes);
 app.use('/api/watchman/parcels', parcelRoutes);
 app.use('/api/parcels', parcelRoutes);
-app.use('/api/vehicles', watchmanRoutes);
-app.use('/api/watchman/vehicles', watchmanRoutes);
 app.use('/api/watchman', watchmanRoutes);
+app.use('/api/vehicles', (req, res, next) => {
+  req.url = '/vehicles' + (req.url === '/' ? '' : req.url);
+  watchmanRoutes(req, res, next);
+});
 app.use('/api/buses', busTrackingRoutes);
 app.use('/api/watchman/buses', busTrackingRoutes);
 app.use('/api/meetings', meetingRoutes);
