@@ -122,6 +122,17 @@ const IncidentReportsPage = () => {
     }
   };
 
+  const formatIncidentDate = (inc) => {
+    const raw = inc.reportedAt || inc.incidentTime || inc.createdAt || inc.timestamp;
+    if (!raw) return { time: '—', date: '—' };
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return { time: '—', date: '—' };
+    return {
+      time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      date: d.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })
+    };
+  };
+
   return (
     <div className="wm-page">
       <div className="wm-header">
@@ -200,16 +211,16 @@ const IncidentReportsPage = () => {
       {/* Incidents List */}
       <div className="wm-card" style={{ padding: 0, overflow: 'hidden' }}>
         <div className="wm-table-container">
-          <table className="wm-table">
+          <table className="wm-table" style={{ width: '100%', minWidth: '940px', tableLayout: 'fixed' }}>
             <thead>
               <tr>
-                <th>Incident Details</th>
-                <th>Category</th>
-                <th>Severity</th>
-                <th>Location & Gate</th>
-                <th>Reported At</th>
-                <th>Status</th>
-                <th>Action</th>
+                <th style={{ width: '34%' }}>Incident Details</th>
+                <th style={{ width: '15%' }}>Category</th>
+                <th style={{ width: '11%' }}>Severity</th>
+                <th style={{ width: '15%' }}>Location & Gate</th>
+                <th style={{ width: '13%' }}>Reported At</th>
+                <th style={{ width: '7%' }}>Status</th>
+                <th style={{ width: '5%', textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -231,69 +242,90 @@ const IncidentReportsPage = () => {
                   </td>
                 </tr>
               ) : (
-                (Array.isArray(incidents) ? incidents : []).map((inc) => (
-                  <tr key={inc._id}>
-                    <td style={{ maxWidth: 280 }}>
-                      <div style={{ fontWeight: 600, color: '#1e293b' }}>{inc.title}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>{inc.description}</div>
-                      {inc.actionTaken && (
-                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: 4 }}>
-                          Action: {inc.actionTaken}
+                (Array.isArray(incidents) ? incidents : []).map((inc) => {
+                  const dateTime = formatIncidentDate(inc);
+                  const showGate = inc.gate && inc.location && inc.gate.trim().toLowerCase() !== inc.location.trim().toLowerCase();
+
+                  return (
+                    <tr key={inc._id}>
+                      <td style={{ verticalAlign: 'top', wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal', padding: '12px 14px' }}>
+                        <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem', lineHeight: '1.35' }}>{inc.title}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 4, lineHeight: '1.45', wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal' }}>
+                          {inc.description}
                         </div>
-                      )}
-                      {(inc.resolutionNotes || inc.resolution) && (
-                        <div style={{ fontSize: '0.75rem', color: '#059669', marginTop: 4 }}>
-                          Resolution: {inc.resolutionNotes || inc.resolution}
+                        {inc.actionTaken && (
+                          <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: 6, lineHeight: '1.35', wordBreak: 'break-word' }}>
+                            <strong style={{ fontWeight: 600 }}>Action:</strong> {inc.actionTaken}
+                          </div>
+                        )}
+                        {(inc.resolutionNotes || inc.resolution) && (
+                          <div style={{ fontSize: '0.75rem', color: '#059669', marginTop: 4, lineHeight: '1.35', wordBreak: 'break-word' }}>
+                            <strong style={{ fontWeight: 600 }}>Resolution:</strong> {inc.resolutionNotes || inc.resolution}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ verticalAlign: 'top', padding: '12px 14px', wordBreak: 'break-word' }}>
+                        <span style={{
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          color: '#334155',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          display: 'inline-block',
+                          lineHeight: '1.3'
+                        }}>
+                          {inc.category}
+                        </span>
+                      </td>
+                      <td style={{ verticalAlign: 'top', padding: '12px 14px' }}>
+                        {getSeverityBadge(inc.severity)}
+                      </td>
+                      <td style={{ verticalAlign: 'top', padding: '12px 14px', wordBreak: 'break-word' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 5, fontSize: '0.83rem', color: '#1e293b', fontWeight: 500 }}>
+                          <MapPin size={14} color="#64748b" style={{ flexShrink: 0, marginTop: 2 }} />
+                          <span>{inc.location || 'Campus'}</span>
                         </div>
-                      )}
-                    </td>
-                    <td>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#334155' }}>
-                        {inc.category}
-                      </span>
-                    </td>
-                    <td>{getSeverityBadge(inc.severity)}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85rem', color: '#1e293b' }}>
-                        <MapPin size={13} color="#64748b" />
-                        {inc.location}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: 17 }}>
-                        {inc.gate || 'Campus Area'}
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 500, color: '#1e293b' }}>
-                        {new Date(inc.reportedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        {new Date(inc.reportedAt).toLocaleDateString()}
-                      </div>
-                    </td>
-                    <td>
-                      {inc.status === 'Resolved' ? (
-                        <span className="wm-badge wm-badge-success">Resolved</span>
-                      ) : inc.status === 'Under Investigation' ? (
-                        <span className="wm-badge wm-badge-warning">Under Review</span>
-                      ) : (
-                        <span className="wm-badge wm-badge-danger">Open</span>
-                      )}
-                    </td>
-                    <td>
-                      {inc.status !== 'Resolved' ? (
-                        <button
-                          className="wm-btn wm-btn-secondary"
-                          style={{ padding: '4px 10px', fontSize: '0.75rem', color: '#059669' }}
-                          onClick={() => setResolveTarget(inc)}
-                        >
-                          Resolve
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Closed</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                        {showGate && (
+                          <div style={{ fontSize: '0.74rem', color: '#64748b', marginLeft: 19, marginTop: 2 }}>
+                            {inc.gate}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ verticalAlign: 'top', padding: '12px 14px' }}>
+                        <div style={{ fontSize: '0.83rem', fontWeight: 600, color: '#1e293b' }}>
+                          {dateTime.time}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: 2 }}>
+                          {dateTime.date}
+                        </div>
+                      </td>
+                      <td style={{ verticalAlign: 'top', padding: '12px 14px' }}>
+                        {inc.status === 'Resolved' ? (
+                          <span className="wm-badge wm-badge-success">Resolved</span>
+                        ) : inc.status === 'Under Investigation' ? (
+                          <span className="wm-badge wm-badge-warning">Under Review</span>
+                        ) : (
+                          <span className="wm-badge wm-badge-danger">Open</span>
+                        )}
+                      </td>
+                      <td style={{ verticalAlign: 'top', padding: '12px 14px', textAlign: 'right' }}>
+                        {inc.status !== 'Resolved' ? (
+                          <button
+                            className="wm-btn wm-btn-secondary"
+                            style={{ padding: '4px 10px', fontSize: '0.75rem', color: '#059669', borderColor: '#a7f3d0' }}
+                            onClick={() => setResolveTarget(inc)}
+                          >
+                            Resolve
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Closed</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

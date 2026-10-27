@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Bus, Users, Navigation, Plus, Search, Download,
   CreditCard, UserCheck, ShieldCheck, FileText, BarChart, Clock,
-  CheckCircle, AlertCircle, CheckSquare, Wrench, Edit, Trash2
+  CheckCircle, AlertCircle, CheckSquare, Wrench, Edit, Trash2, ExternalLink
 } from 'lucide-react';
 import {
   getTransportRoutes, createTransportRoute, updateTransportRoute, deleteTransportRoute,
@@ -10,8 +11,8 @@ import {
   getTransportStudents, createTransportStudent, updateTransportStudent, deleteTransportStudent,
   getTransportVehicles, createTransportVehicle, updateTransportVehicle, deleteTransportVehicle,
   getStudents, getTransportMaintenance, createTransportMaintenance,
-  getTransportComplaints, createTransportComplaint,
-  getDriverAttendance, getUsers
+  getTransportComplaints, createTransportComplaint, updateTransportComplaint,
+  getDriverAttendance, getUsers, getStudentTransportAttendanceReport
 } from '../../api/index';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -92,6 +93,113 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
   const [showChangeBusModal, setShowChangeBusModal] = useState(false);
   const [changeBusRoute, setChangeBusRoute] = useState(null);
   const [changeBusForm, setChangeBusForm] = useState({ vehicle: '', driver: '' });
+
+  // Complaint Action State
+  const [selectedComplaint, setSelectedComplaint] = useState(null);
+  const [showAssignModalComp, setShowAssignModalComp] = useState(false);
+  const [showStatusModalComp, setShowStatusModalComp] = useState(false);
+  const [showResolveModalComp, setShowResolveModalComp] = useState(false);
+  const [assigneeName, setAssigneeName] = useState('');
+  const [statusSelection, setStatusSelection] = useState('In Progress');
+  const [resolutionNoteInput, setResolutionNoteInput] = useState('');
+  const [isUpdatingComplaint, setIsUpdatingComplaint] = useState(false);
+
+  const handleOpenAssignComplaint = (comp) => {
+    setSelectedComplaint(comp);
+    setAssigneeName(comp.assignedTo && comp.assignedTo !== 'Unassigned' ? comp.assignedTo : '');
+    setShowAssignModalComp(true);
+  };
+
+  const handleSaveComplaintAssignment = async (e) => {
+    e.preventDefault();
+    if (!selectedComplaint || !assigneeName.trim()) return;
+    setIsUpdatingComplaint(true);
+    try {
+      const nextStatus = selectedComplaint.status === 'Pending' ? 'Assigned' : selectedComplaint.status;
+      await updateTransportComplaint(selectedComplaint._id || selectedComplaint.complaintId, {
+        assignedTo: assigneeName.trim(),
+        status: nextStatus
+      });
+      showToast(`Complaint ${selectedComplaint.complaintId} successfully assigned to ${assigneeName.trim()}`);
+      setShowAssignModalComp(false);
+      setSelectedComplaint(null);
+      await fetchTransportData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to assign complaint: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsUpdatingComplaint(false);
+    }
+  };
+
+  const handleOpenStatusComplaint = (comp) => {
+    setSelectedComplaint(comp);
+    setStatusSelection(comp.status || 'In Progress');
+    setResolutionNoteInput(comp.resolutionNote || '');
+    setShowStatusModalComp(true);
+  };
+
+  const handleSaveComplaintStatus = async (e) => {
+    e.preventDefault();
+    if (!selectedComplaint) return;
+    setIsUpdatingComplaint(true);
+    try {
+      const isSafety = /brake|tire|tyre|steering|suspension|engine|safety/i.test(selectedComplaint.complaintType || '') ||
+                       /brake|tire|tyre|steering|suspension|engine|safety/i.test(selectedComplaint.description || '');
+      if (statusSelection === 'Resolved' && isSafety && (!resolutionNoteInput || resolutionNoteInput.trim().length < 5)) {
+        alert('Safety-critical complaint (Brakes/Tires) requires detailed resolution notes from authorized personnel before marking resolved.');
+        setIsUpdatingComplaint(false);
+        return;
+      }
+
+      await updateTransportComplaint(selectedComplaint._id || selectedComplaint.complaintId, {
+        status: statusSelection,
+        resolutionNote: resolutionNoteInput.trim()
+      });
+      showToast(`Complaint ${selectedComplaint.complaintId} status updated to ${statusSelection}`);
+      setShowStatusModalComp(false);
+      setSelectedComplaint(null);
+      await fetchTransportData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update status: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsUpdatingComplaint(false);
+    }
+  };
+
+  const handleOpenResolveComplaint = (comp) => {
+    setSelectedComplaint(comp);
+    setResolutionNoteInput(comp.resolutionNote || '');
+    setShowResolveModalComp(true);
+  };
+
+  const handleConfirmResolveComplaint = async (e) => {
+    e.preventDefault();
+    if (!selectedComplaint) return;
+    const isSafety = /brake|tire|tyre|steering|suspension|engine|safety/i.test(selectedComplaint.complaintType || '') ||
+                     /brake|tire|tyre|steering|suspension|engine|safety/i.test(selectedComplaint.description || '');
+    if (isSafety && (!resolutionNoteInput || resolutionNoteInput.trim().length < 5)) {
+      alert('Safety-critical issue (Brakes/Tires) must be verified and recorded with resolution notes before resolving.');
+      return;
+    }
+    setIsUpdatingComplaint(true);
+    try {
+      await updateTransportComplaint(selectedComplaint._id || selectedComplaint.complaintId, {
+        status: 'Resolved',
+        resolutionNote: resolutionNoteInput.trim() || 'Issue inspected, repaired and resolved by authorized maintenance team.'
+      });
+      showToast(`Complaint ${selectedComplaint.complaintId} successfully marked as Resolved!`);
+      setShowResolveModalComp(false);
+      setSelectedComplaint(null);
+      await fetchTransportData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to resolve complaint: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsUpdatingComplaint(false);
+    }
+  };
 
   // Driver Management State & Handlers
   const [showDriverModal, setShowDriverModal] = useState(false);
@@ -495,6 +603,37 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
       rows,
       filename: "Transport_Fee_Defaulters.csv"
     });
+  };
+
+  const handleViewTransitAttendanceReport = async () => {
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const res = await getStudentTransportAttendanceReport({
+        routeId: 'R-01',
+        date: todayStr,
+        tripType: 'Pickup'
+      });
+      const data = res?.data;
+      const headers = ["Student ID", "Student Name", "Pickup Stop", "Attendance Status", "Boarded", "Route"];
+      const rows = (data?.studentAttendance || []).map(s => [
+        s.studentId,
+        s.name,
+        s.pickupPoint || 'Campus Stop',
+        s.status,
+        s.boarded ? 'Yes' : 'No',
+        'R-01'
+      ]);
+      setReportModal({
+        isOpen: true,
+        title: `Student Transit Attendance & Boarding Report (${todayStr})`,
+        headers,
+        rows: rows.length > 0 ? rows : [["-", "No attendance records recorded today yet", "-", "-", "-", "-"]],
+        filename: `Student_Transit_Attendance_${todayStr}.csv`
+      });
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to load student attendance report', 'error');
+    }
   };
 
   const fetchTransportData = async () => {
@@ -1017,11 +1156,12 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
                     <th>Description</th>
                     <th>Assigned To</th>
                     <th>Status</th>
+                    <th style={{ textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {complaints.map(comp => (
-                    <tr key={comp._id}>
+                    <tr key={comp._id || comp.complaintId}>
                       <td style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{comp.complaintId}</td>
                       <td style={{ fontFamily: 'monospace', fontWeight: '700' }}>{comp.studentId}</td>
                       <td style={{ fontWeight: '600' }}>{comp.name}</td>
@@ -1030,20 +1170,68 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
                         <span className="tm-badge tm-badge-route">Route: {comp.routeId || 'N/A'}</span>
                       </td>
                       <td style={{ fontWeight: '700', fontSize: '0.78rem' }}>{comp.complaintType}</td>
-                      <td style={{ fontSize: '0.84rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={comp.description}>{comp.description}</td>
+                      <td style={{ fontSize: '0.84rem', maxWidth: '240px' }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={comp.description}>{comp.description}</div>
+                        {comp.resolutionNote && (
+                          <div style={{ fontSize: '0.72rem', color: '#166534', background: '#dcfce7', padding: '0.15rem 0.4rem', borderRadius: '4px', marginTop: '4px', fontWeight: 600 }}>
+                            Note: {comp.resolutionNote}
+                          </div>
+                        )}
+                      </td>
                       <td><span style={{ fontWeight: '700', color: '#2563eb' }}>{comp.assignedTo || 'Unassigned'}</span></td>
                       <td>
-                        <span className={`tm-badge ${comp.status === 'Resolved' ? 'tm-badge-paid' :
-                          comp.status === 'In Progress' ? 'tm-badge-route' : 'tm-badge-pending'
+                        <span className={`tm-badge ${comp.status === 'Resolved' || comp.status === 'Closed' ? 'tm-badge-paid' :
+                          comp.status === 'In Progress' || comp.status === 'Assigned' ? 'tm-badge-route' : 'tm-badge-pending'
                           }`}>
                           {comp.status}
                         </span>
+                      </td>
+                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <button
+                            type="button"
+                            className="tm-btn tm-btn-secondary"
+                            style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                            onClick={() => handleOpenAssignComplaint(comp)}
+                            title="Assign to Maintenance Team or Transport Officer"
+                          >
+                            <UserCheck size={12} /> Assign
+                          </button>
+                          <button
+                            type="button"
+                            className="tm-btn tm-btn-secondary"
+                            style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                            onClick={() => handleOpenStatusComplaint(comp)}
+                            title="Update Status"
+                          >
+                            <Clock size={12} /> Update Status
+                          </button>
+                          {comp.status !== 'Resolved' && comp.status !== 'Closed' && (
+                            <button
+                              type="button"
+                              className="tm-btn tm-btn-primary"
+                              style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem', fontWeight: 600, background: '#16a34a', borderColor: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                              onClick={() => handleOpenResolveComplaint(comp)}
+                              title="Resolve Complaint"
+                            >
+                              <CheckCircle size={12} /> Resolve
+                            </button>
+                          )}
+                          <Link
+                            to={`/transport/complaints/${comp.complaintId || comp._id}`}
+                            className="tm-btn tm-btn-secondary"
+                            style={{ padding: '0.25rem 0.45rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center' }}
+                            title="View Full Details & Discussion"
+                          >
+                            <ExternalLink size={12} />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}
                   {complaints.length === 0 && (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No driver tasks or complaints logged.</td>
+                      <td colSpan="9" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No driver tasks or complaints logged.</td>
                     </tr>
                   )}
                 </tbody>
@@ -1266,6 +1454,7 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button className="tm-btn tm-btn-primary" onClick={handleViewManifest}><FileText size={16} /> View Student Manifest</button>
             <button className="tm-btn tm-btn-secondary" onClick={handleViewDefaulters}><FileText size={16} /> View Defaulters List</button>
+            <button className="tm-btn tm-btn-success" style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff' }} onClick={handleViewTransitAttendanceReport}><Users size={16} /> Student Transit Attendance & Boarding</button>
           </div>
         </div>
       )}
@@ -1694,6 +1883,178 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
               <div className="modal-footer">
                 <button type="button" className="tm-btn tm-btn-secondary" onClick={() => setShowComplaintModal(false)}>Cancel</button>
                 <button type="submit" className="tm-btn tm-btn-primary">Assign Task</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Complaint to Maintenance Team or Transport Officer Modal */}
+      {showAssignModalComp && selectedComplaint && (
+        <div className="modal-overlay">
+          <div className="modal-card" style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Assign Complaint {selectedComplaint.complaintId}</h2>
+              <button className="modal-close-btn" onClick={() => setShowAssignModalComp(false)}>✕</button>
+            </div>
+            <form onSubmit={handleSaveComplaintAssignment}>
+              <div className="modal-body">
+                <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
+                  <div><strong>Issue:</strong> {selectedComplaint.complaintType}</div>
+                  <div><strong>Bus:</strong> {selectedComplaint.busNumber || 'N/A'} | <strong>Route:</strong> {selectedComplaint.routeId || 'N/A'}</div>
+                  <div style={{ marginTop: '4px', color: '#475569' }}><strong>Description:</strong> {selectedComplaint.description}</div>
+                </div>
+
+                <div className="form-group">
+                  <label>Assign to Maintenance Team / Transport Authority</label>
+                  <select
+                    className="input-field"
+                    required
+                    value={assigneeName}
+                    onChange={e => setAssigneeName(e.target.value)}
+                  >
+                    <option value="">Select Assignee</option>
+                    <optgroup label="Maintenance & Workshop Team">
+                      <option value="Fleet Maintenance Team">Fleet Maintenance Team</option>
+                      <option value="Chief Workshop Engineer - Ramesh">Chief Workshop Engineer - Ramesh</option>
+                      <option value="Senior Bus Mechanic - Suresh">Senior Bus Mechanic - Suresh</option>
+                      <option value="Tire & Brake Specialist - Kumar">Tire & Brake Specialist - Kumar</option>
+                    </optgroup>
+                    <optgroup label="Transport Supervisors & Officers">
+                      <option value="Transport Supervisor">Transport Supervisor</option>
+                      <option value="Safety & Compliance Officer">Safety & Compliance Officer</option>
+                      <option value="Vaideeswari (Admin)">Vaideeswari (Admin)</option>
+                    </optgroup>
+                    {drivers.length > 0 && (
+                      <optgroup label="Drivers">
+                        {drivers.map(d => (
+                          <option key={d.driverId || d._id} value={d.name}>{d.name} ({d.driverId || 'Driver'})</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Or Enter Custom Person / Agency</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. Authorized Bosch Workshop"
+                    value={assigneeName}
+                    onChange={e => setAssigneeName(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="tm-btn tm-btn-secondary" onClick={() => setShowAssignModalComp(false)}>Cancel</button>
+                <button type="submit" disabled={isUpdatingComplaint || !assigneeName.trim()} className="tm-btn tm-btn-primary">
+                  {isUpdatingComplaint ? 'Saving...' : 'Confirm Assignment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Update Complaint Status Modal */}
+      {showStatusModalComp && selectedComplaint && (
+        <div className="modal-overlay">
+          <div className="modal-card" style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Update Status: {selectedComplaint.complaintId}</h2>
+              <button className="modal-close-btn" onClick={() => setShowStatusModalComp(false)}>✕</button>
+            </div>
+            <form onSubmit={handleSaveComplaintStatus}>
+              <div className="modal-body">
+                <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
+                  <div><strong>Complaint:</strong> {selectedComplaint.complaintType} ({selectedComplaint.complaintId})</div>
+                  <div><strong>Reporter:</strong> {selectedComplaint.name} ({selectedComplaint.studentId})</div>
+                  <div><strong>Assigned To:</strong> {selectedComplaint.assignedTo || 'Unassigned'}</div>
+                </div>
+
+                <div className="form-group">
+                  <label>Workflow Status</label>
+                  <select
+                    className="input-field"
+                    required
+                    value={statusSelection}
+                    onChange={e => setStatusSelection(e.target.value)}
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Assigned">Assigned</option>
+                    <option value="In Progress">In Progress (Inspection/Repair Active)</option>
+                    <option value="Resolved">Resolved</option>
+                    <option value="Closed">Closed</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Resolution / Status Update Notes</label>
+                  <textarea
+                    rows="3"
+                    className="input-field"
+                    placeholder="Describe actions taken, inspection results, or parts replaced..."
+                    value={resolutionNoteInput}
+                    onChange={e => setResolutionNoteInput(e.target.value)}
+                  ></textarea>
+                  {/brake|tire|tyre|steering|suspension|engine|safety/i.test(selectedComplaint.complaintType || '') && (
+                    <small style={{ color: '#b45309', display: 'block', marginTop: '4px', fontWeight: 600 }}>
+                      ⚠️ Safety-critical item (Brakes/Tires). Mandatory resolution notes required to resolve.
+                    </small>
+                  )}
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="tm-btn tm-btn-secondary" onClick={() => setShowStatusModalComp(false)}>Cancel</button>
+                <button type="submit" disabled={isUpdatingComplaint} className="tm-btn tm-btn-primary">
+                  {isUpdatingComplaint ? 'Saving...' : 'Update Status'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Resolve Complaint Modal */}
+      {showResolveModalComp && selectedComplaint && (
+        <div className="modal-overlay">
+          <div className="modal-card" style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title" style={{ color: '#166534' }}>Resolve Complaint {selectedComplaint.complaintId}</h2>
+              <button className="modal-close-btn" onClick={() => setShowResolveModalComp(false)}>✕</button>
+            </div>
+            <form onSubmit={handleConfirmResolveComplaint}>
+              <div className="modal-body">
+                <div style={{ background: '#f0fdf4', padding: '0.85rem', borderRadius: '6px', marginBottom: '1rem', border: '1px solid #bbf7d0', fontSize: '0.85rem' }}>
+                  <div><strong>Complaint ID:</strong> {selectedComplaint.complaintId}</div>
+                  <div><strong>Bus:</strong> {selectedComplaint.busNumber} | <strong>Route:</strong> {selectedComplaint.routeId}</div>
+                  <div><strong>Issue:</strong> {selectedComplaint.complaintType}</div>
+                  <div style={{ marginTop: '4px', color: '#15803d' }}><strong>Details:</strong> {selectedComplaint.description}</div>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 700 }}>Authorized Resolution & Inspection Notes *</label>
+                  <textarea
+                    rows="4"
+                    required
+                    className="input-field"
+                    placeholder="Detail the technical action taken, inspection cleared, mechanic confirmation, and safety verification..."
+                    value={resolutionNoteInput}
+                    onChange={e => setResolutionNoteInput(e.target.value)}
+                  ></textarea>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="tm-btn tm-btn-secondary" onClick={() => setShowResolveModalComp(false)}>Cancel</button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingComplaint || !resolutionNoteInput.trim()}
+                  className="tm-btn tm-btn-primary"
+                  style={{ background: '#16a34a', borderColor: '#16a34a' }}
+                >
+                  {isUpdatingComplaint ? 'Saving Resolution...' : 'Confirm & Mark Resolved'}
+                </button>
               </div>
             </form>
           </div>

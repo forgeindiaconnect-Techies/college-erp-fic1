@@ -5,7 +5,7 @@ import {
   Phone, UserCheck, Search, ShieldCheck, Download, ExternalLink, Compass
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getTransportRoutes, getTransportStudents, getTransportDrivers, getTransportVehicles } from '../../api/index';
+import { getTransportRoutes, getTransportStudents, getTransportDrivers, getTransportVehicles, getStudentTransportAttendanceReport } from '../../api/index';
 import './DriverDashboard.css';
 
 const DriverRoute = () => {
@@ -14,6 +14,7 @@ const DriverRoute = () => {
   const [route, setRoute] = useState(null);
   const [vehicle, setVehicle] = useState(null);
   const [students, setStudents] = useState([]);
+  const [attendanceReport, setAttendanceReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedStopFilter, setSelectedStopFilter] = useState('ALL');
@@ -153,6 +154,18 @@ const DriverRoute = () => {
             cleanStr(v.vehicleId) === cleanStr(myRoute.vehicle)
           ) || { vehicleNumber: myRoute.vehicle || 'TN 01 AB 1234', capacity: 50 };
           setVehicle(matchingVeh);
+
+          try {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const rep = await getStudentTransportAttendanceReport({
+              routeId: myRoute.routeId || 'R-01',
+              date: todayStr,
+              tripType: 'Pickup'
+            });
+            if (rep?.data) setAttendanceReport(rep.data);
+          } catch (e) {
+            console.error('Failed to load attendance report:', e);
+          }
         }
       } catch (err) {
         console.error('Failed to load route data', err);
@@ -366,7 +379,11 @@ const DriverRoute = () => {
               </thead>
               <tbody>
                 {pointsList.map((stop, index) => {
-                  const count = getStudentCountForStop(stop);
+                  const stopRep = attendanceReport?.stopBreakdown?.find(sb => 
+                    (sb.stopName || '').toLowerCase().trim() === (stop || '').toLowerCase().trim()
+                  );
+                  const expectedCount = stopRep ? stopRep.expectedStudents : getStudentCountForStop(stop);
+                  const boardedCount = stopRep ? stopRep.boardedCount : 0;
                   const isFirst = index === 0;
                   const isLast = index === pointsList.length - 1;
 
@@ -395,17 +412,18 @@ const DriverRoute = () => {
                         <button 
                           onClick={() => setSelectedStopFilter(selectedStopFilter === stop ? 'ALL' : stop)}
                           style={{
-                            background: count > 0 ? '#eff6ff' : '#f8fafc',
-                            color: count > 0 ? '#1d4ed8' : '#94a3b8',
-                            border: count > 0 ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
+                            background: boardedCount > 0 ? '#dcfce7' : '#f8fafc',
+                            color: boardedCount > 0 ? '#15803d' : (expectedCount > 0 ? '#1e293b' : '#94a3b8'),
+                            border: boardedCount > 0 ? '1px solid #86efac' : '1px solid #e2e8f0',
                             borderRadius: '4px',
-                            padding: '0.15rem 0.5rem',
+                            padding: '0.2rem 0.6rem',
                             fontSize: '0.75rem',
                             fontWeight: 700,
                             cursor: 'pointer'
                           }}
+                          title={`Click to filter manifest for ${stop}`}
                         >
-                          {count} Students
+                          {boardedCount} / {expectedCount} Boarded
                         </button>
                       </td>
                     </tr>

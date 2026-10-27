@@ -61,6 +61,7 @@ import SystemAnalytics from './pages/analytics/SystemAnalytics';
 import LibraryManagement from './pages/library/LibraryManagement';
 import LibrarianManagement from './pages/library/LibrarianManagement';
 import TransportManagement from './pages/transport/TransportManagement';
+import ResolveComplaintPage from './pages/transport/ResolveComplaintPage';
 import AdminBusTrackingPage from './pages/transport/AdminBusTrackingPage';
 import DriverManagement from './pages/admin/DriverManagement';
 import AdminWatchmanManagement from './pages/watchman/AdminWatchmanManagement';
@@ -533,6 +534,7 @@ function App() {
               <Route path="library"       element={<LibraryManagement />} />
               <Route path="librarian-management" element={<LibrarianManagement />} />
               <Route path="transport"     element={<TransportManagement />} />
+              <Route path="transport/complaints/:id" element={<ResolveComplaintPage />} />
               <Route path="bus-tracking"  element={<AdminBusTrackingPage />} />
               <Route path="buses"         element={<AdminBusTrackingPage />} />
               <Route path="drivers"       element={<DriverManagement />} />
@@ -762,6 +764,8 @@ function App() {
               <Route path="trips" element={<DriverTripManagement />} />
               <Route path="vehicle" element={<DriverVehicle />} />
               <Route path="tasks" element={<DriverTasks />} />
+              <Route path="tasks/:id" element={<ResolveComplaintPage />} />
+              <Route path="complaint/:id" element={<ResolveComplaintPage />} />
               <Route path="payroll" element={<DriverPayroll />} />
               <Route path="notifications" element={<DriverNotifications />} />
               <Route path="attendance" element={<DriverAttendance />} />

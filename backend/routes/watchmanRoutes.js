@@ -114,7 +114,7 @@ export const buildTenantOrAllFilter = async (req, Model, extraConditions = {}) =
           $or: [{ collegeId: tenantId }, { tenantId }]
         };
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // Fallback: match current tenant, default 'COL001', or unassigned records
@@ -540,15 +540,15 @@ router.get('/', protect, authorize('Admin', 'Super Admin'), async (req, res) => 
   try {
     const tenantId = getTenant(req);
     const isSuperAdmin = req.user && String(req.user.role).toLowerCase() === 'super admin';
-    const filter = isSuperAdmin 
-      ? {} 
-      : { 
-          $or: [
-            { tenantId }, 
-            { collegeId: tenantId },
-            { tenantId: { $exists: false } }
-          ] 
-        };
+    const filter = isSuperAdmin
+      ? {}
+      : {
+        $or: [
+          { tenantId },
+          { collegeId: tenantId },
+          { tenantId: { $exists: false } }
+        ]
+      };
 
     let watchmen = [];
     try {
@@ -1223,7 +1223,7 @@ const handleVerifyVisitorPass = async (req, res) => {
         if (urlMatch && urlMatch[1]) {
           rawQuery = decodeURIComponent(urlMatch[1]).trim();
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // If query is JSON string e.g. {"passNumber":"PASS-1515-1523"}
@@ -1231,7 +1231,7 @@ const handleVerifyVisitorPass = async (req, res) => {
       try {
         const parsed = JSON.parse(rawQuery);
         rawQuery = (parsed.passNumber || parsed.code || parsed.visitorId || parsed.phone || parsed.id || rawQuery).trim();
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Strip out quotes
@@ -1294,6 +1294,40 @@ const handleVerifyVisitorPass = async (req, res) => {
     }
 
     if (!visitor) {
+      // Check if this query corresponds to a registered Student, Staff, or HOD in CampusPerson, Student, or Staff
+      const memberPerson = await CampusPerson.findOne({
+        $or: [
+          { personId: exactRegex },
+          { personId: rawQuery },
+          { phone: rawQuery }
+        ],
+        personType: { $in: ['Student', 'Staff', 'Faculty', 'HOD'] }
+      }).lean() || await Student.findOne({
+        $or: [
+          { id: exactRegex },
+          { rollNumber: exactRegex },
+          { id: rawQuery },
+          { rollNumber: rawQuery }
+        ]
+      }).lean() || await Staff.findOne({
+        $or: [
+          { employeeId: exactRegex },
+          { employeeId: rawQuery }
+        ]
+      }).lean();
+
+      if (memberPerson) {
+        const pType = memberPerson.personType || (memberPerson.rollNumber || memberPerson.id ? 'Student' : 'Staff');
+        return res.status(400).json({
+          success: false,
+          valid: false,
+          isMemberPass: true,
+          personType: pType,
+          name: memberPerson.name,
+          message: `College member pass detected (${pType}: ${memberPerson.name || rawQuery}). Please use the Gate Operations QR Scanner under Gate Ops.`
+        });
+      }
+
       return res.status(404).json({
         success: false,
         valid: false,
@@ -1821,8 +1855,55 @@ router.patch('/parcels/:id/handover', protect, authorize('Watchman', 'Admin', 'S
 // 5. VEHICLE REGISTER OPERATIONS
 // ──────────────────────────────────────────────────────────────────────────
 
-// GET /api/watchman/vehicles - List vehicles
-router.get('/vehicles', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+// Normalizers for vehicle schema
+const VALID_VEHICLE_TYPES = [
+  'Two Wheeler',
+  'Four Wheeler (Car/SUV)',
+  'College Bus',
+  'Commercial / Delivery Van',
+  'Heavy Vehicle / Truck',
+  'Auto Rickshaw',
+  'Other'
+];
+
+const VALID_VEHICLE_PURPOSES = [
+  'Staff Parking',
+  'Visitor Entry',
+  'Student Commute',
+  'Goods / Delivery',
+  'Maintenance / Contractor',
+  'VIP / Official Guest',
+  'Other'
+];
+
+function normalizeVehicleType(rawType) {
+  if (!rawType) return 'Other';
+  if (VALID_VEHICLE_TYPES.includes(rawType)) return rawType;
+  const t = String(rawType).trim().toLowerCase();
+  if (t.includes('two') || t.includes('2-wheeler') || t.includes('bike') || t.includes('scooter') || t.includes('motorcycle')) return 'Two Wheeler';
+  if (t.includes('four') || t.includes('4-wheeler') || t.includes('car') || t.includes('suv') || t.includes('sedan')) return 'Four Wheeler (Car/SUV)';
+  if (t.includes('bus') || (t.includes('van') && t.includes('college'))) return 'College Bus';
+  if (t.includes('commercial') || t.includes('delivery van') || t.includes('van')) return 'Commercial / Delivery Van';
+  if (t.includes('heavy') || t.includes('truck') || t.includes('lorry')) return 'Heavy Vehicle / Truck';
+  if (t.includes('auto') || t.includes('rickshaw')) return 'Auto Rickshaw';
+  return 'Other';
+}
+
+function normalizePurpose(rawPurpose) {
+  if (!rawPurpose) return 'Visitor Entry';
+  if (VALID_VEHICLE_PURPOSES.includes(rawPurpose)) return rawPurpose;
+  const p = String(rawPurpose).trim().toLowerCase();
+  if (p.includes('staff') || p.includes('faculty') || p.includes('parking')) return 'Staff Parking';
+  if (p.includes('student') || p.includes('commute')) return 'Student Commute';
+  if (p.includes('good') || p.includes('delivery') || p.includes('parcel')) return 'Goods / Delivery';
+  if (p.includes('maint') || p.includes('contract')) return 'Maintenance / Contractor';
+  if (p.includes('vip') || p.includes('guest') || p.includes('official')) return 'VIP / Official Guest';
+  if (p.includes('visitor') || p.includes('campus entry') || p.includes('entry')) return 'Visitor Entry';
+  return 'Other';
+}
+
+// GET /api/watchman/vehicles or /api/vehicles - List vehicles
+router.get(['/vehicles', '/vehicles/all', '/'], protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
   try {
     const filter = await buildTenantOrAllFilter(req, SecurityVehicleLog);
 
@@ -1844,27 +1925,54 @@ router.get('/vehicles', protect, authorize('Watchman', 'Admin', 'Super Admin'), 
   }
 });
 
-// POST /api/watchman/vehicles/entry - Record vehicle entry
-router.post('/vehicles/entry', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+// POST /api/watchman/vehicles/entry or /api/vehicles/entry - Record vehicle entry
+router.post(['/vehicles/entry', '/entry'], protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
   try {
-    const { vehicleNumber, vehicleType, driverName, driverPhone, purpose, destination, gate, notes } = req.body;
+    const rawNumber = req.body.vehicleNumber || req.body.vehicleNo;
+    const rawDriver = req.body.driverName || req.body.driver;
+    const rawType = req.body.vehicleType;
+    const rawPhone = req.body.driverPhone || req.body.phone || '';
+    const rawPurpose = req.body.purpose;
+    const { destination, gate, notes } = req.body;
 
-    if (!vehicleNumber || !vehicleType || !driverName) {
-      return res.status(400).json({ success: false, message: 'Vehicle number, vehicle type, and driver name are required' });
+    if (!rawNumber || !rawNumber.trim()) {
+      return res.status(400).json({ success: false, message: 'Vehicle registration number is required' });
+    }
+    if (!rawDriver || !rawDriver.trim()) {
+      return res.status(400).json({ success: false, message: 'Driver name is required' });
+    }
+
+    const cleanVehicleNumber = rawNumber.trim().toUpperCase();
+    const cleanDriverName = rawDriver.trim();
+    const normalizedType = normalizeVehicleType(rawType);
+    const normalizedPurp = normalizePurpose(rawPurpose);
+
+    // Duplicate Check: Check if this vehicle is ALREADY inside campus
+    const activeInsideVehicle = await SecurityVehicleLog.findOne({
+      vehicleNumber: cleanVehicleNumber,
+      status: 'Inside'
+    });
+
+    if (activeInsideVehicle) {
+      return res.status(400).json({
+        success: false,
+        message: `Vehicle ${cleanVehicleNumber} is already logged as inside campus (Entered at ${activeInsideVehicle.gate || 'Gate 1'}, Driver: ${activeInsideVehicle.driverName || 'Unknown'}). Please record vehicle exit before registering a new entry.`
+      });
     }
 
     const tenantId = getTenant(req);
-    const count = await SecurityVehicleLog.countDocuments();
+    // Collision-free unique ID generation
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const vehicleLogId = `VEH-${dateStr}-${String(count + 1).padStart(3, '0')}`;
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const vehicleLogId = `VEH-${dateStr}-${Date.now().toString().slice(-4)}-${randomSuffix}`;
 
     const newVehicle = new SecurityVehicleLog({
       vehicleLogId,
-      vehicleNumber: vehicleNumber.trim().toUpperCase(),
-      vehicleType,
-      driverName: driverName.trim(),
-      driverPhone: driverPhone ? driverPhone.trim() : '',
-      purpose: purpose || 'Visitor Entry',
+      vehicleNumber: cleanVehicleNumber,
+      vehicleType: normalizedType,
+      driverName: cleanDriverName,
+      driverPhone: rawPhone ? String(rawPhone).trim() : '',
+      purpose: normalizedPurp,
       destination: destination || 'Campus Parking',
       entryTime: new Date(),
       status: 'Inside',
@@ -1885,25 +1993,40 @@ router.post('/vehicles/entry', protect, authorize('Watchman', 'Admin', 'Super Ad
 
     res.status(201).json({
       success: true,
-      message: `Vehicle ${vehicleNumber.toUpperCase()} entry recorded.`,
+      message: `Vehicle ${cleanVehicleNumber} entry recorded.`,
       data: newVehicle
     });
   } catch (err) {
+    console.error('Error recording vehicle entry:', err);
     res.status(500).json({ success: false, message: 'Failed to record vehicle entry', error: err.message });
   }
 });
 
-// PATCH /api/watchman/vehicles/:id/exit - Record vehicle exit
-router.patch('/vehicles/:id/exit', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+// PATCH /api/watchman/vehicles/:id/exit or /api/vehicles/:id/exit - Record vehicle exit
+router.patch(['/vehicles/:id/exit', '/:id/exit'], protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
   try {
-    const vehicle = await SecurityVehicleLog.findById(req.params.id);
+    let vehicle = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      vehicle = await SecurityVehicleLog.findById(req.params.id);
+    }
+    if (!vehicle) {
+      vehicle = await SecurityVehicleLog.findOne({ vehicleLogId: req.params.id });
+    }
+
     if (!vehicle) {
       return res.status(404).json({ success: false, message: 'Vehicle record not found' });
+    }
+
+    if (vehicle.status === 'Exited') {
+      return res.status(400).json({ success: false, message: `Vehicle ${vehicle.vehicleNumber} has already been recorded as exited.` });
     }
 
     vehicle.status = 'Exited';
     vehicle.exitTime = new Date();
     vehicle.exitWatchmanName = req.user.name || 'Security Guard';
+    if (req.body.gate) {
+      vehicle.notes = vehicle.notes ? `${vehicle.notes} | Exited via ${req.body.gate}` : `Exited via ${req.body.gate}`;
+    }
     await vehicle.save();
 
     const ioExit = req.app.get('io');
@@ -1933,9 +2056,9 @@ router.get('/student-register', protect, authorize('Watchman', 'Admin', 'Super A
     const filter = req.user.role === 'Super Admin'
       ? { personType: 'Student' }
       : {
-          personType: 'Student',
-          $or: [{ collegeId: tenantId }, { tenantId }]
-        };
+        personType: 'Student',
+        $or: [{ collegeId: tenantId }, { tenantId }]
+      };
 
     const { search, movementType, direction } = req.query;
     const activeDir = movementType || direction;
@@ -2213,14 +2336,14 @@ router.get('/student-qr/:code', optionalAuth, async (req, res) => {
         if (urlMatch && urlMatch[1]) {
           queryCode = decodeURIComponent(urlMatch[1]);
         }
-      } catch (_) {}
+      } catch (_) { }
     } else {
       try {
         if (rawCode.startsWith('{') && rawCode.endsWith('}')) {
           const parsed = JSON.parse(rawCode);
           queryCode = parsed.studentId || parsed.id || parsed.code || rawCode;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Strip common prefixes if present, e.g. "STU-QR-"
@@ -2228,6 +2351,28 @@ router.get('/student-qr/:code', optionalAuth, async (req, res) => {
     // Normalize phone digits for mobile search
     const cleanDigits = queryCode.replace(/\D/g, '');
     const phone10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : '';
+
+    // Verify this is not a visitor pass
+    const visitorCheck = await VisitorLog.findOne({
+      $or: [
+        { passNumber: new RegExp(`^${queryCode}$`, 'i') },
+        { visitorId: new RegExp(`^${queryCode}$`, 'i') }
+      ]
+    }).lean() || await CampusPerson.findOne({
+      $or: [
+        { personId: new RegExp(`^${queryCode}$`, 'i') },
+        { personId: queryCode }
+      ],
+      personType: 'Visitor'
+    }).lean();
+
+    if (visitorCheck) {
+      return res.status(400).json({
+        success: false,
+        isVisitorPass: true,
+        message: `Visitor pass detected (${visitorCheck.name || queryCode}). Please use the dedicated Visitor Scanner in Visitor Management.`
+      });
+    }
 
     // Find student in DB across all identifiers (QR code, ID, rollNo, mobile/phone, email, name)
     const orConditions = [
@@ -3330,9 +3475,9 @@ router.get('/attendance', protect, authorize('Watchman', 'Admin', 'Super Admin')
     const filter = req.user.role === 'Watchman'
       ? { watchmanId: req.user._id }
       : (req.user.role === 'Super Admin'
-          ? {}
-          : { $or: [{ collegeId: tenantId }, { tenantId }] }
-        );
+        ? {}
+        : { $or: [{ collegeId: tenantId }, { tenantId }] }
+      );
 
     const records = await WatchmanAttendance.find(filter).sort({ createdAt: -1 }).limit(100).lean();
 
@@ -4117,16 +4262,11 @@ router.get('/admin/daily-report', protect, authorize('Admin', 'Super Admin'), as
 // 12. CAMPUS IN & CAMPUS OUT (REGISTERED PERSONS GATE MOVEMENTS)
 // ──────────────────────────────────────────────────────────────────────────
 
-// Auto-sync Student & Staff records to CampusPerson directory if needed
+// Auto-sync Student, Staff & HOD records to CampusPerson directory
 const syncCampusPeopleFromDirectory = async (tenantId) => {
   try {
-    const existingCount = await CampusPerson.countDocuments({
-      $or: [{ tenantId }, { collegeId: tenantId }]
-    });
-    if (existingCount >= 10) return;
-
-    // 1. Sync Students
-    const students = await Student.find({}).limit(50).lean();
+    // 1. Sync Students from Student collection
+    const students = await Student.find({}).limit(150).lean();
     for (const s of students) {
       if (!s.id && !s.rollNumber) continue;
       const pid = (s.id || s.rollNumber).toUpperCase().trim();
@@ -4154,18 +4294,41 @@ const syncCampusPeopleFromDirectory = async (tenantId) => {
       }
     }
 
-    // 2. Sync Staff / Faculty
+    // 2. Sync Staff & HOD from Staff collection
+    const staffDocs = await Staff.find({}).limit(50).lean();
+    for (const st of staffDocs) {
+      const pid = (st.employeeId || `STF-${st._id.toString().slice(-6)}`).toUpperCase().trim();
+      const exists = await CampusPerson.findOne({ personId: pid });
+      if (!exists) {
+        const isHod = /hod|head of department/i.test(st.designation || '') || /hod/i.test(st.role || '');
+        await CampusPerson.create({
+          personId: pid,
+          name: st.name,
+          personType: isHod ? 'HOD' : 'Staff',
+          phone: st.phone || st.mobile || '',
+          email: st.email || '',
+          department: st.department || 'General',
+          designation: st.designation || (isHod ? 'Head of Department' : 'Faculty'),
+          currentStatus: 'Outside Campus',
+          collegeId: tenantId || 'COL001',
+          tenantId: tenantId || 'COL001'
+        });
+      }
+    }
+
+    // 3. Sync Staff & HOD from User accounts
     const staffMembers = await User.find({
-      role: { $in: ['Staff', 'HOD', 'Principal', 'Librarian'] }
-    }).limit(30).lean();
+      role: { $in: ['Staff', 'HOD', 'Principal', 'Librarian', 'Faculty'] }
+    }).limit(50).lean();
     for (const st of staffMembers) {
       const pid = (st.referenceId || st.employeeId || `STF-${st._id.toString().slice(-4)}`).toUpperCase().trim();
       const exists = await CampusPerson.findOne({ personId: pid });
       if (!exists) {
+        const isHod = st.role === 'HOD' || /hod|head/i.test(st.department || '');
         await CampusPerson.create({
           personId: pid,
           name: st.name,
-          personType: 'Staff',
+          personType: isHod ? 'HOD' : 'Staff',
           phone: st.phone || '',
           email: st.email || '',
           department: st.department || 'Faculty',
@@ -4194,7 +4357,11 @@ router.get('/campus-people', protect, authorize('Watchman', 'Admin', 'Super Admi
       filter.currentStatus = status;
     }
     if (personType && personType !== 'All') {
-      filter.personType = personType;
+      if (personType === 'Members' || personType === 'Institutional' || personType === 'Staff,Student,HOD') {
+        filter.personType = { $in: ['Student', 'Staff', 'Faculty', 'HOD'] };
+      } else {
+        filter.personType = personType;
+      }
     }
 
     if (search && search.trim()) {
@@ -4225,14 +4392,14 @@ const handleLookupCampusPerson = async (req, res) => {
       try {
         const match = rawQuery.match(/[?&]code=([^&#]+)/);
         if (match && match[1]) rawQuery = decodeURIComponent(match[1]).trim();
-      } catch (_) {}
+      } catch (_) { }
     }
 
     if (rawQuery.startsWith('{') && rawQuery.endsWith('}')) {
       try {
         const parsed = JSON.parse(rawQuery);
         rawQuery = (parsed.personId || parsed.studentId || parsed.passNumber || parsed.id || parsed.code || parsed.phone || rawQuery).trim();
-      } catch (_) {}
+      } catch (_) { }
     }
 
     rawQuery = rawQuery.replace(/^STU-QR-/i, '').replace(/^["']|["']$/g, '').trim();
@@ -4245,13 +4412,42 @@ const handleLookupCampusPerson = async (req, res) => {
     const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const exactRegex = new RegExp(`^${escapeRegex(rawQuery)}$`, 'i');
 
+    const scannerModule = (req.query.module || req.query.scannerType || '').toLowerCase();
+    const isGateScanner = scannerModule === 'gate_operations' || scannerModule === 'gate' || scannerModule === 'members';
+    const isVisitorScanner = scannerModule === 'visitor_management' || scannerModule === 'visitor';
+
+    // If on Gate Scanner and query looks like a visitor pass, reject immediately
+    if (isGateScanner && (rawQuery.toUpperCase().startsWith('PASS-') || rawQuery.toUpperCase().startsWith('V-') || /^PASS/i.test(rawQuery))) {
+      const visitor = await VisitorLog.findOne({
+        $or: [
+          { passNumber: exactRegex },
+          { passNumber: rawQuery },
+          { visitorId: exactRegex },
+          { visitorId: rawQuery }
+        ]
+      }).lean();
+      return res.status(400).json({
+        success: false,
+        found: false,
+        isVisitorPass: true,
+        personType: 'Visitor',
+        name: visitor?.name || rawQuery,
+        passNumber: visitor?.passNumber || rawQuery,
+        message: `Visitor pass detected (${visitor ? `${visitor.name} - ${visitor.passNumber}` : rawQuery}). This scanner is strictly for Students, Staff, and HODs. Please use the dedicated Visitor Pass QR Scanner in Visitor Management.`
+      });
+    }
+
     // 1. Search CampusPerson by exact personId first
-    let person = await CampusPerson.findOne({
+    let personFilter = {
       $or: [
         { personId: exactRegex },
         { personId: rawQuery }
       ]
-    }).lean();
+    };
+    if (isGateScanner) {
+      personFilter.personType = { $ne: 'Visitor' };
+    }
+    let person = await CampusPerson.findOne(personFilter).lean();
 
     // 2. If not found by personId, search CampusPerson by phone
     if (!person) {
@@ -4291,10 +4487,37 @@ const handleLookupCampusPerson = async (req, res) => {
           tenantId
         });
         person = created.toObject ? created.toObject() : created;
+      } else {
+        const userStudent = await User.findOne({
+          $or: [
+            { referenceId: exactRegex },
+            { referenceId: rawQuery },
+            { studentId: exactRegex },
+            { studentId: rawQuery },
+            { email: exactRegex }
+          ],
+          role: 'Student'
+        }).lean();
+        if (userStudent) {
+          const pId = (userStudent.studentId || userStudent.referenceId || `STU-${userStudent._id.toString().slice(-4)}`).toUpperCase();
+          const created = await CampusPerson.create({
+            personId: pId,
+            name: userStudent.name,
+            personType: 'Student',
+            phone: userStudent.phone || '',
+            email: userStudent.email || '',
+            department: userStudent.department || 'Computer Science',
+            designation: 'Student',
+            currentStatus: 'Outside Campus',
+            collegeId: tenantId,
+            tenantId
+          });
+          person = created.toObject ? created.toObject() : created;
+        }
       }
     }
 
-    // 3. If not, search Staff
+    // 3. If not, search Staff / HOD
     if (!person) {
       const staff = await Staff.findOne({
         $or: [
@@ -4322,6 +4545,34 @@ const handleLookupCampusPerson = async (req, res) => {
           tenantId
         });
         person = created.toObject ? created.toObject() : created;
+      } else {
+        const userStaff = await User.findOne({
+          $or: [
+            { referenceId: exactRegex },
+            { referenceId: rawQuery },
+            { employeeId: exactRegex },
+            { employeeId: rawQuery },
+            { email: exactRegex }
+          ],
+          role: { $in: ['Staff', 'HOD', 'Principal', 'Faculty', 'Librarian'] }
+        }).lean();
+        if (userStaff) {
+          const isHod = userStaff.role === 'HOD' || /hod|head/i.test(userStaff.department || '');
+          const pId = (userStaff.referenceId || userStaff.employeeId || `STF-${userStaff._id.toString().slice(-4)}`).toUpperCase();
+          const created = await CampusPerson.create({
+            personId: pId,
+            name: userStaff.name,
+            personType: isHod ? 'HOD' : 'Staff',
+            phone: userStaff.phone || '',
+            email: userStaff.email || '',
+            department: userStaff.department || 'General',
+            designation: userStaff.role,
+            currentStatus: 'Outside Campus',
+            collegeId: tenantId,
+            tenantId
+          });
+          person = created.toObject ? created.toObject() : created;
+        }
       }
     }
 
@@ -4380,6 +4631,31 @@ const handleLookupCampusPerson = async (req, res) => {
         found: false,
         message: `No registered person found matching "${rawQuery}". Please register them using "Register New Person".`
       });
+    }
+
+    // Check scanner module strict type separation if requested
+    if (scannerModule === 'gate_operations' || scannerModule === 'gate') {
+      if (person.personType === 'Visitor') {
+        return res.status(400).json({
+          success: false,
+          found: false,
+          isVisitorPass: true,
+          personType: 'Visitor',
+          name: person.name,
+          message: `Visitor pass detected (${person.name || rawQuery}). Please use the dedicated Visitor Scanner in Visitor Management.`
+        });
+      }
+    } else if (scannerModule === 'visitor_management' || scannerModule === 'visitor') {
+      if (['Student', 'Staff', 'Faculty', 'HOD'].includes(person.personType)) {
+        return res.status(400).json({
+          success: false,
+          found: false,
+          isMemberPass: true,
+          personType: person.personType,
+          name: person.name,
+          message: `College member pass detected (${person.personType}: ${person.name || rawQuery}). Please use the Gate Operations QR Scanner under Gate Ops.`
+        });
+      }
     }
 
     // Fetch their recent movements
@@ -4561,23 +4837,35 @@ router.post('/campus-in', protect, authorize('Watchman', 'Admin', 'Super Admin')
       return res.status(400).json({ success: false, message: 'Person ID or selection is required' });
     }
 
-    const cleanId = rawPersonId.replace(/^STU-QR-/i, '').trim().toUpperCase();
+    const cleanId = rawPersonId.replace(/^STU-QR-/i, '').trim();
     const tenantId = getTenant(req);
     const now = new Date();
 
-    // 1. Locate registered person in CampusPerson
+    const escapeRegex = (s) => (s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const exactRegex = new RegExp(`^${escapeRegex(rawPersonId)}$`, 'i');
+    const cleanRegex = new RegExp(`^${escapeRegex(cleanId)}$`, 'i');
+
+    // 1. Locate registered person in CampusPerson (case-insensitive)
     let person = await CampusPerson.findOne({
       $or: [
-        { personId: cleanId },
-        { personId: rawPersonId },
+        { personId: exactRegex },
+        { personId: cleanRegex },
+        { phone: exactRegex },
         { phone: rawPersonId }
       ]
     });
 
-    // If not yet in CampusPerson, auto-link from Student or Staff
+    // 2. If not yet in CampusPerson, auto-link from Student, Staff, or User
     if (!person) {
       const student = await Student.findOne({
-        $or: [{ id: cleanId }, { rollNumber: cleanId }]
+        $or: [
+          { id: exactRegex },
+          { id: cleanRegex },
+          { rollNumber: exactRegex },
+          { rollNumber: cleanRegex },
+          { phone: exactRegex },
+          { mobile: exactRegex }
+        ]
       }).lean();
 
       if (student) {
@@ -4597,13 +4885,75 @@ router.post('/campus-in', protect, authorize('Watchman', 'Admin', 'Super Admin')
     }
 
     if (!person) {
+      const staff = await Staff.findOne({
+        $or: [
+          { employeeId: exactRegex },
+          { employeeId: cleanRegex },
+          { phone: exactRegex },
+          { mobile: exactRegex },
+          { email: exactRegex }
+        ]
+      }).lean();
+
+      if (staff) {
+        const isHod = /hod|head of department/i.test(staff.designation || '') || /hod/i.test(staff.role || '');
+        const pId = (staff.employeeId || `STF-${staff._id.toString().slice(-6)}`).toUpperCase();
+        person = await CampusPerson.create({
+          personId: pId,
+          name: staff.name,
+          personType: isHod ? 'HOD' : 'Staff',
+          phone: staff.phone || staff.mobile || '',
+          email: staff.email || '',
+          department: staff.department || 'General',
+          designation: staff.designation || (isHod ? 'Head of Department' : 'Faculty'),
+          currentStatus: 'Outside Campus',
+          collegeId: tenantId,
+          tenantId
+        });
+      }
+    }
+
+    if (!person) {
+      const user = await User.findOne({
+        $or: [
+          { referenceId: exactRegex },
+          { referenceId: cleanRegex },
+          { employeeId: exactRegex },
+          { employeeId: cleanRegex },
+          { studentId: exactRegex },
+          { studentId: cleanRegex },
+          { email: exactRegex },
+          { phone: exactRegex }
+        ]
+      }).lean();
+
+      if (user) {
+        const isStudent = user.role === 'Student';
+        const isHod = user.role === 'HOD' || /hod|head/i.test(user.department || '');
+        const pId = (user.referenceId || user.employeeId || user.studentId || `USR-${user._id.toString().slice(-4)}`).toUpperCase();
+        person = await CampusPerson.create({
+          personId: pId,
+          name: user.name,
+          personType: isStudent ? 'Student' : isHod ? 'HOD' : 'Staff',
+          phone: user.phone || '',
+          email: user.email || '',
+          department: user.department || 'General',
+          designation: user.role || 'Member',
+          currentStatus: 'Outside Campus',
+          collegeId: tenantId,
+          tenantId
+        });
+      }
+    }
+
+    if (!person) {
       return res.status(404).json({
         success: false,
         message: `Registered person not found for ID/Phone "${rawPersonId}". Please register the person once first.`
       });
     }
 
-    // 2. Prevent Duplicate Campus In without Campus Out
+    // 3. Prevent Duplicate Campus In without Campus Out
     if (person.currentStatus === 'Inside Campus') {
       const inTimeStr = person.lastEntryTime
         ? new Date(person.lastEntryTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
@@ -4614,16 +4964,23 @@ router.post('/campus-in', protect, authorize('Watchman', 'Admin', 'Super Admin')
       });
     }
 
-    // 3. Record Campus In
-    person.currentStatus = 'Inside Campus';
-    person.lastEntryTime = now;
-    person.lastGate = gate;
-    person.totalVisits = (person.totalVisits || 0) + 1;
-    if (vehicleNumber) person.vehicleNumber = vehicleNumber;
-    await person.save();
+    // 4. Record Campus In (Direct database update to avoid entire document re-validation)
+    const updatedPerson = await CampusPerson.findByIdAndUpdate(
+      person._id,
+      {
+        $set: {
+          currentStatus: 'Inside Campus',
+          lastEntryTime: now,
+          lastGate: gate,
+          ...(vehicleNumber ? { vehicleNumber } : {})
+        },
+        $inc: { totalVisits: 1 }
+      },
+      { new: true }
+    );
 
-    // 4. Create Movement Log in CampusGateMovement
-    const movementId = `MOV-IN-${Date.now().toString().slice(-6)}`;
+    // 5. Create Movement Log in CampusGateMovement with collision-free unique movementId
+    const movementId = `MOV-IN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const movement = new CampusGateMovement({
       movementId,
       personType: person.personType || 'Visitor',
@@ -4644,7 +5001,7 @@ router.post('/campus-in', protect, authorize('Watchman', 'Admin', 'Super Admin')
     });
     await movement.save();
 
-    // 5. Synchronize StudentCampusEntry if person is Student
+    // 6. Synchronize StudentCampusEntry if person is Student
     if (person.personType === 'Student') {
       try {
         const studentEntry = new StudentCampusEntry({
@@ -4671,17 +5028,17 @@ router.post('/campus-in', protect, authorize('Watchman', 'Admin', 'Super Admin')
       }
     }
 
-    // 6. Broadcast Real-Time updates
+    // 7. Broadcast Real-Time updates
     const io = req.app.get('io');
     if (io) {
       io.emit('dataUpdated', {
         module: 'campus_movement',
         action: 'campus_in',
-        data: { person, movement }
+        data: { person: updatedPerson || person, movement }
       });
       io.emit('campusMovementUpdated', {
         action: 'campus_in',
-        person,
+        person: updatedPerson || person,
         movement
       });
     }
@@ -4689,7 +5046,7 @@ router.post('/campus-in', protect, authorize('Watchman', 'Admin', 'Super Admin')
     res.status(201).json({
       success: true,
       message: `Campus In recorded for ${person.name} (${person.personId}) at ${now.toLocaleTimeString('en-IN')}`,
-      data: { person, movement }
+      data: { person: updatedPerson || person, movement }
     });
   } catch (err) {
     console.error('Campus In error:', err);
@@ -4708,14 +5065,19 @@ router.post('/campus-out', protect, authorize('Watchman', 'Admin', 'Super Admin'
       return res.status(400).json({ success: false, message: 'Person ID or selection is required' });
     }
 
-    const cleanId = rawPersonId.replace(/^STU-QR-/i, '').trim().toUpperCase();
+    const cleanId = rawPersonId.replace(/^STU-QR-/i, '').trim();
     const tenantId = getTenant(req);
     const now = new Date();
 
+    const escapeRegex = (s) => (s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const exactRegex = new RegExp(`^${escapeRegex(rawPersonId)}$`, 'i');
+    const cleanRegex = new RegExp(`^${escapeRegex(cleanId)}$`, 'i');
+
     const person = await CampusPerson.findOne({
       $or: [
-        { personId: cleanId },
-        { personId: rawPersonId },
+        { personId: exactRegex },
+        { personId: cleanRegex },
+        { phone: exactRegex },
         { phone: rawPersonId }
       ]
     });
@@ -4740,14 +5102,21 @@ router.post('/campus-out', protect, authorize('Watchman', 'Admin', 'Super Admin'
     const durationMinutes = Math.max(1, Math.round((now - inTime) / (1000 * 60)));
     const durationFormatted = formatCampusDuration(durationMinutes);
 
-    // Update person status
-    person.currentStatus = 'Outside Campus';
-    person.lastExitTime = now;
-    person.lastGate = gate;
-    await person.save();
+    // Update person status directly
+    const updatedPerson = await CampusPerson.findByIdAndUpdate(
+      person._id,
+      {
+        $set: {
+          currentStatus: 'Outside Campus',
+          lastExitTime: now,
+          lastGate: gate
+        }
+      },
+      { new: true }
+    );
 
-    // Create Movement Log
-    const movementId = `MOV-OUT-${Date.now().toString().slice(-6)}`;
+    // Create Movement Log with collision-free unique movementId
+    const movementId = `MOV-OUT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const movement = new CampusGateMovement({
       movementId,
       personType: person.personType || 'Visitor',
@@ -4797,11 +5166,11 @@ router.post('/campus-out', protect, authorize('Watchman', 'Admin', 'Super Admin'
       io.emit('dataUpdated', {
         module: 'campus_movement',
         action: 'campus_out',
-        data: { person, movement }
+        data: { person: updatedPerson || person, movement }
       });
       io.emit('campusMovementUpdated', {
         action: 'campus_out',
-        person,
+        person: updatedPerson || person,
         movement
       });
     }
@@ -4809,7 +5178,7 @@ router.post('/campus-out', protect, authorize('Watchman', 'Admin', 'Super Admin'
     res.json({
       success: true,
       message: `Campus Out recorded for ${person.name} (${person.personId}). Time on campus: ${durationFormatted}`,
-      data: { person, movement }
+      data: { person: updatedPerson || person, movement }
     });
   } catch (err) {
     console.error('Campus Out error:', err);
@@ -4875,20 +5244,33 @@ router.get('/campus-stats', protect, authorize('Watchman', 'Admin', 'Super Admin
       $or: [{ tenantId }, { collegeId: tenantId }]
     };
 
-    const [totalRegistered, currentlyInside, currentlyOutside, todayEntries, todayExits] = await Promise.all([
-      CampusPerson.countDocuments(baseFilter),
-      CampusPerson.countDocuments({ ...baseFilter, currentStatus: 'Inside Campus' }),
-      CampusPerson.countDocuments({ ...baseFilter, currentStatus: 'Outside Campus' }),
+    const isMemberScope = req.query.personType === 'Members' || req.query.scope === 'members' || req.query.type === 'members';
+    const memberFilter = {
+      ...baseFilter,
+      personType: { $in: ['Student', 'Staff', 'Faculty', 'HOD'] }
+    };
+    const activeFilter = isMemberScope ? memberFilter : baseFilter;
+
+    const [
+      totalRegistered, currentlyInside, currentlyOutside, todayEntries, todayExits,
+      activeVisitors, preRegVisitors, totalVisitorsToday
+    ] = await Promise.all([
+      CampusPerson.countDocuments(activeFilter),
+      CampusPerson.countDocuments({ ...activeFilter, currentStatus: 'Inside Campus' }),
+      CampusPerson.countDocuments({ ...activeFilter, currentStatus: { $ne: 'Inside Campus' } }),
       CampusGateMovement.countDocuments({
-        ...baseFilter,
+        ...activeFilter,
         direction: 'In',
         timestamp: { $gte: startOfToday, $lte: endOfToday }
       }),
       CampusGateMovement.countDocuments({
-        ...baseFilter,
+        ...activeFilter,
         direction: 'Out',
         timestamp: { $gte: startOfToday, $lte: endOfToday }
-      })
+      }),
+      VisitorLog.countDocuments({ ...baseFilter, status: 'Inside' }),
+      VisitorLog.countDocuments({ ...baseFilter, status: 'Pre-Registered' }),
+      VisitorLog.countDocuments({ ...baseFilter, createdAt: { $gte: startOfToday, $lte: endOfToday } })
     ]);
 
     res.json({
@@ -4898,7 +5280,19 @@ router.get('/campus-stats', protect, authorize('Watchman', 'Admin', 'Super Admin
         currentlyInside,
         currentlyOutside,
         todayEntries,
-        todayExits
+        todayExits,
+        members: {
+          totalRegistered,
+          currentlyInside,
+          currentlyOutside,
+          todayEntries,
+          todayExits
+        },
+        visitors: {
+          currentlyInside: activeVisitors,
+          preRegistered: preRegVisitors,
+          todayTotal: totalVisitorsToday
+        }
       }
     });
   } catch (err) {

@@ -347,11 +347,29 @@ router.post('/', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Sub Adm
       notes
     } = req.body;
 
+    const effectiveCompany = deliveryCompany || req.body.courier || req.body.company || senderName || '';
+    const effectiveSender = senderName || deliveryCompany || req.body.courier || '';
+    const effectiveTracking = (trackingNumber || req.body.awb || req.body.tracking || '').trim();
+
     if (!recipientName && !staffId && !recipientId && !recipientEmail) {
       return res.status(400).json({ success: false, message: 'Please select or specify a recipient staff member.' });
     }
-    if (!deliveryCompany && !senderName) {
-      return res.status(400).json({ success: false, message: 'Courier or Sender name is required.' });
+    if (!effectiveCompany && !effectiveSender) {
+      return res.status(400).json({ success: false, message: 'Courier or Delivery company name is required.' });
+    }
+
+    // ── Duplicate Check on Tracking / AWB Number (If provided) ──
+    if (effectiveTracking) {
+      const existingActiveParcel = await ParcelLog.findOne({
+        trackingNumber: { $regex: new RegExp(`^${effectiveTracking.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        status: { $in: ['Received', 'Received at Gate', 'Pending Collection'] }
+      });
+      if (existingActiveParcel) {
+        return res.status(400).json({
+          success: false,
+          message: `A delivery/parcel with Tracking / AWB number "${effectiveTracking}" is already registered at the gate and awaiting collection (ID: ${existingActiveParcel.parcelId}, Recipient: ${existingActiveParcel.recipientName}).`
+        });
+      }
     }
 
     const tenantId = getTenant(req);
@@ -461,17 +479,17 @@ router.post('/', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Sub Adm
       finalRecipientType = finalRecipientType === 'Principal' ? 'Principal' : (finalRecipientType === 'HOD' ? 'HOD' : 'Staff');
     }
 
-    // Generate unique Parcel ID
-    const count = await ParcelLog.countDocuments();
+    // Generate collision-free unique Parcel ID
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const prefix = type === 'Delivery' ? 'DEL' : 'PCL';
-    const parcelId = `${prefix}-${dateStr}-${String(count + 1).padStart(3, '0')}`;
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const parcelId = `${prefix}-${dateStr}-${Date.now().toString().slice(-4)}-${randomSuffix}`;
 
     const newParcel = new ParcelLog({
       parcelId,
       type: type === 'Delivery' ? 'Delivery' : 'Parcel',
-      deliveryCompany: deliveryCompany || senderName || 'Courier',
-      senderName: senderName || deliveryCompany || '',
+      deliveryCompany: effectiveCompany,
+      senderName: effectiveSender,
       otherCompany: otherCompany || '',
       recipientId: finalRecipientId,
       staffId: finalStaffId,
@@ -480,7 +498,7 @@ router.post('/', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Sub Adm
       recipientPhone: finalRecipientPhone,
       recipientType: finalRecipientType,
       department: finalDepartment,
-      trackingNumber: trackingNumber ? trackingNumber.trim() : '',
+      trackingNumber: effectiveTracking,
       parcelDetails: parcelDetails ? parcelDetails.trim() : (type === 'Delivery' ? 'Food / Important Delivery' : 'Standard Courier Parcel'),
       receivedAt: receivedAt ? new Date(receivedAt) : new Date(),
       status: 'Pending Collection',

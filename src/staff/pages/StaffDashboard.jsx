@@ -20,9 +20,11 @@ import {
   getMyFacultyAllocations,
   getSubjects,
   getPlacementJobs,
-  getParcels
+  getParcels,
+  getLeaves,
+  createLeave
 } from '../../api/index';
-import useRealtimeSync from '../../hooks/useRealtimeSync';
+import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
 import LiveClassModal from '../components/LiveClassModal';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
 import MyDocumentChecklist from '../../components/common/MyDocumentChecklist';
@@ -106,7 +108,8 @@ const StaffDashboard = () => {
         allocationRes,
         subjectRes,
         jobsRes,
-        parcelsRes
+        parcelsRes,
+        leavesRes
       ] = await Promise.all([
         getStudents().catch(() => ({ data: [] })),
         getAllMarks().catch(() => ({ data: [] })),
@@ -120,8 +123,14 @@ const StaffDashboard = () => {
         getMyFacultyAllocations().catch(() => ({ data: [] })),
         getSubjects().catch(() => ({ data: [] })),
         getPlacementJobs().catch(() => ({ data: [] })),
-        getParcels().catch(() => ({ data: [] }))
+        getParcels().catch(() => ({ data: [] })),
+        getLeaves().catch(() => ({ data: [] }))
       ]);
+
+      const liveLeaves = Array.isArray(leavesRes?.data) ? leavesRes.data : [];
+      if (liveLeaves.length > 0) {
+        setLeaves(liveLeaves);
+      }
 
       const parcelList = Array.isArray(parcelsRes?.data?.data) ? parcelsRes.data.data : (Array.isArray(parcelsRes?.data) ? parcelsRes.data : []);
       setParcels(parcelList);
@@ -245,11 +254,11 @@ const StaffDashboard = () => {
 
     loadDashboardData();
 
-    // Leaves Setup
+    // Initial Leaves Cache Fallback
     const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
     const leaveRaw = localStorage.getItem(`erp_leave_requests_${tenantId}`);
     if (leaveRaw) {
-      try { setLeaves(JSON.parse(leaveRaw)); } catch (e) {}
+      try { setLeaves(prev => prev.length === 0 ? JSON.parse(leaveRaw) : prev); } catch (e) {}
     }
 
     const handlePlacementUpdate = () => {
@@ -269,7 +278,7 @@ const StaffDashboard = () => {
     };
   }, [loadDashboardData, navigate]);
 
-  useRealtimeSync(loadDashboardData, ['timetable', 'attendance', 'substitutions', 'assignments', 'marks', 'parcel']);
+  useRealtimeSync(loadDashboardData, ['timetable', 'attendance', 'substitutions', 'assignments', 'marks', 'parcel', 'leaves', 'staffSupportUpdated']);
 
   const staffName = staffSession.name || 'Faculty Member';
   const staffDept = staffSession.dept || staffSession.department || 'Computer Science Engineering';
@@ -427,30 +436,39 @@ const StaffDashboard = () => {
     }
   };
 
-  const handleLeaveSubmit = (e) => {
+  const handleLeaveSubmit = async (e) => {
     e.preventDefault();
     const newLeave = {
-      id: `leave_${Date.now()}`,
-      staffId: staffSession.id || 'STF001',
+      staffId: staffSession.id || staffSession.referenceId || 'STF001',
       name: staffName,
       staffName,
       role: 'Staff',
       email: staffSession.email,
       dept: staffDept,
+      department: staffDept,
       type: leaveForm.type,
+      leaveType: leaveForm.type,
       startDate: leaveForm.startDate,
       endDate: leaveForm.endDate,
       reason: leaveForm.reason,
+      description: leaveForm.reason,
       status: 'Pending',
       createdAt: new Date().toISOString()
     };
-    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
-    const saved = localStorage.getItem(`erp_leave_requests_${tenantId}`);
-    const existing = saved ? JSON.parse(saved) : leaves;
-    const updatedLeaves = [newLeave, ...existing];
-    setLeaves(updatedLeaves);
-    localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(updatedLeaves));
-    window.dispatchEvent(new Event('storage'));
+
+    try {
+      const res = await createLeave(newLeave);
+      emitERPDataUpdate(['leaves', 'staffSupportUpdated'], 'created', res.data);
+      await loadDashboardData();
+    } catch (err) {
+      console.warn('API leave creation fallback to local storage:', err);
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const saved = localStorage.getItem(`erp_leave_requests_${tenantId}`);
+      const existing = saved ? JSON.parse(saved) : leaves;
+      const updatedLeaves = [newLeave, ...existing];
+      setLeaves(updatedLeaves);
+      localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(updatedLeaves));
+    }
 
     setLeaveSuccess(true);
     setTimeout(() => {

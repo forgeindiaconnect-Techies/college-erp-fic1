@@ -237,8 +237,10 @@
 .wm-table td {
   padding: 11px 14px;
   border-bottom: 1px solid var(--border-color, #f1f5f9);
-  vertical-align: middle;
+  vertical-align: top;
   color: #1e293b;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .wmn-table tbody tr:hover,

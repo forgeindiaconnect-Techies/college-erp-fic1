@@ -15,6 +15,7 @@ import {
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import DynamicFormRenderer from './DynamicFormRenderer';
 import ReferralSubmissionModal from '../../components/referrals/ReferralSubmissionModal';
+import TopReferralPerformers from '../../components/referrals/TopReferralPerformers';
 import '../admin/UserManagementCommon.css';
 import './PersonalReferrals.css';
 import './AdminReferralManagement.css';
@@ -23,9 +24,9 @@ export default function PersonalReferrals() {
   const navigate = useNavigate();
   const location = useLocation();
   const pathParts = location.pathname.split('/').filter(Boolean);
-  const rootRole = ['admin', 'accounts', 'staff', 'student', 'principal', 'superadmin', 'hod', 'librarian'].includes(pathParts[0]?.toLowerCase())
+  const rootRole = ['admin', 'accounts', 'staff', 'student', 'principal', 'superadmin', 'hod', 'librarian', 'driver', 'parent', 'watchman', 'hostel', 'placement'].includes(pathParts[0]?.toLowerCase())
     ? pathParts[0].toLowerCase()
-    : (localStorage.getItem('role')?.toLowerCase() || 'admin');
+    : (sessionStorage.getItem('active_role')?.toLowerCase() || localStorage.getItem('role')?.toLowerCase() || 'staff');
   const dashboardPath = `/${rootRole}/dashboard`;
   const businessCatalogPath = `/${rootRole}/business-referral`;
 
@@ -569,6 +570,28 @@ export default function PersonalReferrals() {
           >
             <CheckCircle2 size={16} />
             <span>My Applications Tracking ({myApplications.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainView('leaderboard')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: mainView === 'leaderboard' ? '1px solid #2563eb' : '1px solid transparent',
+              background: mainView === 'leaderboard' ? '#eff6ff' : 'transparent',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              color: mainView === 'leaderboard' ? '#1d4ed8' : '#64748b',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Award size={16} />
+            <span>Leaderboard</span>
           </button>
         </div>
 
@@ -1127,6 +1150,13 @@ export default function PersonalReferrals() {
           </div>
         );
       })()}
+
+      {/* ── VIEW 4: TOP REFERRAL PERFORMERS LEADERBOARD ── */}
+      {mainView === 'leaderboard' && (
+        <div style={{ padding: '20px' }}>
+          <TopReferralPerformers title="Campus Referral Leaderboard" />
+        </div>
+      )}
       </div>
 
       {/* ── OPPORTUNITY DETAILS MODAL ── */}

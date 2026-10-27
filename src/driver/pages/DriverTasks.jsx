@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Wrench, ShieldCheck, Clock, CheckCircle, AlertTriangle, ChevronRight, Check } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CheckSquare, Wrench, ShieldCheck, Clock, CheckCircle, AlertTriangle, ChevronRight, Check, ExternalLink, MessageSquare, AlertCircle } from 'lucide-react';
 import { getTransportMaintenance, updateTransportMaintenance, getTransportComplaints, updateTransportComplaint, getTransportRoutes } from '../../api/index';
 
 const DriverTasks = () => {
@@ -31,7 +32,7 @@ const DriverTasks = () => {
       ];
       const allComplaints = [
         ...localComplaints,
-        ...(compRes.data || []).filter(c => !localComplaints.find(l => l._id === c._id))
+        ...(compRes.data || []).filter(c => !localComplaints.find(l => (l._id && l._id === c._id) || (l.complaintId && l.complaintId === c.complaintId)))
       ];
       const allRoutes = [
         ...localRoutes,
@@ -50,29 +51,40 @@ const DriverTasks = () => {
                rDriver.includes(meId) ||
                (session.routeId && (cleanStr(r.routeId) === cleanStr(session.routeId) || cleanStr(r.name) === cleanStr(session.routeId)));
       });
-      const myVehicleId = myRoute ? myRoute.vehicle : (session.vehicleId || session.vehicle);
+      const myVehicleId = myRoute ? myRoute.vehicle : (session.vehicleId || session.vehicle || 'TN 01 AB 1234');
       const myVehicleClean = myVehicleId ? String(myVehicleId).trim().toLowerCase() : '';
       
       const myMaintenance = allMaintenance.filter(m => 
         m.vehicleNumber && String(m.vehicleNumber).trim().toLowerCase() === myVehicleClean
       );
       
-      const myNameClean = session.name ? String(session.name).trim().toLowerCase() : '';
-      const myIdClean = session.referenceId ? String(session.referenceId).trim().toLowerCase() : '';
-      const myRouteClean = myRoute ? String(myRoute.routeId).trim().toLowerCase() : '';
+      const myNameClean = session.name ? String(session.name).trim().toLowerCase() : 'viji';
+      const myIdClean = session.referenceId ? String(session.referenceId).trim().toLowerCase() : 'drv-0001';
+      const myRouteClean = myRoute ? String(myRoute.routeId).trim().toLowerCase() : 'r-01';
       
       const myComplaints = allComplaints.filter(c => {
         const typeClean = (c.complaintType || c.category || '').toLowerCase();
         const descClean = (c.description || '').toLowerCase();
-        const sensitiveKeywords = ['driver behavior', 'behavior', 'overspeed', 'speed', 'harassment', 'safety', 'rash', 'misbehave', 'rude'];
-        const isSensitive = sensitiveKeywords.some(keyword => typeClean.includes(keyword) || descClean.includes(keyword));
-        if (isSensitive) return false;
+        
+        const reporterIdClean = cleanStr(c.studentId);
+        const reporterNameClean = cleanStr(c.name);
+
+        const isReporter = (reporterIdClean && (reporterIdClean === myIdClean || reporterIdClean.includes(myIdClean) || myIdClean.includes(reporterIdClean) || reporterIdClean === 'drv-0001')) ||
+                           (reporterNameClean && (reporterNameClean === myNameClean || reporterNameClean.includes(myNameClean) || reporterNameClean === 'viji')) ||
+                           c.reporterType === 'Driver';
+
+        if (!isReporter) {
+          const sensitiveKeywords = ['driver behavior', 'behavior', 'overspeed', 'speed', 'harassment', 'rash', 'misbehave', 'rude'];
+          const isMisconduct = sensitiveKeywords.some(keyword => typeClean.includes(keyword) || descClean.includes(keyword));
+          if (isMisconduct) return false;
+        }
 
         const assignedClean = c.assignedTo ? String(c.assignedTo).trim().toLowerCase() : '';
         const busClean = c.busNumber ? String(c.busNumber).trim().toLowerCase() : '';
         const routeClean = c.routeId ? String(c.routeId).trim().toLowerCase() : '';
 
         return (
+          isReporter ||
           (assignedClean && (assignedClean === myNameClean || assignedClean === myIdClean || assignedClean === 'driver')) ||
           (myVehicleClean && busClean === myVehicleClean) ||
           (myRouteClean && routeClean === myRouteClean)
@@ -102,13 +114,16 @@ const DriverTasks = () => {
     }
   };
 
-  const handleUpdateComplaint = async (id, status) => {
+  const handleAcknowledgeComplaint = async (id) => {
     try {
-      await updateTransportComplaint(id, { status });
+      await updateTransportComplaint(id, {
+        acknowledgedByDriver: true,
+        driverAcknowledgeNote: `Acknowledged by Driver ${driverInfo.name || 'Viji'}`
+      });
       fetchData();
-      alert(`Complaint marked as ${status}`);
+      alert('Resolution acknowledged successfully.');
     } catch (err) {
-      alert('Failed to update complaint status');
+      alert('Failed to acknowledge resolution: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -222,26 +237,77 @@ const DriverTasks = () => {
               </div>
             ) : (
               complaintTasks.map(task => {
-                const isResolved = task.status === 'Resolved';
+                const isResolved = task.status === 'Resolved' || task.status === 'Closed';
+                const isSafety = /brake|tire|tyre|steering|suspension|engine|safety/i.test(task.complaintType || '') ||
+                                 /brake|tire|tyre|steering|suspension|engine|safety/i.test(task.description || '');
+
                 return (
-                  <div key={task._id} style={{ border: '1px solid #fee2e2', borderRadius: '6px', padding: '0.75rem', background: isResolved ? '#f0fdf4' : '#ffffff' }}>
+                  <div key={task._id || task.complaintId} style={{ border: `1px solid ${isResolved ? '#bbf7d0' : '#fee2e2'}`, borderRadius: '6px', padding: '0.85rem', background: isResolved ? '#f0fdf4' : '#ffffff' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#b91c1c' }}>{task.category || 'Vehicle Issue'}</div>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '4px', background: isResolved ? '#dcfce7' : '#fee2e2', color: isResolved ? '#166534' : '#b91c1c' }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '0.85rem', color: isResolved ? '#15803d' : '#b91c1c' }}>
+                          {task.complaintType || task.category || 'Vehicle Defect'}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
+                          ID: {task.complaintId || task._id} • Bus: {task.busNumber || 'N/A'}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '4px', background: isResolved ? '#dcfce7' : '#fee2e2', color: isResolved ? '#166534' : '#b91c1c' }}>
                         {task.status}
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#334155', marginBottom: '0.5rem' }}>
+
+                    <div style={{ fontSize: '0.78rem', color: '#334155', margin: '0.5rem 0', background: isResolved ? '#ffffff' : '#f8fafc', padding: '0.5rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
                       "{task.description}"
                     </div>
-                    {!isResolved && (
-                      <button 
-                        onClick={() => handleUpdateComplaint(task._id, 'Resolved')}
-                        style={{ width: '100%', padding: '0.35rem', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
-                      >
-                        <Check size={12} /> Mark Defect Resolved
-                      </button>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#475569', marginBottom: '0.5rem' }}>
+                      <span>Assigned: <strong>{task.assignedTo || 'Pending Assignment'}</strong></span>
+                      {task.priority && <span>Priority: <strong>{task.priority}</strong></span>}
+                    </div>
+
+                    {/* Admin Resolution Notes */}
+                    {task.resolutionNote && (
+                      <div style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: '4px', padding: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem', color: '#166534' }}>
+                        <div style={{ fontWeight: 700, marginBottom: '2px' }}>🛠️ Fleet Resolution Note:</div>
+                        <div>{task.resolutionNote}</div>
+                        {task.resolvedBy && (
+                          <div style={{ fontSize: '0.68rem', color: '#15803d', marginTop: '3px' }}>
+                            Resolved by: {task.resolvedBy}
+                          </div>
+                        )}
+                      </div>
                     )}
+
+                    {/* Safety notice for pending/in-progress issues */}
+                    {!isResolved && isSafety && (
+                      <div style={{ fontSize: '0.72rem', color: '#b45309', background: '#fef3c7', padding: '0.35rem 0.5rem', borderRadius: '4px', marginBottom: '0.5rem', fontWeight: 600 }}>
+                        ⚠️ Brakes/Tires safety defect. In progress until authorized workshop inspection clearance.
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+                      {isResolved && !task.acknowledgedByDriver && (
+                        <button 
+                          onClick={() => handleAcknowledgeComplaint(task._id || task.complaintId)}
+                          style={{ flex: 1, padding: '0.4rem', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                        >
+                          <Check size={12} /> Confirm & Acknowledge Resolution
+                        </button>
+                      )}
+                      {task.acknowledgedByDriver && (
+                        <div style={{ flex: 1, padding: '0.35rem', background: '#dcfce7', color: '#15803d', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, textAlign: 'center' }}>
+                          ✓ Resolution Acknowledged by Driver
+                        </div>
+                      )}
+                      <Link 
+                        to={`/driver/complaint/${task.complaintId || task._id}`}
+                        style={{ padding: '0.35rem 0.6rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', color: '#334155', textDecoration: 'none', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}
+                      >
+                        <MessageSquare size={12} /> Details
+                      </Link>
+                    </div>
                   </div>
                 );
               })

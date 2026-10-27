@@ -39,13 +39,25 @@ mongoose.plugin((schema) => {
           return;
         }
 
-        // Match against collegeId OR tenantId
-        this.where({
-          $or: [
-            { collegeId: targetCid },
-            { tenantId: targetCid }
-          ]
-        });
+        // Match against collegeId OR tenantId (allow null/unassigned when querying mock_college_id)
+        if (targetCid === 'mock_college_id') {
+          this.where({
+            $or: [
+              { collegeId: targetCid },
+              { tenantId: targetCid },
+              { collegeId: { $exists: false } },
+              { collegeId: null },
+              { collegeId: '' }
+            ]
+          });
+        } else {
+          this.where({
+            $or: [
+              { collegeId: targetCid },
+              { tenantId: targetCid }
+            ]
+          });
+        }
       }
       if (typeof next === 'function') next();
     });

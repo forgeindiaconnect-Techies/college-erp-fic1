@@ -46,6 +46,21 @@ export const normalizeText = (rawText) => {
   return String(rawText).trim().toLowerCase().replace(/\s+/g, ' ');
 };
 
+/**
+ * Normalizes payment modes to valid schema values
+ */
+export const normalizePaymentMode = (rawMode) => {
+  if (!rawMode) return 'Bank Transfer';
+  const m = String(rawMode).trim();
+  const lower = m.toLowerCase();
+  if (lower.includes('upi')) return 'UPI';
+  if (lower.includes('neft') && !lower.includes('rtgs')) return 'NEFT';
+  if (lower.includes('imps')) return 'IMPS';
+  if (lower.includes('cheque')) return 'Cheque';
+  if (lower.includes('cash')) return 'Cash';
+  return 'Bank Transfer';
+};
+
 export const escapeRegex = (string) => {
   return String(string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
@@ -259,6 +274,175 @@ export const resolveCollegeTenantIds = async (collegeIdentifier) => {
   }
   return [cleanId];
 };
+
+// Helper for read routes: optional auth if bearer provided, safe fallback for public read
+export const optionalProtect = async (req, res, next) => {
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    return protect(req, res, () => {
+      collegeScope(req, res, next);
+    });
+  }
+  req.collegeId = req.query.tenantId || req.query.collegeId || 'COL001';
+  next();
+};
+
+/**
+ * ── TOP REFERRAL PERFORMERS / LEADERBOARD ENDPOINT ──
+ * Ranks performers by verified successful referrals and actual earned incentives.
+ * Excludes rejected, duplicate, unsuccessful, and ineligible referrals.
+ */
+const getTopPerformersHandler = async (req, res) => {
+  try {
+    const isSuperAdmin = req.user?.role === 'Super Admin';
+    let tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId)) || 'COL001';
+    if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
+      tenantId = req.query.collegeId;
+    }
+
+    const query = {};
+    if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
+      const targetCollegeIds = await resolveCollegeTenantIds(req.query.collegeId);
+      if (targetCollegeIds && targetCollegeIds.length > 0) {
+        query.$or = [
+          { tenantId: { $in: targetCollegeIds } },
+          { collegeId: { $in: targetCollegeIds } }
+        ];
+      }
+    } else if (!isSuperAdmin) {
+      const allowedTenants = [tenantId, 'COL001', 'COL004-3190860', 'mock_college_id', null].filter(Boolean);
+      query.$or = [
+        { tenantId: { $in: allowedTenants } },
+        { collegeId: { $in: allowedTenants } },
+        { tenantId: { $exists: false } }
+      ];
+    }
+
+    const [allReferrals, allIncentives] = await Promise.all([
+      Referral.find(query)
+        .populate('submittedBy', 'name email role department referenceId studentId phone avatar')
+        .lean(),
+      IncentiveRecord.find(query).lean(),
+    ]);
+
+    const unsuccessfulStatuses = ['rejected', 'cancelled', 'failed', 'returned', 'duplicate', 'reversed'];
+    const performersMap = {};
+
+    allReferrals.forEach((r) => {
+      if (r.isDuplicate) return;
+
+      const userObj = r.submittedBy;
+      const rawId = userObj?._id ? userObj._id.toString() : (r.submittedBy ? r.submittedBy.toString() : null);
+      const cleanName = (r.submitterName || userObj?.name || 'Referrer').trim();
+      const userId = rawId || cleanName.toLowerCase().replace(/\s+/g, '_');
+
+      const userName = cleanName;
+      const userRole = r.submitterRole || userObj?.role || 'Staff';
+      const userDept = r.submitterDepartment || userObj?.department || 'General';
+      const empId = r.submitterEmployeeId || userObj?.referenceId || userObj?.studentId || '';
+      const avatar = userObj?.avatar || null;
+
+      if (!performersMap[userId]) {
+        performersMap[userId] = {
+          userId,
+          name: userName,
+          role: userRole,
+          department: userDept,
+          employeeId: empId,
+          avatar,
+          totalReferrals: 0,
+          successfulReferrals: 0,
+          earnedIncentive: 0,
+          paidIncentive: 0,
+          pendingIncentive: 0,
+          categories: {},
+        };
+      }
+
+      performersMap[userId].totalReferrals += 1;
+      const cat = r.category || 'Other';
+      performersMap[userId].categories[cat] = (performersMap[userId].categories[cat] || 0) + 1;
+
+      // Determine if referral is successful & eligible
+      const statusLower = (r.status || '').toLowerCase().trim();
+      const isStatusSuccess = [
+        'policy issued', 'approved', 'issued', 'activated', 'account opened', 'joined', 'completed', 'success'
+      ].includes(statusLower);
+
+      const isEligible = Boolean(r.incentiveEligible || r.milestoneVerified || isStatusSuccess);
+      const isNotRejected = !unsuccessfulStatuses.some((st) => statusLower.includes(st)) && r.incentiveStatus !== 'Rejected';
+
+      if (isEligible && isNotRejected) {
+        performersMap[userId].successfulReferrals += 1;
+        const refAmount = Number(r.incentiveAmount) || (r.category === 'Credit Card' ? 1000 : r.category === 'Insurance' ? 750 : r.category === 'Bank Account' ? 500 : 750);
+        performersMap[userId]._refBaselineEarned = (performersMap[userId]._refBaselineEarned || 0) + refAmount;
+      }
+    });
+
+    allIncentives.forEach((inc) => {
+      const earnedById = inc.earnedBy ? inc.earnedBy.toString() : null;
+      const earnedByName = (inc.earnedByName || '').trim().toLowerCase();
+
+      let performer = null;
+      if (earnedById && performersMap[earnedById]) {
+        performer = performersMap[earnedById];
+      } else {
+        performer = Object.values(performersMap).find((p) => p.name.trim().toLowerCase() === earnedByName);
+      }
+
+      if (performer) {
+        performer._hasIncentiveRecords = true;
+        const incAmount = Number(inc.amount) || 0;
+        const paidAmount = Number(inc.paidAmount) || (inc.status === 'Paid' ? incAmount : 0);
+
+        if (inc.status !== 'Rejected' && inc.status !== 'Reversed') {
+          performer.earnedIncentive += incAmount;
+          performer.paidIncentive += paidAmount;
+        }
+      }
+    });
+
+    Object.values(performersMap).forEach((p) => {
+      if (!p._hasIncentiveRecords && p._refBaselineEarned) {
+        p.earnedIncentive = p._refBaselineEarned;
+      }
+      p.pendingIncentive = Math.max(0, p.earnedIncentive - p.paidIncentive);
+      delete p._refBaselineEarned;
+      delete p._hasIncentiveRecords;
+    });
+
+    const sortedPerformers = Object.values(performersMap)
+      .filter((p) => p.totalReferrals > 0)
+      .sort((a, b) => {
+        if (b.successfulReferrals !== a.successfulReferrals) {
+          return b.successfulReferrals - a.successfulReferrals;
+        }
+        return b.earnedIncentive - a.earnedIncentive;
+      })
+      .map((p, idx) => ({
+        ...p,
+        rank: idx + 1,
+      }));
+
+    res.json({
+      success: true,
+      data: sortedPerformers,
+      stats: {
+        totalPerformers: sortedPerformers.length,
+        totalSuccessfulReferrals: sortedPerformers.reduce((acc, cur) => acc + cur.successfulReferrals, 0),
+        totalVerifiedReferrals: sortedPerformers.reduce((acc, cur) => acc + cur.successfulReferrals, 0),
+        totalIncentivesEarned: sortedPerformers.reduce((acc, cur) => acc + cur.earnedIncentive, 0),
+        totalEarnedIncentives: sortedPerformers.reduce((acc, cur) => acc + cur.earnedIncentive, 0),
+        totalIncentivesPaid: sortedPerformers.reduce((acc, cur) => acc + cur.paidIncentive, 0),
+      }
+    });
+  } catch (err) {
+    console.error('Error in /top-performers:', err);
+    res.status(500).json({ success: false, message: 'Server error loading top performers', error: err.message });
+  }
+};
+
+router.get('/top-performers', optionalProtect, getTopPerformersHandler);
+router.get('/leaderboard', optionalProtect, getTopPerformersHandler);
 
 router.get('/test-duplicate-scenarios', async (req, res) => {
   const results = [];
@@ -874,25 +1058,53 @@ router.post('/', protect, collegeScope, async (req, res) => {
 router.get('/my-referrals', protect, collegeScope, async (req, res) => {
   try {
     const { category, status, search } = req.query;
+    const tenantId = req.collegeId || req.user.tenantId;
 
-    const query = {
-      $or: [
-        { submittedBy: req.user._id },
-        { submitterEmail: req.user.email }
-      ]
-    };
-
-    if (category && category !== 'All') query.category = category;
-    if (status && status !== 'All') query.status = status;
-    if (search) {
-      query.$or = [
-        { referralCode: { $regex: search, $options: 'i' } },
-        { 'insuranceDetails.applicantName': { $regex: search, $options: 'i' } },
-        { 'creditCardDetails.applicantName': { $regex: search, $options: 'i' } },
-        { 'bankAccountDetails.applicantName': { $regex: search, $options: 'i' } },
-        { 'jobDetails.candidateName': { $regex: search, $options: 'i' } },
-      ];
+    // Strict ownership condition: only records submitted by this specific authenticated user
+    const userConditions = [{ submittedBy: req.user._id }];
+    if (req.user.email && typeof req.user.email === 'string' && req.user.email.trim().length > 0) {
+      userConditions.push({ submitterEmail: req.user.email.trim().toLowerCase() });
     }
+
+    const andConditions = [
+      userConditions.length > 1 ? { $or: userConditions } : userConditions[0]
+    ];
+
+    if (tenantId) {
+      andConditions.push({
+        $or: [
+          { tenantId },
+          { collegeId: tenantId },
+          { tenantId: { $exists: false } },
+          { tenantId: null }
+        ]
+      });
+    }
+
+    if (category && category !== 'All') {
+      andConditions.push({ category });
+    }
+    if (status && status !== 'All') {
+      andConditions.push({ status });
+    }
+    if (search && search.trim()) {
+      const s = search.trim();
+      andConditions.push({
+        $or: [
+          { referralCode: { $regex: s, $options: 'i' } },
+          { 'insuranceDetails.applicantName': { $regex: s, $options: 'i' } },
+          { 'insuranceDetails.applicantPhone': { $regex: s, $options: 'i' } },
+          { 'creditCardDetails.applicantName': { $regex: s, $options: 'i' } },
+          { 'creditCardDetails.applicantPhone': { $regex: s, $options: 'i' } },
+          { 'bankAccountDetails.applicantName': { $regex: s, $options: 'i' } },
+          { 'bankAccountDetails.applicantPhone': { $regex: s, $options: 'i' } },
+          { 'jobDetails.candidateName': { $regex: s, $options: 'i' } },
+          { 'jobDetails.candidatePhone': { $regex: s, $options: 'i' } },
+        ]
+      });
+    }
+
+    const query = andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
 
     const referrals = await Referral.find(query)
       .sort({ createdAt: -1 })
@@ -910,7 +1122,27 @@ router.get('/my-stats', protect, collegeScope, async (req, res) => {
     const tenantId = req.collegeId || req.user.tenantId || 'COL001';
     const userId = req.user._id;
 
-    const allMyReferrals = await Referral.find({ submittedBy: userId, tenantId });
+    // Strict ownership condition for this authenticated user
+    const userConditions = [{ submittedBy: userId }];
+    if (req.user.email && typeof req.user.email === 'string' && req.user.email.trim().length > 0) {
+      userConditions.push({ submitterEmail: req.user.email.trim().toLowerCase() });
+    }
+
+    const refQuery = {
+      $and: [
+        userConditions.length > 1 ? { $or: userConditions } : userConditions[0],
+        {
+          $or: [
+            { tenantId },
+            { collegeId: tenantId },
+            { tenantId: { $exists: false } },
+            { tenantId: null }
+          ]
+        }
+      ]
+    };
+
+    const allMyReferrals = await Referral.find(refQuery);
 
     const totalReferrals = allMyReferrals.length;
     const submittedCount = allMyReferrals.filter(r => r.status === 'Submitted').length;
@@ -923,7 +1155,20 @@ router.get('/my-stats', protect, collegeScope, async (req, res) => {
     const rejectedCount = allMyReferrals.filter(r => ['Rejected', 'Cancelled'].includes(r.status)).length;
 
     // Incentive totals directly from verified IncentiveRecords
-    const myIncentives = await IncentiveRecord.find({ earnedBy: userId, tenantId });
+    const incQuery = {
+      $and: [
+        { earnedBy: userId },
+        {
+          $or: [
+            { tenantId },
+            { collegeId: tenantId },
+            { tenantId: { $exists: false } },
+            { tenantId: null }
+          ]
+        }
+      ]
+    };
+    const myIncentives = await IncentiveRecord.find(incQuery);
 
     let totalPaid = 0;
     let totalPendingApproval = 0;
@@ -968,9 +1213,10 @@ router.get('/my-stats', protect, collegeScope, async (req, res) => {
 });
 
 // ── 4. ADMIN & SUPER ADMIN LIST ALL REFERRALS (SCOPED & ENHANCED FILTERS) ────────────────────────
-router.get('/', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal'), async (req, res) => {
+router.get('/', protect, collegeScope, async (req, res) => {
   try {
     const isSuperAdmin = req.user.role === 'Super Admin';
+    const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal'].includes(req.user.role);
     let tenantId = req.collegeId || req.user.tenantId;
 
     if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
@@ -1001,12 +1247,17 @@ router.get('/', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Ad
         ];
       }
     } else if (!isSuperAdmin) {
-      const allowedTenants = [tenantId, 'COL001', 'mock_college_id', null].filter(Boolean);
+      const allowedTenants = [tenantId].filter(Boolean);
       query.$or = [
         { tenantId: { $in: allowedTenants } },
         { collegeId: { $in: allowedTenants } },
         { tenantId: { $exists: false } }
       ];
+    }
+
+    if (!isPrivileged) {
+      // Regular users (Staff, Driver, Student, Parent, etc.) can ONLY EVER see their own leads!
+      query.submittedBy = req.user._id;
     }
 
     if (category && category !== 'All') query.category = category;
@@ -1015,8 +1266,8 @@ router.get('/', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Ad
     if (submitterRole && submitterRole !== 'All') query.submitterRole = submitterRole;
     if (department && department !== 'All') query.submitterDepartment = department;
 
-    // Filter by specific referrer
-    if (referrer && referrer !== 'All') {
+    // Filter by specific referrer (only privileged admins can filter by another user)
+    if (referrer && referrer !== 'All' && isPrivileged) {
       if (mongoose.Types.ObjectId.isValid(referrer)) {
         query.submittedBy = referrer;
       } else {
@@ -1251,6 +1502,12 @@ router.patch('/:id/status', protect, collegeScope, authorize('Admin', 'Super Adm
       return res.status(404).json({ success: false, message: 'Referral not found' });
     }
 
+    const isSuperAdmin = req.user.role === 'Super Admin';
+    const tenantId = req.collegeId || req.user.tenantId;
+    if (!isSuperAdmin && tenantId && referral.tenantId && referral.tenantId !== tenantId) {
+      return res.status(403).json({ success: false, message: 'Forbidden: Access restricted to authorized institution' });
+    }
+
     const previousStatus = referral.status;
     referral.status = status;
 
@@ -1479,17 +1736,6 @@ router.patch('/:id/status', protect, collegeScope, authorize('Admin', 'Super Adm
   }
 });
 
-// Helper for read routes: optional auth if bearer provided, safe fallback for public read
-const optionalProtect = async (req, res, next) => {
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    return protect(req, res, () => {
-      collegeScope(req, res, next);
-    });
-  }
-  req.collegeId = req.query.tenantId || req.query.collegeId || 'COL001';
-  next();
-};
-
 // ── 7. INCENTIVE RULES CRUD ───────────────────────────────────────────────────
 router.get('/rules', optionalProtect, async (req, res) => {
   try {
@@ -1674,56 +1920,71 @@ router.get('/incentives', protect, collegeScope, async (req, res) => {
     const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts'].includes(req.user.role);
     let tenantId = req.collegeId || req.user.tenantId || 'COL001';
 
-    const query = {};
+    const andConditions = [];
+
     if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
       const targetCollegeIds = await resolveCollegeTenantIds(req.query.collegeId);
       if (targetCollegeIds && targetCollegeIds.length > 0) {
-        query.$or = [
-          { tenantId: { $in: targetCollegeIds } },
-          { collegeId: { $in: targetCollegeIds } }
-        ];
+        andConditions.push({
+          $or: [
+            { tenantId: { $in: targetCollegeIds } },
+            { collegeId: { $in: targetCollegeIds } }
+          ]
+        });
       }
     } else if (!isSuperAdmin) {
-      query.tenantId = tenantId;
+      andConditions.push({
+        $or: [
+          { tenantId },
+          { collegeId: tenantId },
+          { tenantId: { $exists: false } },
+          { tenantId: null }
+        ]
+      });
     }
 
     if (!isPrivileged) {
       // Non-privileged users can ONLY see their own incentives!
-      query.earnedBy = req.user._id;
+      andConditions.push({ earnedBy: req.user._id });
+    } else if (req.query.earnedBy) {
+      // Only privileged roles can query incentives by another user's ID
+      andConditions.push({ earnedBy: req.query.earnedBy });
     }
 
     if (req.query.status && req.query.status !== 'All') {
-      query.status = req.query.status;
+      andConditions.push({ status: req.query.status });
     }
     if (req.query.category && req.query.category !== 'All') {
-      query.category = req.query.category;
-    }
-    if (req.query.earnedBy) {
-      query.earnedBy = req.query.earnedBy;
+      andConditions.push({ category: req.query.category });
     }
 
     if (req.query.search && req.query.search.trim()) {
       const s = req.query.search.trim();
-      query.$or = [
-        { incentiveCode: { $regex: s, $options: 'i' } },
-        { referralCode: { $regex: s, $options: 'i' } },
-        { earnedByName: { $regex: s, $options: 'i' } },
-        { earnedByEmployeeId: { $regex: s, $options: 'i' } },
-        { candidateName: { $regex: s, $options: 'i' } },
-        { candidateApplicationId: { $regex: s, $options: 'i' } },
-        { payoutRef: { $regex: s, $options: 'i' } },
-      ];
+      andConditions.push({
+        $or: [
+          { incentiveCode: { $regex: s, $options: 'i' } },
+          { referralCode: { $regex: s, $options: 'i' } },
+          { earnedByName: { $regex: s, $options: 'i' } },
+          { earnedByEmployeeId: { $regex: s, $options: 'i' } },
+          { candidateName: { $regex: s, $options: 'i' } },
+          { candidateApplicationId: { $regex: s, $options: 'i' } },
+          { payoutRef: { $regex: s, $options: 'i' } },
+        ]
+      });
     }
 
     if (req.query.startDate || req.query.endDate) {
-      query.createdAt = {};
-      if (req.query.startDate) query.createdAt.$gte = new Date(req.query.startDate);
+      const dateCond = {};
+      if (req.query.startDate) dateCond.$gte = new Date(req.query.startDate);
       if (req.query.endDate) {
         const end = new Date(req.query.endDate);
         end.setHours(23, 59, 59, 999);
-        query.createdAt.$lte = end;
+        dateCond.$lte = end;
       }
+      andConditions.push({ createdAt: dateCond });
     }
+
+    const query = andConditions.length > 1 ? { $and: andConditions } : (andConditions[0] || {});
 
     const incentives = await IncentiveRecord.find(query)
       .sort({ createdAt: -1 })
@@ -1998,7 +2259,7 @@ router.post('/incentives/payout', protect, collegeScope, async (req, res) => {
         totalAmount: group.totalAmount,
         incentiveCount: group.incentives.length,
         incentiveRecords: group.incentives.map(i => i._id),
-        paymentMode: paymentMode || 'Bank Transfer',
+        paymentMode: normalizePaymentMode(paymentMode),
         transactionReference: transactionReference.trim(),
         processedBy: req.user._id,
         processedByName: req.user.name || 'Accounts Admin',
@@ -2015,7 +2276,7 @@ router.post('/incentives/payout', protect, collegeScope, async (req, res) => {
         inc.paidAt = now;
         inc.payoutRecordId = payout._id;
         inc.payoutRef = payout.payoutRef;
-        inc.paymentMode = paymentMode || 'Bank Transfer';
+        inc.paymentMode = normalizePaymentMode(paymentMode);
         await inc.save();
 
         await Referral.findByIdAndUpdate(inc.referralId, {
@@ -2856,7 +3117,7 @@ router.post('/incentive-payment', protect, collegeScope, authorize('Admin'), asy
     inc.status = isFullyPaid ? 'Paid' : 'Partially Paid';
     inc.paidAt = payDate;
     inc.payoutRef = transactionReference.trim();
-    inc.paymentMode = paymentMode || 'Bank Transfer';
+    inc.paymentMode = normalizePaymentMode(paymentMode);
     inc.paymentHistory.push(paymentTxn);
     await inc.save();
 
@@ -2874,7 +3135,7 @@ router.post('/incentive-payment', protect, collegeScope, authorize('Admin'), asy
       totalAmount: payAmt,
       incentiveCount: 1,
       incentiveRecords: [inc._id],
-      paymentMode: paymentMode || 'Bank Transfer',
+      paymentMode: normalizePaymentMode(paymentMode),
       transactionReference: transactionReference.trim(),
       processedBy: req.user._id,
       processedByName: req.user.name || 'Admin',
@@ -3219,10 +3480,13 @@ router.get('/export/csv', protect, collegeScope, async (req, res) => {
 
     if (type === 'incentives') {
       const incQuery = { tenantId };
-      if (!isPrivileged) incQuery.earnedBy = req.user._id;
+      if (!isPrivileged) {
+        incQuery.earnedBy = req.user._id;
+      } else if (referrerId) {
+        incQuery.earnedBy = referrerId;
+      }
       if (category && category !== 'All') incQuery.category = category;
       if (status && status !== 'All') incQuery.status = status;
-      if (referrerId) incQuery.earnedBy = referrerId;
 
       const incentives = await IncentiveRecord.find(incQuery).sort({ createdAt: -1 });
       const header = [
@@ -3276,10 +3540,11 @@ router.get('/export/csv', protect, collegeScope, async (req, res) => {
     const query = { tenantId };
     if (!isPrivileged) {
       query.submittedBy = req.user._id;
+    } else if (referrerId) {
+      query.submittedBy = referrerId;
     }
     if (category && category !== 'All') query.category = category;
     if (status && status !== 'All') query.status = status;
-    if (referrerId) query.submittedBy = referrerId;
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) query.createdAt.$gte = new Date(startDate);
@@ -3474,9 +3739,18 @@ router.get('/:id', protect, collegeScope, async (req, res) => {
     }
 
     // Privacy & permission check:
-    const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal', 'HOD'].includes(req.user.role);
-    if (!isPrivileged && referral.submittedBy && referral.submittedBy._id.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, message: 'Access denied: You can only view your own referrals.' });
+    const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal'].includes(req.user.role);
+    const ownerId = referral.submittedBy?._id ? referral.submittedBy._id.toString() : (referral.submittedBy ? referral.submittedBy.toString() : null);
+
+    if (!isPrivileged) {
+      if (!ownerId || ownerId !== req.user._id.toString()) {
+        return res.status(403).json({ success: false, message: 'Access denied: You can only view your own referrals.' });
+      }
+    } else if (req.user.role !== 'Super Admin') {
+      const tenantId = req.collegeId || req.user.tenantId;
+      if (tenantId && referral.tenantId && referral.tenantId !== tenantId) {
+        return res.status(403).json({ success: false, message: 'Access denied: Referral belongs to another institution.' });
+      }
     }
 
     const refObj = referral.toObject();

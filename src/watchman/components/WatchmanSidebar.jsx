@@ -5,7 +5,7 @@ import {
   LayoutDashboard, UserPlus, LogOut as ExitIcon, QrCode,
   CalendarCheck, Package, Truck, Bus, Users, UserCheck,
   Clock, AlertTriangle, History, Bell, User, Key,
-  LogOut, Shield, ChevronRight, X, ArrowLeftRight
+  LogOut, Shield, ChevronRight, X, ArrowLeftRight, ShieldCheck
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -45,13 +45,13 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
         { name: 'Gate Dashboard', path: '/watchman/dashboard', icon: <LayoutDashboard size={19} /> },
         { name: 'Campus In / Out Control', path: '/watchman/campus-in-out', icon: <ArrowLeftRight size={19} /> },
         { name: 'Register Student / Staff', path: '/watchman/register-person', icon: <UserCheck size={19} /> },
-        { name: 'Gate QR Scanner', path: '/watchman/qr-verification', icon: <QrCode size={19} /> }
+        { name: 'Member QR Scanner (Students/Staff/HOD)', path: '/watchman/qr-verification?type=members', icon: <QrCode size={19} /> },
+        { name: 'Visitor Pass QR Scanner', path: '/watchman/qr-verification?type=visitor', icon: <ShieldCheck size={19} /> }
       ]
     },
     {
       title: 'Student Gate Operations',
       items: [
-        { name: 'Student QR Scanner', path: '/watchman/qr-verification', icon: <QrCode size={19} /> },
         { name: 'Student Movement Register', path: '/watchman/student-register', icon: <Users size={19} /> }
       ]
     },
@@ -66,7 +66,7 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
       items: [
         { name: 'New Visitor Entry', path: '/watchman/visitor-entry', icon: <UserPlus size={19} /> },
         { name: 'Active Visitors & Exit', path: '/watchman/visitor-exit', icon: <ExitIcon size={19} /> },
-        { name: 'Visitor Pass QR Scanner', path: '/watchman/qr-verification?type=visitor', icon: <QrCode size={19} /> },
+        { name: 'Visitor Pass QR Scanner', path: '/watchman/qr-verification?type=visitor', icon: <ShieldCheck size={19} /> },
         { name: 'Pre-Registered Visitors', path: '/watchman/pre-registered', icon: <CalendarCheck size={19} /> },
         { name: 'Visitor History Logs', path: '/watchman/visitor-history', icon: <History size={19} /> }
       ]
@@ -136,12 +136,19 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
                 <li key={item.path}>
                   <NavLink
                     to={item.path}
-                    className={({ isActive }) => {
-                      let active = isActive;
-                      if (item.path.includes('?')) {
-                        active = `${location.pathname}${location.search}` === item.path;
-                      } else if (location.search.includes('type=visitor') && item.path === '/watchman/qr-verification') {
-                        active = false;
+                    className={() => {
+                      let active = false;
+                      const isVisitor = location.search.includes('type=visitor');
+                      const isMember = location.search.includes('type=members');
+
+                      if (item.path.includes('type=visitor')) {
+                        active = location.pathname === '/watchman/qr-verification' && isVisitor;
+                      } else if (item.path.includes('type=members')) {
+                        active = location.pathname === '/watchman/qr-verification' && (isMember || (!isVisitor && location.search === ''));
+                      } else if (item.path === '/watchman/qr-verification') {
+                        active = location.pathname === '/watchman/qr-verification' && !isVisitor;
+                      } else {
+                        active = location.pathname === item.path;
                       }
                       return `nav-link ${active ? 'active' : ''}`;
                     }}

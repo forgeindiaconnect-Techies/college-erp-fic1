@@ -68,23 +68,35 @@ api.interceptors.request.use(
         token = sessionStorage.getItem('placement_token');
       } else if (path.startsWith('/watchman')) {
         token = sessionStorage.getItem('watchman_token') || sessionStorage.getItem('admin_token') || sessionStorage.getItem('superadmin_token');
-      } else {
-        // Fallback: Check all in priority
-        token = sessionStorage.getItem('superadmin_token')
-          || sessionStorage.getItem('admin_token')
-          || sessionStorage.getItem('subadmin_token')
-          || sessionStorage.getItem('principal_token')
-          || sessionStorage.getItem('hod_token')
-          || sessionStorage.getItem('staff_token')
-          || sessionStorage.getItem('student_token')
-          || sessionStorage.getItem('parent_token')
-          || sessionStorage.getItem('accounts_token')
-          || sessionStorage.getItem('driver_token')
-          || sessionStorage.getItem('hostel_token')
-          || sessionStorage.getItem('librarian_token')
-          || sessionStorage.getItem('placement_token')
-          || sessionStorage.getItem('watchman_token')
-          || sessionStorage.getItem('token');
+      }
+
+      // Neutral paths (e.g. /referrals, /business-referral, /settings) or fallback:
+      // First check active role or currently present session key to prevent cross-account token mixup
+      if (!token) {
+        const activeRole = sessionStorage.getItem('active_role') || localStorage.getItem('role');
+        if (activeRole) {
+          const roleKey = activeRole.toLowerCase().replace(/\s+/g, '');
+          token = sessionStorage.getItem(`${roleKey}_token`);
+        }
+      }
+
+      if (!token) {
+        // Detect which role session is currently stored
+        const roleOrder = [
+          'driver', 'staff', 'student', 'parent', 'librarian', 'watchman',
+          'hostel', 'placement', 'hod', 'accounts', 'principal', 'admin',
+          'subadmin', 'superadmin'
+        ];
+        for (const r of roleOrder) {
+          if (sessionStorage.getItem(`${r}_session`)) {
+            token = sessionStorage.getItem(`${r}_token`);
+            if (token) break;
+          }
+        }
+      }
+
+      if (!token) {
+        token = sessionStorage.getItem('token') || localStorage.getItem('token');
       }
     } catch (e) {
       console.error('Error fetching token from storage', e);
@@ -419,6 +431,12 @@ export const updateTransportMaintenance = (id, data) => api.put(`/transport/main
 export const deleteTransportMaintenance = (id) => api.delete(`/transport/maintenance/${id}`);
 export const getTransportNotifications = (params) => api.get('/transport/notifications', { params });
 export const createTransportNotification = (data) => api.post('/transport/notifications', data);
+
+// Student Transport Attendance & Boarding Reports
+export const getStudentTransportAttendance = (params) => api.get('/transport/student-attendance', { params });
+export const markStudentTransportAttendance = (data) => api.post('/transport/student-attendance', data);
+export const correctStudentTransportAttendance = (data) => api.post('/transport/student-attendance/correct', data);
+export const getStudentTransportAttendanceReport = (params) => api.get('/transport/student-attendance/report', { params });
 
 // Hostel Management
 export const getHostelBlocks = () => api.get('/hostel/blocks');
@@ -839,6 +857,7 @@ export const getSuperAdminReferralOverview = () => api.get('/referrals/superadmi
 export const getReferrerReport = (userId, params = {}) => api.get(`/referrals/referrer/${userId}`, { params });
 export const getReferrerWiseReport = (params = {}) => api.get('/referrals/reports/referrer-wise', { params });
 export const recordIncentivePayment = (data) => api.post('/referrals/incentive-payment', data);
+export const getTopReferralPerformers = (params = {}) => api.get('/referrals/top-performers', { params });
 export const getReferrerWiseExportUrl = (params = {}) => {
   const query = new URLSearchParams(params).toString();
   return `/api/referrals/reports/referrer-wise/export${query ? `?${query}` : ''}`;
@@ -978,13 +997,13 @@ export const recordCampusIn = (data) => api.post('/watchman/campus-in', data);
 export const recordCampusOut = (data) => api.post('/watchman/campus-out', data);
 export const getCampusMovements = (params = {}) => api.get('/watchman/campus-movements', { params });
 export const getCampusMovementStats = (params = {}) => api.get('/watchman/campus-stats', { params });
-export const lookupCampusPerson = (query) => {
+export const lookupCampusPerson = (query, extraParams = {}) => {
   let cleanQuery = (query || '').toString().trim();
   if (cleanQuery.includes('code=')) {
     const match = cleanQuery.match(/[?&]code=([^&#]+)/);
     if (match && match[1]) cleanQuery = decodeURIComponent(match[1]).trim();
   }
-  return api.get('/watchman/campus-people/lookup', { params: { query: cleanQuery, code: cleanQuery } });
+  return api.get('/watchman/campus-people/lookup', { params: { query: cleanQuery, code: cleanQuery, ...extraParams } });
 };
 
 // ── Real-Time Leave Management APIs ──────────────────────────────────────────

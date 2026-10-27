@@ -29,13 +29,28 @@ const DriverTripManagement = () => {
     return JSON.parse(localStorage.getItem('driver_student_status') || '{}');
   });
 
-  const updateStudentStatus = (studentId, status) => {
+  const updateStudentStatus = async (studentId, status) => {
     const updated = {
       ...studentStatus,
       [studentId]: status
     };
     setStudentStatus(updated);
     localStorage.setItem('driver_student_status', JSON.stringify(updated));
+
+    if (currentTrip && (currentTrip._id || currentTrip.tripId)) {
+      try {
+        const trackingList = students.map(s => ({
+          studentId: s.studentId,
+          pickupPoint: s.pickupPoint,
+          boarded: updated[s.studentId] === 'PICKED UP' || updated[s.studentId] === 'DROPPED',
+          dropped: updated[s.studentId] === 'DROPPED',
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        }));
+        await updateTransportTrip(currentTrip._id || currentTrip.tripId, { studentTracking: trackingList });
+      } catch (err) {
+        console.warn('Could not sync student tracking to backend trip:', err);
+      }
+    }
   };
 
   const fetchData = async () => {
@@ -173,7 +188,7 @@ const DriverTripManagement = () => {
       const todayStr = new Date().toISOString().split('T')[0];
       const activeTrip = allTrips.find(t =>
         t.date === todayStr &&
-        ['Scheduled', 'Started', 'Arrived'].includes(t.status)
+        ['Scheduled', 'Started', 'In Progress', 'Arrived'].includes(t.status)
       );
       setCurrentTrip(activeTrip);
     } catch (err) {
@@ -191,8 +206,10 @@ const DriverTripManagement = () => {
     try {
       const todayStr = new Date().toISOString().split('T')[0];
       const nowTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const tripId = `TRIP-${Date.now().toString().slice(-6)}`;
       
       const payload = {
+        tripId,
         driverId: myDriverInfo ? myDriverInfo.driverId : (session.referenceId || session._id || 'DRIVER'),
         vehicleId: route ? route.vehicle : (vehicle?.vehicleNumber || myDriverInfo?.vehicleId || 'Unassigned'),
         routeId: route ? route.routeId : (myDriverInfo?.routeId || 'Unassigned'),
@@ -401,7 +418,7 @@ const DriverTripManagement = () => {
                   Start Time: <strong>{completedToday.startTime}</strong> • End Time: <strong>{completedToday.endTime || 'Concluded'}</strong>
                 </div>
               </div>
-            ) : currentTrip && (currentTrip.status === 'Started' || currentTrip.status === 'Arrived') ? (
+            ) : currentTrip && (currentTrip.status === 'Started' || currentTrip.status === 'In Progress' || currentTrip.status === 'Arrived') ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.65rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
@@ -413,7 +430,7 @@ const DriverTripManagement = () => {
                   </span>
                 </div>
 
-                {currentTrip.status === 'Started' && (
+                {(currentTrip.status === 'Started' || currentTrip.status === 'In Progress') && (
                   <button
                     onClick={handleArrivedTrip}
                     style={{ padding: '0.65rem', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}

@@ -20,6 +20,7 @@ export type MobileUser = {
   studentId?: string | null;
   parentOf?: string | null;
   collegeName?: string;
+  phone?: string;
   token: string;
 };
 
@@ -278,6 +279,29 @@ export async function loginUser(
     throw new Error('Authentication error: The server response is missing a valid security token or role.');
   }
 
+  // Purge any stale tokens before writing new credentials
+  if (Platform.OS === 'web' || typeof window !== 'undefined') {
+    try {
+      const allRoleKeys = [
+        'superadmin', 'admin', 'subadmin', 'principal', 'hod', 'staff',
+        'student', 'parent', 'accounts', 'driver', 'hostel', 'watchman',
+        'librarian', 'placement'
+      ];
+      allRoleKeys.forEach((k) => {
+        sessionStorage.removeItem(`${k}_token`);
+        sessionStorage.removeItem(`${k}_session`);
+        localStorage.removeItem(`${k}_token`);
+        localStorage.removeItem(`${k}_session`);
+      });
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('active_role');
+      sessionStorage.removeItem('tenantId');
+      localStorage.removeItem('token');
+      localStorage.removeItem('active_role');
+      localStorage.removeItem('role');
+    } catch {}
+  }
+
   await storage.setItem('mobile_erp_token', data.token);
   await storage.setItem('mobile_erp_user', JSON.stringify(data));
 
@@ -286,13 +310,17 @@ export async function loginUser(
     try {
       const roleKey = (data.role || '').toLowerCase().replace(/\s+/g, '');
       sessionStorage.setItem(`${roleKey}_token`, data.token);
+      sessionStorage.setItem(`${roleKey}_session`, JSON.stringify(data));
       sessionStorage.setItem('token', data.token);
+      sessionStorage.setItem('active_role', data.role);
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('role', data.role);
+      localStorage.setItem(`${roleKey}_token`, data.token);
+      localStorage.setItem(`${roleKey}_session`, JSON.stringify(data));
       if (data.tenantId || data.collegeId) {
         sessionStorage.setItem('tenantId', data.tenantId || data.collegeId || '');
+        localStorage.setItem('tenantId', data.tenantId || data.collegeId || '');
       }
-      sessionStorage.setItem(`${roleKey}_session`, JSON.stringify(data));
-      localStorage.setItem('student_session', JSON.stringify(data));
-      localStorage.setItem('staff_session', JSON.stringify(data));
     } catch {}
   }
 
@@ -325,13 +353,25 @@ export async function getSavedUser(): Promise<MobileUser | null> {
   // Fallback to active web sessions if on browser
   if (!savedUser && (Platform.OS === 'web' || typeof window !== 'undefined')) {
     try {
-      savedUser =
-        sessionStorage.getItem('student_session') ||
-        sessionStorage.getItem('staff_session') ||
-        sessionStorage.getItem('admin_session') ||
-        sessionStorage.getItem('user_session') ||
-        localStorage.getItem('student_session') ||
-        localStorage.getItem('staff_session');
+      const activeRole = sessionStorage.getItem('active_role') || localStorage.getItem('role');
+      if (activeRole) {
+        const roleKey = activeRole.toLowerCase().replace(/\s+/g, '');
+        savedUser = sessionStorage.getItem(`${roleKey}_session`) || localStorage.getItem(`${roleKey}_session`);
+      }
+      if (!savedUser) {
+        const roleOrder = [
+          'driver', 'staff', 'student', 'parent', 'librarian', 'watchman',
+          'hostel', 'placement', 'hod', 'accounts', 'principal', 'admin',
+          'subadmin', 'superadmin'
+        ];
+        for (const r of roleOrder) {
+          savedUser = sessionStorage.getItem(`${r}_session`) || localStorage.getItem(`${r}_session`);
+          if (savedUser) break;
+        }
+      }
+      if (!savedUser) {
+        savedUser = sessionStorage.getItem('user_session') || localStorage.getItem('user_session');
+      }
     } catch {}
   }
 
@@ -353,13 +393,25 @@ export async function getAuthToken(): Promise<string | null> {
   // Fallback to web session tokens if on browser
   if (!token && (Platform.OS === 'web' || typeof window !== 'undefined')) {
     try {
-      token =
-        sessionStorage.getItem('student_token') ||
-        sessionStorage.getItem('staff_token') ||
-        sessionStorage.getItem('admin_token') ||
-        sessionStorage.getItem('token') ||
-        localStorage.getItem('student_token') ||
-        localStorage.getItem('staff_token');
+      const activeRole = sessionStorage.getItem('active_role') || localStorage.getItem('role');
+      if (activeRole) {
+        const roleKey = activeRole.toLowerCase().replace(/\s+/g, '');
+        token = sessionStorage.getItem(`${roleKey}_token`) || localStorage.getItem(`${roleKey}_token`);
+      }
+      if (!token) {
+        const roleOrder = [
+          'driver', 'staff', 'student', 'parent', 'librarian', 'watchman',
+          'hostel', 'placement', 'hod', 'accounts', 'principal', 'admin',
+          'subadmin', 'superadmin'
+        ];
+        for (const r of roleOrder) {
+          token = sessionStorage.getItem(`${r}_token`) || localStorage.getItem(`${r}_token`);
+          if (token) break;
+        }
+      }
+      if (!token) {
+        token = sessionStorage.getItem('token') || localStorage.getItem('token');
+      }
     } catch {}
   }
 
@@ -371,12 +423,26 @@ export async function logoutUser(): Promise<void> {
   await storage.deleteItem('mobile_erp_user');
   if (Platform.OS === 'web' || typeof window !== 'undefined') {
     try {
-      sessionStorage.removeItem('student_token');
-      sessionStorage.removeItem('staff_token');
-      sessionStorage.removeItem('admin_token');
+      const allRoleKeys = [
+        'superadmin', 'admin', 'subadmin', 'principal', 'hod', 'staff',
+        'student', 'parent', 'accounts', 'driver', 'hostel', 'watchman',
+        'librarian', 'placement'
+      ];
+      allRoleKeys.forEach((k) => {
+        sessionStorage.removeItem(`${k}_token`);
+        sessionStorage.removeItem(`${k}_session`);
+        localStorage.removeItem(`${k}_token`);
+        localStorage.removeItem(`${k}_session`);
+      });
       sessionStorage.removeItem('token');
-      sessionStorage.removeItem('student_session');
-      sessionStorage.removeItem('staff_session');
+      sessionStorage.removeItem('active_role');
+      sessionStorage.removeItem('tenantId');
+      sessionStorage.removeItem('user_session');
+      localStorage.removeItem('token');
+      localStorage.removeItem('active_role');
+      localStorage.removeItem('role');
+      localStorage.removeItem('tenantId');
+      localStorage.removeItem('user_session');
     } catch {}
   }
 }

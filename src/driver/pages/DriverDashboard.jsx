@@ -9,7 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   getTransportDrivers, getTransportRoutes, getTransportStudents, 
   getDriverAttendance, getTransportVehicles, createTransportTrip, 
-  getTransportTrips, updateTransportTrip 
+  getTransportTrips, updateTransportTrip, getStudentTransportAttendanceReport 
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
@@ -30,6 +30,7 @@ const DriverDashboard = () => {
     attendance: null,
     vehicleDetails: null
   });
+  const [studentReport, setStudentReport] = useState(null);
 
   const [tripStatus, setTripStatus] = useState(
     localStorage.getItem('driver_trip_status') || 'SCHEDULED'
@@ -181,7 +182,7 @@ const DriverDashboard = () => {
 
         return false;
       });
-
+                   
       if (!myRoute && allRoutes.length > 0) {
         myRoute = allRoutes.find(r => {
           const rDriver = cleanStr(r.driver);
@@ -206,13 +207,34 @@ const DriverDashboard = () => {
         };
       }
 
-      const myStudents = myRoute 
+      const rawMyStudents = myRoute 
         ? allStudents.filter(s => s.routeId === myRoute.routeId || cleanStr(s.routeId) === cleanStr(myRoute.name)) 
         : [];
+      
+      const seenStu = new Set();
+      const myStudents = [];
+      rawMyStudents.forEach(s => {
+        const k = (s.studentId || s._id || s.name || '').toString().trim().toLowerCase();
+        if (k && !seenStu.has(k)) {
+          seenStu.add(k);
+          myStudents.push(s);
+        }
+      });
 
       const todayStr = new Date().toISOString().split('T')[0];
       const attendanceData = Array.isArray(attendanceRes.data) ? attendanceRes.data : [];
       const myAttendance = attendanceData.find(a => a.date === todayStr);
+
+      // Fetch today's transit attendance report
+      const studentReportRes = await getStudentTransportAttendanceReport({
+        date: todayStr,
+        routeId: myRoute?.routeId || 'R-01',
+        tripType: 'Pickup'
+      }).catch(() => ({ data: null }));
+
+      if (studentReportRes?.data) {
+        setStudentReport(studentReportRes.data);
+      }
 
       setDashboardData({
         driver: me,
@@ -327,10 +349,10 @@ const DriverDashboard = () => {
             <Users size={14} style={{ color: '#16a34a' }} />
           </div>
           <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-            {boardingCount} <span style={{ fontSize: '0.8rem', color: '#64748b' }}>/ {capacity}</span>
+            {studentReport?.presentCount ?? boardingCount} <span style={{ fontSize: '0.8rem', color: '#64748b' }}>/ {capacity}</span>
           </div>
           <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>
-            {boardingPercentage}% Capacity Occupied
+            {studentReport ? `${studentReport.presentCount} Boarded Today` : `${boardingPercentage}% Capacity Occupied`}
           </div>
         </div>
 
@@ -348,6 +370,105 @@ const DriverDashboard = () => {
           </div>
         </div>
 
+      </div>
+
+      {/* ── Student Transit Boarding & Attendance Report Card (Driver Command View) ── */}
+      <div style={{
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '12px',
+        padding: '1.25rem 1.5rem',
+        marginBottom: '1.25rem',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: 32, height: 32, borderRadius: '8px', background: 'rgba(37, 99, 235, 0.12)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Users size={18} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                Student Transit Attendance & Boarding Report
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
+                Live transit roster for {new Date().toISOString().split('T')[0]} • Pickup Session • Route {dashboardData.route?.name || 'East'} ({dashboardData.route?.routeId || 'R-01'})
+              </p>
+            </div>
+          </div>
+
+          <Link 
+            to="/driver/students?tab=report"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '0.4rem 0.85rem',
+              borderRadius: '6px',
+              background: '#eff6ff',
+              color: '#1d4ed8',
+              border: '1px solid #bfdbfe',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              textDecoration: 'none'
+            }}
+          >
+            View Full Report & Multi-Day History <ArrowRight size={14} />
+          </Link>
+        </div>
+
+        {/* 4 Mini KPI Chips */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div style={{ background: '#f8fafc', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Assigned Students</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', marginTop: '0.15rem' }}>
+              {studentReport?.totalExpected ?? dashboardData.students.length}
+            </div>
+          </div>
+
+          <div style={{ background: '#ecfdf5', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+            <div style={{ fontSize: '0.7rem', color: '#047857', fontWeight: 700, textTransform: 'uppercase' }}>Present / Boarded</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#047857', marginTop: '0.15rem' }}>
+              {studentReport?.presentCount ?? 0}
+            </div>
+          </div>
+
+          <div style={{ background: '#fee2e2', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #fecaca' }}>
+            <div style={{ fontSize: '0.7rem', color: '#b91c1c', fontWeight: 700, textTransform: 'uppercase' }}>Reported Absent</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#b91c1c', marginTop: '0.15rem' }}>
+              {studentReport?.absentCount ?? 0}
+            </div>
+          </div>
+
+          <div style={{ background: '#fef3c7', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
+            <div style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: 700, textTransform: 'uppercase' }}>Pending Check-in</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#b45309', marginTop: '0.15rem' }}>
+              {studentReport?.pendingCount ?? Math.max(0, (studentReport?.totalExpected ?? dashboardData.students.length) - ((studentReport?.presentCount ?? 0) + (studentReport?.absentCount ?? 0)))}
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Waypoint Boarding Strip */}
+        {studentReport?.stopBreakdown && studentReport.stopBreakdown.length > 0 && (
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Waypoint Status:</span>
+            {studentReport.stopBreakdown.map((b, idx) => (
+              <span 
+                key={idx}
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '6px',
+                  background: b.boardedCount > 0 ? '#dcfce7' : '#f1f5f9',
+                  color: b.boardedCount > 0 ? '#15803d' : '#475569',
+                  border: b.boardedCount > 0 ? '1px solid #bbf7d0' : '1px solid #cbd5e1'
+                }}
+              >
+                📍 {b.stopName}: {b.boardedCount}/{b.expectedStudents} Boarded
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Driver Operations Quick Actions Hub */}

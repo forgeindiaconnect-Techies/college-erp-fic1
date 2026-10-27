@@ -276,18 +276,6 @@ export default function BusinessReferralCreditCard() {
             </span>
           </button>
         </div>
-
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            type="button"
-            className="mgmt-btn-primary"
-            style={{ background: '#2563eb', borderColor: '#2563eb', fontSize: '0.82rem', padding: '7px 14px' }}
-            onClick={() => handleOpenSubmit('HDFC Bank')}
-          >
-            <Send size={14} />
-            <span>Apply / Refer Now</span>
-          </button>
-        </div>
       </div>
 
       {viewMode === 'catalog' && (

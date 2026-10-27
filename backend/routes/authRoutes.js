@@ -894,15 +894,7 @@ router.get('/repair-users', async (req, res) => {
   }
 });
 
-// Dev Only: Inspect specific users
-router.get('/check-users', async (req, res) => {
-  try {
-    const users = await User.find({ email: /pooja|gowtham/i });
-    res.json(users);
-  } catch(err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+
 
 router.get('/clean-pooja', async (req, res) => {
   try {

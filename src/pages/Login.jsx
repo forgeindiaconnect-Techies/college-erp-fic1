@@ -22,12 +22,17 @@ const applySession = (userData) => {
   const roleKey = role.toLowerCase().replace(/\s+/g, '');
   const allKeys = [
     'superadmin_token','admin_token','subadmin_token','principal_token','hod_token','staff_token','student_token','parent_token','accounts_token','driver_token','hostel_token','watchman_token','librarian_token','placement_token',
-    'superadmin_session','admin_session','subadmin_session','principal_session','hod_session','staff_session','student_session','parent_session','accounts_session','driver_session','hostel_session','watchman_session','librarian_session','placement_session', 'tenantId'
+    'superadmin_session','admin_session','subadmin_session','principal_session','hod_session','staff_session','student_session','parent_session','accounts_session','driver_session','hostel_session','watchman_session','librarian_session','placement_session', 'tenantId', 'active_role', 'token', 'role'
   ];
-  allKeys.forEach(k => sessionStorage.removeItem(k));
+  allKeys.forEach(k => {
+    sessionStorage.removeItem(k);
+    localStorage.removeItem(k);
+  });
 
   sessionStorage.setItem(`${roleKey}_token`, userData.token);
   sessionStorage.setItem('token', userData.token);
+  sessionStorage.setItem('active_role', role);
+  localStorage.setItem('role', role);
   if (userData.tenantId) {
     sessionStorage.setItem('tenantId', userData.tenantId);
   }

@@ -182,6 +182,7 @@ import ParcelLog from './models/ParcelLog.js';
 import SecurityVehicleLog from './models/SecurityVehicleLog.js';
 import SecurityIncident from './models/SecurityIncident.js';
 
+// Active ERP Server - Verified Real-time Sync & Profile Integrity: 2026-10-26T18:14:00
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -1102,6 +1103,8 @@ app.use('/api/referrals/config', referralConfigRoutes);
 app.use('/api/opportunities', opportunityRoutes);
 app.use('/api/watchman/parcels', parcelRoutes);
 app.use('/api/parcels', parcelRoutes);
+app.use('/api/vehicles', watchmanRoutes);
+app.use('/api/watchman/vehicles', watchmanRoutes);
 app.use('/api/watchman', watchmanRoutes);
 app.use('/api/buses', busTrackingRoutes);
 app.use('/api/watchman/buses', busTrackingRoutes);

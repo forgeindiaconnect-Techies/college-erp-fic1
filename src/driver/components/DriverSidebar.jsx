@@ -69,8 +69,14 @@ const DriverSidebar = ({ isOpen, onClose }) => {
   ];
 
   const handleLogout = () => {
-    sessionStorage.removeItem('driver_session');
-    sessionStorage.removeItem('driver_token');
+    const allKeys = [
+      'superadmin_token','admin_token','subadmin_token','principal_token','hod_token','staff_token','student_token','parent_token','accounts_token','driver_token','hostel_token','watchman_token','librarian_token','placement_token',
+      'superadmin_session','admin_session','subadmin_session','principal_session','hod_session','staff_session','student_session','parent_session','accounts_session','driver_session','hostel_session','watchman_session','librarian_session','placement_session', 'tenantId', 'active_role', 'token', 'role'
+    ];
+    allKeys.forEach(k => {
+      sessionStorage.removeItem(k);
+      localStorage.removeItem(k);
+    });
     if (onClose) onClose();
     navigate('/login');
   };

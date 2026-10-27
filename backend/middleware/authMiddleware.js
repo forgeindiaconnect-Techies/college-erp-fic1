@@ -7,9 +7,13 @@ import { calculateSubscriptionStatus } from '../utils/subscriptionHelper.js';
 export const protect = async (req, res, next) => {
   let token;
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.query && req.query.token) {
+    token = req.query.token;
+  }
+
+  if (token) {
     try {
-      token = req.headers.authorization.split(' ')[1];
-      
       // Accept frontend mock tokens to prevent 401 redirect loops in demo mode
       if (token.startsWith('mock-')) {
         let role = 'Student';

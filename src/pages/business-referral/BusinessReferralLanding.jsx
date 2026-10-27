@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { getIncentiveRules } from '../../api';
 import EditCategoryModal from '../../components/referrals/EditCategoryModal';
+import TopReferralPerformers from '../../components/referrals/TopReferralPerformers';
 import { getCustomCategoryOverrides } from '../../utils/categoryConfig';
 import '../admin/UserManagementCommon.css';
 import './BusinessReferralLanding.css';
@@ -590,6 +591,9 @@ export default function BusinessReferralLanding() {
           </div>
         ))}
       </div>
+
+      {/* ── Top Referral Performers Section (Desktop Leaderboard) ── */}
+      <TopReferralPerformers />
 
       {/* ── Standardized Workflow Lifecycle Card (Enterprise ERP Process) ── */}
       <div className="bus-ref-roadmap-card">

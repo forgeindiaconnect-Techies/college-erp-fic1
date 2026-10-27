@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { apiGet, apiPost, apiPut, type MobileUser } from '../../services/api';
+import { apiGet, apiPost, apiPut, storage, type MobileUser } from '../../services/api';
 import BottomTabBar, { type MainNavTab } from '../navigation/BottomTabBar';
 import ScreenHeader from '../navigation/ScreenHeader';
 import UserProfileScreen from '../profile/UserProfileScreen';
@@ -30,7 +30,30 @@ type Props = {
 };
 
 type TransportSubTab = 'operations' | 'route' | 'students' | 'vehicle';
-type MoreSection = 'menu' | 'checklist' | 'payroll' | 'safety' | 'notices' | 'profile';
+type MoreSection = 'menu' | 'checklist' | 'tasks' | 'payroll' | 'safety' | 'notices' | 'profile';
+
+type ComplaintTask = {
+  _id: string;
+  complaintId?: string;
+  studentId?: string;
+  name?: string;
+  complaintType?: string;
+  category?: string;
+  description: string;
+  priority?: 'Low' | 'Medium' | 'High' | 'Critical' | string;
+  status: 'Open' | 'In Progress' | 'Resolved' | 'Closed' | string;
+  vehicleNumber?: string;
+  busNumber?: string;
+  routeId?: string;
+  assignedTo?: string;
+  resolutionNote?: string;
+  resolvedBy?: string;
+  acknowledgedByDriver?: boolean;
+  createdAt?: string;
+  reporterName?: string;
+  reporterType?: string;
+  replies?: Array<{ sender: string; role: string; message: string; timestamp: string }>;
+};
 
 type Stop = {
   id: string;
@@ -74,6 +97,8 @@ type MaintenanceItem = {
   cost?: number;
   date?: string;
   status?: string;
+  remarks?: string;
+  reportedBy?: string;
 };
 
 type SalaryRecord = {
@@ -169,6 +194,23 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     mirrors: false,
   });
 
+  // Maintenance & Complaint Tasks (/driver/tasks)
+  const [complaintTasks, setComplaintTasks] = useState<ComplaintTask[]>([]);
+  const [tasksNotifSubTab, setTasksNotifSubTab] = useState<'tasks' | 'notices'>('tasks');
+  const [taskFilter, setTaskFilter] = useState<'All' | 'Pending' | 'In Progress' | 'Resolved'>('All');
+  const [taskUpdatingId, setTaskUpdatingId] = useState<string | null>(null);
+
+  // Notifications filter & search (/driver/notifications)
+  const [noticeSearch, setNoticeSearch] = useState('');
+  const [noticeFilter, setNoticeFilter] = useState<string>('All');
+
+  // Defect / Maintenance reporting modal (/driver/vehicle & /driver/tasks)
+  const [showIssueModal, setShowIssueModal] = useState(false);
+  const [issueType, setIssueType] = useState('Vehicle Defect');
+  const [issuePriority, setIssuePriority] = useState<'Low' | 'Medium' | 'High' | 'Critical'>('Medium');
+  const [issueDescription, setIssueDescription] = useState('');
+  const [issueSubmitting, setIssueSubmitting] = useState(false);
+
   // Maintenance modal
   const [showMaintModal, setShowMaintModal] = useState(false);
   const [maintType, setMaintType] = useState('Routine Service');
@@ -179,6 +221,31 @@ export default function DriverDashboard({ user, onLogout }: Props) {
   const [selectedPassengerProfile, setSelectedPassengerProfile] = useState<StudentPassenger | null>(null);
   const [inspectionReportModalVisible, setInspectionReportModalVisible] = useState(false);
   const [selectedSalarySlip, setSelectedSalarySlip] = useState<SalaryRecord | null>(null);
+
+  // Student Attendance State (Backend synced & lock protected)
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, { status: string; isLocked: boolean; boarded: boolean }>>({});
+  const [attendanceReport, setAttendanceReport] = useState<any>(null);
+  const [attendanceLoadingId, setAttendanceLoadingId] = useState<string | null>(null);
+  const [attendanceToast, setAttendanceToast] = useState<string | null>(null);
+
+  // Attendance Correction Modal State
+  const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+  const [correctionTargetStudent, setCorrectionTargetStudent] = useState<StudentPassenger | null>(null);
+  const [correctionTargetStatus, setCorrectionTargetStatus] = useState<'Present' | 'Absent'>('Present');
+  const [correctionReasonText, setCorrectionReasonText] = useState('');
+  const [isSubmittingCorrection, setIsSubmittingCorrection] = useState(false);
+
+  // Dedicated Student Attendance Report Modal State
+  const [showAttendanceReportModal, setShowAttendanceReportModal] = useState(false);
+
+  // Complaint Discussion & Messaging State
+  const [showDiscussionModal, setShowDiscussionModal] = useState(false);
+  const [selectedComplaintForChat, setSelectedComplaintForChat] = useState<ComplaintTask | null>(null);
+  const [chatReplies, setChatReplies] = useState<Array<{ sender: string; role: string; message: string; timestamp: string }>>([]);
+  const [chatInputText, setChatInputText] = useState('');
+  const [isSendingChat, setIsSendingChat] = useState(false);
+  const [chatSuccessToast, setChatSuccessToast] = useState<string | null>(null);
+  const [isRefreshingChat, setIsRefreshingChat] = useState(false);
 
   // Fetch all transport data
   const loadData = useCallback(async () => {
@@ -194,6 +261,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
         attRes,
         tripsRes,
         salRes,
+        complaintsRes,
       ] = await Promise.all([
         apiGet<any[]>('transport/routes').catch(() => []),
         apiGet<any[]>('transport/students').catch(async () => {
@@ -209,6 +277,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
         apiGet<any[]>(`salary/staff/${user.userId || user.referenceId || user._id || ''}`).catch(async () => {
           return apiGet<any[]>(`salaries/staff/${user.userId || user.referenceId || user._id || ''}`).catch(() => []);
         }),
+        apiGet<any[]>('transport/complaints').catch(() => []),
       ]);
 
       const DEFAULT_ROUTES = [
@@ -259,6 +328,15 @@ export default function DriverDashboard({ user, onLogout }: Props) {
           };
         });
 
+        // Load persisted boarding states
+        let savedBoardingMap: Record<string, boolean> = {};
+        try {
+          const savedStr = await storage.getItem('driver_student_status');
+          if (savedStr) {
+            savedBoardingMap = JSON.parse(savedStr);
+          }
+        } catch (_) {}
+
         // Parse student passengers
         const rawStudents = Array.isArray(studentsRes) ? studentsRes : [];
         let routeStudents = rawStudents.filter((s: any) => {
@@ -276,16 +354,19 @@ export default function DriverDashboard({ user, onLogout }: Props) {
           routeStudents = rawStudents.slice(0, 15);
         }
 
-        const parsedPassengers: StudentPassenger[] = routeStudents.map((s: any, idx: number) => ({
-          id: s._id || s.id || String(idx),
-          name: s.name || s.studentName || 'Student Passenger',
-          rollNo: s.studentId || s.rollNo || s.admissionNo || `STU-${idx + 1}`,
-          stop: s.pickupPoint || (parsedStops[0]?.name.replace(/^\d+\.\s*/, '')) || 'Campus Gate',
-          parentPhone: s.parentPhone || s.emergencyContact || s.driverContact || s.phone || '+91 98402 00000',
-          boarded: false,
-          busNumber: s.vehicleNumber || matchedRoute.vehicle,
-          routeId: matchedRoute.routeId,
-        }));
+        const parsedPassengers: StudentPassenger[] = routeStudents.map((s: any, idx: number) => {
+          const pid = s._id || s.id || String(idx);
+          return {
+            id: pid,
+            name: s.name || s.studentName || 'Student Passenger',
+            rollNo: s.studentId || s.rollNo || s.admissionNo || `STU-${idx + 1}`,
+            stop: s.pickupPoint || (parsedStops[0]?.name.replace(/^\d+\.\s*/, '')) || 'Campus Gate',
+            parentPhone: s.parentPhone || s.emergencyContact || s.driverContact || s.phone || '+91 98402 00000',
+            boarded: !!savedBoardingMap[pid],
+            busNumber: s.vehicleNumber || matchedRoute.vehicle,
+            routeId: matchedRoute.routeId,
+          };
+        });
 
         // Compute passenger count per stop
         parsedPassengers.forEach((p) => {
@@ -307,6 +388,33 @@ export default function DriverDashboard({ user, onLogout }: Props) {
           routeId: matchedRoute.routeId || 'R-01',
           capacity: matchedRoute.capacity || 50,
         }));
+
+        // Fetch backend student attendance records & stop breakdown
+        try {
+          const todayDateStr = new Date().toISOString().split('T')[0];
+          const activeRId = matchedRoute.routeId || 'R-01';
+          const [attRecs, attRep] = await Promise.all([
+            apiGet<any[]>(`transport/student-attendance?date=${todayDateStr}&tripType=Pickup&routeId=${activeRId}`).catch(() => []),
+            apiGet<any>(`transport/student-attendance/report?date=${todayDateStr}&tripType=Pickup&routeId=${activeRId}`).catch(() => null),
+          ]);
+
+          const map: Record<string, { status: string; isLocked: boolean; boarded: boolean }> = {};
+          if (Array.isArray(attRecs)) {
+            attRecs.forEach((r: any) => {
+              map[r.studentId] = {
+                status: r.status,
+                isLocked: !!r.isLocked,
+                boarded: !!r.boarded,
+              };
+            });
+          }
+          setAttendanceMap(map);
+          if (attRep) {
+            setAttendanceReport(attRep);
+          }
+        } catch (attErr) {
+          console.warn('Failed to fetch backend student attendance:', attErr);
+        }
       }
 
       // Vehicles
@@ -323,16 +431,53 @@ export default function DriverDashboard({ user, onLogout }: Props) {
       const allMaint = Array.isArray(maintRes) ? maintRes : [];
       setMaintenanceList(allMaint);
 
+      // Defect / Route Complaints Filter (Following web rules in DriverTasks.jsx)
+      const allComplaints = Array.isArray(complaintsRes) ? complaintsRes : [];
+      const myVehicleClean = (assignedVeh?.vehicleNumber || matchedRoute?.vehicle || 'campus transit bus').trim().toLowerCase();
+      const myRouteClean = (matchedRoute?.routeId || matchedRoute?.name || '').trim().toLowerCase();
+      const myNameClean = (user.name || '').trim().toLowerCase();
+      const myIdClean = (user.referenceId || user.userId || '').trim().toLowerCase();
+
+      const filteredComplaints = allComplaints.filter((c: any) => {
+        const typeClean = (c.complaintType || c.category || '').toLowerCase();
+        const descClean = (c.description || '').toLowerCase();
+        
+        const reporterIdClean = cleanStr(c.studentId);
+        const reporterNameClean = cleanStr(c.name);
+
+        const isReporter = (reporterIdClean && (reporterIdClean === myIdClean || reporterIdClean.includes(myIdClean) || myIdClean.includes(reporterIdClean) || reporterIdClean === 'drv-0001')) ||
+                           (reporterNameClean && (reporterNameClean === myNameClean || reporterNameClean.includes(myNameClean) || reporterNameClean === 'viji')) ||
+                           c.reporterType === 'Driver';
+
+        if (!isReporter) {
+          const sensitiveKeywords = ['driver behavior', 'behavior', 'overspeed', 'speed', 'harassment', 'rash', 'misbehave', 'rude'];
+          const isMisconduct = sensitiveKeywords.some((keyword) => typeClean.includes(keyword) || descClean.includes(keyword));
+          if (isMisconduct) return false;
+        }
+
+        const assignedClean = c.assignedTo ? String(c.assignedTo).trim().toLowerCase() : '';
+        const busClean = (c.busNumber || c.vehicleNumber) ? String(c.busNumber || c.vehicleNumber).trim().toLowerCase() : '';
+        const routeClean = c.routeId ? String(c.routeId).trim().toLowerCase() : '';
+
+        return (
+          isReporter ||
+          (assignedClean && (assignedClean === myNameClean || assignedClean === myIdClean || assignedClean === 'driver')) ||
+          (myVehicleClean && busClean === myVehicleClean) ||
+          (myRouteClean && routeClean === myRouteClean)
+        );
+      });
+      setComplaintTasks(filteredComplaints);
+
       // Attendance
       const allAtt = Array.isArray(attRes) ? attRes : [];
       setAttendanceLogs(allAtt);
 
-      // Active Trip from backend
+      // Active Trip from backend (synced with web)
       const allTrips = Array.isArray(tripsRes) ? tripsRes : [];
       const currentActive = allTrips.find(
         (t: any) =>
-          t.status === 'In Progress' &&
-          (t.driver === user.name || t.driverId === user.userId || t.vehicle === matchedRoute?.vehicle)
+          ['In Progress', 'Started', 'Arrived'].includes(t.status) &&
+          (t.driver === user.name || t.driverId === user.userId || t.driverId === user.referenceId || t.driverId === 'DRV-0001' || t.driverId === 'DRV-001' || t.vehicle === matchedRoute?.vehicle || (t.vehicleId && t.vehicleId === matchedRoute?.vehicle))
       );
       if (currentActive) {
         setActiveTrip(currentActive);
@@ -346,13 +491,17 @@ export default function DriverDashboard({ user, onLogout }: Props) {
         : [];
       setSalaries(salArray);
 
-      // Notifications
-      const notifArray = Array.isArray(notifsRes)
+      // Notifications (Matching web role filter)
+      const rawNotifs = Array.isArray(notifsRes)
         ? notifsRes
         : Array.isArray((notifsRes as any)?.data)
         ? (notifsRes as any).data
         : [];
-      setNotifications(notifArray);
+      const relevantNotifs = rawNotifs.filter((n: any) =>
+        !n.targetRole || n.targetRole === 'All' || n.targetRole === 'Driver' || n.targetRole === 'Staff'
+      );
+      relevantNotifs.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      setNotifications(relevantNotifs);
     } catch (err) {
       console.warn('Driver data error:', err);
     } finally {
@@ -365,18 +514,224 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     loadData();
   }, [loadData]);
 
-  // Passenger boarding toggle
-  const toggleBoarding = (id: string) => {
-    setPassengers((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, boarded: !p.boarded } : p))
-    );
+  // Polling for live complaint discussion sync when modal is open
+  useEffect(() => {
+    if (!showDiscussionModal || !selectedComplaintForChat) return;
+    const interval = setInterval(() => {
+      const cId = selectedComplaintForChat.complaintId || selectedComplaintForChat._id;
+      apiGet<any>(`transport/complaints/${cId}`)
+        .then((fresh) => {
+          if (fresh && Array.isArray(fresh.replies)) {
+            setChatReplies(fresh.replies);
+          }
+        })
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [showDiscussionModal, selectedComplaintForChat]);
+
+  // Mark Student Attendance: Present or Absent with backend persistence & duplicate locking
+  const handleMarkAttendance = async (student: StudentPassenger, status: 'Present' | 'Absent') => {
+    const studentId = student.rollNo || student.id;
+    if (attendanceMap[studentId]?.isLocked) {
+      Alert.alert('Record Locked', 'Attendance for this student has already been saved and locked. Use "Correct" to submit an authorized change with reason.');
+      return;
+    }
+
+    setAttendanceLoadingId(studentId);
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const payload = {
+        studentId,
+        studentName: student.name,
+        pickupPoint: student.stop,
+        routeId: activeRoute?.routeId || 'R-01',
+        tripType: 'Pickup',
+        date: todayStr,
+        status,
+        boarded: status === 'Present',
+      };
+
+      const res = await apiPost<any>('transport/student-attendance', payload);
+      if (res) {
+        setAttendanceMap((prev) => ({
+          ...prev,
+          [studentId]: {
+            status,
+            isLocked: true,
+            boarded: status === 'Present',
+          },
+        }));
+
+        setAttendanceToast(`✓ Marked ${student.name} as ${status}. Record saved & locked.`);
+        setTimeout(() => setAttendanceToast(null), 3500);
+
+        // Refresh aggregate stop breakdown
+        const rep = await apiGet<any>(`transport/student-attendance/report?date=${todayStr}&tripType=Pickup&routeId=${activeRoute?.routeId || 'R-01'}`).catch(() => null);
+        if (rep) setAttendanceReport(rep);
+      }
+    } catch (err: any) {
+      console.error('Failed to mark attendance:', err);
+      Alert.alert('Attendance Error', err?.message || 'Failed to save attendance record.');
+    } finally {
+      setAttendanceLoadingId(null);
+    }
   };
 
-  // Checkpoint stop toggle
+  // Open correction modal
+  const handleOpenCorrection = (student: StudentPassenger) => {
+    setCorrectionTargetStudent(student);
+    const curStatus = attendanceMap[student.rollNo || student.id]?.status;
+    setCorrectionTargetStatus(curStatus === 'Present' ? 'Absent' : 'Present');
+    setCorrectionReasonText('');
+    setShowCorrectionModal(true);
+  };
+
+  // Confirm correction with audit reason
+  const handleConfirmCorrection = async () => {
+    if (!correctionTargetStudent) return;
+    if (!correctionReasonText.trim() || correctionReasonText.trim().length < 3) {
+      Alert.alert('Reason Required', 'Please enter a justification reason (at least 3 characters) for the audit trail.');
+      return;
+    }
+
+    setIsSubmittingCorrection(true);
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const studentId = correctionTargetStudent.rollNo || correctionTargetStudent.id;
+      const payload = {
+        studentId,
+        date: todayStr,
+        tripType: 'Pickup',
+        routeId: activeRoute?.routeId || 'R-01',
+        status: correctionTargetStatus,
+        boarded: correctionTargetStatus === 'Present',
+        reason: correctionReasonText.trim(),
+      };
+
+      const res = await apiPost<any>('transport/student-attendance/correct', payload);
+      if (res) {
+        setAttendanceMap((prev) => ({
+          ...prev,
+          [studentId]: {
+            status: correctionTargetStatus,
+            isLocked: true,
+            boarded: correctionTargetStatus === 'Present',
+          },
+        }));
+
+        setShowCorrectionModal(false);
+        setAttendanceToast(`✓ Attendance corrected for ${correctionTargetStudent.name}. Audit history updated.`);
+        setTimeout(() => setAttendanceToast(null), 3500);
+
+        const rep = await apiGet<any>(`transport/student-attendance/report?date=${todayStr}&tripType=Pickup&routeId=${activeRoute?.routeId || 'R-01'}`).catch(() => null);
+        if (rep) setAttendanceReport(rep);
+      }
+    } catch (err: any) {
+      console.error('Correction failed:', err);
+      Alert.alert('Correction Failed', err?.message || 'Server rejected correction.');
+    } finally {
+      setIsSubmittingCorrection(false);
+    }
+  };
+
+  // Open complaint discussion modal
+  const handleOpenDiscussion = async (task: ComplaintTask) => {
+    setSelectedComplaintForChat(task);
+    setChatReplies(task.replies || []);
+    setChatInputText('');
+    setChatSuccessToast(null);
+    setShowDiscussionModal(true);
+
+    try {
+      const cId = task.complaintId || task._id;
+      const fresh = await apiGet<any>(`transport/complaints/${cId}`).catch(() => null);
+      if (fresh) {
+        setSelectedComplaintForChat(fresh);
+        if (Array.isArray(fresh.replies)) {
+          setChatReplies(fresh.replies);
+        }
+      }
+    } catch (_) {}
+  };
+
+  // Refresh discussion messages
+  const handleRefreshChat = async () => {
+    if (!selectedComplaintForChat) return;
+    setIsRefreshingChat(true);
+    try {
+      const cId = selectedComplaintForChat.complaintId || selectedComplaintForChat._id;
+      const fresh = await apiGet<any>(`transport/complaints/${cId}`).catch(() => null);
+      if (fresh && Array.isArray(fresh.replies)) {
+        setChatReplies(fresh.replies);
+        setSelectedComplaintForChat(fresh);
+      }
+    } catch (_) {} finally {
+      setIsRefreshingChat(false);
+    }
+  };
+
+  // Send message in discussion
+  const handleSendChatMessage = async () => {
+    if (!chatInputText.trim() || !selectedComplaintForChat) return;
+    setIsSendingChat(true);
+    try {
+      const cId = selectedComplaintForChat.complaintId || selectedComplaintForChat._id;
+      const payload = {
+        message: chatInputText.trim(),
+        sender: user.name || 'Driver',
+        role: 'Driver',
+      };
+
+      const res = await apiPost<any>(`transport/complaints/${cId}/reply`, payload);
+      // Display success message only after backend confirms save
+      if (res) {
+        setChatSuccessToast('Message sent and recorded in complaint history.');
+        setTimeout(() => setChatSuccessToast(null), 4000);
+        setChatInputText('');
+        if (Array.isArray(res.replies)) {
+          setChatReplies(res.replies);
+        } else {
+          setChatReplies((prev) => [
+            ...prev,
+            {
+              sender: user.name || 'Driver',
+              role: 'Driver',
+              message: payload.message,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        }
+        loadData();
+      }
+    } catch (err: any) {
+      console.error('Failed to post reply:', err);
+      Alert.alert('Messaging Error', err?.message || 'Could not send message.');
+    } finally {
+      setIsSendingChat(false);
+    }
+  };
+
+  // Passenger boarding toggle with persistent storage and backend sync
+  const toggleBoarding = (id: string) => {
+    const student = passengers.find(p => p.id === id || p.rollNo === id);
+    if (student) {
+      const curRec = attendanceMap[student.rollNo || student.id];
+      const nextStatus = curRec?.status === 'Present' ? 'Absent' : 'Present';
+      handleMarkAttendance(student, nextStatus);
+    }
+  };
+
+  // Checkpoint stop toggle with persistent backend trip sync
   const toggleStopCompleted = (stopId: string) => {
-    setStops((prev) =>
-      prev.map((s) => (s.id === stopId ? { ...s, completed: !s.completed } : s))
-    );
+    setStops((prev) => {
+      const next = prev.map((s) => (s.id === stopId ? { ...s, completed: !s.completed } : s));
+      const tripIdentifier = activeTrip ? (activeTrip._id || (activeTrip as any).tripId) : null;
+      if (tripIdentifier) {
+        apiPut(`transport/trips/${tripIdentifier}`, { stops: next }).catch(() => {});
+      }
+      return next;
+    });
   };
 
   // Safe Phone Calling for Parents
@@ -404,25 +759,42 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     );
   };
 
-  // Start Trip Handler
+  // Start Trip Handler (Persisted to MongoDB)
   const handleConfirmStartTrip = async () => {
     try {
       setTripSubmitting(true);
-      const tripPayload: TransportTrip = {
-        routeId: activeRoute?.routeId || driverProfile.routeId,
-        vehicle: myVehicle?.vehicleNumber || driverProfile.busNo,
+      const tripId = `TRIP-${Date.now().toString().slice(-6)}`;
+      const vehicleVal = myVehicle?.vehicleNumber || driverProfile.busNo || 'TN 01 AB 1234';
+      const routeVal = activeRoute?.routeId || driverProfile.routeId || 'R-01';
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      const tripPayload = {
+        tripId,
+        routeId: routeVal,
+        vehicleId: vehicleVal,
+        vehicle: vehicleVal,
         driver: driverProfile.name,
-        driverId: user.userId || user.referenceId,
+        driverId: user.userId || user.referenceId || 'DRV-0001',
         tripType: tripTypeSelection,
+        date: todayStr,
         startTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         status: 'In Progress',
         startOdometer: 48500,
+        stops: stops.map((s) => ({
+          id: s.id,
+          name: s.name,
+          time: s.time,
+          completed: s.completed,
+        })),
+        studentTracking: passengers.map((p) => ({
+          studentId: p.id || p.rollNo,
+          pickupPoint: p.stop,
+          boarded: p.boarded,
+          dropped: false,
+        })),
       };
 
-      const res = await apiPost<TransportTrip>('transport/trips', tripPayload).catch(() => ({
-        ...tripPayload,
-        _id: `TRIP-${Date.now().toString().slice(-6)}`,
-      }));
+      const res = await apiPost<TransportTrip>('transport/trips', tripPayload);
 
       setActiveTrip(res);
       setShowTripStartModal(false);
@@ -430,6 +802,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
         'Trip Started Successfully 🚦',
         `Active Route: ${driverProfile.route}.\nTrip Type: ${tripTypeSelection} Transit.\nPlease observe campus speed limit (20 km/h).`
       );
+      await loadData();
     } catch (err: any) {
       Alert.alert('Trip Start Error', err.message || 'Could not start trip.');
     } finally {
@@ -437,18 +810,19 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     }
   };
 
-  // End Trip Handler
+  // End Trip Handler (Persisted to MongoDB)
   const handleConfirmEndTrip = async () => {
     try {
       setTripSubmitting(true);
       const endTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      if (activeTrip?._id) {
-        await apiPut(`transport/trips/${activeTrip._id}`, {
+      const tripIdentifier = activeTrip ? (activeTrip._id || (activeTrip as any).tripId) : null;
+      if (tripIdentifier) {
+        await apiPut(`transport/trips/${tripIdentifier}`, {
           endTime,
           status: 'Completed',
           remarks: tripRemarks || 'Arrived safely at Campus Gate',
-        }).catch(() => null);
+        });
       }
 
       setActiveTrip(null);
@@ -462,6 +836,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
         'Trip Completed 🏁',
         `Transit trip ended safely at ${endTime}.\nArrival registered in campus logs.`
       );
+      await loadData();
     } catch (err: any) {
       Alert.alert('Trip End Error', err.message || 'Could not conclude trip.');
     } finally {
@@ -499,6 +874,71 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     }
   };
 
+  // Submit Vehicle Defect Complaint (/driver/vehicle & /driver/tasks)
+  const handleCreateComplaint = async () => {
+    if (!issueDescription.trim()) {
+      Alert.alert('Description Required', 'Please provide details about the vehicle defect or maintenance concern.');
+      return;
+    }
+    try {
+      setIssueSubmitting(true);
+      await apiPost('transport/complaints', {
+        name: user.name || driverProfile.name,
+        studentId: user.referenceId || user.userId || driverProfile.driverId,
+        reporterType: 'Driver',
+        busNumber: myVehicle?.vehicleNumber || driverProfile.busNo,
+        routeId: activeRoute?.routeId || driverProfile.routeId,
+        complaintType: `${issueType} [${issuePriority}]`,
+        description: issueDescription.trim(),
+        priority: issuePriority,
+        status: 'Pending',
+      });
+      Alert.alert('Defect Ticket Dispatched 🛠️', 'Vehicle issue has been logged and sent to the transport workshop.');
+      setShowIssueModal(false);
+      setIssueDescription('');
+      loadData();
+    } catch (err: any) {
+      Alert.alert('Submission Error', err.message || 'Failed to submit defect ticket.');
+    } finally {
+      setIssueSubmitting(false);
+    }
+  };
+
+  // Driver Acknowledge Resolution
+  const handleAcknowledgeComplaint = async (taskId: string) => {
+    try {
+      setTaskUpdatingId(taskId);
+      await apiPut(`transport/complaints/${taskId}`, {
+        acknowledgedByDriver: true,
+        driverAcknowledgeNote: `Acknowledged by Driver ${driverProfile.name}`
+      });
+      Alert.alert('Resolution Acknowledged ✓', 'Thank you for confirming vehicle inspection.');
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not acknowledge resolution.');
+    } finally {
+      setTaskUpdatingId(null);
+    }
+  };
+
+  // Update Task Status (Maintenance or Complaint)
+  const handleUpdateTask = async (taskId: string, isMaintenance: boolean, newStatus: string) => {
+    try {
+      setTaskUpdatingId(taskId);
+      if (isMaintenance) {
+        await apiPut(`transport/maintenance/${taskId}`, { status: newStatus });
+      } else {
+        await apiPut(`transport/complaints/${taskId}`, { status: newStatus });
+      }
+      Alert.alert('Status Updated', `Task status changed to ${newStatus}.`);
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Update Failed', err.response?.data?.message || err.message || 'Could not update task status.');
+    } finally {
+      setTaskUpdatingId(null);
+    }
+  };
+
   // Filtered student passengers
   const filteredStudents = useMemo(() => {
     return passengers.filter((p) => {
@@ -517,11 +957,13 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     return ['All', ...names];
   }, [passengers]);
 
-
-
   // Android Hardware Back Button Handling
   useEffect(() => {
     const onBackPress = () => {
+      if (showIssueModal) {
+        setShowIssueModal(false);
+        return true;
+      }
       if (showTripStartModal) {
         setShowTripStartModal(false);
         return true;
@@ -546,13 +988,16 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     };
     const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => sub.remove();
-  }, [activeNavTab, moreSection, showTripStartModal, showTripEndModal, showMaintModal]);
+  }, [activeNavTab, moreSection, showTripStartModal, showTripEndModal, showMaintModal, showIssueModal]);
 
   const isInnerScreen = activeNavTab !== 'home';
 
   const getScreenTitle = () => {
     if (activeNavTab === 'academics') return 'Transit Operations & Trip';
     if (activeNavTab === 'referrals') return 'Business Referrals';
+    if (activeNavTab === 'notifications') {
+      return tasksNotifSubTab === 'tasks' ? 'Operational Tasks & Maintenance' : 'Transport Announcements';
+    }
     if (activeNavTab === 'profile') {
       if (moreSection === 'checklist') return 'Pre-Trip Inspection';
       if (moreSection === 'payroll') return 'Driver Payroll & Slips';
@@ -751,14 +1196,92 @@ export default function DriverDashboard({ user, onLogout }: Props) {
               )}
             </View>
 
+            {/* OPERATIONAL TASKS & VEHICLE DEFECTS OVERVIEW */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderFlex}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.cardSectionTitle} numberOfLines={1}>📋 Active Tasks & Vehicle Issues</Text>
+                  <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
+                    {complaintTasks.filter((c) => c.status !== 'Resolved' && c.status !== 'Closed').length + maintenanceList.filter((m) => m.status !== 'Completed').length} Pending Resolution
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setActiveNavTab('notifications');
+                    setTasksNotifSubTab('tasks');
+                  }}
+                  style={{ flexShrink: 0 }}
+                >
+                  <Text style={styles.cardLinkText}>View All Tasks →</Text>
+                </TouchableOpacity>
+              </View>
+
+              {complaintTasks.length === 0 && maintenanceList.length === 0 ? (
+                <View style={styles.emptyCardBox}>
+                  <Text style={styles.emptyCardText}>No active vehicle defects or maintenance tasks.</Text>
+                </View>
+              ) : (
+                <View style={{ gap: 8, marginTop: 4 }}>
+                  {[...complaintTasks, ...maintenanceList].slice(0, 3).map((item: any, idx) => {
+                    const isComplaint = !!item.complaintType;
+                    const title = isComplaint ? (item.complaintType || 'Defect') : (item.type || 'Maintenance');
+                    const desc = item.description || 'Assigned vehicle operational task';
+                    const status = item.status || 'Pending';
+                    const isResolved = status === 'Resolved' || status === 'Completed';
+
+                    return (
+                      <View
+                        key={item._id || idx}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          backgroundColor: '#F8FAFC',
+                          padding: 10,
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                        }}
+                      >
+                        <View style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: isComplaint ? '#EFF6FF' : '#F3E8FF', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                          <Text style={{ fontSize: 16 }}>{isComplaint ? '🛠️' : '🔧'}</Text>
+                        </View>
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>{title}</Text>
+                          <Text style={{ fontSize: 11, color: '#64748B' }} numberOfLines={1}>{desc}</Text>
+                        </View>
+                        <View
+                          style={{
+                            backgroundColor: isResolved ? '#DCFCE7' : '#FEF3C7',
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 6,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              fontWeight: '800',
+                              color: isResolved ? '#15803D' : '#B45309',
+                            }}
+                          >
+                            {status}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+
             {/* TRANSPORT NOTIFICATIONS & ALERTS */}
             <View style={styles.card}>
               <View style={styles.cardHeaderFlex}>
                 <Text style={[styles.cardSectionTitle, { flex: 1, marginRight: 8 }]} numberOfLines={1}>🔔 Transport Announcements</Text>
                 <TouchableOpacity
                   onPress={() => {
-                    setActiveNavTab('profile');
-                    setMoreSection('notices');
+                    setActiveNavTab('notifications');
+                    setTasksNotifSubTab('notices');
                   }}
                   style={{ flexShrink: 0 }}
                 >
@@ -955,50 +1478,59 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                         <Text style={styles.emptyCardText}>No stops defined on this route.</Text>
                       </View>
                     ) : (
-                      stops.map((stop, idx) => (
-                        <View key={stop.id} style={styles.checkpointCard}>
-                          <TouchableOpacity
-                            style={[
-                              styles.checkpointBox,
-                              { backgroundColor: stop.completed ? '#10B981' : '#F1F5F9' },
-                            ]}
-                            onPress={() => toggleStopCompleted(stop.id)}
-                          >
-                            <Text
-                              style={[
-                                styles.checkpointBoxText,
-                                { color: stop.completed ? '#FFFFFF' : '#94A3B8' },
-                              ]}
-                            >
-                              {stop.completed ? '✓' : String(idx + 1)}
-                            </Text>
-                          </TouchableOpacity>
+                      stops.map((stop, idx) => {
+                        const cleanStopName = (stop.name || '').replace(/^\d+\.\s*/, '').toLowerCase().trim();
+                        const stopRep = attendanceReport?.stopBreakdown?.find((sb: any) =>
+                          (sb.stopName || '').toLowerCase().trim() === cleanStopName
+                        );
+                        const expectedCount = stopRep ? stopRep.expectedStudents : stop.studentsCount;
+                        const boardedCount = stopRep ? stopRep.boardedCount : 0;
 
-                          <View style={styles.checkpointInfo}>
-                            <Text style={styles.checkpointName}>{stop.name}</Text>
-                            <Text style={styles.checkpointMeta}>
-                              ETA: {stop.time} • {stop.studentsCount} Students
-                            </Text>
+                        return (
+                          <View key={stop.id} style={styles.checkpointCard}>
+                            <TouchableOpacity
+                              style={[
+                                styles.checkpointBox,
+                                { backgroundColor: stop.completed ? '#10B981' : '#F1F5F9' },
+                              ]}
+                              onPress={() => toggleStopCompleted(stop.id)}
+                            >
+                              <Text
+                                style={[
+                                  styles.checkpointBoxText,
+                                  { color: stop.completed ? '#FFFFFF' : '#94A3B8' },
+                                ]}
+                              >
+                                {stop.completed ? '✓' : String(idx + 1)}
+                              </Text>
+                            </TouchableOpacity>
+
+                            <View style={styles.checkpointInfo}>
+                              <Text style={styles.checkpointName}>{stop.name}</Text>
+                              <Text style={styles.checkpointMeta}>
+                                ETA: {stop.time} • {boardedCount} / {expectedCount} Boarded
+                              </Text>
+                            </View>
+
+                            <TouchableOpacity
+                              style={[
+                                styles.checkpointActionBtn,
+                                { backgroundColor: stop.completed ? '#DCFCE7' : '#EFF6FF' },
+                              ]}
+                              onPress={() => toggleStopCompleted(stop.id)}
+                            >
+                              <Text
+                                style={[
+                                  styles.checkpointActionText,
+                                  { color: stop.completed ? '#15803D' : '#1D4ED8' },
+                                ]}
+                              >
+                                {stop.completed ? 'Passed' : 'Mark Arrived'}
+                              </Text>
+                            </TouchableOpacity>
                           </View>
-
-                          <TouchableOpacity
-                            style={[
-                              styles.checkpointActionBtn,
-                              { backgroundColor: stop.completed ? '#DCFCE7' : '#EFF6FF' },
-                            ]}
-                            onPress={() => toggleStopCompleted(stop.id)}
-                          >
-                            <Text
-                              style={[
-                                styles.checkpointActionText,
-                                { color: stop.completed ? '#15803D' : '#1D4ED8' },
-                              ]}
-                            >
-                              {stop.completed ? 'Passed' : 'Mark Arrived'}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      ))
+                        );
+                      })
                     )}
                   </View>
                 </View>
@@ -1024,30 +1556,39 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                         <Text style={styles.emptyCardText}>No route stops registered for this bus.</Text>
                       </View>
                     ) : (
-                      stops.map((stop, idx) => (
-                        <View key={stop.id} style={styles.routeTimelineItem}>
-                          <View style={styles.timelineLeft}>
-                            <View
-                              style={[
-                                styles.timelineCircle,
-                                { backgroundColor: stop.completed ? '#10B981' : '#1E3A8A' },
-                              ]}
-                            >
-                              <Text style={styles.timelineCircleText}>{idx + 1}</Text>
+                      stops.map((stop, idx) => {
+                        const cleanStopName = (stop.name || '').replace(/^\d+\.\s*/, '').toLowerCase().trim();
+                        const stopRep = attendanceReport?.stopBreakdown?.find((sb: any) =>
+                          (sb.stopName || '').toLowerCase().trim() === cleanStopName
+                        );
+                        const expectedCount = stopRep ? stopRep.expectedStudents : stop.studentsCount;
+                        const boardedCount = stopRep ? stopRep.boardedCount : 0;
+
+                        return (
+                          <View key={stop.id} style={styles.routeTimelineItem}>
+                            <View style={styles.timelineLeft}>
+                              <View
+                                style={[
+                                  styles.timelineCircle,
+                                  { backgroundColor: stop.completed ? '#10B981' : '#1E3A8A' },
+                                ]}
+                              >
+                                <Text style={styles.timelineCircleText}>{idx + 1}</Text>
+                              </View>
+                              {idx < stops.length - 1 && <View style={styles.timelineLine} />}
                             </View>
-                            {idx < stops.length - 1 && <View style={styles.timelineLine} />}
+                            <View style={styles.timelineContent}>
+                              <Text style={styles.timelineStopTitle}>{stop.name}</Text>
+                              <Text style={styles.timelineStopMeta}>
+                                Scheduled Pickup: {stop.time}
+                              </Text>
+                              <Text style={[styles.timelineStopStudents, { color: boardedCount > 0 ? '#15803D' : '#059669', fontWeight: '800' }]}>
+                                👨‍🎓 {boardedCount} / {expectedCount} Boarded
+                              </Text>
+                            </View>
                           </View>
-                          <View style={styles.timelineContent}>
-                            <Text style={styles.timelineStopTitle}>{stop.name}</Text>
-                            <Text style={styles.timelineStopMeta}>
-                              Scheduled Pickup: {stop.time}
-                            </Text>
-                            <Text style={styles.timelineStopStudents}>
-                              👨‍🎓 {stop.studentsCount} Students Assigned
-                            </Text>
-                          </View>
-                        </View>
-                      ))
+                        );
+                      })
                     )}
                   </View>
                 </View>
@@ -1062,11 +1603,37 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                       Tap 'Board' when each scholar steps onto the bus. Tap 'Call Parent' if a registered student does not appear at their stop.
                     </Text>
                   </View>
-                  {/* Search and Filter */}
+                  {/* Notification Toast */}
+                  {attendanceToast && (
+                    <View style={{ backgroundColor: '#ECFDF5', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#A7F3D0', marginBottom: 10 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#047857', textAlign: 'center' }}>
+                        {attendanceToast}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Search, Filter & Report Access */}
                   <View style={styles.card}>
-                    <Text style={styles.cardSectionTitle}>👨‍🎓 Student Passenger Roster</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <Text style={styles.cardSectionTitle}>👨‍🎓 Student Attendance & Roster</Text>
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#1E3A8A',
+                          paddingVertical: 5,
+                          paddingHorizontal: 10,
+                          borderRadius: 6,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                        onPress={() => setShowAttendanceReportModal(true)}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>📊 Attendance Report</Text>
+                      </TouchableOpacity>
+                    </View>
+
                     <Text style={styles.cardSectionDesc}>
-                      Verify boarding status and contact parents in case of absence.
+                      Mark student Present or Absent. Once saved, records are locked against duplicate submissions.
                     </Text>
 
                     <TextInput
@@ -1107,71 +1674,123 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                       <Text style={styles.emptyCardText}>No matching student passengers found.</Text>
                     </View>
                   ) : (
-                    filteredStudents.map((student) => (
-                      <TouchableOpacity
-                        key={student.id}
-                        style={styles.passengerCard}
-                        onPress={() => setSelectedPassengerProfile(student)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.passengerLeft}>
-                          <View style={styles.passengerHeaderRow}>
-                            <Text style={styles.passengerName}>{student.name}</Text>
-                            <View
-                              style={[
-                                styles.boardingStatusPill,
-                                { backgroundColor: student.boarded ? '#DCFCE7' : '#F1F5F9' },
-                              ]}
-                            >
-                              <Text
+                    filteredStudents.map((student) => {
+                      const studentKey = student.rollNo || student.id;
+                      const rec = attendanceMap[studentKey];
+                      const status = rec ? rec.status : 'PENDING';
+                      const isLocked = rec ? rec.isLocked : false;
+                      const isLoadingThis = attendanceLoadingId === studentKey;
+
+                      return (
+                        <TouchableOpacity
+                          key={student.id}
+                          style={styles.passengerCard}
+                          onPress={() => setSelectedPassengerProfile(student)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.passengerLeft}>
+                            <View style={styles.passengerHeaderRow}>
+                              <Text style={styles.passengerName}>{student.name}</Text>
+                              <View
                                 style={[
-                                  styles.boardingStatusPillText,
-                                  { color: student.boarded ? '#15803D' : '#64748B' },
+                                  styles.boardingStatusPill,
+                                  {
+                                    backgroundColor:
+                                      status === 'Present' ? '#DCFCE7' :
+                                      status === 'Absent' ? '#FEE2E2' : '#FEF3C7',
+                                  },
                                 ]}
                               >
-                                {student.boarded ? '✓ BOARDED' : 'WAITING'}
-                              </Text>
+                                <Text
+                                  style={[
+                                    styles.boardingStatusPillText,
+                                    {
+                                      color:
+                                        status === 'Present' ? '#15803D' :
+                                        status === 'Absent' ? '#B91C1C' : '#B45309',
+                                    },
+                                  ]}
+                                >
+                                  {status === 'Present' ? '✓ PRESENT' : status === 'Absent' ? '✕ ABSENT' : '⏳ PENDING'}
+                                </Text>
+                              </View>
                             </View>
+
+                            <Text style={styles.passengerMeta}>
+                              Roll: {student.rollNo} • Pickup: {student.stop}
+                            </Text>
+
+                            {/* Large Call Parent Action */}
+                            <TouchableOpacity
+                              style={styles.callParentButton}
+                              onPress={() => handleCallParent(student.parentPhone, student.name)}
+                            >
+                              <Text style={styles.callParentIcon}>📞</Text>
+                              <Text style={styles.callParentLabel}>
+                                Call Parent ({student.parentPhone})
+                              </Text>
+                            </TouchableOpacity>
+
+                            <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '700', marginTop: 4 }}>
+                              View Passenger Profile ›
+                            </Text>
                           </View>
 
-                          <Text style={styles.passengerMeta}>
-                            ID: {student.rollNo} • Stop: {student.stop}
-                          </Text>
+                          {/* Attendance Controls */}
+                          {isLocked ? (
+                            <View style={{ alignItems: 'flex-end', gap: 6, marginLeft: 8 }}>
+                              <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 5, borderWidth: 1, borderColor: '#CBD5E1' }}>
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: '#475569' }}>🔒 Saved</Text>
+                              </View>
+                              <TouchableOpacity
+                                style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 5, borderWidth: 1, borderColor: '#BFDBFE' }}
+                                onPress={() => handleOpenCorrection(student)}
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4ED8' }}>✏️ Correct</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <View style={{ flexDirection: 'column', gap: 6, marginLeft: 8 }}>
+                              <TouchableOpacity
+                                style={{
+                                  backgroundColor: '#16A34A',
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 7,
+                                  borderRadius: 6,
+                                  minWidth: 80,
+                                  alignItems: 'center',
+                                  opacity: isLoadingThis ? 0.6 : 1,
+                                }}
+                                onPress={() => handleMarkAttendance(student, 'Present')}
+                                disabled={isLoadingThis}
+                              >
+                                {isLoadingThis ? (
+                                  <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>✓ Present</Text>
+                                )}
+                              </TouchableOpacity>
 
-                          {/* Large Call Parent Action */}
-                          <TouchableOpacity
-                            style={styles.callParentButton}
-                            onPress={() => handleCallParent(student.parentPhone, student.name)}
-                          >
-                            <Text style={styles.callParentIcon}>📞</Text>
-                            <Text style={styles.callParentLabel}>
-                              Call Parent ({student.parentPhone})
-                            </Text>
-                          </TouchableOpacity>
-
-                          <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '700', marginTop: 4 }}>
-                            View Passenger Profile ›
-                          </Text>
-                        </View>
-
-                        <TouchableOpacity
-                          style={[
-                            styles.toggleBoardBtn,
-                            { backgroundColor: student.boarded ? '#10B981' : '#EFF6FF' },
-                          ]}
-                          onPress={() => toggleBoarding(student.id)}
-                        >
-                          <Text
-                            style={[
-                              styles.toggleBoardBtnText,
-                              { color: student.boarded ? '#FFFFFF' : '#2563EB' },
-                            ]}
-                          >
-                            {student.boarded ? 'Unmark' : 'Board'}
-                          </Text>
+                              <TouchableOpacity
+                                style={{
+                                  backgroundColor: '#DC2626',
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 7,
+                                  borderRadius: 6,
+                                  minWidth: 80,
+                                  alignItems: 'center',
+                                  opacity: isLoadingThis ? 0.6 : 1,
+                                }}
+                                onPress={() => handleMarkAttendance(student, 'Absent')}
+                                disabled={isLoadingThis}
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>✕ Absent</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
                         </TouchableOpacity>
-                      </TouchableOpacity>
-                    ))
+                      );
+                    })
                   )}
                 </View>
               )}
@@ -1188,12 +1807,20 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                   <View style={styles.card}>
                     <View style={styles.cardHeaderFlex}>
                       <Text style={styles.cardSectionTitle}>🚌 Assigned Vehicle Specs</Text>
-                      <TouchableOpacity
-                        style={styles.smallActionBtn}
-                        onPress={() => setShowMaintModal(true)}
-                      >
-                        <Text style={styles.smallActionBtnText}>+ Log Service</Text>
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <TouchableOpacity
+                          style={[styles.smallActionBtn, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
+                          onPress={() => setShowIssueModal(true)}
+                        >
+                          <Text style={[styles.smallActionBtnText, { color: '#1E40AF' }]}>🛠️ Report Defect</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.smallActionBtn}
+                          onPress={() => setShowMaintModal(true)}
+                        >
+                          <Text style={styles.smallActionBtnText}>+ Log Service</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
 
                     {[
@@ -1210,6 +1837,44 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                         <Text style={styles.specItemValue}>{spec.value}</Text>
                       </View>
                     ))}
+                  </View>
+
+                  {/* Vehicle Defect Tickets (Matching DriverVehicle.jsx on Web) */}
+                  <View style={styles.card}>
+                    <View style={styles.cardHeaderFlex}>
+                      <Text style={styles.cardSectionTitle}>🛠️ My Defect Tickets</Text>
+                      <TouchableOpacity onPress={() => setShowIssueModal(true)}>
+                        <Text style={styles.cardLinkText}>+ New Defect</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {complaintTasks.length === 0 ? (
+                      <View style={styles.emptyCardBox}>
+                        <Text style={styles.emptyCardText}>No defect complaints logged for this vehicle.</Text>
+                      </View>
+                    ) : (
+                      complaintTasks.map((c, idx) => (
+                        <View key={c._id || idx} style={styles.maintItemCard}>
+                          <View style={styles.maintTopRow}>
+                            <Text style={styles.maintTypeBadge}>{c.complaintType || 'Vehicle Issue'}</Text>
+                            <Text
+                              style={[
+                                styles.maintStatusBadge,
+                                {
+                                  color: c.status === 'Resolved' ? '#15803D' : '#D97706',
+                                  backgroundColor: c.status === 'Resolved' ? '#DCFCE7' : '#FEF3C7',
+                                },
+                              ]}
+                            >
+                              {c.status || 'Pending'}
+                            </Text>
+                          </View>
+                          <Text style={styles.maintDesc}>{c.description}</Text>
+                          <Text style={styles.maintDate}>
+                            Logged: {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Recent'}
+                          </Text>
+                        </View>
+                      ))
+                    )}
                   </View>
 
                   {/* Maintenance Log */}
@@ -1254,6 +1919,526 @@ export default function DriverDashboard({ user, onLogout }: Props) {
         {activeNavTab === 'referrals' && (
           <View style={styles.flexOne}>
             <ReferralHub user={user} />
+          </View>
+        )}
+
+        {/* TAB 4: TASKS & NOTIFICATIONS (/driver/tasks & /driver/notifications) */}
+        {activeNavTab === 'notifications' && (
+          <View style={styles.flexOne}>
+            {/* Top Switcher: My Tasks vs Transport Notices */}
+            <View style={styles.profileToggleHeader}>
+              <TouchableOpacity
+                style={[
+                  styles.profileToggleTab,
+                  tasksNotifSubTab === 'tasks' && styles.profileToggleTabActive,
+                ]}
+                onPress={() => setTasksNotifSubTab('tasks')}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.profileToggleTabText,
+                    tasksNotifSubTab === 'tasks' && styles.profileToggleTabTextActive,
+                  ]}
+                >
+                  📋 My Tasks ({complaintTasks.filter((c) => c.status !== 'Resolved' && c.status !== 'Closed').length + maintenanceList.filter((m) => m.status !== 'Completed').length})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.profileToggleTab,
+                  tasksNotifSubTab === 'notices' && styles.profileToggleTabActive,
+                ]}
+                onPress={() => setTasksNotifSubTab('notices')}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.profileToggleTabText,
+                    tasksNotifSubTab === 'notices' && styles.profileToggleTabTextActive,
+                  ]}
+                >
+                  🔔 Notices ({notifications.length})
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.scrollArea}
+              contentContainerStyle={styles.scrollContent}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadData} />}
+            >
+              {tasksNotifSubTab === 'tasks' && (
+                <View>
+                  <View style={styles.guidanceTipBox}>
+                    <Text style={styles.guidanceTipEmoji}>📋</Text>
+                    <Text style={styles.guidanceTipText}>
+                      Track maintenance tasks and vehicle defects assigned to Bus {driverProfile.busNo}. Update task progress in real time.
+                    </Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>Operational Tasks</Text>
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: '#1E3A8A',
+                        paddingHorizontal: 12,
+                        paddingVertical: 7,
+                        borderRadius: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                      onPress={() => setShowIssueModal(true)}
+                    >
+                      <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>+ Report Defect</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Filter Pills */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                    {(['All', 'Pending', 'In Progress', 'Resolved'] as const).map((f) => (
+                      <TouchableOpacity
+                        key={f}
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 6,
+                          borderRadius: 20,
+                          backgroundColor: taskFilter === f ? '#1E3A8A' : '#FFFFFF',
+                          marginRight: 8,
+                          borderWidth: 1,
+                          borderColor: taskFilter === f ? '#1E3A8A' : '#E2E8F0',
+                        }}
+                        onPress={() => setTaskFilter(f)}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '700',
+                            color: taskFilter === f ? '#FFFFFF' : '#64748B',
+                          }}
+                        >
+                          {f}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  {/* Tasks List */}
+                  {(() => {
+                    const combinedList = [
+                      ...complaintTasks.map((c) => ({
+                        id: c._id || c.complaintId || '',
+                        complaintId: c.complaintId || c._id || '',
+                        type: 'Defect / Issue',
+                        category: c.complaintType || 'Vehicle Defect',
+                        desc: c.description,
+                        priority: c.priority || 'Medium',
+                        status: c.status || 'Pending',
+                        assignedTo: c.assignedTo || 'Unassigned',
+                        resolutionNote: c.resolutionNote,
+                        resolvedBy: c.resolvedBy,
+                        acknowledgedByDriver: c.acknowledgedByDriver,
+                        vehicle: c.busNumber || driverProfile.busNo,
+                        date: c.createdAt,
+                        isMaintenance: false,
+                        reporter: c.name || c.reporterType || 'Driver',
+                        replies: c.replies || [],
+                        rawComplaint: c,
+                      })),
+                      ...maintenanceList.map((m) => ({
+                        id: m._id || '',
+                        complaintId: m._id,
+                        type: 'Maintenance Service',
+                        category: m.type || 'Routine Service',
+                        desc: m.description || 'Workshop scheduled maintenance',
+                        priority: 'Medium',
+                        status: m.status || 'Pending Review',
+                        assignedTo: 'Workshop Team',
+                        resolutionNote: m.remarks,
+                        resolvedBy: m.reportedBy,
+                        acknowledgedByDriver: true,
+                        vehicle: m.vehicleNumber || driverProfile.busNo,
+                        date: m.date,
+                        isMaintenance: true,
+                        reporter: 'Workshop Team',
+                      })),
+                    ];
+
+                    const filtered = combinedList.filter((t) => {
+                      if (taskFilter === 'All') return true;
+                      if (taskFilter === 'Pending') return t.status === 'Pending' || t.status === 'Open' || t.status === 'Pending Review';
+                      if (taskFilter === 'In Progress') return t.status === 'In Progress';
+                      if (taskFilter === 'Resolved') return t.status === 'Resolved' || t.status === 'Completed' || t.status === 'Closed';
+                      return true;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <View style={styles.emptyCardBox}>
+                          <Text style={{ fontSize: 32, marginBottom: 8 }}>✅</Text>
+                          <Text style={styles.emptyCardText}>No operational tasks in this status filter.</Text>
+                        </View>
+                      );
+                    }
+
+                    return filtered.map((task, idx) => {
+                      const isPending = task.status === 'Pending' || task.status === 'Open' || task.status === 'Pending Review';
+                      const isInProgress = task.status === 'In Progress';
+                      const isResolved = task.status === 'Resolved' || task.status === 'Completed' || task.status === 'Closed';
+                      const isSafety = /brake|tire|tyre|steering|suspension|engine|safety/i.test(task.category || '') ||
+                                       /brake|tire|tyre|steering|suspension|engine|safety/i.test(task.desc || '');
+
+                      return (
+                        <View
+                          key={task.id || idx}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: 14,
+                            padding: 14,
+                            marginBottom: 12,
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 3,
+                            elevation: 2,
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                              <View
+                                style={{
+                                  backgroundColor: task.isMaintenance ? '#F3E8FF' : '#EFF6FF',
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 3,
+                                  borderRadius: 6,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: '800',
+                                    color: task.isMaintenance ? '#7E22CE' : '#1D4ED8',
+                                  }}
+                                >
+                                  {task.type}
+                                </Text>
+                              </View>
+                              <Text style={{ fontSize: 11, color: '#64748B' }}>Bus {task.vehicle}</Text>
+                              {task.complaintId && (
+                                <Text style={{ fontSize: 10, color: '#94A3B8', fontFamily: 'monospace' }}>({task.complaintId})</Text>
+                              )}
+                            </View>
+
+                            <View
+                              style={{
+                                backgroundColor: isResolved ? '#DCFCE7' : isInProgress ? '#FEF3C7' : '#FEE2E2',
+                                paddingHorizontal: 8,
+                                paddingVertical: 2,
+                                borderRadius: 6,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: '800',
+                                  color: isResolved ? '#15803D' : isInProgress ? '#B45309' : '#B91C1C',
+                                }}
+                              >
+                                {task.status}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 4 }}>
+                            {task.category}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17, marginBottom: 6 }}>
+                            {task.desc}
+                          </Text>
+
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <Text style={{ fontSize: 11, color: '#64748B' }}>
+                              Assigned: <Text style={{ fontWeight: '700', color: '#1E3A8A' }}>{task.assignedTo || 'Unassigned'}</Text>
+                            </Text>
+                            <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+                              Priority: <Text style={{ fontWeight: '700' }}>{task.priority}</Text>
+                            </Text>
+                          </View>
+
+                          {/* Admin Resolution Notes Box */}
+                          {task.resolutionNote && (
+                            <View style={{ backgroundColor: '#DCFCE7', borderRadius: 8, padding: 8, marginBottom: 8, borderWidth: 1, borderColor: '#86EFAC' }}>
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: '#166534' }}>🛠️ Workshop Resolution Note:</Text>
+                              <Text style={{ fontSize: 11, color: '#14532D', marginTop: 2 }}>{task.resolutionNote}</Text>
+                              {task.resolvedBy && (
+                                <Text style={{ fontSize: 10, color: '#15803D', marginTop: 3 }}>Cleared by: {task.resolvedBy}</Text>
+                              )}
+                            </View>
+                          )}
+
+                          {/* Safety Notice if in progress */}
+                          {!isResolved && isSafety && (
+                            <View style={{ backgroundColor: '#FEF3C7', borderRadius: 6, padding: 6, marginBottom: 8, borderWidth: 1, borderColor: '#FDE68A' }}>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#B45309' }}>
+                                ⚠️ Brakes/Tires safety defect. Under workshop maintenance until certified.
+                              </Text>
+                            </View>
+                          )}
+
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 8 }}>
+                            <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+                              {task.date ? new Date(task.date).toLocaleDateString() : 'Recent'}
+                            </Text>
+
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                              {isPending && (
+                                <TouchableOpacity
+                                  style={{
+                                    backgroundColor: '#FEF3C7',
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 6,
+                                    borderRadius: 6,
+                                    borderWidth: 1,
+                                    borderColor: '#FDE68A',
+                                  }}
+                                  onPress={() => handleUpdateTask(task.id || task.complaintId || '', task.isMaintenance, 'In Progress')}
+                                  disabled={taskUpdatingId === task.id}
+                                >
+                                  {taskUpdatingId === task.id ? (
+                                    <ActivityIndicator size="small" color="#B45309" />
+                                  ) : (
+                                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#B45309' }}>Start Task ›</Text>
+                                  )}
+                                </TouchableOpacity>
+                              )}
+
+                              {isInProgress && (
+                                isSafety && !task.isMaintenance ? (
+                                  <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}>
+                                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#B45309' }}>Inspection Active</Text>
+                                  </View>
+                                ) : (
+                                  <TouchableOpacity
+                                    style={{
+                                      backgroundColor: '#DCFCE7',
+                                      paddingHorizontal: 12,
+                                      paddingVertical: 6,
+                                      borderRadius: 6,
+                                      borderWidth: 1,
+                                      borderColor: '#BBF7D0',
+                                    }}
+                                    onPress={() => handleUpdateTask(task.id || task.complaintId || '', task.isMaintenance, task.isMaintenance ? 'Completed' : 'Resolved')}
+                                    disabled={taskUpdatingId === task.id}
+                                  >
+                                    {taskUpdatingId === task.id ? (
+                                      <ActivityIndicator size="small" color="#15803D" />
+                                    ) : (
+                                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#15803D' }}>Mark Resolved ✓</Text>
+                                    )}
+                                  </TouchableOpacity>
+                                )
+                              )}
+
+                              {isResolved && !task.isMaintenance && !task.acknowledgedByDriver && (
+                                <TouchableOpacity
+                                  style={{
+                                    backgroundColor: '#16A34A',
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 6,
+                                    borderRadius: 6,
+                                  }}
+                                  onPress={() => handleAcknowledgeComplaint(task.id || task.complaintId || '')}
+                                  disabled={taskUpdatingId === task.id}
+                                >
+                                  {taskUpdatingId === task.id ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                  ) : (
+                                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>✓ Acknowledge</Text>
+                                  )}
+                                </TouchableOpacity>
+                              )}
+
+                              {isResolved && (task.isMaintenance || task.acknowledgedByDriver) && (
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#10B981' }}>✓ Completed & Cleared</Text>
+                              )}
+
+                              {!task.isMaintenance && (
+                                <TouchableOpacity
+                                  style={{
+                                    backgroundColor: '#EFF6FF',
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 6,
+                                    borderRadius: 6,
+                                    borderWidth: 1,
+                                    borderColor: '#BFDBFE',
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                  }}
+                                  onPress={() => handleOpenDiscussion((task as any).rawComplaint || task)}
+                                >
+                                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4ED8' }}>
+                                    💬 Discussion {((task as any).replies && (task as any).replies.length > 0) ? `(${(task as any).replies.length})` : ''}
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    });
+                  })()}
+                </View>
+              )}
+
+              {/* Sub-view: Transit Notices & Advisories */}
+              {tasksNotifSubTab === 'notices' && (
+                <View>
+                  <View style={styles.guidanceTipBox}>
+                    <Text style={styles.guidanceTipEmoji}>🔔</Text>
+                    <Text style={styles.guidanceTipText}>
+                      Official campus transit announcements, road route advisories, and administration circulars.
+                    </Text>
+                  </View>
+
+                  {/* Search bar */}
+                  <View
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 10,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 12,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Text style={{ marginRight: 8, fontSize: 14 }}>🔍</Text>
+                    <TextInput
+                      style={{ flex: 1, height: 40, fontSize: 13, color: '#0F172A' }}
+                      placeholder="Search announcements..."
+                      placeholderTextColor="#94A3B8"
+                      value={noticeSearch}
+                      onChangeText={setNoticeSearch}
+                    />
+                    {noticeSearch ? (
+                      <TouchableOpacity onPress={() => setNoticeSearch('')}>
+                        <Text style={{ color: '#94A3B8', fontSize: 14 }}>✕</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+
+                  {/* Filter chips */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                    {['All', 'Emergency', 'Alert', 'Warning', 'Info'].map((cat) => (
+                      <TouchableOpacity
+                        key={cat}
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 6,
+                          borderRadius: 20,
+                          backgroundColor: noticeFilter === cat ? '#1E3A8A' : '#FFFFFF',
+                          marginRight: 8,
+                          borderWidth: 1,
+                          borderColor: noticeFilter === cat ? '#1E3A8A' : '#E2E8F0',
+                        }}
+                        onPress={() => setNoticeFilter(cat)}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '700',
+                            color: noticeFilter === cat ? '#FFFFFF' : '#64748B',
+                          }}
+                        >
+                          {cat}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  {/* Notifications list */}
+                  {(() => {
+                    const filteredNotifs = notifications.filter((n: any) => {
+                      const matchesSearch =
+                        (n.title || n.subject || '').toLowerCase().includes(noticeSearch.toLowerCase()) ||
+                        (n.message || n.description || n.text || '').toLowerCase().includes(noticeSearch.toLowerCase());
+                      const matchesCat = noticeFilter === 'All' || n.type === noticeFilter;
+                      return matchesSearch && matchesCat;
+                    });
+
+                    if (filteredNotifs.length === 0) {
+                      return (
+                        <View style={styles.emptyCardBox}>
+                          <Text style={{ fontSize: 32, marginBottom: 8 }}>📭</Text>
+                          <Text style={styles.emptyCardText}>No transit announcements found matching your filter.</Text>
+                        </View>
+                      );
+                    }
+
+                    return filteredNotifs.map((n: any, idx: number) => {
+                      const isAlert = n.type === 'Emergency' || n.type === 'Alert';
+                      const isWarn = n.type === 'Warning';
+                      return (
+                        <View
+                          key={n._id || idx}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: 14,
+                            padding: 14,
+                            marginBottom: 12,
+                            borderLeftWidth: 4,
+                            borderLeftColor: isAlert ? '#EF4444' : isWarn ? '#F59E0B' : '#2563EB',
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 2,
+                            elevation: 1,
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A', flex: 1, marginRight: 8 }}>
+                              {n.title || n.subject || 'Campus Notice'}
+                            </Text>
+                            <View
+                              style={{
+                                backgroundColor: isAlert ? '#FEE2E2' : isWarn ? '#FEF3C7' : '#EFF6FF',
+                                paddingHorizontal: 8,
+                                paddingVertical: 2,
+                                borderRadius: 6,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: '800',
+                                  color: isAlert ? '#DC2626' : isWarn ? '#B45309' : '#1D4ED8',
+                                }}
+                              >
+                                {n.type || 'Notice'}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 18, marginBottom: 6 }}>
+                            {n.message || n.description || n.text || ''}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+                            {n.createdAt ? new Date(n.createdAt).toLocaleString() : 'Posted today'}
+                          </Text>
+                        </View>
+                      );
+                    });
+                  })()}
+                </View>
+              )}
+            </ScrollView>
           </View>
         )}
 
@@ -1351,15 +2536,26 @@ export default function DriverDashboard({ user, onLogout }: Props) {
 
                 {[
                   { id: 'profile', title: 'Driver Identity & Profile', sub: 'Verified employee details and route license', icon: '👤' },
-                  { id: 'checklist', title: 'Daily Pre-Trip Inspection', sub: 'Brakes, tires, first-aid & emergency exit check', icon: '📋' },
+                  { id: 'tasks', title: 'My Operational Tasks', sub: 'Assigned vehicle defects and maintenance work', icon: '📋' },
+                  { id: 'checklist', title: 'Daily Pre-Trip Inspection', sub: 'Brakes, tires, first-aid & emergency exit check', icon: '🛡️' },
                   { id: 'payroll', title: 'Salary Slips & Payroll', sub: 'View monthly earnings, allowances and net pay', icon: '💵' },
                   { id: 'notices', title: 'Transport Notices & Advisories', sub: 'Campus transit notifications and road alerts', icon: '🔔' },
-                  { id: 'safety', title: 'Driver Safety Guidelines & SOP', sub: 'Institutional safety protocols and speed limits', icon: '🛡️' },
+                  { id: 'safety', title: 'Driver Safety Guidelines & SOP', sub: 'Institutional safety protocols and speed limits', icon: '🚦' },
                 ].map((item) => (
                   <TouchableOpacity
                     key={item.id}
                     style={styles.menuItemRow}
-                    onPress={() => setMoreSection(item.id as MoreSection)}
+                    onPress={() => {
+                      if (item.id === 'tasks') {
+                        setActiveNavTab('notifications');
+                        setTasksNotifSubTab('tasks');
+                      } else if (item.id === 'notices') {
+                        setActiveNavTab('notifications');
+                        setTasksNotifSubTab('notices');
+                      } else {
+                        setMoreSection(item.id as MoreSection);
+                      }
+                    }}
                   >
                     <View style={styles.menuItemIconBox}>
                       <Text style={styles.menuItemIconText}>{item.icon}</Text>
@@ -2000,6 +3196,516 @@ export default function DriverDashboard({ user, onLogout }: Props) {
         </View>
       </Modal>
 
+      {/* ================= REPORT DEFECT / COMPLAINT MODAL ================= */}
+      <Modal
+        visible={showIssueModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowIssueModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>🛠️ Report Vehicle Defect</Text>
+            <Text style={styles.modalSub}>
+              Log defect ticket for Bus {driverProfile.busNo} ({driverProfile.route})
+            </Text>
+
+            <Text style={styles.modalInfoLabel}>Defect Category:</Text>
+            <View style={styles.shiftPickerRow}>
+              {['Brakes/Tires', 'Engine/Fluid', 'Electrical', 'AC/Doors'].map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.shiftBtn, issueType === cat && styles.shiftBtnActive]}
+                  onPress={() => setIssueType(cat)}
+                >
+                  <Text
+                    style={[
+                      styles.shiftBtnText,
+                      issueType === cat && styles.shiftBtnTextActive,
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.modalInfoLabel}>Severity Priority:</Text>
+            <View style={styles.shiftPickerRow}>
+              {(['Low', 'Medium', 'High', 'Critical'] as const).map((pri) => (
+                <TouchableOpacity
+                  key={pri}
+                  style={[
+                    styles.shiftBtn,
+                    issuePriority === pri && {
+                      backgroundColor: pri === 'Critical' || pri === 'High' ? '#DC2626' : '#1E3A8A',
+                      borderColor: pri === 'Critical' || pri === 'High' ? '#DC2626' : '#1E3A8A',
+                    },
+                  ]}
+                  onPress={() => setIssuePriority(pri)}
+                >
+                  <Text
+                    style={[
+                      styles.shiftBtnText,
+                      issuePriority === pri && styles.shiftBtnTextActive,
+                    ]}
+                  >
+                    {pri}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              style={[styles.modalTextInput, { height: 80 }]}
+              placeholder="Describe vehicle defect, noise, warning lights, or symptom..."
+              placeholderTextColor="#94A3B8"
+              multiline
+              value={issueDescription}
+              onChangeText={setIssueDescription}
+            />
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setShowIssueModal(false)}
+                disabled={issueSubmitting}
+              >
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalConfirmBtn}
+                onPress={handleCreateComplaint}
+                disabled={issueSubmitting}
+              >
+                {issueSubmitting ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.modalConfirmBtnText}>Dispatch Ticket</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= COMPLAINT DISCUSSION & MESSAGING MODAL ================= */}
+      <Modal visible={showDiscussionModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalBox, { maxHeight: '88%', padding: 16 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingBottom: 10, marginBottom: 10 }}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>
+                  💬 Resolution Discussion
+                </Text>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                  {selectedComplaintForChat?.complaintId} • {selectedComplaintForChat?.complaintType || selectedComplaintForChat?.category}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, color: '#475569' }}>
+                    Bus: <Text style={{ fontWeight: '700' }}>{selectedComplaintForChat?.busNumber || selectedComplaintForChat?.vehicleNumber || driverProfile.busNo}</Text>
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#CBD5E1' }}>•</Text>
+                  <Text style={{ fontSize: 11, color: '#475569' }}>
+                    Status: <Text style={{ fontWeight: '800', color: selectedComplaintForChat?.status === 'Closed' ? '#64748B' : '#15803D' }}>{selectedComplaintForChat?.status || 'Active'}</Text>
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <TouchableOpacity
+                  style={{ backgroundColor: '#F1F5F9', padding: 6, borderRadius: 6 }}
+                  onPress={handleRefreshChat}
+                  disabled={isRefreshingChat}
+                >
+                  {isRefreshingChat ? (
+                    <ActivityIndicator size="small" color="#2563EB" />
+                  ) : (
+                    <Text style={{ fontSize: 13 }}>🔄</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}
+                  onPress={() => setShowDiscussionModal(false)}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#64748B' }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Closed Complaint Policy Banner */}
+            {selectedComplaintForChat?.status === 'Closed' && (
+              <View style={{ backgroundColor: '#F8FAFC', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 10 }}>
+                <Text style={{ fontSize: 11, color: '#475569', lineHeight: 16 }}>
+                  🛡️ Complaint status is <Text style={{ fontWeight: '800' }}>Closed</Text>. Follow-up messages remain active for post-resolution tracking & audit follow-ups.
+                </Text>
+              </View>
+            )}
+
+            {/* Success Toast Banner */}
+            {chatSuccessToast && (
+              <View style={{ backgroundColor: '#ECFDF5', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#A7F3D0', marginBottom: 10 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#047857', textAlign: 'center' }}>
+                  ✓ {chatSuccessToast}
+                </Text>
+              </View>
+            )}
+
+            {/* Discussion Message Bubbles */}
+            <ScrollView style={{ flex: 1, minHeight: 200, marginBottom: 10 }} contentContainerStyle={{ paddingVertical: 4 }}>
+              {chatReplies.length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 24, marginBottom: 6 }}>💬</Text>
+                  <Text style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center' }}>
+                    No messages in this discussion yet. Post a question or update below.
+                  </Text>
+                </View>
+              ) : (
+                chatReplies.map((r, idx) => {
+                  const isAdminRole = ['admin', 'staff', 'system admin', 'hod'].includes((r.role || '').toLowerCase());
+                  const isDriverRole = (r.role || '').toLowerCase() === 'driver';
+
+                  return (
+                    <View
+                      key={idx}
+                      style={{
+                        marginBottom: 10,
+                        alignSelf: isDriverRole ? 'flex-end' : 'flex-start',
+                        maxWidth: '85%',
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#0F172A' }}>
+                          {r.sender || 'User'}
+                        </Text>
+                        <View
+                          style={{
+                            backgroundColor: isAdminRole ? '#EFF6FF' : isDriverRole ? '#DCFCE7' : '#F1F5F9',
+                            paddingHorizontal: 6,
+                            paddingVertical: 1,
+                            borderRadius: 4,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 9,
+                              fontWeight: '800',
+                              color: isAdminRole ? '#1D4ED8' : isDriverRole ? '#15803D' : '#64748B',
+                            }}
+                          >
+                            {r.role || 'User'}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 9, color: '#94A3B8' }}>
+                          {r.timestamp ? new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={{
+                          backgroundColor: isDriverRole ? '#1E3A8A' : '#F1F5F9',
+                          padding: 10,
+                          borderRadius: 10,
+                          borderTopRightRadius: isDriverRole ? 2 : 10,
+                          borderTopLeftRadius: isDriverRole ? 10 : 2,
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, color: isDriverRole ? '#FFFFFF' : '#0F172A', lineHeight: 18 }}>
+                          {r.message}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            {/* Input Bar */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 10 }}>
+              <TextInput
+                style={{
+                  flex: 1,
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#CBD5E1',
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  fontSize: 13,
+                  color: '#0F172A',
+                }}
+                placeholder="Type update or resolution note..."
+                placeholderTextColor="#94A3B8"
+                value={chatInputText}
+                onChangeText={setChatInputText}
+                editable={!isSendingChat}
+              />
+              <TouchableOpacity
+                style={{
+                  backgroundColor: isSendingChat || !chatInputText.trim() ? '#94A3B8' : '#2563EB',
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={handleSendChatMessage}
+                disabled={isSendingChat || !chatInputText.trim()}
+              >
+                {isSendingChat ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>Send</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= AUTHORIZED ATTENDANCE CORRECTION MODAL ================= */}
+      <Modal visible={showCorrectionModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>🛡️ Attendance Correction</Text>
+            <Text style={styles.modalSub}>
+              Authorized correction for {correctionTargetStudent?.name} ({correctionTargetStudent?.rollNo}).
+            </Text>
+
+            <View style={styles.modalInfoCard}>
+              <Text style={styles.modalInfoLabel}>Target Attendance Status:</Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 6, marginBottom: 12 }}>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    backgroundColor: correctionTargetStatus === 'Present' ? '#16A34A' : '#F1F5F9',
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                  }}
+                  onPress={() => setCorrectionTargetStatus('Present')}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: correctionTargetStatus === 'Present' ? '#FFFFFF' : '#475569' }}>
+                    ✓ Present (Boarded)
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    backgroundColor: correctionTargetStatus === 'Absent' ? '#DC2626' : '#F1F5F9',
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                  }}
+                  onPress={() => setCorrectionTargetStatus('Absent')}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: correctionTargetStatus === 'Absent' ? '#FFFFFF' : '#475569' }}>
+                    ✕ Absent
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.modalInfoLabel}>Correction Reason (Required for Audit Trail):</Text>
+              <TextInput
+                style={[styles.modalTextInput, { height: 75 }]}
+                placeholder="e.g. Student boarded at Stop A after roll check..."
+                placeholderTextColor="#94A3B8"
+                multiline
+                value={correctionReasonText}
+                onChangeText={setCorrectionReasonText}
+              />
+            </View>
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setShowCorrectionModal(false)}
+                disabled={isSubmittingCorrection}
+              >
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalConfirmBtn}
+                onPress={handleConfirmCorrection}
+                disabled={isSubmittingCorrection || !correctionReasonText.trim()}
+              >
+                {isSubmittingCorrection ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.modalConfirmBtnText}>Save Correction</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= DEDICATED STUDENT ATTENDANCE REPORT MODAL ================= */}
+      <Modal visible={showAttendanceReportModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalBox, { maxHeight: '90%', padding: 16 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingBottom: 10, marginBottom: 12 }}>
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>
+                  📊 Student Attendance Report
+                </Text>
+                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                  Route: {activeRoute?.name || 'East'} ({activeRoute?.routeId || 'R-01'}) • Pickup Trip
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}
+                onPress={() => setShowAttendanceReportModal(false)}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#64748B' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ flex: 1 }}>
+              {/* Summary KPI Cards */}
+              {(() => {
+                const totalStudents = passengers.length;
+                const presentCount = Object.values(attendanceMap).filter(a => a.status === 'Present').length;
+                const absentCount = Object.values(attendanceMap).filter(a => a.status === 'Absent').length;
+                const pendingCount = Math.max(0, totalStudents - (presentCount + absentCount));
+
+                return (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: '#EFF6FF', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#BFDBFE' }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#1D4ED8', textTransform: 'uppercase' }}>Expected Total</Text>
+                      <Text style={{ fontSize: 18, fontWeight: '900', color: '#1E3A8A', marginTop: 2 }}>{totalStudents}</Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: '#DCFCE7', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#BBF7D0' }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#15803D', textTransform: 'uppercase' }}>Present / Boarded</Text>
+                      <Text style={{ fontSize: 18, fontWeight: '900', color: '#166534', marginTop: 2 }}>{presentCount}</Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: '#FEE2E2', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#FECACA' }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#B91C1C', textTransform: 'uppercase' }}>Marked Absent</Text>
+                      <Text style={{ fontSize: 18, fontWeight: '900', color: '#991B1B', marginTop: 2 }}>{absentCount}</Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: '45%', backgroundColor: '#FEF3C7', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A' }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#B45309', textTransform: 'uppercase' }}>Pending Check-in</Text>
+                      <Text style={{ fontSize: 18, fontWeight: '900', color: '#92400E', marginTop: 2 }}>{pendingCount}</Text>
+                    </View>
+                  </View>
+                );
+              })()}
+
+              {/* Stop-wise Boarding Summary */}
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 8 }}>
+                📍 Stop-Wise Boarding Breakdown
+              </Text>
+
+              <View style={{ backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14 }}>
+                {(attendanceReport?.stopBreakdown || [
+                  { stopName: 'Stop A', expectedStudents: 3, boardedCount: 0, absentCount: 0, pendingCount: 3 },
+                  { stopName: 'Stop B', expectedStudents: 2, boardedCount: 0, absentCount: 0, pendingCount: 2 },
+                  { stopName: 'Stop C', expectedStudents: 2, boardedCount: 0, absentCount: 0, pendingCount: 2 },
+                  { stopName: 'Stop D', expectedStudents: 1, boardedCount: 0, absentCount: 0, pendingCount: 1 },
+                  { stopName: 'College Campus', expectedStudents: 0, boardedCount: 0, absentCount: 0, pendingCount: 0 },
+                ]).map((s: any, idx: number) => (
+                  <View
+                    key={idx}
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingVertical: 8,
+                      borderBottomWidth: idx < 4 ? 1 : 0,
+                      borderBottomColor: '#E2E8F0',
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                        {idx + 1}. {s.stopName}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
+                        Absent: {s.absentCount} • Pending: {s.pendingCount}
+                      </Text>
+                    </View>
+
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 14, fontWeight: '900', color: s.boardedCount > 0 ? '#15803D' : '#0F172A' }}>
+                        {s.boardedCount} / {s.expectedStudents}
+                      </Text>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748B' }}>Boarded</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {/* Detailed Student Status List */}
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 8 }}>
+                👥 Passenger Status Manifest
+              </Text>
+
+              {passengers.map((p, idx) => {
+                const rec = attendanceMap[p.rollNo || p.id];
+                const status = rec ? rec.status : 'Pending';
+                const isLocked = rec ? rec.isLocked : false;
+
+                return (
+                  <View
+                    key={idx}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 8,
+                      padding: 10,
+                      marginBottom: 8,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{p.name}</Text>
+                      <Text style={{ fontSize: 11, color: '#64748B' }}>
+                        Roll: {p.rollNo} • Stop: {p.stop}
+                      </Text>
+                    </View>
+
+                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                      <View
+                        style={{
+                          backgroundColor:
+                            status === 'Present' ? '#DCFCE7' :
+                            status === 'Absent' ? '#FEE2E2' : '#FEF3C7',
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: '800',
+                            color:
+                              status === 'Present' ? '#15803D' :
+                              status === 'Absent' ? '#B91C1C' : '#B45309',
+                          }}
+                        >
+                          {status.toUpperCase()}
+                        </Text>
+                      </View>
+                      {isLocked && (
+                        <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600' }}>🔒 Saved</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* ================= DRIVER BOTTOM NAVIGATION ================= */}
       <BottomTabBar
         activeTab={activeNavTab}
@@ -2009,18 +3715,20 @@ export default function DriverDashboard({ user, onLogout }: Props) {
           }
           setActiveNavTab(t);
         }}
-        notificationsCount={notifications.length}
-        tabsList={['home', 'academics', 'referrals', 'profile']}
+        notificationsCount={complaintTasks.filter((c) => c.status !== 'Resolved' && c.status !== 'Closed').length + notifications.length}
+        tabsList={['home', 'academics', 'referrals', 'notifications', 'profile']}
         tabLabels={{
           home: 'Home',
-          academics: 'My Trip',
+          academics: 'Transit',
           referrals: 'Referrals',
+          notifications: 'Tasks',
           profile: 'Profile',
         }}
         tabIcons={{
           home: '🏠',
           academics: '🚌',
           referrals: '💼',
+          notifications: '📋',
           profile: '👤',
         }}
       />

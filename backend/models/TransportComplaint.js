@@ -8,11 +8,16 @@ const transportComplaintSchema = new mongoose.Schema({
   routeId: { type: String },
   complaintType: { type: String, required: true },
   description: { type: String, required: true },
-  status: { type: String, default: 'Pending' }, // Pending, In Progress, Resolved
+  status: { type: String, default: 'Pending' }, // Pending, Assigned, In Progress, Resolved, Closed
   assignedTo: { type: String }, // Staff/Admin assigned to resolve
   department: { type: String }, // Assigned Department based on category
+  priority: { type: String, default: 'Medium' },
   resolutionNote: { type: String }, // Note left by staff upon resolution
   resolvedAt: { type: Date },
+  resolvedBy: { type: String },
+  resolvedByRole: { type: String },
+  acknowledgedByDriver: { type: Boolean, default: false },
+  driverAcknowledgeNote: { type: String },
   reporterType: { type: String, default: 'Student' }, // Student, Parent, Driver
   replies: [{
     sender: { type: String },
@@ -23,6 +28,8 @@ const transportComplaintSchema = new mongoose.Schema({
   timeline: [{
     action: { type: String },
     details: { type: String },
+    user: { type: String },
+    role: { type: String },
     timestamp: { type: Date, default: Date.now }
   }]
 , collegeId: { type: String } }, { timestamps: true });

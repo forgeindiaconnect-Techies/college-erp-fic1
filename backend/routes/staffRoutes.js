@@ -41,14 +41,35 @@ router.get('/me', protect, collegeScope, async (req, res) => {
   try {
     const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
     const refId = req.user.referenceId || req.user.userId || req.user.id || req.user._id?.toString();
-    const query = {
-      $or: [
-        { id: refId },
-        { email: req.user.email },
-        ...(req.user.name ? [{ name: { $regex: new RegExp(`^${req.user.name.trim()}$`, 'i') } }] : [])
-      ]
-    };
-    let staffDoc = await Staff.findOne(query).lean();
+
+    let staffDoc = null;
+    // 1. Prioritize exact email match (unique per staff user account)
+    if (req.user?.email) {
+      staffDoc = await Staff.findOne({
+        email: { $regex: new RegExp(`^${req.user.email.trim()}$`, 'i') }
+      }).lean();
+    }
+
+    // 2. Fall back to college-scoped referenceId
+    if (!staffDoc && refId && targetCollegeId && targetCollegeId !== 'system') {
+      staffDoc = await Staff.findOne({
+        id: refId,
+        $or: [
+          { collegeId: targetCollegeId },
+          { tenantId: targetCollegeId }
+        ]
+      }).lean();
+    }
+
+    // 3. Fall back to referenceId matching user's exact name
+    if (!staffDoc && refId && req.user?.name) {
+      staffDoc = await Staff.findOne({
+        id: refId,
+        name: { $regex: new RegExp(`^${req.user.name.trim()}$`, 'i') }
+      }).lean();
+    }
+
+    // 4. Default to User record profile if not found in Staff collection
     if (!staffDoc) {
       staffDoc = {
         id: refId || 'STF001',
@@ -61,6 +82,11 @@ router.get('/me', protect, collegeScope, async (req, res) => {
         qualification: 'M.Tech, Ph.D.',
         experience: '5+ Years Academic Experience'
       };
+    } else {
+      // Always guarantee the authenticated User account name is reflected
+      if (req.user?.name && (!staffDoc.name || staffDoc.email?.toLowerCase() === req.user.email?.toLowerCase())) {
+        staffDoc.name = req.user.name;
+      }
     }
     res.json(staffDoc);
   } catch (err) {
@@ -71,6 +97,7 @@ router.get('/me', protect, collegeScope, async (req, res) => {
 // Update logged-in staff member's own profile
 router.put('/me', protect, collegeScope, async (req, res) => {
   try {
+    const targetCollegeId = req.collegeId || req.user?.collegeId || req.user?.tenantId;
     const refId = req.user.referenceId || req.user.userId || req.user.id || req.user._id?.toString();
     const allowedUpdates = {};
     if (req.body.phone !== undefined) allowedUpdates.phone = req.body.phone;
@@ -80,13 +107,18 @@ router.put('/me', protect, collegeScope, async (req, res) => {
     if (req.body.name) allowedUpdates.name = req.body.name;
     if (req.body.email) allowedUpdates.email = req.body.email;
 
+    // Find and update by email first, then scoped id
+    let filter = { email: { $regex: new RegExp(`^${req.user.email.trim()}$`, 'i') } };
+    let existingStaff = await Staff.findOne(filter);
+    if (!existingStaff && refId) {
+      filter = {
+        id: refId,
+        ...(targetCollegeId && targetCollegeId !== 'system' ? { $or: [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }] } : {})
+      };
+    }
+
     let updatedStaff = await Staff.findOneAndUpdate(
-      {
-        $or: [
-          { id: refId },
-          { email: req.user.email }
-        ]
-      },
+      filter,
       { $set: allowedUpdates },
       { new: true }
     );

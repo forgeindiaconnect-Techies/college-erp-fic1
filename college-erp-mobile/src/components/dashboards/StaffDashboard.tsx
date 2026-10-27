@@ -406,7 +406,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   // Faculty Profile State
   const [faculty, setFaculty] = useState({
     name: user.name || 'Faculty Member',
-    empId: user.userId || user.referenceId || 'STF007',
+    empId: user.referenceId || user.userId || 'STF008',
     dept: user.department || 'Computer Science',
     designation: 'Assistant Professor',
     email: user.email || 'faculty@college.edu',
@@ -638,6 +638,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         placementInterviewsRes,
         placementSelectionsRes,
         attendanceRecordsRes,
+        leavesApiRes,
       ] = await Promise.all([
         apiGet<any>('auth/me').catch(() => null),
         apiGet<any>('staff/me').catch(() => null),
@@ -667,6 +668,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         apiGet<any>('placement/interviews').catch(() => []),
         apiGet<any>('placement/selections').catch(() => []),
         apiGet<any[]>('attendance').catch(() => []),
+        apiGet<any[]>('leaves').catch(() => []),
       ]);
 
       // 1. Profile Processing
@@ -921,18 +923,47 @@ export default function StaffDashboard({ user, onLogout }: Props) {
 
       // 8. Staff Support & Leaves Processing
       const rawSupport = Array.isArray(supportRes) ? supportRes : (Array.isArray((supportRes as any)?.data) ? (supportRes as any).data : []);
-      const staffLeaves: StaffLeaveItem[] = rawSupport
-        .filter((r: any) => {
-          const reqType = (r.requestType || '').toLowerCase();
-          const matchStaff = !prof.name || (r.staffName && r.staffName.toLowerCase().includes(prof.name.toLowerCase())) || r.staffId === prof.userId;
-          return reqType === 'leave' && matchStaff;
-        })
+      const rawLeavesApi = Array.isArray(leavesApiRes) ? leavesApiRes : (Array.isArray((leavesApiRes as any)?.data) ? (leavesApiRes as any).data : []);
+
+      // Check if ticket or leave belongs to logged-in user
+      const isMyStaffRecord = (r: any) => {
+        const uEmail = (user.email || prof.email || '').toLowerCase().trim();
+        const rEmail = (r.email || r.staffEmail || '').toLowerCase().trim();
+        if (rEmail && uEmail && rEmail === uEmail) return true;
+
+        const uRef = String(user.referenceId || '').toLowerCase().trim();
+        const uId = String(user.userId || user._id || '').toLowerCase().trim();
+        const rStaffId = String(r.staffId || '').toLowerCase().trim();
+        if (rStaffId && (rStaffId === uRef || rStaffId === uId)) return true;
+
+        const uName = (user.name || prof.name || '').toLowerCase().trim();
+        const rName = (r.staffName || r.name || '').toLowerCase().trim();
+        if (rName && uName && (rName === uName || rName.includes(uName) || uName.includes(rName))) return true;
+
+        return false;
+      };
+
+      // Combine and deduplicate leaves from both endpoints
+      const combinedLeavesPool = [
+        ...rawLeavesApi,
+        ...rawSupport.filter((r: any) => (r.requestType || '').toLowerCase() === 'leave')
+      ];
+      const leaveMap = new Map();
+      combinedLeavesPool.forEach((item: any) => {
+        const key = String(item._id || item.id || `${item.startDate}_${item.reason}`);
+        if (!leaveMap.has(key)) {
+          leaveMap.set(key, item);
+        }
+      });
+
+      const staffLeaves: StaffLeaveItem[] = Array.from(leaveMap.values())
+        .filter((r: any) => isMyStaffRecord(r))
         .map((l: any, idx: number) => ({
           id: l._id || l.id || String(idx),
-          type: l.subType || l.leaveType || 'Casual Leave',
+          type: l.subType || l.leaveType || l.type || 'Casual Leave',
           from: l.startDate || l.from || 'Today',
           to: l.endDate || l.to || l.startDate || 'Tomorrow',
-          days: Number(l.days || 1),
+          days: Number(l.daysCount || l.days || 1),
           reason: l.description || l.reason || 'Personal / Academic Commitment',
           status: l.status === 'Approved' ? 'Approved' : (l.status === 'Rejected' ? 'Rejected' : 'Pending'),
           timeline: l.timeline || [],
@@ -940,18 +971,15 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       setLeaves(staffLeaves);
 
       const allSupportTickets: SupportTicketItem[] = rawSupport
-        .filter((r: any) => {
-          const matchStaff = !prof.name || (r.staffName && r.staffName.toLowerCase().includes(prof.name.toLowerCase())) || r.staffId === prof.userId;
-          return matchStaff;
-        })
+        .filter((r: any) => isMyStaffRecord(r))
         .map((t: any, idx: number) => ({
           id: t._id || t.id || `TKT-${idx + 101}`,
-          staffName: t.staffName || prof.name,
-          department: t.department || prof.dept,
-          requestType: t.requestType || 'IT Support',
+          staffName: t.staffName || user.name || prof.name,
+          department: t.department || user.department || prof.dept,
+          requestType: t.requestType || 'Complaint',
           subType: t.subType || t.subject || 'Campus Request',
           subject: t.subType || t.subject || 'Campus Assistance',
-          description: t.description || 'Assistance requested with campus amenities.',
+          description: t.description || t.reason || 'Assistance requested with campus amenities.',
           priority: t.priority || 'Medium',
           status: t.status || 'Pending',
           startDate: t.startDate || '',
@@ -1113,12 +1141,13 @@ export default function StaffDashboard({ user, onLogout }: Props) {
 
       // 12. Update Faculty State with full Staff profile details
       const staffDoc = staffMeRes || {};
-      const facultyName = staffDoc.name || prof.name || user.name || 'Faculty Member';
-      const facultyEmpId = staffDoc.id || prof.userId || user.userId || user.referenceId || 'STF007';
-      const facultyDept = staffDoc.dept || deptName;
+      const isDocAuthentic = !staffDoc.email || staffDoc.email.toLowerCase() === (user.email || '').toLowerCase();
+      const facultyName = (isDocAuthentic && staffDoc.name) ? staffDoc.name : (user.name || prof.name || 'Faculty Member');
+      const facultyEmpId = (isDocAuthentic && staffDoc.id) ? staffDoc.id : (user.referenceId || user.userId || prof.userId || 'STF008');
+      const facultyDept = (isDocAuthentic && staffDoc.dept) ? staffDoc.dept : (user.department || prof.department || deptName);
       const facultyDesig = staffDoc.designation || prof.designation || 'Assistant Professor';
-      const facultyEmail = staffDoc.email || prof.email || user.email || '';
-      const facultyPhone = staffDoc.phone || prof.phone || '+91 98234 56789';
+      const facultyEmail = user.email || prof.email || staffDoc.email || '';
+      const facultyPhone = staffDoc.phone || prof.phone || user.phone || '+91 98234 56789';
       const facultyQual = staffDoc.qualification || 'M.Tech, Ph.D.';
       const facultyExp = staffDoc.experience || '6+ Years Teaching & Research';
 
@@ -1602,18 +1631,30 @@ export default function StaffDashboard({ user, onLogout }: Props) {
     }
     try {
       setSubmittingLeave(true);
-      await apiPost('staff-support', {
-        staffName: faculty.name,
-        staffId: faculty.empId,
-        staffEmail: faculty.email,
-        department: faculty.dept,
+      const leavePayload = {
+        staffName: user.name || faculty.name,
+        name: user.name || faculty.name,
+        staffId: user.referenceId || faculty.empId || user.userId,
+        email: user.email || faculty.email,
+        staffEmail: user.email || faculty.email,
+        department: user.department || faculty.dept,
         requestType: 'Leave',
         subType: newLeaveType,
+        type: newLeaveType,
         startDate: startDate,
         endDate: endDate,
+        daysCount: 1,
+        reason: reason,
         description: reason,
         priority: 'Medium',
-      });
+      };
+
+      try {
+        await apiPost('leaves', leavePayload);
+      } catch {
+        await apiPost('staff-support', leavePayload);
+      }
+
       setLeaveModalVisible(false);
       setNewLeaveDates('');
       setNewLeaveStartDate('');
@@ -1655,13 +1696,18 @@ export default function StaffDashboard({ user, onLogout }: Props) {
     try {
       setSubmittingSupport(true);
       await apiPost('staff-support', {
-        staffName: faculty.name || user.name,
-        department: faculty.dept || user.department || 'General',
+        staffName: user.name || faculty.name,
+        name: user.name || faculty.name,
+        staffId: user.referenceId || faculty.empId || user.userId,
+        email: user.email || faculty.email,
+        staffEmail: user.email || faculty.email,
+        department: user.department || faculty.dept || 'General',
         requestType: supportType,
         subType: subType,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         description: desc,
+        reason: desc,
         priority: supportPriority,
       });
       setSupportModalVisible(false);
@@ -1700,11 +1746,16 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       setSubmittingComplaint(true);
       const categoryPrefix = complaintCategory ? `[${complaintCategory}] ` : '';
       await apiPost('staff-support', {
-        staffName: faculty.name || user.name,
-        department: faculty.dept || user.department || 'General',
+        staffName: user.name || faculty.name,
+        name: user.name || faculty.name,
+        staffId: user.referenceId || faculty.empId || user.userId,
+        email: user.email || faculty.email,
+        staffEmail: user.email || faculty.email,
+        department: user.department || faculty.dept || 'General',
         requestType: 'Complaint',
         subType: `${categoryPrefix}${subType}`,
         description: desc,
+        reason: desc,
         priority: complaintPriority,
       });
       setComplaintModalVisible(false);
@@ -2564,7 +2615,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                 <View style={{ flex: 1, marginRight: 10 }}>
                   <Text style={styles.cardHeaderTitle} numberOfLines={1}>💼 Institutional Referral Rewards</Text>
                   <Text style={styles.sectionSubtitle} numberOfLines={2}>
-                    Earn verified bonuses across 4 commercial partner categories
+                    Earn verified bonuses across commercial partner categories
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => setActiveTab('referrals')} activeOpacity={0.7} style={{ flexShrink: 0 }}>
@@ -2575,7 +2626,6 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               <View style={{ gap: 8, marginTop: 4 }}>
                 {[
                   { id: 'cards', title: 'Credit Cards', desc: 'Pre-approved lifetime-free cards with airport lounge access', icon: '💳', bg: '#EFF6FF', badge: 'Up to ₹2,500' },
-                  { id: 'insurance', title: 'Insurance Policies', desc: 'Comprehensive health, term life & family mediclaim', icon: '🛡️', bg: '#ECFDF5', badge: 'Up to ₹5,000' },
                   { id: 'jobs', title: 'Job Openings', desc: 'Refer candidates for tech, teaching & executive vacancies', icon: '💼', bg: '#F5F3FF', badge: 'Placement Bonus' },
                   { id: 'banking', title: 'Bank Accounts', desc: 'Corporate salary accounts & high-yield digital savings', icon: '🏛️', bg: '#FFFBEB', badge: 'Up to ₹750' },
                 ].map((item) => (

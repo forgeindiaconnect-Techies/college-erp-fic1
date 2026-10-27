@@ -65,10 +65,13 @@ router.get('/', async (req, res) => {
 
     // Role-based filtering
     if (role === 'staff' || role === 'faculty' || role === 'teacher') {
-      const staffFilter = [{ staffName: req.user.name }];
-      if (req.user.referenceId) staffFilter.push({ staffId: req.user.referenceId });
-      if (req.user.email) staffFilter.push({ email: req.user.email });
-      query.$and = [{ $or: query.$or }, { $or: staffFilter }];
+      const staffFilter = [];
+      if (req.user?.name) staffFilter.push({ staffName: { $regex: new RegExp(`^${req.user.name.trim()}$`, 'i') } });
+      if (req.user?.referenceId) staffFilter.push({ staffId: req.user.referenceId });
+      if (req.user?._id) staffFilter.push({ staffId: req.user._id.toString() });
+      if (req.user?.email) staffFilter.push({ email: { $regex: new RegExp(`^${req.user.email.trim()}$`, 'i') } });
+
+      query.$and = [{ $or: query.$or }, { $or: staffFilter.length > 0 ? staffFilter : [{ staffName: req.user.name }] }];
       delete query.$or;
     } else if (role === 'student') {
       const studentFilter = [{ staffName: req.user.name }];

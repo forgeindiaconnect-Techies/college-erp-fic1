@@ -543,19 +543,37 @@ const WatchmanDashboard = () => {
           <ChevronRight size={18} className="action-chevron" />
         </button>
 
-        {/* Action: Gate QR Scanner */}
+        {/* Action: Member QR Scanner */}
         <button
           type="button"
-          onClick={() => navigate('/watchman/qr-verification')}
+          onClick={() => navigate('/watchman/qr-verification?type=members')}
           className="wmn-action-card"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div className="icon-box">
+            <div className="icon-box" style={{ background: '#eff6ff', color: '#2563eb' }}>
               <QrCode size={22} />
             </div>
             <div>
-              <div className="title">Gate QR Scanner</div>
-              <div className="desc">Webcam scan • Campus In & Out</div>
+              <div className="title">Member QR Scanner</div>
+              <div className="desc">Students, Staff & HOD • Real-Time In/Out</div>
+            </div>
+          </div>
+          <ChevronRight size={18} className="action-chevron" />
+        </button>
+
+        {/* Action: Visitor Pass QR Scanner */}
+        <button
+          type="button"
+          onClick={() => navigate('/watchman/qr-verification?type=visitor')}
+          className="wmn-action-card"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="icon-box" style={{ background: '#fef3c7', color: '#b45309' }}>
+              <ShieldCheck size={22} />
+            </div>
+            <div>
+              <div className="title">Visitor Pass QR Scanner</div>
+              <div className="desc">Visitors & Pre-Visitors • Clearance & Exit</div>
             </div>
           </div>
           <ChevronRight size={18} className="action-chevron" />
