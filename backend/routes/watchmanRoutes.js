@@ -966,20 +966,57 @@ router.get('/stats', protect, authorize('Watchman', 'Admin', 'Super Admin'), asy
 // GET /api/watchman/visitors/active - Visitors currently inside
 router.get('/visitors/active', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
   try {
-    const filter = await buildTenantOrAllFilter(req, VisitorLog, { status: 'Inside' });
-    const activeVisitors = await VisitorLog.find(filter).sort({ entryTime: -1 });
+    const filter = await buildTenantOrAllFilter(req, VisitorLog, { status: { $in: ['Inside', 'Inside Campus'] } });
+    const activeVisitors = await VisitorLog.find(filter).sort({ entryTime: -1, createdAt: -1 });
     res.json({ success: true, count: activeVisitors.length, data: activeVisitors });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to fetch active visitors', error: err.message });
   }
 });
 
-// POST /api/watchman/visitors/entry - Log visitor entry
+// GET /api/watchman/visitors - List all registered visitors with status filter and search
+router.get('/visitors', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+  try {
+    const filter = await buildTenantOrAllFilter(req, VisitorLog);
+    const { status, search } = req.query;
+
+    if (status && status !== 'All') {
+      if (status === 'Inside Campus' || status === 'Inside') {
+        filter.status = { $in: ['Inside Campus', 'Inside'] };
+      } else if (status === 'Exited' || status === 'Checked Out') {
+        filter.status = { $in: ['Exited', 'Checked Out'] };
+      } else {
+        filter.status = status;
+      }
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      filter.$or = [
+        { name: { $regex: q, $options: 'i' } },
+        { phone: { $regex: q, $options: 'i' } },
+        { passNumber: { $regex: q, $options: 'i' } },
+        { visitorId: { $regex: q, $options: 'i' } },
+        { personToMeet: { $regex: q, $options: 'i' } },
+        { department: { $regex: q, $options: 'i' } },
+        { vehicleNumber: { $regex: q, $options: 'i' } }
+      ];
+    }
+
+    const visitors = await VisitorLog.find(filter).sort({ createdAt: -1 }).limit(300);
+    res.json({ success: true, count: visitors.length, data: visitors });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to fetch visitors', error: err.message });
+  }
+});
+
+// POST /api/watchman/visitors/entry - Register visitor and generate unique QR pass
 router.post('/visitors/entry', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
   try {
     const {
       name, phone, email, purpose, personToMeet, department,
-      vehicleNumber, idProofType, idProofNumber, gate, notes
+      vehicleNumber, idProofType, idProofNumber, gate, notes,
+      immediateIn
     } = req.body;
 
     if (!name || !phone || !purpose || !personToMeet) {
@@ -993,6 +1030,14 @@ router.post('/visitors/entry', protect, authorize('Watchman', 'Admin', 'Super Ad
     const passNumber = `PASS-${Date.now().toString().slice(-4)}-${Math.floor(1000 + Math.random() * 9000)}`;
     const watchmanName = req.user?.name || req.user?.username || 'Security Guard';
 
+    const frontendBase = getFrontendBase(req);
+    const verifyUrl = `${frontendBase}/watchman/qr-verification?type=visitor&code=${encodeURIComponent(passNumber)}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(verifyUrl)}`;
+
+    const shouldLogInNow = immediateIn === true || req.body.status === 'Inside Campus' || req.body.status === 'Inside';
+    const initialStatus = shouldLogInNow ? 'Inside Campus' : (req.body.status || 'Registered');
+    const entryTime = shouldLogInNow ? new Date() : null;
+
     const newVisitor = new VisitorLog({
       visitorId,
       passNumber,
@@ -1005,14 +1050,14 @@ router.post('/visitors/entry', protect, authorize('Watchman', 'Admin', 'Super Ad
       vehicleNumber: vehicleNumber ? vehicleNumber.trim().toUpperCase() : '',
       idProofType: idProofType || 'Aadhaar Card',
       idProofNumber: idProofNumber ? idProofNumber.trim() : '',
-      entryTime: new Date(),
-      status: 'Inside',
+      entryTime,
+      status: initialStatus,
       isPreRegistered: false,
       approvalStatus: 'Approved',
       gate: gate || 'Gate 1 (Main Entrance)',
       watchmanId: req.user?._id || null,
       watchmanName,
-      qrCodeData: JSON.stringify({ passNumber, visitorId, name: name.trim(), phone: phone.trim(), purpose: purpose.trim(), valid: true }),
+      qrCodeData: verifyUrl,
       notes: notes || '',
       collegeId: tenantId,
       tenantId: tenantId
@@ -1020,73 +1065,99 @@ router.post('/visitors/entry', protect, authorize('Watchman', 'Admin', 'Super Ad
 
     await newVisitor.save();
 
-    // If vehicle entered, log to SecurityVehicleLog automatically
-    if (vehicleNumber && vehicleNumber.trim()) {
+    if (shouldLogInNow) {
+      // If vehicle entered, log to SecurityVehicleLog automatically
+      if (vehicleNumber && vehicleNumber.trim()) {
+        try {
+          const vehLogId = `VEH-${dateStr}-${Date.now().toString().slice(-6)}-${randSuffix}`;
+          await SecurityVehicleLog.create({
+            vehicleLogId: vehLogId,
+            vehicleNumber: vehicleNumber.trim().toUpperCase(),
+            vehicleType: 'Four Wheeler (Car/SUV)',
+            driverName: name.trim(),
+            driverPhone: phone.trim(),
+            purpose: 'Visitor Entry',
+            destination: department || 'Campus',
+            entryTime: new Date(),
+            status: 'Inside',
+            gate: gate || 'Gate 1 (Main Entrance)',
+            watchmanName,
+            collegeId: tenantId,
+            tenantId: tenantId
+          });
+        } catch (e) {
+          console.warn('Auto vehicle log skipped:', e.message);
+        }
+      }
+
+      // Synchronize CampusGateMovement & CampusPerson for unified tracking
       try {
-        const vehLogId = `VEH-${dateStr}-${Date.now().toString().slice(-6)}-${randSuffix}`;
-        await SecurityVehicleLog.create({
-          vehicleLogId: vehLogId,
-          vehicleNumber: vehicleNumber.trim().toUpperCase(),
-          vehicleType: 'Four Wheeler (Car/SUV)',
-          driverName: name.trim(),
-          driverPhone: phone.trim(),
-          purpose: 'Visitor Entry',
-          destination: department || 'Campus',
-          entryTime: new Date(),
-          status: 'Inside',
+        const movId = `MOV-${dateStr}-${Date.now().toString().slice(-6)}`;
+        await CampusGateMovement.create({
+          movementId: movId,
+          personType: 'Visitor',
+          personId: passNumber,
+          name: name.trim(),
+          phone: phone.trim(),
+          department: department || 'General',
+          direction: 'In',
+          reason: purpose.trim(),
+          gatePassId: passNumber,
+          vehicleNumber: vehicleNumber ? vehicleNumber.trim().toUpperCase() : '',
           gate: gate || 'Gate 1 (Main Entrance)',
           watchmanName,
+          timestamp: new Date(),
           collegeId: tenantId,
           tenantId: tenantId
         });
-      } catch (e) {
-        console.warn('Auto vehicle log skipped:', e.message);
-      }
-    }
 
-    // Synchronize CampusGateMovement & CampusPerson for unified tracking
-    try {
-      const movId = `MOV-${dateStr}-${Date.now().toString().slice(-6)}`;
-      await CampusGateMovement.create({
-        movementId: movId,
-        personType: 'Visitor',
-        personId: passNumber,
-        name: name.trim(),
-        phone: phone.trim(),
-        department: department || 'General',
-        direction: 'In',
-        reason: purpose.trim(),
-        gatePassId: passNumber,
-        vehicleNumber: vehicleNumber ? vehicleNumber.trim().toUpperCase() : '',
-        gate: gate || 'Gate 1 (Main Entrance)',
-        watchmanName,
-        timestamp: new Date(),
-        collegeId: tenantId,
-        tenantId: tenantId
-      });
-
-      await CampusPerson.findOneAndUpdate(
-        { personId: passNumber },
-        {
-          $set: {
-            name: name.trim(),
-            personType: 'Visitor',
-            phone: phone.trim(),
-            email: email ? email.trim() : '',
-            department: department || 'General',
-            vehicleNumber: vehicleNumber ? vehicleNumber.trim().toUpperCase() : '',
-            idProofType: idProofType || 'Aadhaar Card',
-            idProofNumber: idProofNumber ? idProofNumber.trim() : '',
-            currentStatus: 'Inside Campus',
-            lastGate: gate || 'Gate 1 (Main Entrance)',
-            lastEntryTime: new Date()
+        await CampusPerson.findOneAndUpdate(
+          { personId: passNumber },
+          {
+            $set: {
+              name: name.trim(),
+              personType: 'Visitor',
+              phone: phone.trim(),
+              email: email ? email.trim() : '',
+              department: department || 'General',
+              vehicleNumber: vehicleNumber ? vehicleNumber.trim().toUpperCase() : '',
+              idProofType: idProofType || 'Aadhaar Card',
+              idProofNumber: idProofNumber ? idProofNumber.trim() : '',
+              currentStatus: 'Inside Campus',
+              lastGate: gate || 'Gate 1 (Main Entrance)',
+              lastEntryTime: new Date()
+            },
+            $inc: { totalVisits: 1 }
           },
-          $inc: { totalVisits: 1 }
-        },
-        { upsert: true, new: true }
-      );
-    } catch (syncErr) {
-      console.warn('Campus unified tracking sync notice:', syncErr.message);
+          { upsert: true, new: true }
+        );
+      } catch (syncErr) {
+        console.warn('Campus unified tracking sync notice:', syncErr.message);
+      }
+    } else {
+      // Record initial registration in CampusPerson
+      try {
+        await CampusPerson.findOneAndUpdate(
+          { personId: passNumber },
+          {
+            $set: {
+              name: name.trim(),
+              personType: 'Visitor',
+              phone: phone.trim(),
+              email: email ? email.trim() : '',
+              department: department || 'General',
+              vehicleNumber: vehicleNumber ? vehicleNumber.trim().toUpperCase() : '',
+              idProofType: idProofType || 'Aadhaar Card',
+              idProofNumber: idProofNumber ? idProofNumber.trim() : '',
+              currentStatus: 'Registered',
+              lastGate: gate || 'Gate 1 (Main Entrance)'
+            }
+          },
+          { upsert: true, new: true }
+        );
+      } catch (syncErr) {
+        console.warn('Campus person registration sync notice:', syncErr.message);
+      }
     }
 
     const io = req.app.get('io');
@@ -1102,8 +1173,12 @@ router.post('/visitors/entry', protect, authorize('Watchman', 'Admin', 'Super Ad
 
     res.status(201).json({
       success: true,
-      message: 'Visitor entry recorded successfully. Visitor pass generated.',
-      data: newVisitor
+      message: 'Visitor registered successfully. Individual QR pass generated.',
+      data: {
+        ...newVisitor.toObject(),
+        verifyUrl,
+        qrUrl
+      }
     });
   } catch (err) {
     console.error('Failed to record visitor entry error:', err);
@@ -1111,8 +1186,8 @@ router.post('/visitors/entry', protect, authorize('Watchman', 'Admin', 'Super Ad
   }
 });
 
-// POST /api/watchman/visitors/:id/exit - Log visitor exit
-router.post('/visitors/:id/exit', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+// POST /api/watchman/visitors/:id/in - Login / Campus In for registered visitor
+router.post('/visitors/:id/in', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
   try {
     const isObjId = mongoose.Types.ObjectId.isValid(req.params.id);
     const visitor = await VisitorLog.findOne({
@@ -1126,13 +1201,171 @@ router.post('/visitors/:id/exit', protect, authorize('Watchman', 'Admin', 'Super
       return res.status(404).json({ success: false, message: 'Visitor record not found' });
     }
 
-    if (visitor.status === 'Checked Out') {
-      return res.status(400).json({ success: false, message: 'Visitor is already marked as Checked Out' });
+    if (visitor.status === 'Inside Campus' || visitor.status === 'Inside') {
+      return res.status(400).json({
+        success: false,
+        message: `Visitor ${visitor.name} is already logged in (Inside Campus). Duplicate entry is prevented.`
+      });
+    }
+
+    if (visitor.status === 'Exited' || visitor.status === 'Checked Out') {
+      return res.status(400).json({
+        success: false,
+        message: `Visitor pass ${visitor.passNumber} has already been used and exited. Repeated entry on an archived pass is prevented.`
+      });
+    }
+
+    if (visitor.status === 'Pre-Registered' && visitor.approvalStatus !== 'Approved' && visitor.approvalStatus !== 'Not Required') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot record entry. Pre-registered visitor status is "${visitor.approvalStatus}". Host approval required.`
+      });
+    }
+
+    if (visitor.status === 'Rejected' || visitor.status === 'Expired') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot record entry. Pass status is ${visitor.status}.`
+      });
+    }
+
+    const tenantId = visitor.collegeId || visitor.tenantId || getTenant(req) || 'COL001';
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randSuffix = Math.floor(100 + Math.random() * 900);
+    const inGate = req.body.gate || visitor.gate || 'Gate 1 (Main Entrance)';
+    const watchmanName = req.user?.name || req.user?.username || 'Security Guard';
+
+    visitor.status = 'Inside Campus';
+    visitor.entryTime = new Date();
+    visitor.gate = inGate;
+    visitor.watchmanId = req.user?._id || null;
+    visitor.watchmanName = watchmanName;
+    if (req.body.notes) {
+      visitor.notes = visitor.notes ? `${visitor.notes} | In: ${req.body.notes}` : req.body.notes;
+    }
+    await visitor.save();
+
+    // Auto log vehicle if present
+    if (visitor.vehicleNumber && visitor.vehicleNumber.trim()) {
+      try {
+        const vehLogId = `VEH-${dateStr}-${Date.now().toString().slice(-6)}-${randSuffix}`;
+        await SecurityVehicleLog.create({
+          vehicleLogId: vehLogId,
+          vehicleNumber: visitor.vehicleNumber.trim().toUpperCase(),
+          vehicleType: 'Four Wheeler (Car/SUV)',
+          driverName: visitor.name,
+          driverPhone: visitor.phone,
+          purpose: visitor.purpose || 'Visitor Entry',
+          destination: visitor.department || 'Campus',
+          entryTime: new Date(),
+          status: 'Inside',
+          gate: inGate,
+          watchmanName,
+          collegeId: tenantId,
+          tenantId: tenantId
+        });
+      } catch (e) {
+        console.warn('Auto vehicle entry log skipped:', e.message);
+      }
+    }
+
+    // Sync CampusGateMovement & CampusPerson
+    try {
+      const movId = `MOV-${dateStr}-${Date.now().toString().slice(-6)}`;
+      await CampusGateMovement.create({
+        movementId: movId,
+        personType: 'Visitor',
+        personId: visitor.passNumber,
+        name: visitor.name,
+        phone: visitor.phone || '',
+        department: visitor.department || 'General',
+        direction: 'In',
+        reason: visitor.purpose || 'Visitor Entry',
+        gatePassId: visitor.passNumber,
+        vehicleNumber: visitor.vehicleNumber || '',
+        gate: inGate,
+        watchmanName,
+        timestamp: new Date(),
+        collegeId: tenantId,
+        tenantId: tenantId
+      });
+
+      await CampusPerson.findOneAndUpdate(
+        { personId: visitor.passNumber },
+        {
+          $set: {
+            name: visitor.name,
+            personType: 'Visitor',
+            phone: visitor.phone || '',
+            department: visitor.department || 'General',
+            vehicleNumber: visitor.vehicleNumber || '',
+            currentStatus: 'Inside Campus',
+            lastGate: inGate,
+            lastEntryTime: new Date()
+          },
+          $inc: { totalVisits: 1 }
+        },
+        { upsert: true, new: true }
+      );
+    } catch (syncErr) {
+      console.warn('Campus unified tracking entry sync notice:', syncErr.message);
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      try {
+        io.emit('visitorUpdated', { action: 'in', visitor });
+        io.emit('dataUpdated', { module: 'watchman', action: 'visitor_in', data: visitor });
+        io.emit('dataUpdated', { module: 'visitors', action: 'in', data: visitor });
+      } catch (ioErr) {
+        console.warn('Socket emit error:', ioErr.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Campus In recorded successfully for ${visitor.name}. Status updated to Inside Campus.`,
+      data: visitor
+    });
+  } catch (err) {
+    console.error('Failed to record visitor in error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Failed to record visitor entry', error: err.message });
+  }
+});
+
+// Helper for visitor exit / logout
+const handleVisitorExit = async (req, res) => {
+  try {
+    const isObjId = mongoose.Types.ObjectId.isValid(req.params.id);
+    const visitor = await VisitorLog.findOne({
+      $or: [
+        ...(isObjId ? [{ _id: req.params.id }] : []),
+        { visitorId: req.params.id },
+        { passNumber: req.params.id }
+      ]
+    });
+    if (!visitor) {
+      return res.status(404).json({ success: false, message: 'Visitor record not found' });
+    }
+
+    if (visitor.status === 'Registered') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot record Logout for visitor ${visitor.name}. Visitor is only registered and has not entered campus yet (Login / Campus In required first).`
+      });
+    }
+
+    if (visitor.status === 'Exited' || visitor.status === 'Checked Out') {
+      return res.status(400).json({
+        success: false,
+        message: `Visitor ${visitor.name} has already logged out / exited on ${visitor.exitTime ? new Date(visitor.exitTime).toLocaleString('en-IN') : 'earlier'}. Duplicate exit prevented.`
+      });
     }
 
     const exitWatchmanName = req.user?.name || req.user?.username || 'Security Guard';
+    const exitGate = req.body.gate || visitor.gate || 'Gate 1 (Main Entrance)';
 
-    visitor.status = 'Checked Out';
+    visitor.status = 'Exited';
     visitor.exitTime = new Date();
     visitor.exitWatchmanId = req.user?._id || null;
     visitor.exitWatchmanName = exitWatchmanName;
@@ -1154,14 +1387,15 @@ router.post('/visitors/:id/exit', protect, authorize('Watchman', 'Admin', 'Super
       }
     }
 
-    // Sync CampusPerson status
+    // Sync CampusPerson status & CampusGateMovement
     try {
       await CampusPerson.findOneAndUpdate(
         { personId: visitor.passNumber },
         {
           $set: {
             currentStatus: 'Outside Campus',
-            lastExitTime: new Date()
+            lastExitTime: new Date(),
+            lastGate: exitGate
           }
         }
       );
@@ -1179,7 +1413,7 @@ router.post('/visitors/:id/exit', protect, authorize('Watchman', 'Admin', 'Super
         reason: 'Visitor Departure',
         gatePassId: visitor.passNumber,
         vehicleNumber: visitor.vehicleNumber || '',
-        gate: visitor.gate || 'Gate 1 (Main Entrance)',
+        gate: exitGate,
         watchmanName: exitWatchmanName,
         timestamp: new Date(),
         collegeId: tenantId,
@@ -1202,14 +1436,20 @@ router.post('/visitors/:id/exit', protect, authorize('Watchman', 'Admin', 'Super
 
     res.json({
       success: true,
-      message: `Visitor ${visitor.name} marked as Checked Out successfully`,
+      message: `Campus Out recorded successfully for ${visitor.name}. Status updated to Exited.`,
       data: visitor
     });
   } catch (err) {
     console.error('Failed to record visitor exit error:', err);
     res.status(500).json({ success: false, message: err.message || 'Failed to record visitor exit', error: err.message });
   }
-});
+};
+
+// POST /api/watchman/visitors/:id/out - Logout / Campus Out
+router.post('/visitors/:id/out', protect, authorize('Watchman', 'Admin', 'Super Admin'), handleVisitorExit);
+
+// POST /api/watchman/visitors/:id/exit - Log visitor exit (alias for backward compatibility)
+router.post('/visitors/:id/exit', protect, authorize('Watchman', 'Admin', 'Super Admin'), handleVisitorExit);
 
 // Helper & Handler for Visitor Pass Verification (Supports both query params and URL path params)
 const handleVerifyVisitorPass = async (req, res) => {
@@ -1248,49 +1488,42 @@ const handleVerifyVisitorPass = async (req, res) => {
     const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const exactRegex = new RegExp(`^${escapeRegex(rawQuery)}$`, 'i');
 
-    const orConditions = [
-      { passNumber: exactRegex },
-      { passNumber: rawQuery },
-      { visitorId: exactRegex },
-      { visitorId: rawQuery },
-      { phone: rawQuery }
-    ];
+    let visitor = null;
 
-    if (rawQuery.length === 24 && mongoose?.Types?.ObjectId?.isValid(rawQuery)) {
-      orConditions.push({ _id: rawQuery });
+    // 0. Direct lookup by _id if valid 24-character ObjectId
+    if (rawQuery.length === 24 && mongoose.Types.ObjectId.isValid(rawQuery)) {
+      try {
+        visitor = await VisitorLog.findById(new mongoose.Types.ObjectId(rawQuery)).lean();
+      } catch (_) {}
     }
 
-    if (rawQuery.length >= 3) {
-      orConditions.push({ name: exactRegex });
-      orConditions.push({ vehicleNumber: exactRegex });
-    }
-
-    // Direct global search (prioritizing active inside visitors first, then latest records)
-    let visitor = await VisitorLog.findOne({ $or: orConditions, status: 'Inside' }).sort({ createdAt: -1 }).lean();
+    // 1. Prioritize EXACT match on pass identifier (passNumber or visitorId)
     if (!visitor) {
-      visitor = await VisitorLog.findOne({ $or: orConditions }).sort({ createdAt: -1 }).lean();
-    }
-
-    // Secondary fallback: partial substring match if not found
-    if (!visitor && rawQuery.length >= 4) {
       visitor = await VisitorLog.findOne({
         $or: [
-          { passNumber: { $regex: escapeRegex(rawQuery), $options: 'i' } },
-          { phone: { $regex: escapeRegex(rawQuery), $options: 'i' } },
-          { name: { $regex: escapeRegex(rawQuery), $options: 'i' } }
-        ],
-        status: 'Inside'
+          { passNumber: exactRegex },
+          { visitorId: exactRegex },
+          { passNumber: rawQuery },
+          { visitorId: rawQuery }
+        ]
       }).sort({ createdAt: -1 }).lean();
+    }
 
-      if (!visitor) {
-        visitor = await VisitorLog.findOne({
-          $or: [
-            { passNumber: { $regex: escapeRegex(rawQuery), $options: 'i' } },
-            { phone: { $regex: escapeRegex(rawQuery), $options: 'i' } },
-            { name: { $regex: escapeRegex(rawQuery), $options: 'i' } }
-          ]
-        }).sort({ createdAt: -1 }).lean();
-      }
+    // 2. Secondary fallback: search by exact phone number
+    if (!visitor) {
+      visitor = await VisitorLog.findOne({
+        phone: rawQuery
+      }).sort({ createdAt: -1 }).lean();
+    }
+
+    // 3. Fallback: exact match on name or vehicle number
+    if (!visitor && rawQuery.length >= 2) {
+      visitor = await VisitorLog.findOne({
+        $or: [
+          { name: exactRegex },
+          { vehicleNumber: exactRegex }
+        ]
+      }).sort({ createdAt: -1 }).lean();
     }
 
     if (!visitor) {
@@ -1324,7 +1557,7 @@ const handleVerifyVisitorPass = async (req, res) => {
           isMemberPass: true,
           personType: pType,
           name: memberPerson.name,
-          message: `College member pass detected (${pType}: ${memberPerson.name || rawQuery}). Please use the Gate Operations QR Scanner under Gate Ops.`
+          message: `College member pass detected (${pType}: ${memberPerson.name || rawQuery}). Please use the Member QR Scanner under Gate Operations.`
         });
       }
 
@@ -1338,42 +1571,64 @@ const handleVerifyVisitorPass = async (req, res) => {
     let validationStatus = 'VALID';
     let statusMessage = 'Pass is valid and active.';
     let isValid = true;
+    let canLogin = false;
+    let canLogout = false;
 
-    if (visitor.status === 'Inside') {
-      validationStatus = 'INSIDE';
-      statusMessage = 'Visitor is currently inside campus (Active Pass). Ready for departure checkout.';
+    if (visitor.status === 'Registered') {
+      validationStatus = 'REGISTERED';
+      statusMessage = 'Visitor pass is registered and verified. Ready for Campus In (Login).';
       isValid = true;
-    } else if (visitor.status === 'Checked Out') {
+      canLogin = true;
+      canLogout = false;
+    } else if (visitor.status === 'Inside Campus' || visitor.status === 'Inside') {
+      validationStatus = 'INSIDE';
+      statusMessage = `Visitor is currently inside campus (entered at ${visitor.entryTime ? new Date(visitor.entryTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'earlier today'}). Ready for Campus Out (Logout).`;
+      isValid = true;
+      canLogin = false;
+      canLogout = true;
+    } else if (visitor.status === 'Exited' || visitor.status === 'Checked Out') {
       validationStatus = 'ALREADY_USED';
-      statusMessage = `Pass has already been used and visitor checked out on ${visitor.exitTime ? new Date(visitor.exitTime).toLocaleString('en-IN') : 'earlier'}.`;
+      statusMessage = `Pass has already been used and visitor exited on ${visitor.exitTime ? new Date(visitor.exitTime).toLocaleString('en-IN') : 'earlier'}. Pass is archived.`;
       isValid = false;
+      canLogin = false;
+      canLogout = false;
     } else if (visitor.status === 'Expired') {
       validationStatus = 'EXPIRED';
-      statusMessage = 'Pass has expired.';
+      statusMessage = 'Visitor pass has expired.';
       isValid = false;
+      canLogin = false;
+      canLogout = false;
     } else if (visitor.status === 'Rejected') {
       validationStatus = 'REJECTED';
       statusMessage = 'Visitor request was rejected.';
       isValid = false;
+      canLogin = false;
+      canLogout = false;
     } else if (visitor.status === 'Pre-Registered') {
       if (visitor.approvalStatus === 'Approved') {
         validationStatus = 'PRE_REGISTERED_APPROVED';
-        statusMessage = 'Pre-registered visitor pass is approved. Ready for campus entry.';
+        statusMessage = 'Pre-registered visitor pass is approved by host department. Ready for Campus In (Login).';
         isValid = true;
+        canLogin = true;
+        canLogout = false;
       } else {
         validationStatus = 'PRE_REGISTERED_PENDING';
         statusMessage = 'Pre-registered visitor pass is pending host approval.';
         isValid = false;
+        canLogin = false;
+        canLogout = false;
       }
     } else if (visitor.status === 'Approved') {
       validationStatus = 'APPROVED';
-      statusMessage = 'Pass is approved and ready for campus entry.';
+      statusMessage = 'Pass is approved and ready for Campus In (Login).';
       isValid = true;
+      canLogin = true;
+      canLogout = false;
     }
 
     const passIdentifier = visitor.passNumber || visitor.visitorId;
     const frontendBase = getFrontendBase(req);
-    const verifyUrl = `${frontendBase}/watchman/verify?code=${encodeURIComponent(passIdentifier)}&type=visitor`;
+    const verifyUrl = `${frontendBase}/watchman/qr-verification?type=visitor&code=${encodeURIComponent(passIdentifier)}`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(verifyUrl)}`;
 
     res.json({
@@ -1381,8 +1636,14 @@ const handleVerifyVisitorPass = async (req, res) => {
       valid: isValid,
       validationStatus,
       statusMessage,
+      canLogin,
+      canLogout,
       data: {
         ...visitor,
+        canLogin,
+        canLogout,
+        validationStatus,
+        statusMessage,
         verifyUrl,
         rawCode: passIdentifier,
         qrUrl
@@ -1686,73 +1947,101 @@ router.post('/parcels', protect, authorize('Watchman', 'Admin', 'Super Admin'), 
       }
     }
 
-    const targetStaffId = staffId || extractedId;
-    if (!resolvedUser && targetStaffId) {
-      resolvedUser = await User.findOne({ referenceId: targetStaffId });
-      if (!resolvedUser && mongoose.Types.ObjectId.isValid(targetStaffId)) {
-        resolvedUser = await User.findById(targetStaffId);
-      }
+    const targetStaffId = (staffId || extractedId || '').trim();
+    const cleanName = recipientName ? recipientName.replace(/\[.*?\]|\(.*?\)/g, '').trim() : '';
+    const targetEmail = (recipientEmail || (recipientName && recipientName.includes('@') ? recipientName.trim() : '')).toLowerCase().trim();
+
+    // 1. Try recipientId in User collection or Staff collection
+    if (recipientId && mongoose.Types.ObjectId.isValid(recipientId)) {
+      resolvedUser = await User.findById(recipientId);
       if (!resolvedUser) {
-        resolvedStaff = await Staff.findOne({ id: targetStaffId });
-        if (resolvedStaff) {
-          resolvedUser = await User.findOne({
-            $or: [{ email: resolvedStaff.email }, { referenceId: resolvedStaff.id }]
-          });
-        }
+        resolvedStaff = await Staff.findById(recipientId);
       }
     }
 
-    const targetEmail = recipientEmail || (recipientName && recipientName.includes('@') ? recipientName.trim() : '');
-    if (!resolvedUser && targetEmail) {
-      resolvedUser = await User.findOne({ email: targetEmail.toLowerCase().trim() });
+    // 2. Try targetStaffId across User & Staff with hyphen tolerance
+    if (targetStaffId) {
+      const idVariants = [
+        targetStaffId,
+        targetStaffId.replace(/[-_\s]/g, ''),
+        targetStaffId.replace(/^(STF)(.*)$/i, '$1-$2')
+      ];
       if (!resolvedUser) {
-        resolvedStaff = await Staff.findOne({ email: targetEmail.toLowerCase().trim() });
-        if (resolvedStaff) {
-          resolvedUser = await User.findOne({ referenceId: resolvedStaff.id });
-        }
+        resolvedUser = await User.findOne({ referenceId: { $in: idVariants } });
+      }
+      if (!resolvedStaff) {
+        resolvedStaff = await Staff.findOne({ id: { $in: idVariants } });
       }
     }
 
-    if (!resolvedUser && recipientName) {
-      const cleanName = recipientName.replace(/\[.*?\]|\(.*?\)/g, '').trim();
-      if (cleanName) {
-        const candidateUsers = await User.find({
-          name: { $regex: `^${cleanName}$`, $options: 'i' },
+    // 3. Try targetEmail
+    if (targetEmail) {
+      if (!resolvedUser) resolvedUser = await User.findOne({ email: targetEmail });
+      if (!resolvedStaff) resolvedStaff = await Staff.findOne({ email: targetEmail });
+    }
+
+    // 4. Try exact recipientName
+    if (cleanName) {
+      if (!resolvedUser) {
+        resolvedUser = await User.findOne({
+          name: { $regex: `^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
           role: { $in: ['Staff', 'Faculty', 'HOD', 'Principal', 'Teacher'] }
         });
-
-        if (candidateUsers.length === 1) {
-          resolvedUser = candidateUsers[0];
-        } else if (candidateUsers.length > 1 && department && department !== 'General') {
-          const matchInDept = candidateUsers.find(u => u.department?.toLowerCase() === department.toLowerCase());
-          if (matchInDept) resolvedUser = matchInDept;
-        }
-
-        if (!resolvedUser) {
-          const candidateStaff = await Staff.find({
-            name: { $regex: `^${cleanName}$`, $options: 'i' }
-          });
-          if (candidateStaff.length === 1) {
-            resolvedStaff = candidateStaff[0];
-            resolvedUser = await User.findOne({
-              $or: [{ email: resolvedStaff.email }, { referenceId: resolvedStaff.id }]
-            });
-          }
-        }
+      }
+      if (!resolvedStaff) {
+        resolvedStaff = await Staff.findOne({
+          name: { $regex: `^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' }
+        });
       }
     }
 
+    // Cross-link User and Staff
+    if (resolvedStaff && !resolvedUser) {
+      resolvedUser = await User.findOne({
+        $or: [
+          ...(resolvedStaff.email ? [{ email: resolvedStaff.email.toLowerCase().trim() }] : []),
+          ...(resolvedStaff.id ? [
+            { referenceId: resolvedStaff.id },
+            { referenceId: resolvedStaff.id.replace(/[-_\s]/g, '') },
+            { referenceId: resolvedStaff.id.replace(/^(STF)(.*)$/i, '$1-$2') }
+          ] : []),
+          ...(resolvedStaff.name ? [{ name: { $regex: `^${resolvedStaff.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }] : [])
+        ]
+      });
+    } else if (resolvedUser && !resolvedStaff) {
+      resolvedStaff = await Staff.findOne({
+        $or: [
+          ...(resolvedUser.email ? [{ email: resolvedUser.email.toLowerCase().trim() }] : []),
+          ...(resolvedUser.referenceId ? [
+            { id: resolvedUser.referenceId },
+            { id: resolvedUser.referenceId.replace(/[-_\s]/g, '') },
+            { id: resolvedUser.referenceId.replace(/^(STF)(.*)$/i, '$1-$2') }
+          ] : []),
+          ...(resolvedUser.name ? [{ name: { $regex: `^${resolvedUser.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }] : [])
+        ]
+      });
+    }
+
+    // Extract finalized recipient values preserving unique staffId and recipientId
+    const finalStaffId = targetStaffId || resolvedStaff?.id || resolvedUser?.referenceId || '';
     const finalRecipientId = resolvedUser ? resolvedUser._id : (resolvedStaff ? resolvedStaff._id : (recipientId && mongoose.Types.ObjectId.isValid(recipientId) ? recipientId : null));
-    const finalStaffId = resolvedUser?.referenceId || resolvedStaff?.id || targetStaffId || '';
-    const cleanRawName = recipientName ? recipientName.replace(/\[.*?\]|\(.*?\)/g, '').trim() : '';
-    const finalRecipientName = resolvedUser?.name || resolvedStaff?.name || cleanRawName || 'Campus Staff';
-    const finalRecipientEmail = resolvedUser?.email || resolvedStaff?.email || recipientEmail || '';
+    const finalRecipientName = resolvedUser?.name || resolvedStaff?.name || cleanName || 'Campus Staff';
+    const finalRecipientEmail = resolvedUser?.email || resolvedStaff?.email || targetEmail || '';
     const finalRecipientPhone = resolvedUser?.phone || resolvedStaff?.phone || recipientPhone || '';
     const finalDepartment = resolvedUser?.department || resolvedStaff?.dept || department || 'General';
     let finalRecipientType = recipientType || resolvedUser?.role || resolvedStaff?.designation || (finalStaffId.startsWith('HOD') ? 'HOD' : 'Staff');
     if (!['Staff', 'Faculty', 'HOD', 'Department', 'Student', 'Hostel Warden', 'Principal', 'Principal / Admin', 'Other'].includes(finalRecipientType)) {
       finalRecipientType = finalRecipientType === 'Principal' ? 'Principal' : (finalRecipientType === 'HOD' ? 'HOD' : 'Staff');
     }
+
+    // Sync referenceId onto User record if it was empty
+    if (resolvedUser && finalStaffId && (!resolvedUser.referenceId || resolvedUser.referenceId !== finalStaffId)) {
+      try {
+        await User.findByIdAndUpdate(resolvedUser._id, { referenceId: finalStaffId });
+      } catch (_) {}
+    }
+
+    const collegeId = resolvedUser?.collegeId || resolvedUser?.tenantId || tenantId;
 
     const count = await ParcelLog.countDocuments();
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -1779,8 +2068,8 @@ router.post('/parcels', protect, authorize('Watchman', 'Admin', 'Super Admin'), 
       watchmanName: req.user.name || 'Security Guard',
       watchmanId: req.user._id,
       notes: notes || '',
-      collegeId: tenantId,
-      tenantId: tenantId
+      collegeId: collegeId,
+      tenantId: collegeId
     });
 
     await newParcel.save();
@@ -2722,7 +3011,7 @@ router.get(['/student-entries', '/student-tracking'], protect, authorize('Watchm
     }
 
     if (department && department !== 'All') {
-      andConditions.push({ department });
+      andConditions.push({ department: { $regex: new RegExp(`^${department.trim()}$`, 'i') } });
     }
 
     if (gate && gate !== 'All') {
@@ -2950,7 +3239,8 @@ router.get('/student-qr-directory', protect, authorize('Watchman', 'Admin', 'Sup
 
     const extraConds = {};
     if (department && department !== 'All') {
-      extraConds.$or = [{ dept: department }, { department }];
+      const deptRegex = { $regex: new RegExp(`^${department.trim()}$`, 'i') };
+      extraConds.$or = [{ dept: deptRegex }, { department: deptRegex }];
     }
 
     if (search && search.trim()) {
@@ -3683,30 +3973,59 @@ router.get('/incidents', protect, authorize('Watchman', 'Admin', 'Super Admin', 
 // POST /api/watchman/incidents - Report security incident
 router.post('/incidents', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Security', 'Guard', 'Staff', 'Sub Admin'), async (req, res) => {
   try {
-    const { title, category, severity, description, location, actionTaken, gate } = req.body;
+    const rawTitle = (req.body.title || req.body.incidentType || req.body.details || '').trim();
+    const rawCategory = (req.body.category || req.body.incidentType || 'Suspicious Activity').trim();
+    const rawDescription = (req.body.description || req.body.details || req.body.notes || rawTitle).trim();
+    const rawLocation = (req.body.location || req.body.gate || 'Main Gate').trim();
+    const rawSeverity = (req.body.severity || 'Medium').trim();
+    const rawGate = (req.body.gate || req.body.location || 'Gate 1 (Main Entrance)').trim();
+    const rawAction = (req.body.actionTaken || 'Reported to College Admin and Security Command').trim();
 
-    if (!title || !category || !description || !location) {
-      return res.status(400).json({ success: false, message: 'Title, category, description, and location are required' });
+    const title = rawTitle || `${rawCategory} at ${rawLocation}`;
+
+    if (!rawDescription && !rawTitle) {
+      return res.status(400).json({ success: false, message: 'Incident description and details are required.' });
+    }
+    if (!rawLocation) {
+      return res.status(400).json({ success: false, message: 'Incident location is required.' });
     }
 
     const tenantId = getTenant(req) || req.user?.collegeId || 'COL001';
+
+    // Prevent duplicate incident reports within 30 seconds
+    const thirtySecAgo = new Date(Date.now() - 30 * 1000);
+    const existingDuplicate = await SecurityIncident.findOne({
+      title: title,
+      location: rawLocation,
+      incidentTime: { $gte: thirtySecAgo },
+      $or: [{ tenantId }, { collegeId: tenantId }]
+    });
+
+    if (existingDuplicate) {
+      return res.status(200).json({
+        success: true,
+        message: `Incident report already registered and active (ID: ${existingDuplicate.incidentId})`,
+        data: existingDuplicate
+      });
+    }
+
     const incidentId = `INC-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const reporterName = req.user?.name || req.user?.username || 'Security Guard';
+    const reporterName = req.user?.name || req.user?.username || 'Security Officer';
     const reporterId = req.user?._id || null;
 
     const newIncident = new SecurityIncident({
       incidentId,
-      title: title.trim(),
-      category: category ? category.trim() : 'Other',
-      severity: severity || 'Medium',
-      description: description.trim(),
-      location: location.trim(),
+      title: title,
+      category: rawCategory,
+      severity: ['Low', 'Medium', 'High', 'Critical'].includes(rawSeverity) ? rawSeverity : 'Medium',
+      description: rawDescription || title,
+      location: rawLocation,
       incidentTime: new Date(),
       status: 'Open',
       reportedBy: reporterName,
       reportedById: reporterId,
-      actionTaken: actionTaken ? actionTaken.trim() : 'Reported to College Admin and Security Log',
-      gate: gate ? gate.trim() : 'Main Gate 1',
+      actionTaken: rawAction,
+      gate: rawGate,
       collegeId: tenantId,
       tenantId: tenantId
     });
@@ -3715,21 +4034,21 @@ router.post('/incidents', protect, authorize('Watchman', 'Admin', 'Super Admin',
 
     // Alert Admin via Notification safely
     try {
-      const adminUser = await User.findOne({
-        role: { $in: ['Admin', 'Super Admin'] },
+      const adminUsers = await User.find({
+        role: { $in: ['Admin', 'Super Admin', 'Principal'] },
         $or: [{ tenantId }, { collegeId: tenantId }]
-      });
+      }).limit(5);
 
-      if (adminUser) {
+      for (const adminUser of adminUsers) {
         await Notification.create({
           recipient: adminUser._id,
           title: `🚨 Security Incident Reported: ${title}`,
-          message: `Severity: ${severity}. Reported at ${location} by ${reporterName}. Description: ${description}`,
-          type: severity === 'Critical' || severity === 'High' ? 'Alert' : 'Warning',
+          message: `Severity: ${newIncident.severity}. Reported at ${rawLocation} by ${reporterName}. Details: ${newIncident.description}`,
+          type: newIncident.severity === 'Critical' || newIncident.severity === 'High' ? 'Alert' : 'Warning',
           category: 'security',
           collegeId: tenantId,
           tenantId: tenantId
-        });
+        }).catch(() => null);
       }
     } catch (notifErr) {
       console.warn('Incident notification error:', notifErr.message);
@@ -3752,30 +4071,30 @@ router.post('/incidents', protect, authorize('Watchman', 'Admin', 'Super Admin',
   }
 });
 
-// PATCH /api/watchman/incidents/:id - Update incident status / resolution
-router.patch('/incidents/:id', protect, authorize('Watchman', 'Admin', 'Super Admin', 'Security', 'Guard', 'Staff', 'Sub Admin'), async (req, res) => {
+// PATCH /api/watchman/incidents/:id - Resolve or update incident status (Strictly Admin / Principal Only)
+const handleIncidentResolution = async (req, res) => {
   try {
     const incident = await SecurityIncident.findById(req.params.id);
     if (!incident) {
       return res.status(404).json({ success: false, message: 'Incident record not found' });
     }
 
-    const { status, actionTaken, resolutionNotes, resolution } = req.body;
-    if (status) incident.status = status;
+    const { status = 'Resolved', actionTaken, resolutionNotes, resolution } = req.body;
+    incident.status = status;
     if (actionTaken) incident.actionTaken = actionTaken;
-    const resolvedText = resolutionNotes || resolution;
-    if (resolvedText) {
-      incident.resolutionNotes = resolvedText;
-      if (status === 'Resolved' || status === 'Closed') {
-        incident.resolvedAt = new Date();
-        incident.resolvedBy = req.user?.name || 'Security Guard';
-      }
+    const resolvedText = resolutionNotes || resolution || incident.resolutionNotes || 'Incident investigated, resolved and signed off by College Administration.';
+    incident.resolutionNotes = resolvedText;
+
+    if (status === 'Resolved' || status === 'Closed') {
+      incident.resolvedAt = new Date();
+      incident.resolvedBy = req.user?.name || 'College Administrator';
     }
 
     await incident.save();
 
     const ioUp = req.app.get('io');
     if (ioUp) {
+      ioUp.emit('incidentUpdated', { incident });
       ioUp.emit('dataUpdated', { module: 'watchman', action: 'incident_updated', data: incident });
     }
 
@@ -3788,7 +4107,10 @@ router.patch('/incidents/:id', protect, authorize('Watchman', 'Admin', 'Super Ad
     console.error('Failed to update incident error:', err);
     res.status(500).json({ success: false, message: 'Failed to update incident', error: err.message });
   }
-});
+};
+
+router.patch('/incidents/:id', protect, authorize('Admin', 'Super Admin', 'Principal', 'Sub Admin'), handleIncidentResolution);
+router.patch('/incidents/:id/resolve', protect, authorize('Admin', 'Super Admin', 'Principal', 'Sub Admin'), handleIncidentResolution);
 
 // ──────────────────────────────────────────────────────────────────────────
 // 9. WATCHMAN NOTIFICATIONS
@@ -4437,25 +4759,33 @@ const handleLookupCampusPerson = async (req, res) => {
       });
     }
 
-    // 1. Search CampusPerson by exact personId first
-    let personFilter = {
-      $or: [
-        { personId: exactRegex },
-        { personId: rawQuery }
-      ]
-    };
-    if (isGateScanner) {
-      personFilter.personType = { $ne: 'Visitor' };
+    // 0. Direct lookup by _id if valid 24-character ObjectId
+    let person = null;
+    if (rawQuery.length === 24 && mongoose.Types.ObjectId.isValid(rawQuery)) {
+      try {
+        person = await CampusPerson.findById(new mongoose.Types.ObjectId(rawQuery)).lean();
+      } catch (_) {}
     }
-    let person = await CampusPerson.findOne(personFilter).lean();
+
+    // 1. Search CampusPerson by exact personId first
+    if (!person) {
+      let personFilter = {
+        $or: [
+          { personId: exactRegex },
+          { personId: rawQuery }
+        ]
+      };
+      if (isGateScanner) {
+        personFilter.personType = { $ne: 'Visitor' };
+      }
+      person = await CampusPerson.findOne(personFilter).lean();
+    }
 
     // 2. If not found by personId, search CampusPerson by phone
     if (!person) {
       person = await CampusPerson.findOne({
-        $or: [
-          { phone: exactRegex },
-          { phone: rawQuery }
-        ]
+        phone: rawQuery,
+        ...(isGateScanner ? { personType: { $ne: 'Visitor' } } : {})
       }).lean();
     }
 

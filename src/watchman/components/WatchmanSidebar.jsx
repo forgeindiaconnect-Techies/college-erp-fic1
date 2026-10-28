@@ -45,8 +45,7 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
         { name: 'Gate Dashboard', path: '/watchman/dashboard', icon: <LayoutDashboard size={19} /> },
         { name: 'Campus In / Out Control', path: '/watchman/campus-in-out', icon: <ArrowLeftRight size={19} /> },
         { name: 'Register Student / Staff', path: '/watchman/register-person', icon: <UserCheck size={19} /> },
-        { name: 'Member QR Scanner (Students/Staff/HOD)', path: '/watchman/qr-verification?type=members', icon: <QrCode size={19} /> },
-        { name: 'Visitor Pass QR Scanner', path: '/watchman/qr-verification?type=visitor', icon: <ShieldCheck size={19} /> }
+        { name: 'Member QR Scanner', path: '/watchman/qr-verification?type=members', icon: <QrCode size={19} /> }
       ]
     },
     {
@@ -65,8 +64,8 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
       title: 'Visitor Management',
       items: [
         { name: 'New Visitor Entry', path: '/watchman/visitor-entry', icon: <UserPlus size={19} /> },
+        { name: 'Verify Visitor Pass', path: '/watchman/qr-verification?type=visitor', icon: <ShieldCheck size={19} /> },
         { name: 'Active Visitors & Exit', path: '/watchman/visitor-exit', icon: <ExitIcon size={19} /> },
-        { name: 'Visitor Pass QR Scanner', path: '/watchman/qr-verification?type=visitor', icon: <ShieldCheck size={19} /> },
         { name: 'Pre-Registered Visitors', path: '/watchman/pre-registered', icon: <CalendarCheck size={19} /> },
         { name: 'Visitor History Logs', path: '/watchman/visitor-history', icon: <History size={19} /> }
       ]
@@ -156,7 +155,7 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
                     end={item.path === '/watchman/dashboard'}
                   >
                     {item.icon}
-                    <span>{item.name}</span>
+                    <span style={{ whiteSpace: 'normal', lineHeight: 1.25, wordBreak: 'break-word' }}>{item.name}</span>
                   </NavLink>
                 </li>
               ))}

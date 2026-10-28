@@ -168,20 +168,24 @@ export default function WatchmanGateOperations({ user, assignedGate = 'Gate 1 (M
   // STUDENT GATE ATTENDANCE (Quick Check-in / Check-out)
   // ----------------------------------------------------------------------
   const handleStudentCheckin = async (student: any) => {
-    const sId = student.studentId || student.id || student.rollNo;
+    const sId = student.personId || student.studentId || student.id || student.rollNo;
     const sName = student.studentName || student.name || 'Student';
     try {
       setPerformingActionId(sId);
-      const res = await apiPost<any>('watchman/student-checkin', {
-        studentId: sId,
-        gate: assignedGate,
-        remarks: 'Mobile Gate Attendance Check-in',
-      });
-      if (res?.success === false) {
-        Alert.alert('Notice', res.message || 'Student check-in could not be completed.');
-      } else {
-        Alert.alert('✓ Student Checked In', `${sName} (${sId}) recorded as INSIDE campus.`);
+      try {
+        await apiPost<any>('watchman/campus-in', {
+          personId: sId,
+          gate: assignedGate,
+          remarks: 'Mobile Gate Attendance Check-in',
+        });
+      } catch (err) {
+        await apiPost<any>('watchman/student-checkin', {
+          studentId: sId,
+          gate: assignedGate,
+          remarks: 'Mobile Gate Attendance Check-in',
+        });
       }
+      Alert.alert('✓ Student Checked In', `${sName} (${sId}) recorded as INSIDE campus.`);
       await loadData();
     } catch (err: any) {
       Alert.alert('Check-in Failed', err?.message || 'Could not verify student.');
@@ -191,20 +195,24 @@ export default function WatchmanGateOperations({ user, assignedGate = 'Gate 1 (M
   };
 
   const handleStudentCheckout = async (student: any) => {
-    const sId = student.studentId || student.id || student.rollNo;
+    const sId = student.personId || student.studentId || student.id || student.rollNo;
     const sName = student.studentName || student.name || 'Student';
     try {
       setPerformingActionId(sId);
-      const res = await apiPost<any>('watchman/student-checkout', {
-        studentId: sId,
-        gate: assignedGate,
-        remarks: 'Mobile Gate Attendance Check-out',
-      });
-      if (res?.success === false) {
-        Alert.alert('Notice', res.message || 'Student check-out could not be completed.');
-      } else {
-        Alert.alert('✓ Student Checked Out', `${sName} (${sId}) recorded as OUTSIDE campus.`);
+      try {
+        await apiPost<any>('watchman/campus-out', {
+          personId: sId,
+          gate: assignedGate,
+          remarks: 'Mobile Gate Attendance Check-out',
+        });
+      } catch (err) {
+        await apiPost<any>('watchman/student-checkout', {
+          studentId: sId,
+          gate: assignedGate,
+          remarks: 'Mobile Gate Attendance Check-out',
+        });
       }
+      Alert.alert('✓ Student Checked Out', `${sName} (${sId}) recorded as OUTSIDE campus.`);
       await loadData();
     } catch (err: any) {
       Alert.alert('Check-out Failed', err?.message || 'Could not record departure.');
@@ -459,23 +467,28 @@ export default function WatchmanGateOperations({ user, assignedGate = 'Gate 1 (M
 
     try {
       setPerformingActionId(stId);
-      const res = await apiPost<any>('watchman/staff-register', {
-        staffId: stId,
-        staffName: stName,
-        movementType: direction,
-        department: dept,
-        designation: desig,
-        gate: assignedGate,
-        reason: direction === 'In' ? 'Duty Shift Reporting' : 'Campus Departure / Shift End',
-      });
-      if (res?.success === false) {
-        Alert.alert('Notice', res.message || 'Staff movement not recorded.');
-      } else {
-        Alert.alert(
-          direction === 'In' ? '✓ Staff Entry Recorded' : '✓ Staff Exit Recorded',
-          `Gate ${direction.toUpperCase()} logged for ${stName} (${stId}).`
-        );
+      const endpoint = direction === 'In' ? 'watchman/campus-in' : 'watchman/campus-out';
+      try {
+        await apiPost<any>(endpoint, {
+          personId: stId,
+          gate: assignedGate,
+          remarks: `Staff Gate ${direction}`,
+        });
+      } catch (e) {
+        await apiPost<any>('watchman/staff-register', {
+          staffId: stId,
+          staffName: stName,
+          movementType: direction,
+          department: dept,
+          designation: desig,
+          gate: assignedGate,
+          reason: direction === 'In' ? 'Duty Shift Reporting' : 'Campus Departure / Shift End',
+        });
       }
+      Alert.alert(
+        direction === 'In' ? '✓ Staff Entry Recorded' : '✓ Staff Exit Recorded',
+        `Gate ${direction.toUpperCase()} logged for ${stName} (${stId}).`
+      );
       await loadData();
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Staff movement update failed.');
@@ -517,20 +530,63 @@ export default function WatchmanGateOperations({ user, assignedGate = 'Gate 1 (M
   };
 
   // ----------------------------------------------------------------------
-  // FILTERED STUDENT & STAFF LISTS
+  // FILTERED STUDENT & STAFF LISTS (Real-time Live Synced with Web ERP)
   // ----------------------------------------------------------------------
   const displayedStudents = useMemo(() => {
+    const studentMap = new Map<string, any>();
+
+    // 1. First priority: Live registered campus people
+    campusPeople
+      .filter((p) => (p.personType || '').toUpperCase() === 'STUDENT')
+      .forEach((p) => {
+        const key = (p.personId || p._id || '').toUpperCase();
+        studentMap.set(key, {
+          ...p,
+          studentId: p.personId,
+          rollNo: p.personId,
+          studentName: p.name,
+          name: p.name,
+          department: p.department || 'General',
+          currentStatus: p.currentStatus || 'Outside Campus',
+          status: p.currentStatus || 'Outside Campus',
+        });
+      });
+
+    // 2. Merge from student directory if not already loaded
+    studentDirectory.forEach((s) => {
+      const key = (s.rollNo || s.studentId || s.id || '').toUpperCase();
+      if (key && !studentMap.has(key)) {
+        studentMap.set(key, {
+          ...s,
+          studentId: s.studentId || s.rollNo || s.id,
+          rollNo: s.rollNo || s.studentId || s.id,
+          studentName: s.studentName || s.name,
+          name: s.name || s.studentName,
+          department: s.department || s.dept || 'General',
+          currentStatus: s.currentStatus || s.status || 'Outside Campus',
+          status: s.status || s.currentStatus || 'Outside Campus',
+        });
+      }
+    });
+
+    // 3. Fallback to studentScans if empty
+    if (studentMap.size === 0) {
+      studentScans.forEach((s) => {
+        const key = (s.studentId || s.rollNo || s.id || '').toUpperCase();
+        if (key && !studentMap.has(key)) {
+          studentMap.set(key, s);
+        }
+      });
+    }
+
+    const allStudents = Array.from(studentMap.values());
     let pool: any[] = [];
     if (studentFilter === 'inside') {
-      pool = studentScans.filter((s) => s.status === 'Inside Campus' || s.currentStatus === 'Inside Campus');
-      if (pool.length === 0 && studentDirectory.length > 0) {
-        // Fallback to active registered students
-        pool = studentDirectory.slice(0, 15);
-      }
+      pool = allStudents.filter((s) => (s.status || s.currentStatus || '').toLowerCase().includes('inside'));
     } else if (studentFilter === 'history') {
       pool = studentMovements.length > 0 ? studentMovements : studentScans;
     } else {
-      pool = studentDirectory.length > 0 ? studentDirectory : studentScans;
+      pool = allStudents;
     }
 
     if (!studentSearch.trim()) return pool;
@@ -541,22 +597,45 @@ export default function WatchmanGateOperations({ user, assignedGate = 'Gate 1 (M
       const dept = (s.department || s.dept || '').toLowerCase();
       return name.includes(q) || id.includes(q) || dept.includes(q);
     });
-  }, [studentFilter, studentScans, studentDirectory, studentMovements, studentSearch]);
+  }, [campusPeople, studentDirectory, studentScans, studentMovements, studentFilter, studentSearch]);
 
   const displayedStaff = useMemo(() => {
-    let pool: any[] = staffDirectory;
-    if (staffFilter === 'inside') {
-      // Find staff who have last movement as 'In'
-      const inIds = new Set(
-        staffMovements
-          .filter((m) => (m.movementType || m.direction || '').toUpperCase() === 'IN')
-          .map((m) => m.staffId || m.id)
-      );
-      if (inIds.size > 0) {
-        pool = staffDirectory.filter((st) => inIds.has(st.staffId || st.id));
-      } else {
-        pool = staffDirectory.slice(0, 15);
+    const staffMap = new Map<string, any>();
+
+    // 1. Live registered campus people
+    campusPeople
+      .filter((p) => (p.personType || '').toUpperCase() === 'STAFF')
+      .forEach((p) => {
+        const key = (p.personId || p._id || '').toUpperCase();
+        staffMap.set(key, {
+          ...p,
+          staffId: p.personId,
+          employeeId: p.personId,
+          staffName: p.name,
+          name: p.name,
+          department: p.department || 'General',
+          currentStatus: p.currentStatus || 'Outside Campus',
+          designation: p.designation || 'Staff',
+        });
+      });
+
+    // 2. Merge from staff directory
+    staffDirectory.forEach((st) => {
+      const key = (st.staffId || st.employeeId || st.id || '').toUpperCase();
+      if (key && !staffMap.has(key)) {
+        staffMap.set(key, {
+          ...st,
+          staffId: key,
+          staffName: st.name || st.staffName,
+          currentStatus: st.currentStatus || 'Outside Campus',
+        });
       }
+    });
+
+    const allStaff = Array.from(staffMap.values());
+    let pool: any[] = allStaff;
+    if (staffFilter === 'inside') {
+      pool = allStaff.filter((st) => (st.currentStatus || '').toLowerCase().includes('inside'));
     } else if (staffFilter === 'history') {
       pool = staffMovements;
     }
@@ -569,7 +648,7 @@ export default function WatchmanGateOperations({ user, assignedGate = 'Gate 1 (M
       const dept = (st.department || st.dept || '').toLowerCase();
       return name.includes(q) || id.includes(q) || dept.includes(q);
     });
-  }, [staffDirectory, staffMovements, staffFilter, staffSearch]);
+  }, [campusPeople, staffDirectory, staffMovements, staffFilter, staffSearch]);
 
   const displayedHODs = useMemo(() => {
     const hodMap = new Map<string, any>();

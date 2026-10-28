@@ -7,7 +7,7 @@ import {
   Sparkles, Camera, CameraOff, AlertCircle, UserPlus,
   LogIn, LogOut, GraduationCap, UserCheck, ShieldCheck,
   ChevronRight, Calendar, Upload, Image as ImageIcon,
-  Car, Eye, Filter
+  Car, Eye, Filter, Printer, Download, ExternalLink
 } from 'lucide-react';
 import {
   lookupCampusPerson,
@@ -16,6 +16,9 @@ import {
   getCampusMovementStats,
   verifyVisitorPass,
   recordVisitorExit,
+  recordVisitorCampusIn,
+  recordVisitorCampusOut,
+  getAllVisitors,
   admitPreRegisteredVisitor,
   getActiveVisitors,
   getCampusPeople,
@@ -152,48 +155,45 @@ const QrVerificationPage = () => {
     }
   }, []);
 
-  // Fetch Registered & Pre-Registered Visitors strictly
+  // Fetch Registered & Pre-Registered Visitors strictly from backend
   const fetchVisitors = useCallback(async () => {
     try {
       setLoadingVisitors(true);
-      const [activeRes, preRegRes, histRes] = await Promise.allSettled([
-        getActiveVisitors(),
-        getPreRegisteredVisitors(),
-        getVisitorHistory()
-      ]);
+      const res = await getAllVisitors().catch(() => null);
+      if (res?.data?.success && Array.isArray(res.data.data)) {
+        setVisitorsList(res.data.data);
+      } else {
+        const [activeRes, preRegRes, histRes] = await Promise.allSettled([
+          getActiveVisitors(),
+          getPreRegisteredVisitors(),
+          getVisitorHistory()
+        ]);
 
-      const activeList = activeRes.status === 'fulfilled' && Array.isArray(activeRes.value?.data?.data)
-        ? activeRes.value.data.data
-        : (Array.isArray(activeRes.value?.data) ? activeRes.value.data : []);
+        const activeList = activeRes.status === 'fulfilled' && Array.isArray(activeRes.value?.data?.data)
+          ? activeRes.value.data.data
+          : (Array.isArray(activeRes.value?.data) ? activeRes.value.data : []);
 
-      const preRegList = preRegRes.status === 'fulfilled' && Array.isArray(preRegRes.value?.data?.data)
-        ? preRegRes.value.data.data
-        : (Array.isArray(preRegRes.value?.data) ? preRegRes.value.data : []);
+        const preRegList = preRegRes.status === 'fulfilled' && Array.isArray(preRegRes.value?.data?.data)
+          ? preRegRes.value.data.data
+          : (Array.isArray(preRegRes.value?.data) ? preRegRes.value.data : []);
 
-      const histList = histRes.status === 'fulfilled' && Array.isArray(histRes.value?.data?.data)
-        ? histRes.value.data.data
-        : (Array.isArray(histRes.value?.data) ? histRes.value.data : []);
+        const histList = histRes.status === 'fulfilled' && Array.isArray(histRes.value?.data?.data)
+          ? histRes.value.data.data
+          : (Array.isArray(histRes.value?.data) ? histRes.value.data : []);
 
-      // Merge and deduplicate by _id or passNumber
-      const visitorMap = new Map();
-      // 1. Add active visitors (highest priority)
-      activeList.forEach(v => {
-        if (v?._id) visitorMap.set(String(v._id), { ...v, status: 'Inside' });
-      });
-      // 2. Add pre-registered visitors
-      preRegList.forEach(v => {
-        if (v?._id && !visitorMap.has(String(v._id))) {
-          visitorMap.set(String(v._id), v);
-        }
-      });
-      // 3. Add history / checked out visitors
-      histList.forEach(v => {
-        if (v?._id && !visitorMap.has(String(v._id))) {
-          visitorMap.set(String(v._id), v);
-        }
-      });
+        const visitorMap = new Map();
+        activeList.forEach(v => {
+          if (v?._id) visitorMap.set(String(v._id), { ...v, status: v.status || 'Inside Campus' });
+        });
+        preRegList.forEach(v => {
+          if (v?._id && !visitorMap.has(String(v._id))) visitorMap.set(String(v._id), v);
+        });
+        histList.forEach(v => {
+          if (v?._id && !visitorMap.has(String(v._id))) visitorMap.set(String(v._id), v);
+        });
 
-      setVisitorsList(Array.from(visitorMap.values()));
+        setVisitorsList(Array.from(visitorMap.values()));
+      }
     } catch (err) {
       console.error('Failed to load visitors list:', err);
     } finally {
@@ -224,7 +224,7 @@ const QrVerificationPage = () => {
       try {
         const match = code.match(/[?&]code=([^&#]+)/);
         if (match && match[1]) code = decodeURIComponent(match[1]).trim();
-      } catch (_) {}
+      } catch (_) { }
     }
 
     if (type === 'visitor' || (code && (code.startsWith('PASS-') || code.startsWith('V-')))) {
@@ -305,7 +305,7 @@ const QrVerificationPage = () => {
       scanIntervalRef.current = null;
     }
 
-    loadQrScannerEngine().catch(() => {});
+    loadQrScannerEngine().catch(() => { });
 
     scanIntervalRef.current = setInterval(async () => {
       const video = videoRef.current;
@@ -396,13 +396,13 @@ const QrVerificationPage = () => {
   // ══════════════════════════════════════════════════════════
   // SCANNER 1: LOOKUP MEMBER (STUDENT, STAFF, HOD)
   // ══════════════════════════════════════════════════════════
-  const handleLookupMember = async (codeToLookup, isSilent = false) => {
+  const handleLookupMember = async (codeToLookup, isSilent = false, fallbackPerson = null) => {
     let code = (codeToLookup || searchInput).trim();
     if (code.includes('code=')) {
       try {
         const match = code.match(/[?&]code=([^&#]+)/);
         if (match && match[1]) code = decodeURIComponent(match[1]).trim();
-      } catch (_) {}
+      } catch (_) { }
     }
 
     if (!code) {
@@ -418,7 +418,7 @@ const QrVerificationPage = () => {
         message: `Visitor Pass detected ("${code}"). This scanner is strictly for Students, Staff, and HODs.`
       });
       setErrorMsg('');
-      setIdentifiedPerson(null);
+      if (!isSilent) setIdentifiedPerson(null);
       return;
     }
 
@@ -438,19 +438,18 @@ const QrVerificationPage = () => {
             name: res.data.person.name,
             message: `Visitor Pass detected (${res.data.person.name} - ${res.data.person.personId}). This scanner is strictly for Students, Staff, and HODs.`
           });
-          setIdentifiedPerson(null);
+          if (!isSilent) setIdentifiedPerson(null);
           return;
         }
 
         setIdentifiedPerson(res.data.person);
         setPersonMovements(res.data.movements || []);
         setSearchInput(res.data.person.personId);
-      } else {
+      } else if (!isSilent) {
         setIdentifiedPerson(null);
         setErrorMsg(`No registered student, staff, or HOD found matching "${code}". Please register them using "Register Person".`);
       }
     } catch (err) {
-      setIdentifiedPerson(null);
       if (err.response?.data?.isVisitorPass) {
         setCrossScanAlert({
           type: 'visitor_on_members',
@@ -458,11 +457,26 @@ const QrVerificationPage = () => {
           name: err.response.data.name,
           message: err.response.data.message || `Visitor Pass detected. This scanner is strictly for Students, Staff, and HODs.`
         });
-      } else {
+        if (!isSilent) setIdentifiedPerson(null);
+      } else if (!isSilent) {
+        setIdentifiedPerson(null);
         setErrorMsg(err.response?.data?.message || `No registered student, staff, or HOD found matching "${code}".`);
       }
     } finally {
       if (!isSilent) setLookingUp(false);
+    }
+  };
+
+  const handleSelectMemberCard = (m) => {
+    if (!m) return;
+    setErrorMsg('');
+    setSuccessMsg('');
+    setCrossScanAlert(null);
+    setIdentifiedPerson(m);
+    setSearchInput(m.personId || '');
+    const lookupKey = (m._id ? m._id.toString() : m.personId) || '';
+    if (lookupKey) {
+      handleLookupMember(lookupKey, true, m);
     }
   };
 
@@ -494,7 +508,7 @@ const QrVerificationPage = () => {
     } catch (err) {
       const serverMsg = err.response?.data?.message;
       const serverErr = err.response?.data?.error;
-      const displayMsg = (serverMsg && serverErr && serverMsg !== serverErr) 
+      const displayMsg = (serverMsg && serverErr && serverMsg !== serverErr)
         ? `${serverMsg}: ${serverErr}`
         : (serverMsg || serverErr || 'Failed to record Campus In');
       setErrorMsg(displayMsg);
@@ -527,7 +541,7 @@ const QrVerificationPage = () => {
     } catch (err) {
       const serverMsg = err.response?.data?.message;
       const serverErr = err.response?.data?.error;
-      const displayMsg = (serverMsg && serverErr && serverMsg !== serverErr) 
+      const displayMsg = (serverMsg && serverErr && serverMsg !== serverErr)
         ? `${serverMsg}: ${serverErr}`
         : (serverMsg || serverErr || 'Failed to record Campus Out');
       setErrorMsg(displayMsg);
@@ -539,50 +553,29 @@ const QrVerificationPage = () => {
   // ══════════════════════════════════════════════════════════
   // SCANNER 2: LOOKUP & VERIFY VISITOR PASS
   // ══════════════════════════════════════════════════════════
-  const handleLookupVisitorDirect = async (code, silentPreload = false) => {
+  const handleLookupVisitorDirect = async (code, keepCurrent = false) => {
     if (!code) return;
     let cleanCode = code.toString().trim();
     if (cleanCode.includes('code=')) {
       try {
         const match = cleanCode.match(/[?&]code=([^&#]+)/);
         if (match && match[1]) cleanCode = decodeURIComponent(match[1]).trim();
-      } catch (_) {}
+      } catch (_) { }
     }
     setPassQuery(cleanCode);
-
-    // If matching active visitor is already in state, sync immediately
-    if (!silentPreload) {
-      const matched = (visitorsList || []).find(
-        v => (v.passNumber && v.passNumber.toLowerCase() === cleanCode.toLowerCase()) ||
-             (v.visitorId && v.visitorId.toLowerCase() === cleanCode.toLowerCase()) ||
-             (v.phone && v.phone === cleanCode)
-      );
-      if (matched) {
-        setVisitorResult({
-          success: true,
-          valid: true,
-          validationStatus: matched.status === 'Inside' ? 'INSIDE' : 'VALID',
-          statusMessage: matched.status === 'Inside'
-            ? 'Visitor is currently inside campus (Active Pass). Ready for departure checkout.'
-            : 'Pass verified against campus security registry.',
-          data: matched,
-          visitor: matched
-        });
-        silentPreload = true;
-      }
-    }
 
     try {
       setVisitorLoading(true);
       setErrorMsg('');
       setCrossScanAlert(null);
-      if (!silentPreload) {
+      if (!keepCurrent) {
         setVisitorResult(null);
       }
+
       const res = await verifyVisitorPass(cleanCode);
       if (res.data?.success && res.data?.data) {
         setVisitorResult(res.data);
-      } else if (!silentPreload) {
+      } else if (!keepCurrent) {
         setVisitorResult(null);
         setErrorMsg(res.data?.message || 'Visitor pass record not found.');
       }
@@ -593,11 +586,11 @@ const QrVerificationPage = () => {
           code: cleanCode,
           name: err.response.data.name,
           personType: err.response.data.personType,
-          message: err.response.data.message || `College member pass detected. This scanner is strictly for Visitors and Pre-Registered Visitors.`
+          message: err.response.data.message || `College member pass detected. This area is strictly for Visitors.`
         });
         setVisitorResult(null);
-      } else {
-        if (!silentPreload) setVisitorResult(null);
+      } else if (!keepCurrent) {
+        setVisitorResult(null);
         setErrorMsg(err.response?.data?.message || 'Verification failed. Pass record not found.');
       }
     } finally {
@@ -612,67 +605,140 @@ const QrVerificationPage = () => {
 
   const handleSelectVisitorCard = (v) => {
     if (!v) return;
-    const pNum = (v.passNumber || v.visitorId || '').trim();
-    setPassQuery(pNum);
     setErrorMsg('');
+    setSuccessMsg('');
     setCrossScanAlert(null);
+    const pCode = (v.passNumber || v.visitorId || (v._id ? v._id.toString() : '')).trim();
+    setPassQuery(pCode);
+
+    const isInsideNow = v.status === 'Inside Campus' || v.status === 'Inside';
+    const isExitedNow = v.status === 'Exited' || v.status === 'Checked Out';
+
+    // Show the selected visitor's details immediately so clicking any person shows THAT person's data
     setVisitorResult({
       success: true,
-      valid: true,
-      validationStatus: v.status === 'Inside' ? 'INSIDE' : 'VALID',
-      statusMessage: v.status === 'Inside'
-        ? 'Visitor is currently inside campus (Active Pass). Ready for departure checkout.'
-        : 'Pass verified against campus security registry.',
+      valid: !isExitedNow,
       data: v,
-      visitor: v
+      visitor: v,
+      status: v.status,
+      validationStatus: isInsideNow ? 'INSIDE' : isExitedNow ? 'ALREADY_USED' : 'REGISTERED',
+      statusMessage: isInsideNow
+        ? `Visitor is currently inside campus (entered at ${v.entryTime ? new Date(v.entryTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'earlier today'}). Ready for Campus Out (Logout).`
+        : isExitedNow
+          ? `Pass has already been used and visitor exited on ${v.exitTime ? new Date(v.exitTime).toLocaleString('en-IN') : 'earlier'}. Pass is archived.`
+          : 'Visitor pass is registered and verified. Ready for Campus In (Login).'
     });
-    if (pNum) {
-      handleLookupVisitorDirect(pNum, true);
+
+    // Sync live from database without wiping the current card
+    if (v._id) {
+      handleLookupVisitorDirect(v._id.toString(), true);
+    } else if (pCode) {
+      handleLookupVisitorDirect(pCode, true);
     }
   };
 
-  const handleQuickCheckoutVisitor = async (vOverride) => {
+  // Login / Campus In Action
+  const handleRecordVisitorIn = async (vOverride) => {
     const v = vOverride || visitorResult?.data || visitorResult?.visitor || visitorResult;
-    if (!v?._id) return;
+    const targetId = v?._id || v?.passNumber || v?.visitorId;
+    if (!targetId) return;
     try {
       setVisitorLoading(true);
       setErrorMsg('');
-      const res = await recordVisitorExit(v._id);
+      setSuccessMsg('');
+      const res = await recordVisitorCampusIn(targetId, { gate, remarks: remarks.trim() || 'Gate Entry Authorized' });
       if (res.data?.success) {
-        setSuccessMsg(`Visitor ${v.name || 'Pass'} has been successfully Checked Out (Logged Out).`);
-        if (v.passNumber) {
-          handleLookupVisitorDirect(v.passNumber);
-        }
+        setSuccessMsg(`Campus In recorded! Visitor ${v.name || 'Pass'} is now LOGGED IN (Inside Campus).`);
+        setRemarks('');
+        const updatedVisitor = {
+          ...v,
+          ...(res.data?.data || {}),
+          status: 'Inside Campus',
+          entryTime: res.data?.data?.entryTime || new Date().toISOString()
+        };
+        setVisitorResult({
+          success: true,
+          valid: true,
+          data: updatedVisitor,
+          visitor: updatedVisitor,
+          status: 'Inside Campus',
+          validationStatus: 'INSIDE',
+          statusMessage: 'Visitor is currently inside campus (entered just now). Ready for departure checkout.'
+        });
         fetchVisitors();
         fetchStats();
       }
     } catch (e) {
-      setErrorMsg(e.response?.data?.message || 'Checkout failed');
+      setErrorMsg(e.response?.data?.message || 'Failed to record Campus In');
     } finally {
       setVisitorLoading(false);
     }
   };
 
-  const handleQuickAdmitVisitor = async (vOverride) => {
+  // Logout / Campus Out Action
+  const handleRecordVisitorOut = async (vOverride) => {
     const v = vOverride || visitorResult?.data || visitorResult?.visitor || visitorResult;
-    if (!v?._id) return;
+    const targetId = v?._id || v?.passNumber || v?.visitorId;
+    if (!targetId) return;
     try {
       setVisitorLoading(true);
       setErrorMsg('');
-      const res = await admitPreRegisteredVisitor(v._id, { gate });
+      setSuccessMsg('');
+      const res = await recordVisitorCampusOut(targetId, { gate, remarks: remarks.trim() || 'Gate Departure Logged' });
       if (res.data?.success) {
-        setSuccessMsg(`Pre-registered visitor ${v.name || 'Pass'} admitted successfully (Logged In).`);
-        if (v.passNumber) {
-          handleLookupVisitorDirect(v.passNumber);
-        }
+        setSuccessMsg(`Campus Out recorded! Visitor ${v.name || 'Pass'} is now LOGGED OUT (Exited Campus).`);
+        setRemarks('');
+        const updatedVisitor = {
+          ...v,
+          ...(res.data?.data || {}),
+          status: 'Exited',
+          exitTime: res.data?.data?.exitTime || new Date().toISOString()
+        };
+        setVisitorResult({
+          success: true,
+          valid: false,
+          data: updatedVisitor,
+          visitor: updatedVisitor,
+          status: 'Exited',
+          validationStatus: 'ALREADY_USED',
+          statusMessage: 'Visitor has completed visit and departed campus.'
+        });
         fetchVisitors();
         fetchStats();
       }
     } catch (e) {
-      setErrorMsg(e.response?.data?.message || 'Admission failed');
+      setErrorMsg(e.response?.data?.message || 'Failed to record Campus Out');
     } finally {
       setVisitorLoading(false);
     }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownloadQr = () => {
+    const v = visitorResult?.data || visitorResult?.visitor || visitorResult;
+    if (!v) return;
+    const passCode = v.passNumber || v.visitorId || v._id;
+    const verifyUrl = `${window.location.origin}/watchman/qr-verification?type=visitor&code=${encodeURIComponent(passCode)}`;
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=10&data=${encodeURIComponent(verifyUrl)}`;
+
+    fetch(qrImageUrl)
+      .then(res => res.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `visitor_pass_${passCode}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      })
+      .catch(() => {
+        window.open(qrImageUrl, '_blank');
+      });
   };
 
   // Helper Badge Colors
@@ -722,9 +788,10 @@ const QrVerificationPage = () => {
 
   // Filter visitors
   const filteredVisitors = visitorsList.filter(v => {
-    if (visitorStatusFilter === 'Inside' && v.status !== 'Inside') return false;
+    if (visitorStatusFilter === 'Registered' && v.status !== 'Registered') return false;
+    if (visitorStatusFilter === 'Inside' && v.status !== 'Inside' && v.status !== 'Inside Campus') return false;
+    if (visitorStatusFilter === 'Exited' && v.status !== 'Exited' && v.status !== 'Checked Out') return false;
     if (visitorStatusFilter === 'Pre-Registered' && v.status !== 'Pre-Registered') return false;
-    if (visitorStatusFilter === 'Checked Out' && v.status !== 'Checked Out') return false;
 
     if (visitorSearch.trim()) {
       const q = visitorSearch.trim().toLowerCase();
@@ -740,9 +807,10 @@ const QrVerificationPage = () => {
     return true;
   });
 
-  const visitorInsideCount = visitorsList.filter(v => v.status === 'Inside').length;
+  const visitorRegisteredCount = visitorsList.filter(v => v.status === 'Registered').length;
+  const visitorInsideCount = visitorsList.filter(v => v.status === 'Inside' || v.status === 'Inside Campus').length;
+  const visitorExitedCount = visitorsList.filter(v => v.status === 'Exited' || v.status === 'Checked Out').length;
   const visitorPreRegCount = visitorsList.filter(v => v.status === 'Pre-Registered').length;
-  const visitorCheckedOutCount = visitorsList.filter(v => v.status === 'Checked Out').length;
 
   return (
     <div className="wmn-page-container">
@@ -753,13 +821,13 @@ const QrVerificationPage = () => {
             <QrCode size={24} style={{ color: '#2563eb' }} />
             <span>
               {activeMode === 'visitor_scanner'
-                ? 'Visitor & Pre-Visitor Pass Scanner'
+                ? 'Visitor Pass Verification'
                 : 'Member QR Scanner (Students, Staff & HOD)'}
             </span>
           </h2>
           <p>
             {activeMode === 'visitor_scanner'
-              ? 'Dedicated Visitor Pass Scanner: Verify visitor passes, admit pre-registered appointments, and log campus departures in real time.'
+              ? 'Real-Time ERP Visitor Verification: Inspect individual visitor credentials, verify unique QR passes, and record live Campus In / Campus Out movements.'
               : 'Dedicated Member Scanner: Track Student Roll Nos, Staff IDs, and HOD QR badges with instant Login / Logout campus movement.'}
           </p>
         </div>
@@ -873,7 +941,7 @@ const QrVerificationPage = () => {
           }}
         >
           <ShieldCheck size={20} />
-          <span>Visitor & Pre-Visitor Pass Scanner</span>
+          <span>Visitor Pass Verification</span>
           <span style={{
             fontSize: '0.74rem',
             padding: '2px 8px',
@@ -940,22 +1008,22 @@ const QrVerificationPage = () => {
         ) : (
           <>
             <div style={{ padding: '12px 16px', background: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ShieldCheck size={20} />
+              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={20} />
               </div>
               <div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Active Visitors Inside</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#059669' }}>{visitorInsideCount}</div>
+                <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Registered Visitors</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#2563eb' }}>{visitorRegisteredCount}</div>
               </div>
             </div>
 
             <div style={{ padding: '12px 16px', background: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Calendar size={20} />
+              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ShieldCheck size={20} />
               </div>
               <div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Pre-Registered Expected</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#2563eb' }}>{visitorPreRegCount}</div>
+                <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Active Inside Campus</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#059669' }}>{visitorInsideCount}</div>
               </div>
             </div>
 
@@ -964,14 +1032,14 @@ const QrVerificationPage = () => {
                 <ExitIcon size={20} />
               </div>
               <div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Departed / Checked Out</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#64748b' }}>{visitorCheckedOutCount}</div>
+                <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Departed / Exited</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#64748b' }}>{visitorExitedCount}</div>
               </div>
             </div>
 
             <div style={{ padding: '12px 16px', background: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Users size={20} />
+                <Clock size={20} />
               </div>
               <div>
                 <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Total Visitors Logged</div>
@@ -1012,11 +1080,22 @@ const QrVerificationPage = () => {
           fontSize: '0.88rem',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
           gap: '10px',
           marginBottom: '18px'
         }}>
-          <AlertCircle size={18} style={{ color: '#dc2626', flexShrink: 0 }} />
-          <span>{errorMsg}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertCircle size={18} style={{ color: '#dc2626', flexShrink: 0 }} />
+            <span>{errorMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setErrorMsg('')}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#991b1b', display: 'flex', alignItems: 'center', padding: '2px' }}
+            title="Dismiss"
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
 
@@ -1086,183 +1165,9 @@ const QrVerificationPage = () => {
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {activeMode === 'members_scanner' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 0.85fr', gap: '24px' }}>
-          {/* Left Column: Search Gun + Camera + AUTOMATICALLY SHOWN REGISTERED MEMBERS */}
+          {/* Left Column: Clean Registered Members Directory */}
           <div>
-            {/* 1. Barcode Scan Gun / Search Input at Top */}
-            <div className="wmn-card" style={{ marginBottom: '16px', border: '1.5px solid #93c5fd', background: '#f8fafc' }}>
-              <div className="wmn-card-header" style={{ marginBottom: '10px' }}>
-                <div className="wmn-card-title">
-                  <Search size={18} style={{ color: '#2563eb' }} />
-                  <h3 style={{ fontSize: '0.95rem' }}>Barcode Scanner Gun / Manual Member Search</h3>
-                </div>
-                <span style={{ fontSize: '0.72rem', background: '#eff6ff', color: '#1d4ed8', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                  Supports Roll #, Staff ID & Phone
-                </span>
-              </div>
-              <form onSubmit={(e) => { e.preventDefault(); handleLookupMember(); }}>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <input
-                      type="text"
-                      className="wmn-form-input"
-                      style={{ paddingLeft: '36px', fontSize: '0.92rem', fontWeight: 600 }}
-                      placeholder="Scan barcode gun or enter Student Roll #, Staff ID, Mobile #..."
-                      value={searchInput}
-                      onChange={(e) => setSearchInput(e.target.value)}
-                      autoFocus
-                    />
-                    <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                    {searchInput && (
-                      <button
-                        type="button"
-                        onClick={() => setSearchInput('')}
-                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 2 }}
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    type="submit"
-                    className="wmn-btn-primary"
-                    disabled={lookingUp}
-                    style={{ whiteSpace: 'nowrap', padding: '0 18px', fontWeight: 700 }}
-                  >
-                    <Search size={15} />
-                    <span>{lookingUp ? 'Searching...' : 'Search Member'}</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* 2. Live Camera Scanner Box (Compact on Standby) */}
-            <div className="wmn-card" style={{ marginBottom: '16px' }}>
-              <div className="wmn-card-header" style={{ marginBottom: '10px' }}>
-                <div className="wmn-card-title">
-                  <Camera size={18} style={{ color: '#2563eb' }} />
-                  <h3 style={{ fontSize: '0.92rem' }}>Live Camera QR Scanner (Members)</h3>
-                </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  {cameraActive && (
-                    <button
-                      type="button"
-                      className="wmn-btn-sec"
-                      style={{ fontSize: '0.74rem', padding: '4px 8px' }}
-                      onClick={toggleCameraFacing}
-                      title="Flip between front and rear camera"
-                    >
-                      <RefreshCw size={13} />
-                      <span>Flip</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="wmn-btn-sec"
-                    style={{ fontSize: '0.74rem', padding: '4px 10px', background: cameraActive ? '#fee2e2' : '#eff6ff', color: cameraActive ? '#dc2626' : '#2563eb' }}
-                    onClick={cameraActive ? stopCamera : startCamera}
-                  >
-                    {cameraActive ? <><CameraOff size={13} /> Stop Camera</> : <><Camera size={13} /> Start Camera</>}
-                  </button>
-                </div>
-              </div>
-
-              {cameraError && (
-                <div style={{ padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', color: '#92400e', fontSize: '0.78rem', marginBottom: '10px' }}>
-                  {cameraError}
-                </div>
-              )}
-
-              {/* Viewfinder Area */}
-              <div style={{
-                position: 'relative',
-                background: '#0f172a',
-                borderRadius: '10px',
-                overflow: 'hidden',
-                aspectRatio: cameraActive ? '16/9' : '21/9',
-                maxHeight: cameraActive ? '400px' : '150px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: scanPulse ? '2.5px solid #10b981' : '1.5px solid #334155',
-                transition: 'all 0.2s ease'
-              }}>
-                <video
-                  ref={videoRef}
-                  playsInline
-                  muted
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    display: cameraActive ? 'block' : 'none'
-                  }}
-                />
-
-                {!cameraActive && (
-                  <div style={{ textAlign: 'center', color: '#94a3b8', padding: '14px' }}>
-                    <QrCode size={36} style={{ color: '#475569', margin: '0 auto 6px auto' }} />
-                    <p style={{ margin: '0 0 8px 0', fontSize: '0.8rem' }}>Camera scanner is on standby.</p>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                      <button
-                        type="button"
-                        className="wmn-btn-primary"
-                        style={{ fontSize: '0.78rem', padding: '6px 14px' }}
-                        onClick={startCamera}
-                      >
-                        <Camera size={14} />
-                        <span>Activate Camera</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="wmn-btn-sec"
-                        style={{ fontSize: '0.78rem', padding: '6px 14px', background: '#1e293b', color: '#f8fafc', border: '1px solid #475569' }}
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Upload size={14} />
-                        <span>Upload QR File</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {cameraActive && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: '65%',
-                    height: '65%',
-                    border: '2px dashed rgba(255,255,255,0.7)',
-                    borderRadius: '12px',
-                    pointerEvents: 'none',
-                    boxShadow: '0 0 0 9999px rgba(0,0,0,0.35)'
-                  }} />
-                )}
-              </div>
-
-              {/* Upload QR Image file helper */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handleFileUpload}
-              />
-              <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', color: '#64748b' }}>
-                <span>Scan Student Roll No, Staff Employee ID, or HOD QR Pass</span>
-                <button
-                  type="button"
-                  style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload size={12} />
-                  <span>Upload QR Image</span>
-                </button>
-              </div>
-            </div>
-
-            {/* 3. AUTOMATICALLY SHOWN REGISTERED MEMBERS SECTION (Students, Staff & HOD) */}
+            {/* REGISTERED MEMBERS DIRECTORY (Students, Staff & HOD) */}
             <div className="wmn-card">
               <div className="wmn-card-header" style={{ marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
                 <div className="wmn-card-title">
@@ -1363,7 +1268,7 @@ const QrVerificationPage = () => {
                   </p>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto', paddingRight: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '620px', overflowY: 'auto', paddingRight: '4px' }}>
                   {filteredMembers.map(m => {
                     const isInside = m.currentStatus === 'Inside Campus';
                     const badge = getPersonTypeBadge(m.personType);
@@ -1384,11 +1289,7 @@ const QrVerificationPage = () => {
                           cursor: 'pointer',
                           transition: 'all 0.15s ease'
                         }}
-                        onClick={() => {
-                          setIdentifiedPerson(m);
-                          setSearchInput(m.personId);
-                          handleLookupMember(m.personId, true);
-                        }}
+                        onClick={() => handleSelectMemberCard(m)}
                       >
                         {/* Member Identity Details */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1795,170 +1696,24 @@ const QrVerificationPage = () => {
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {activeMode === 'visitor_scanner' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 0.85fr', gap: '24px' }}>
-          {/* Left Column: Pass Search + Camera + AUTOMATICALLY SHOWN REGISTERED & PRE-VISITORS */}
+          {/* Left Column: Registered Visitors Directory */}
           <div>
-            {/* 1. Barcode Scan Gun / Pass Search at Top */}
-            <div className="wmn-card" style={{ marginBottom: '16px', border: '1.5px solid #93c5fd', background: '#f8fafc' }}>
-              <div className="wmn-card-header" style={{ marginBottom: '10px' }}>
-                <div className="wmn-card-title">
-                  <Search size={18} style={{ color: '#2563eb' }} />
-                  <h3 style={{ fontSize: '0.95rem' }}>Barcode Scanner Gun / Manual Visitor Pass Lookup</h3>
-                </div>
-                <span style={{ fontSize: '0.72rem', background: '#eff6ff', color: '#1d4ed8', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                  Supports Pass # & Mobile
-                </span>
-              </div>
-              <form onSubmit={handleVerifyVisitorSubmit}>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <input
-                      type="text"
-                      className="wmn-form-input"
-                      style={{ paddingLeft: '36px', fontSize: '0.92rem', fontWeight: 600 }}
-                      placeholder="Scan pass barcode gun or type Pass # (e.g. PASS-...), Visitor Mobile #..."
-                      value={passQuery}
-                      onChange={(e) => setPassQuery(e.target.value)}
-                      autoFocus
-                    />
-                    <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                    {passQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setPassQuery('')}
-                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 2 }}
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    type="submit"
-                    className="wmn-btn-primary"
-                    disabled={visitorLoading}
-                    style={{ whiteSpace: 'nowrap', padding: '0 18px', fontWeight: 700 }}
-                  >
-                    <Search size={15} />
-                    <span>{visitorLoading ? 'Verifying...' : 'Verify Pass'}</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* 2. Live Camera Scanner Box (Compact on Standby) */}
-            <div className="wmn-card" style={{ marginBottom: '16px' }}>
-              <div className="wmn-card-header" style={{ marginBottom: '12px' }}>
-                <div className="wmn-card-title">
-                  <Camera size={18} style={{ color: '#2563eb' }} />
-                  <h3>Live Camera QR Scanner (Visitor Passes)</h3>
-                </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  {cameraActive && (
-                    <button
-                      type="button"
-                      className="wmn-btn-sec"
-                      style={{ fontSize: '0.74rem', padding: '4px 8px' }}
-                      onClick={toggleCameraFacing}
-                      title="Flip camera"
-                    >
-                      <RefreshCw size={13} />
-                      <span>Flip</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="wmn-btn-sec"
-                    style={{ fontSize: '0.74rem', padding: '4px 10px', background: cameraActive ? '#fee2e2' : '#eff6ff', color: cameraActive ? '#dc2626' : '#2563eb' }}
-                    onClick={cameraActive ? stopCamera : startCamera}
-                  >
-                    {cameraActive ? <><CameraOff size={13} /> Stop Camera</> : <><Camera size={13} /> Start Camera</>}
-                  </button>
-                </div>
-              </div>
-
-              {/* Camera Viewfinder */}
-              <div style={{
-                position: 'relative',
-                background: '#0f172a',
-                borderRadius: '10px',
-                overflow: 'hidden',
-                aspectRatio: cameraActive ? '16/9' : '21/9',
-                maxHeight: cameraActive ? '400px' : '150px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: scanPulse ? '2.5px solid #10b981' : '1.5px solid #334155',
-                transition: 'border 0.2s ease'
-              }}>
-                <video
-                  ref={videoRef}
-                  playsInline
-                  muted
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    display: cameraActive ? 'block' : 'none'
-                  }}
-                />
-
-                {!cameraActive && (
-                  <div style={{ textAlign: 'center', color: '#94a3b8', padding: '14px' }}>
-                    <ShieldCheck size={36} style={{ color: '#475569', margin: '0 auto 6px auto' }} />
-                    <p style={{ margin: '0 0 8px 0', fontSize: '0.8rem' }}>Visitor QR scanner is on standby.</p>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                      <button
-                        type="button"
-                        className="wmn-btn-primary"
-                        style={{ fontSize: '0.78rem', padding: '6px 14px' }}
-                        onClick={startCamera}
-                      >
-                        <Camera size={14} />
-                        <span>Activate Camera</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="wmn-btn-sec"
-                        style={{ fontSize: '0.78rem', padding: '6px 14px', background: '#1e293b', color: '#f8fafc', border: '1px solid #475569' }}
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Upload size={14} />
-                        <span>Upload Pass QR</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {cameraActive && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: '65%',
-                    height: '65%',
-                    border: '2px dashed rgba(255,255,255,0.7)',
-                    borderRadius: '12px',
-                    pointerEvents: 'none',
-                    boxShadow: '0 0 0 9999px rgba(0,0,0,0.35)'
-                  }} />
-                )}
-              </div>
-            </div>
-
-
-
-            {/* 3. AUTOMATICALLY SHOWN REGISTERED & PRE-REGISTERED VISITORS SECTION */}
             <div className="wmn-card">
               <div className="wmn-card-header" style={{ marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
                 <div className="wmn-card-title">
-                  <ShieldCheck size={18} style={{ color: '#2563eb' }} />
-                  <h3>Registered & Pre-Registered Visitors ({filteredVisitors.length})</h3>
+                  <ShieldCheck size={20} style={{ color: '#2563eb' }} />
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>Registered Visitors Directory</h3>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      Showing {filteredVisitors.length} of {visitorsList.length} visitors • Direct individual pass selection
+                    </span>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <button
                     type="button"
                     className="wmn-btn-sec"
-                    style={{ fontSize: '0.74rem', padding: '4px 10px' }}
+                    style={{ fontSize: '0.74rem', padding: '5px 10px' }}
                     onClick={fetchVisitors}
                     title="Refresh visitors from database"
                   >
@@ -1967,12 +1722,12 @@ const QrVerificationPage = () => {
                   </button>
                   <button
                     type="button"
-                    className="wmn-btn-sec"
-                    style={{ fontSize: '0.74rem', padding: '4px 10px', color: '#2563eb' }}
+                    className="wmn-btn-primary"
+                    style={{ fontSize: '0.74rem', padding: '5px 12px', background: '#2563eb' }}
                     onClick={() => navigate('/watchman/visitor-entry')}
                   >
-                    <UserPlus size={12} />
-                    <span>New Visitor Entry</span>
+                    <UserPlus size={13} />
+                    <span>Register New Visitor</span>
                   </button>
                 </div>
               </div>
@@ -1992,10 +1747,11 @@ const QrVerificationPage = () => {
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Filter:</span>
                   {[
-                    { key: 'All', label: `All Visitors (${visitorsList.length})` },
+                    { key: 'All', label: `All (${visitorsList.length})` },
+                    { key: 'Registered', label: `🟡 Registered (${visitorRegisteredCount})` },
                     { key: 'Inside', label: `🟢 Inside Campus (${visitorInsideCount})` },
-                    { key: 'Pre-Registered', label: `🔵 Pre-Registered (${visitorPreRegCount})` },
-                    { key: 'Checked Out', label: `⚪ Checked Out (${visitorCheckedOutCount})` }
+                    { key: 'Exited', label: `⚪ Exited (${visitorExitedCount})` },
+                    { key: 'Pre-Registered', label: `🔵 Pre-Reg (${visitorPreRegCount})` }
                   ].map(tab => (
                     <button
                       key={tab.key}
@@ -2028,18 +1784,41 @@ const QrVerificationPage = () => {
                   <ShieldCheck size={32} style={{ color: '#94a3b8', margin: '0 auto 8px auto' }} />
                   <div style={{ fontWeight: 700, color: '#334155', fontSize: '0.9rem' }}>No visitors found matching filter</div>
                   <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                    Click "New Visitor Entry" above to record a new walk-in visitor.
+                    Click "Register New Visitor" above to record a new visitor.
                   </p>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto', paddingRight: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' }}>
                   {filteredVisitors.map(v => {
-                    const isInside = v.status === 'Inside';
-                    const isPreReg = v.status === 'Pre-Registered';
+                    const status = v.status || 'Registered';
+                    const isInside = status === 'Inside' || status === 'Inside Campus';
+                    const isRegistered = status === 'Registered';
+                    const isExited = status === 'Exited' || status === 'Checked Out';
+                    const isPreReg = status === 'Pre-Registered';
                     const isPreRegApproved = isPreReg && v.approvalStatus === 'Approved';
-                    const isPreRegPending = isPreReg && v.approvalStatus !== 'Approved';
-                    const isCheckedOut = v.status === 'Checked Out';
                     const isSelected = (passQuery === v.passNumber || passQuery === v.visitorId || visitorResult?.data?.passNumber === v.passNumber || visitorResult?.data?._id === v._id);
+
+                    let badgeBg = '#eff6ff';
+                    let badgeColor = '#1d4ed8';
+                    let badgeBorder = '#bfdbfe';
+                    let badgeText = '🟡 REGISTERED';
+
+                    if (isInside) {
+                      badgeBg = '#dcfce7';
+                      badgeColor = '#15803d';
+                      badgeBorder = '#86efac';
+                      badgeText = '🟢 INSIDE CAMPUS';
+                    } else if (isExited) {
+                      badgeBg = '#f1f5f9';
+                      badgeColor = '#475569';
+                      badgeBorder = '#cbd5e1';
+                      badgeText = '⚪ EXITED';
+                    } else if (isPreReg) {
+                      badgeBg = '#e0e7ff';
+                      badgeColor = '#3730a3';
+                      badgeBorder = '#c7d2fe';
+                      badgeText = '🔵 PRE-REGISTERED';
+                    }
 
                     return (
                       <div
@@ -2048,7 +1827,7 @@ const QrVerificationPage = () => {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          padding: '10px 14px',
+                          padding: '12px 14px',
                           borderRadius: '8px',
                           background: isSelected ? '#eff6ff' : '#ffffff',
                           border: isSelected ? '2px solid #2563eb' : '1px solid #e2e8f0',
@@ -2059,29 +1838,29 @@ const QrVerificationPage = () => {
                         onClick={() => handleSelectVisitorCard(v)}
                       >
                         {/* Visitor Details */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
                           <div style={{
-                            width: '36px',
-                            height: '36px',
+                            width: '38px',
+                            height: '38px',
                             borderRadius: '8px',
-                            background: isInside ? '#ecfdf5' : isPreRegApproved ? '#eff6ff' : isPreRegPending ? '#fffbeb' : '#f8fafc',
-                            border: `1px solid ${isInside ? '#6ee7b7' : isPreRegApproved ? '#93c5fd' : isPreRegPending ? '#fde68a' : '#cbd5e1'}`,
-                            color: isInside ? '#059669' : isPreRegApproved ? '#2563eb' : isPreRegPending ? '#d97706' : '#64748b',
+                            background: isInside ? '#ecfdf5' : isRegistered ? '#fffbeb' : '#f8fafc',
+                            border: `1px solid ${isInside ? '#6ee7b7' : isRegistered ? '#fde68a' : '#cbd5e1'}`,
+                            color: isInside ? '#059669' : isRegistered ? '#d97706' : '#64748b',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             flexShrink: 0
                           }}>
-                            <ShieldCheck size={18} />
+                            <ShieldCheck size={20} />
                           </div>
 
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{v.name}</strong>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{v.name}</strong>
                               <span style={{
                                 fontFamily: 'monospace',
                                 fontWeight: 800,
-                                fontSize: '0.75rem',
+                                fontSize: '0.74rem',
                                 color: '#2563eb',
                                 background: '#f1f5f9',
                                 padding: '1px 6px',
@@ -2090,64 +1869,39 @@ const QrVerificationPage = () => {
                                 {v.passNumber || v.visitorId}
                               </span>
                             </div>
-                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
-                              <span>To Meet: <strong>{v.personToMeet || 'Host'}</strong> ({v.department || 'General'})</span>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '3px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                              <span>Host: <strong>{v.personToMeet || '—'}</strong> ({v.department || 'General'})</span>
                               {v.phone ? ` • 📞 ${v.phone}` : ''}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '2px' }}>
+                              {v.entryTime ? `Entered: ${new Date(v.entryTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : `Registered: ${v.createdAt ? new Date(v.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Today'}`}
+                              {v.gate ? ` • ${v.gate}` : ''}
                             </div>
                           </div>
                         </div>
 
                         {/* Status & Quick Action Button */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                           <span style={{
-                            fontSize: '0.74rem',
+                            fontSize: '0.72rem',
                             fontWeight: 800,
                             padding: '3px 8px',
                             borderRadius: '12px',
-                            background: isInside ? '#dcfce7' : isPreRegApproved ? '#eff6ff' : isPreRegPending ? '#fef3c7' : '#f1f5f9',
-                            color: isInside ? '#15803d' : isPreRegApproved ? '#1e40af' : isPreRegPending ? '#b45309' : '#64748b',
-                            border: `1px solid ${isInside ? '#86efac' : isPreRegApproved ? '#bfdbfe' : isPreRegPending ? '#fde68a' : '#cbd5e1'}`,
+                            background: badgeBg,
+                            color: badgeColor,
+                            border: `1px solid ${badgeBorder}`,
                             whiteSpace: 'nowrap'
                           }}>
-                            {isInside ? '🟢 INSIDE' : isPreRegApproved ? '🔵 PRE-REG APPROVED' : isPreRegPending ? '🟡 PENDING' : '⚪ CHECKED OUT'}
+                            {badgeText}
                           </span>
 
                           {/* Quick 1-Click Action */}
-                          {isInside && (
+                          {(isRegistered || (isPreReg && isPreRegApproved)) && (
                             <button
                               type="button"
                               style={{
-                                padding: '5px 12px',
-                                fontSize: '0.76rem',
-                                fontWeight: 800,
-                                borderRadius: '6px',
-                                background: '#dc2626',
-                                color: '#ffffff',
-                                border: 'none',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                boxShadow: '0 2px 4px rgba(220,38,38,0.2)'
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleQuickCheckoutVisitor(v);
-                              }}
-                              disabled={visitorLoading}
-                              title="Checkout Visitor"
-                            >
-                              <ExitIcon size={12} />
-                              <span>Checkout</span>
-                            </button>
-                          )}
-
-                          {isPreRegApproved && (
-                            <button
-                              type="button"
-                              style={{
-                                padding: '5px 12px',
-                                fontSize: '0.76rem',
+                                padding: '5px 10px',
+                                fontSize: '0.74rem',
                                 fontWeight: 800,
                                 borderRadius: '6px',
                                 background: '#059669',
@@ -2156,18 +1910,45 @@ const QrVerificationPage = () => {
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '4px',
-                                boxShadow: '0 2px 4px rgba(5,150,105,0.2)'
+                                gap: '4px'
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleQuickAdmitVisitor(v);
+                                handleRecordVisitorIn(v);
                               }}
                               disabled={visitorLoading}
-                              title="Admit Pre-Registered Visitor"
+                              title="Direct Campus In"
                             >
-                              <Check size={12} />
-                              <span>Admit</span>
+                              <LogIn size={13} />
+                              <span>Campus In</span>
+                            </button>
+                          )}
+
+                          {isInside && (
+                            <button
+                              type="button"
+                              style={{
+                                padding: '5px 10px',
+                                fontSize: '0.74rem',
+                                fontWeight: 800,
+                                borderRadius: '6px',
+                                background: '#dc2626',
+                                color: '#ffffff',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRecordVisitorOut(v);
+                              }}
+                              disabled={visitorLoading}
+                              title="Direct Campus Out"
+                            >
+                              <ExitIcon size={13} />
+                              <span>Campus Out</span>
                             </button>
                           )}
                         </div>
@@ -2183,15 +1964,16 @@ const QrVerificationPage = () => {
           <div>
             {visitorResult ? (() => {
               const visitor = visitorResult.data || visitorResult.visitor || visitorResult;
-              const isInside = visitor?.status === 'Inside';
-              const isCheckedOut = visitor?.status === 'Checked Out';
+              const isInside = visitor?.status === 'Inside' || visitor?.status === 'Inside Campus';
+              const isCheckedOut = visitor?.status === 'Checked Out' || visitor?.status === 'Exited';
+              const isRegistered = visitor?.status === 'Registered' || (!visitor?.status);
               const isPreRegApproved = visitor?.status === 'Pre-Registered' && visitor?.approvalStatus === 'Approved';
               const isPreRegPending = visitor?.status === 'Pre-Registered' && visitor?.approvalStatus !== 'Approved';
               const isExpired = visitor?.status === 'Expired' || visitor?.status === 'Rejected';
 
               const isValid = visitorResult.valid !== undefined
                 ? visitorResult.valid
-                : (isInside || isPreRegApproved || (visitor?.status !== 'Checked Out' && visitor?.status !== 'Expired' && visitor?.status !== 'Rejected'));
+                : (isInside || isRegistered || isPreRegApproved || (!isCheckedOut && !isExpired));
 
               let headerBg = '#dcfce7';
               let headerColor = '#166534';
@@ -2349,54 +2131,67 @@ const QrVerificationPage = () => {
                             padding: '3px 10px',
                             borderRadius: '12px',
                             fontSize: '0.76rem',
-                            background: visitor.status === 'Inside' ? '#ecfdf5' : visitor.status === 'Checked Out' ? '#f1f5f9' : '#eff6ff',
-                            color: visitor.status === 'Inside' ? '#059669' : visitor.status === 'Checked Out' ? '#475569' : '#2563eb',
-                            border: `1px solid ${visitor.status === 'Inside' ? '#6ee7b7' : '#cbd5e1'}`
+                            background: isInside ? '#ecfdf5' : isCheckedOut ? '#f1f5f9' : '#fffbeb',
+                            color: isInside ? '#059669' : isCheckedOut ? '#475569' : '#b45309',
+                            border: `1px solid ${isInside ? '#6ee7b7' : isCheckedOut ? '#cbd5e1' : '#fde68a'}`
                           }}>
-                            {visitor.status === 'Inside' ? '🟢 Inside Campus (Logged In)' : visitor.status === 'Checked Out' ? '⚪ Checked Out (Logged Out)' : visitor.status || 'Active'}
+                            {isInside ? '🟢 Inside Campus (Logged In)' : isCheckedOut ? '⚪ Checked Out (Logged Out)' : isRegistered ? '🟡 Registered (Ready for Login)' : visitor.status || 'Active'}
                           </span>
                         </div>
                       </div>
 
                       <div style={{ display: 'flex', gap: '10px', marginTop: '18px', flexWrap: 'wrap' }}>
-                        {visitor.status === 'Inside' && (
-                          <button
-                            type="button"
-                            className="wmn-btn-primary"
-                            style={{
-                              background: '#dc2626',
-                              flex: 1,
-                              justifyContent: 'center',
-                              padding: '10px 16px',
-                              fontSize: '0.88rem',
-                              fontWeight: 700,
-                              boxShadow: '0 4px 12px rgba(220, 38, 38, 0.25)'
-                            }}
-                            onClick={() => handleQuickCheckoutVisitor()}
-                            disabled={visitorLoading}
-                          >
-                            <ExitIcon size={18} />
-                            <span>Confirm Visitor Exit / Checkout (Logout)</span>
-                          </button>
-                        )}
-
-                        {visitor.status === 'Pre-Registered' && visitor.approvalStatus === 'Approved' && (
+                        {/* 1. Login / Campus In Button for Registered or Approved Pre-Registered Visitors */}
+                        {(isRegistered || isPreRegApproved) && (
                           <button
                             type="button"
                             className="wmn-btn-primary"
                             style={{
                               background: '#059669',
                               flex: 1,
+                              minWidth: '200px',
                               justifyContent: 'center',
-                              padding: '10px 16px',
-                              fontSize: '0.88rem',
-                              fontWeight: 700
+                              padding: '12px 18px',
+                              fontSize: '0.9rem',
+                              fontWeight: 800,
+                              boxShadow: '0 4px 14px rgba(5, 150, 105, 0.25)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
                             }}
-                            onClick={() => handleQuickAdmitVisitor()}
+                            onClick={() => handleRecordVisitorIn(visitor)}
                             disabled={visitorLoading}
+                            title="Authorize visitor entry into campus (Campus In / Login)"
                           >
-                            <Check size={18} />
-                            <span>Admit Pre-Registered Visitor (Login)</span>
+                            <LogIn size={18} />
+                            <span>Login / Campus In</span>
+                          </button>
+                        )}
+
+                        {/* 2. Logout / Campus Out Button for Visitors currently inside */}
+                        {isInside && (
+                          <button
+                            type="button"
+                            className="wmn-btn-primary"
+                            style={{
+                              background: '#dc2626',
+                              flex: 1,
+                              minWidth: '200px',
+                              justifyContent: 'center',
+                              padding: '12px 18px',
+                              fontSize: '0.9rem',
+                              fontWeight: 800,
+                              boxShadow: '0 4px 12px rgba(220, 38, 38, 0.25)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}
+                            onClick={() => handleRecordVisitorOut(visitor)}
+                            disabled={visitorLoading}
+                            title="Log visitor exit from campus (Campus Out / Logout)"
+                          >
+                            <ExitIcon size={18} />
+                            <span>Logout / Campus Out</span>
                           </button>
                         )}
 
@@ -2405,15 +2200,25 @@ const QrVerificationPage = () => {
                           className="wmn-btn-sec"
                           style={{ padding: '10px 16px', fontSize: '0.85rem' }}
                           onClick={() => {
-                            if (visitor.passNumber) {
-                              handleLookupVisitorDirect(visitor.passNumber);
-                            }
+                            const pCode = visitor._id ? visitor._id.toString() : (visitor.passNumber || visitor.visitorId);
+                            if (pCode) handleLookupVisitorDirect(pCode, true);
                           }}
                           disabled={visitorLoading}
                           title="Refresh live status from database"
                         >
                           <RefreshCw size={15} />
                           <span>Refresh Pass</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="wmn-btn-sec"
+                          style={{ padding: '10px 16px', fontSize: '0.85rem' }}
+                          onClick={handlePrint}
+                          title="Print official visitor gate pass slip"
+                        >
+                          <Printer size={15} />
+                          <span>Print Slip</span>
                         </button>
                       </div>
                     </div>
