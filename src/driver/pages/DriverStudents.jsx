@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Users, Search, MapPin, Phone, GraduationCap, ChevronRight, Check, X, 
-  Compass, CheckCircle, Shield, AlertCircle, FileText, Lock, Edit3, 
+  Compass, CheckCircle, Shield, ShieldCheck, AlertCircle, FileText, Lock, Edit3, 
   Calendar, Clock, Filter, Eye, Award, BarChart2, RefreshCw
 } from 'lucide-react';
 import { 
@@ -47,9 +47,131 @@ const DriverStudents = () => {
   const [correctionStatus, setCorrectionStatus] = useState('Present');
   const [correctionReason, setCorrectionReason] = useState('');
   const [isSubmittingCorrection, setIsSubmittingCorrection] = useState(false);
+  const [liveTime, setLiveTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setLiveTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // History Drill-down Modal State
   const [historyModalStudent, setHistoryModalStudent] = useState(null);
+
+  // ── Bulk & Individual Attendance State ──
+  const [attendanceDraft, setAttendanceDraft] = useState({});
+  const [isCustomizing, setIsCustomizing] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSavingBulk, setIsSavingBulk] = useState(false);
+
+  // Sync draft from backend records
+  useEffect(() => {
+    if (!hasUnsavedChanges) {
+      const initial = {};
+      students.forEach(s => {
+        if (attendanceRecords[s.studentId]) {
+          initial[s.studentId] = attendanceRecords[s.studentId].status;
+        }
+      });
+      setAttendanceDraft(initial);
+    }
+  }, [attendanceRecords, students, hasUnsavedChanges]);
+
+  // Bulk: Mark All Present
+  const handleMarkAllPresent = () => {
+    const updated = {};
+    students.forEach(s => {
+      if (attendanceRecords[s.studentId]?.isLocked) {
+        updated[s.studentId] = attendanceRecords[s.studentId].status;
+      } else {
+        updated[s.studentId] = 'Present';
+      }
+    });
+    setAttendanceDraft(updated);
+    setHasUnsavedChanges(true);
+    setNotificationMsg({
+      type: 'info',
+      text: `Draft: All ${students.length} students marked Present. Customize any individual student below, then click "Save Attendance".`
+    });
+  };
+
+  // Bulk: Mark All Absent
+  const handleMarkAllAbsent = () => {
+    const updated = {};
+    students.forEach(s => {
+      if (attendanceRecords[s.studentId]?.isLocked) {
+        updated[s.studentId] = attendanceRecords[s.studentId].status;
+      } else {
+        updated[s.studentId] = 'Absent';
+      }
+    });
+    setAttendanceDraft(updated);
+    setHasUnsavedChanges(true);
+    setNotificationMsg({
+      type: 'info',
+      text: `Draft: All ${students.length} students marked Absent. Customize any individual student below, then click "Save Attendance".`
+    });
+  };
+
+  // Individual Student Status Change (Customize mode or direct click)
+  const handleSetStudentDraft = (studentId, status) => {
+    if (attendanceRecords[studentId]?.isLocked) {
+      alert('Attendance for this student has already been saved and locked. Use the "Correct" action to request changes with an audit reason.');
+      return;
+    }
+    setAttendanceDraft(prev => ({
+      ...prev,
+      [studentId]: status
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  // Save Bulk Attendance to Backend Database
+  const handleSaveAttendance = async () => {
+    if (students.length === 0) return;
+    setIsSavingBulk(true);
+    try {
+      const payload = {
+        date: selectedDate,
+        tripType: 'Pickup',
+        routeId: routeInfo?.routeId || 'R-01',
+        routeName: routeInfo?.name || 'East',
+        vehicleNumber: routeInfo?.vehicle || 'TN 01 AB 1234',
+        driverId: session.referenceId || session._id || 'DRV-0001',
+        driverName: session.name || 'Viji',
+        students: students.map(s => ({
+          studentId: s.studentId,
+          studentName: s.name,
+          rollNo: s.rollNo || s.studentId,
+          pickupPoint: s.pickupPoint || 'Campus Stop',
+          status: attendanceDraft[s.studentId] || (attendanceRecords[s.studentId]?.status || 'Present')
+        }))
+      };
+
+      const res = await markStudentTransportAttendance(payload);
+      if (res && res.data) {
+        const newRecords = { ...attendanceRecords };
+        if (Array.isArray(res.data.records)) {
+          res.data.records.forEach(r => {
+            newRecords[r.studentId] = r;
+          });
+        }
+        setAttendanceRecords(newRecords);
+        setHasUnsavedChanges(false);
+        setIsCustomizing(false);
+        setNotificationMsg({
+          type: 'success',
+          text: res.data.message || `✓ Saved attendance for ${students.length} students to database.`
+        });
+        setTimeout(() => setNotificationMsg(null), 5000);
+        fetchBackendAttendance(routeInfo?.routeId || 'R-01', selectedDate);
+      }
+    } catch (err) {
+      console.error('Failed to save bulk attendance:', err);
+      alert('Failed to save attendance: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsSavingBulk(false);
+    }
+  };
 
   const fetchBackendAttendance = useCallback(async (routeId, targetDate = selectedDate) => {
     try {
@@ -449,10 +571,17 @@ const DriverStudents = () => {
     return Array.from(historyMap.values());
   }, [attendanceReport, students, attendanceRecords]);
 
-  // Overall KPI counts
+  // Active status helper
+  const getActiveStatus = (sId) => {
+    if (attendanceDraft[sId]) return attendanceDraft[sId];
+    if (attendanceRecords[sId]) return attendanceRecords[sId].status;
+    return 'PENDING';
+  };
+
+  // Overall KPI counts (Updates immediately in real time)
   const totalCount = students.length;
-  const presentCount = Object.values(attendanceRecords).filter(a => a.status === 'Present').length;
-  const absentCount = Object.values(attendanceRecords).filter(a => a.status === 'Absent').length;
+  const presentCount = students.filter(s => getActiveStatus(s.studentId) === 'Present').length;
+  const absentCount = students.filter(s => getActiveStatus(s.studentId) === 'Absent').length;
   const pendingCount = Math.max(0, totalCount - (presentCount + absentCount));
 
   const filteredStudents = students.filter(s => {
@@ -460,8 +589,7 @@ const DriverStudents = () => {
       s.studentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (s.pickupPoint && s.pickupPoint.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    const rec = attendanceRecords[s.studentId];
-    const status = rec ? rec.status : 'PENDING';
+    const status = getActiveStatus(s.studentId);
     const matchFilter = 
       selectedFilter === 'ALL' || 
       (selectedFilter === 'PRESENT' && status === 'Present') ||
@@ -481,63 +609,73 @@ const DriverStudents = () => {
   return (
     <div className="driver-page-container" style={{ maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
       
-      {/* ── Breadcrumb & ERP Header ── */}
-      <div className="driver-header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
+      {/* ── Enterprise Real-Time Header Bar ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', background: '#ffffff', padding: '18px 24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', marginBottom: '1.25rem' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
-            <span>Transport Operations</span>
-            <ChevronRight size={12} />
-            <span style={{ color: '#0f172a' }}>Student Attendance & Manifest</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              Student Transit Operations Console
+            </h1>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', fontWeight: 700, color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: '20px', border: '1px solid #a7f3d0' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }}></span>
+              LIVE ROSTER SYNC
+            </span>
           </div>
-          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.01em' }}>
-            Student Attendance Register & Boarding
-          </h1>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.88rem', fontWeight: 500 }}>
+            Transit Manifest • Route <strong>{routeInfo?.name || 'East'}</strong> ({routeInfo?.routeId || 'R-01'}) • Driver <strong>{session.name || 'Driver'}</strong> ({session.referenceId || 'DRV-0001'})
+          </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           {/* Main Top Tab Switcher */}
-          <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '6px', padding: '2px' }}>
+          <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '8px', padding: '3px' }}>
             <button 
               onClick={() => setActiveTab('manifest')}
               style={{
-                padding: '0.4rem 0.85rem',
-                borderRadius: '5px',
+                padding: '0.45rem 0.95rem',
+                borderRadius: '6px',
                 border: 'none',
-                fontSize: '0.8rem',
+                fontSize: '0.82rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 background: activeTab === 'manifest' ? '#2563eb' : 'transparent',
                 color: activeTab === 'manifest' ? '#ffffff' : '#64748b',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.35rem'
+                gap: '0.4rem',
+                transition: 'all 0.15s ease'
               }}
             >
-              <Users size={14} /> Passenger Manifest
+              <Users size={15} /> Passenger Manifest
             </button>
             <button 
               onClick={() => setActiveTab('report')}
               style={{
-                padding: '0.4rem 0.85rem',
-                borderRadius: '5px',
+                padding: '0.45rem 0.95rem',
+                borderRadius: '6px',
                 border: 'none',
-                fontSize: '0.8rem',
+                fontSize: '0.82rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 background: activeTab === 'report' ? '#2563eb' : 'transparent',
                 color: activeTab === 'report' ? '#ffffff' : '#64748b',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.35rem'
+                gap: '0.4rem',
+                transition: 'all 0.15s ease'
               }}
             >
-              <FileText size={14} /> Attendance Report & History
+              <FileText size={15} /> Attendance Report & History
             </button>
           </div>
 
-          <span style={{ fontSize: '0.78rem', color: '#1e293b', fontWeight: 700, background: '#e2e8f0', padding: '0.35rem 0.75rem', borderRadius: '6px' }}>
-            Route: {routeInfo?.name || 'East'} ({routeInfo?.routeId || 'R-01'})
-          </span>
+          <button 
+            onClick={() => window.location.reload()}
+            title="Refresh Roster Data"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', color: '#334155' }}
+          >
+            <RefreshCw size={15} /> Refresh
+          </button>
         </div>
       </div>
 
@@ -975,6 +1113,133 @@ const DriverStudents = () => {
       ) : (
         /* ── Passenger Manifest & Active Attendance ── */
         <div>
+          {/* ── Bulk Attendance Action Bar ── */}
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #cbd5e1',
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.75rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', marginRight: '0.2rem' }}>
+                ⚡ Bulk Actions:
+              </span>
+              <button
+                type="button"
+                onClick={handleMarkAllPresent}
+                style={{
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: '6px',
+                  border: '1px solid #86efac',
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+              >
+                <Check size={14} /> Mark All Present
+              </button>
+
+              <button
+                type="button"
+                onClick={handleMarkAllAbsent}
+                style={{
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: '6px',
+                  border: '1px solid #fca5a5',
+                  background: '#dc2626',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+              >
+                <X size={14} /> Mark All Absent
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsCustomizing(prev => !prev)}
+                style={{
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: '6px',
+                  border: isCustomizing ? '2px solid #2563eb' : '1px solid #bfdbfe',
+                  background: isCustomizing ? '#eff6ff' : '#ffffff',
+                  color: '#1d4ed8',
+                  fontWeight: 700,
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}
+              >
+                <Edit3 size={14} /> {isCustomizing ? 'Done Customizing' : 'Customize Attendance'}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {hasUnsavedChanges && (
+                <span style={{ fontSize: '0.76rem', color: '#b45309', fontWeight: 700, background: '#fef3c7', padding: '0.25rem 0.6rem', borderRadius: '4px', border: '1px solid #fde68a' }}>
+                  ⚠️ Unsaved Draft
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleSaveAttendance}
+                disabled={isSavingBulk}
+                style={{
+                  padding: '0.45rem 1.15rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: '#047857',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: isSavingBulk ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  boxShadow: '0 2px 4px rgba(4, 120, 87, 0.25)',
+                  opacity: isSavingBulk ? 0.7 : 1
+                }}
+              >
+                {isSavingBulk ? (
+                  <>
+                    <RefreshCw size={14} /> Saving to Database...
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck size={15} /> Save Attendance
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {isCustomizing && (
+            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.65rem 1rem', marginBottom: '1rem', fontSize: '0.78rem', color: '#1e40af', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span>✏️</span>
+              <span><strong>Customize Mode Active:</strong> Click Present or Absent on any student below to modify their status without affecting other passengers. When finished, click <strong>Save Attendance</strong>.</span>
+            </div>
+          )}
+
           {/* ── Search & Filter Controls ── */}
           <div className="driver-search-filter-bar" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div style={{ position: 'relative', flex: '1 1 300px', maxWidth: '420px', width: '100%' }}>
@@ -1033,8 +1298,8 @@ const DriverStudents = () => {
                     {filteredStudents.map((student, idx) => {
                       const phone = student.studentProfile?.user?.phone || 'N/A';
                       const rec = attendanceRecords[student.studentId];
-                      const status = rec ? rec.status : 'PENDING';
                       const isLocked = rec ? rec.isLocked : false;
+                      const status = getActiveStatus(student.studentId);
                       const isLoading = actionLoading[student.studentId];
 
                       return (
@@ -1118,42 +1383,40 @@ const DriverStudents = () => {
                                 </button>
                               </div>
                             ) : (
-                              /* Unsubmitted State: Active Present / Absent Buttons */
+                              /* Draft / Customization Controls: Present / Absent Buttons */
                               <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
                                 <button
-                                  disabled={isLoading}
-                                  onClick={() => handleMarkAttendance(student, 'Present')}
+                                  type="button"
+                                  onClick={() => handleSetStudentDraft(student.studentId, 'Present')}
                                   style={{
                                     padding: '0.25rem 0.65rem',
                                     borderRadius: '4px',
-                                    border: '1px solid #86efac',
-                                    background: '#16a34a',
-                                    color: '#ffffff',
+                                    border: status === 'Present' ? '2px solid #15803d' : '1px solid #86efac',
+                                    background: status === 'Present' ? '#16a34a' : '#f0fdf4',
+                                    color: status === 'Present' ? '#ffffff' : '#15803d',
                                     fontWeight: 700,
                                     fontSize: '0.72rem',
-                                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                                    opacity: isLoading ? 0.6 : 1
+                                    cursor: 'pointer'
                                   }}
                                 >
-                                  {isLoading ? 'Saving...' : '✓ Present'}
+                                  ✓ Present
                                 </button>
 
                                 <button
-                                  disabled={isLoading}
-                                  onClick={() => handleMarkAttendance(student, 'Absent')}
+                                  type="button"
+                                  onClick={() => handleSetStudentDraft(student.studentId, 'Absent')}
                                   style={{
                                     padding: '0.25rem 0.65rem',
                                     borderRadius: '4px',
-                                    border: '1px solid #fca5a5',
-                                    background: '#dc2626',
-                                    color: '#ffffff',
+                                    border: status === 'Absent' ? '2px solid #b91c1c' : '1px solid #fca5a5',
+                                    background: status === 'Absent' ? '#dc2626' : '#fef2f2',
+                                    color: status === 'Absent' ? '#ffffff' : '#b91c1c',
                                     fontWeight: 700,
                                     fontSize: '0.72rem',
-                                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                                    opacity: isLoading ? 0.6 : 1
+                                    cursor: 'pointer'
                                   }}
                                 >
-                                  {isLoading ? 'Saving...' : '✕ Absent'}
+                                  ✕ Absent
                                 </button>
                               </div>
                             )}

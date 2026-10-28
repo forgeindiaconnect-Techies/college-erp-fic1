@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   AlertTriangle,
   PlusCircle,
@@ -23,6 +23,22 @@ const IncidentReportsPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Current session & administrative permissions
+  const currentUser = useMemo(() => {
+    try {
+      return JSON.parse(
+        sessionStorage.getItem('user_session') ||
+        sessionStorage.getItem('watchman_session') ||
+        sessionStorage.getItem('admin_session') ||
+        localStorage.getItem('erp_user') ||
+        '{}'
+      );
+    } catch (_) {
+      return {};
+    }
+  }, []);
+  const canResolve = ['Admin', 'Super Admin', 'Principal', 'Sub Admin'].includes(currentUser?.role);
 
   // Resolution modal state
   const [resolveTarget, setResolveTarget] = useState(null);
@@ -311,7 +327,9 @@ const IncidentReportsPage = () => {
                         )}
                       </td>
                       <td style={{ verticalAlign: 'top', padding: '12px 14px', textAlign: 'right' }}>
-                        {inc.status !== 'Resolved' ? (
+                        {inc.status === 'Resolved' || inc.status === 'Closed' ? (
+                          <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600 }}>✓ Resolved</span>
+                        ) : canResolve ? (
                           <button
                             className="wm-btn wm-btn-secondary"
                             style={{ padding: '4px 10px', fontSize: '0.75rem', color: '#059669', borderColor: '#a7f3d0' }}
@@ -320,7 +338,7 @@ const IncidentReportsPage = () => {
                             Resolve
                           </button>
                         ) : (
-                          <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>Closed</span>
+                          <span style={{ fontSize: '0.75rem', color: '#d97706', fontWeight: 600 }}>Pending Admin</span>
                         )}
                       </td>
                     </tr>

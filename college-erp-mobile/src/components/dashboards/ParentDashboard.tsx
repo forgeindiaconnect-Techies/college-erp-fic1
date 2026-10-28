@@ -21,6 +21,7 @@ import ReferralHub from '../referrals/ReferralHub';
 import DashboardHeroBanner from './DashboardHeroBanner';
 import QuickAccessGrid from './QuickAccessGrid';
 import HighlightCard from './HighlightCard';
+import MobileNotificationCenter from '../notifications/MobileNotificationCenter';
 
 type Props = {
   user: MobileUser;
@@ -125,10 +126,25 @@ export default function ParentDashboard({ user, onLogout }: Props) {
     Saturday: [],
   });
   const [feeReceipts, setFeeReceipts] = useState<FeeReceipt[]>([]);
-  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState<number>(0);
+  const handleUnreadNotifsCountChange = useCallback((cnt: number) => {
+    setUnreadNotifsCount(prev => (prev === cnt ? prev : cnt));
+  }, []);
+  const [showNotifModal, setShowNotifModal] = useState<boolean>(false);
 
-  // Leave Application Modal
+  // Leave Records & Application Modal
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([
+    {
+      id: 'LV-001',
+      type: 'Medical Leave',
+      startDate: '12 Oct 2026',
+      endDate: '13 Oct 2026',
+      days: 2,
+      reason: 'Viral fever rest advised by physician',
+      status: 'Approved',
+    },
+  ]);
   const [leaveModalVisible, setLeaveModalVisible] = useState(false);
   const [newLeaveType, setNewLeaveType] = useState('Medical Leave');
   const [newLeaveDates, setNewLeaveDates] = useState('');
@@ -609,6 +625,8 @@ export default function ParentDashboard({ user, onLogout }: Props) {
         userName={user.name || 'Parent Scholar'}
         roleBadge="PARENT"
         avatarText={(user.name || 'P').substring(0, 2).toUpperCase()}
+        notificationsCount={unreadNotifsCount}
+        onNotificationsPress={() => setShowNotifModal(true)}
         onProfilePress={() => setActiveTab('profile')}
         onLogoutPress={onLogout}
       />
@@ -759,13 +777,13 @@ export default function ParentDashboard({ user, onLogout }: Props) {
               </View>
             </View>
 
-            {/* Dedicated Family Referral Rewards (Letters Fully Visible) */}
+            {/* Dedicated Family Referral Rewards (Compact 6-Icon Grid) */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
                 <View style={{ flex: 1, marginRight: 10 }}>
                   <Text style={styles.cardHeaderTitle} numberOfLines={1}>💼 Family Referral Rewards</Text>
                   <Text style={styles.sectionSubtitle} numberOfLines={2}>
-                    Earn institutional rewards and fee credits across 4 commercial categories
+                    Earn institutional fee discounts and verified rewards
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => setActiveTab('referrals')} activeOpacity={0.7} style={{ flexShrink: 0 }}>
@@ -773,38 +791,36 @@ export default function ParentDashboard({ user, onLogout }: Props) {
                 </TouchableOpacity>
               </View>
 
-              <View style={{ gap: 8, marginTop: 4 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
                 {[
-                  { id: 'cards', title: 'Credit Cards', desc: 'Pre-approved cards with cashback & fee waivers', icon: '💳', bg: '#EFF6FF', badge: 'Up to ₹2,500' },
-                  { id: 'insurance', title: 'Insurance Policies', desc: 'Family health, education & vehicle insurance plans', icon: '🛡️', bg: '#ECFDF5', badge: 'Up to ₹5,000' },
-                  { id: 'jobs', title: 'Job Openings', desc: 'Refer candidates for corporate and campus recruitment', icon: '💼', bg: '#F5F3FF', badge: 'Placement Bonus' },
-                  { id: 'banking', title: 'Bank Accounts', desc: 'Zero-balance digital savings accounts & privilege debit cards', icon: '🏛️', bg: '#FFFBEB', badge: 'Up to ₹750' },
+                  { id: 'cards', title: 'Credit Card', badge: 'Up to ₹2.5k', icon: '💳', bg: '#EFF6FF', border: '#BFDBFE', badgeColor: '#1D4ED8' },
+                  { id: 'insurance', title: 'Insurance', badge: 'Up to ₹5k', icon: '🛡️', bg: '#ECFDF5', border: '#A7F3D0', badgeColor: '#059669' },
+                  { id: 'jobs', title: 'Job Referral', badge: 'Bonus', icon: '💼', bg: '#F5F3FF', border: '#DDD6FE', badgeColor: '#7C3AED' },
+                  { id: 'banking', title: 'Bank Account', badge: 'Up to ₹750', icon: '🏛️', bg: '#FFFBEB', border: '#FDE68A', badgeColor: '#D97706' },
+                  { id: 'rules', title: 'Rules & Rewards', badge: 'Policies', icon: '📜', bg: '#EEF2FF', border: '#C7D2FE', badgeColor: '#4338CA' },
+                  { id: 'submissions', title: 'My Leads', badge: 'Audit', icon: '📊', bg: '#F8FAFC', border: '#CBD5E1', badgeColor: '#2563EB' },
                 ].map((item) => (
                   <TouchableOpacity
                     key={item.id}
                     style={{
+                      width: '48.5%',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      padding: 10,
                       flexDirection: 'row',
                       alignItems: 'center',
-                      backgroundColor: item.bg,
-                      borderRadius: 12,
-                      padding: 12,
-                      borderWidth: 1,
-                      borderColor: 'rgba(0,0,0,0.05)',
                     }}
                     onPress={() => setActiveTab('referrals')}
                     activeOpacity={0.7}
                   >
-                    <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                      <Text style={{ fontSize: 20 }}>{item.icon}</Text>
+                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: item.bg, borderWidth: 1, borderColor: item.border, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                      <Text style={{ fontSize: 18 }}>{item.icon}</Text>
                     </View>
-                    <View style={{ flex: 1, marginRight: 6 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1, marginRight: 6 }} numberOfLines={1}>{item.title}</Text>
-                        <View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, flexShrink: 0 }}>
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#15803D' }}>{item.badge}</Text>
-                        </View>
-                      </View>
-                      <Text style={{ fontSize: 11, color: '#475569', marginTop: 2 }} numberOfLines={2}>{item.desc}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>{item.title}</Text>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: item.badgeColor, marginTop: 2 }}>{item.badge}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -1184,7 +1200,7 @@ export default function ParentDashboard({ user, onLogout }: Props) {
                       </Text>
                     </View>
                   ) : (
-                    leaves.map((l) => (
+                    leaves.map((l: LeaveRequest) => (
                       <View key={l.id} style={styles.leaveHistoryItem}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                           <Text style={styles.leaveHistoryType}>{l.type}</Text>
@@ -1270,48 +1286,16 @@ export default function ParentDashboard({ user, onLogout }: Props) {
 
         {/* TAB 3: REFERRALS */}
         {activeTab === 'referrals' && (
-          <ReferralHub user={user} />
+          <ReferralHub user={user} onBack={() => setActiveTab('home')} />
         )}
 
         {/* TAB 4: NOTIFICATIONS */}
         {activeTab === 'notifications' && (
-          <View style={{ flex: 1 }}>
-            <View style={styles.pageHeaderBanner}>
-              <Text style={styles.pageHeaderTitle}>Campus Notices & Alerts</Text>
-              <Text style={styles.pageHeaderDesc}>
-                Official announcements from the college regarding academic schedules, examinations, fee deadlines, and holidays.
-              </Text>
-            </View>
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
-            >
-              <View style={styles.card}>
-                <Text style={styles.cardHeaderTitle}>🔔 Campus Bulletins & Ward Updates</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Official updates from the institution concerning academics, holidays, and campus events.
-                </Text>
-
-              {notifications.length === 0 ? (
-                <View style={styles.emptyStateBox}>
-                  <Text style={styles.emptyStateText}>No campus notices published yet.</Text>
-                </View>
-              ) : (
-                notifications.map((n) => (
-                  <View key={n.id} style={styles.noticeCardItem}>
-                    <View style={styles.noticeHeaderRow}>
-                      <Text style={styles.noticeTag}>{n.tag}</Text>
-                      <Text style={styles.noticeDate}>{n.date}</Text>
-                    </View>
-                    <Text style={styles.noticeTitle}>{n.title}</Text>
-                    <Text style={styles.noticeBody}>{n.text}</Text>
-                  </View>
-                ))
-              )}
-            </View>
-          </ScrollView>
-        </View>
-      )}
+          <MobileNotificationCenter
+            user={user}
+            onUnreadCountChange={handleUnreadNotifsCountChange}
+          />
+        )}
 
       {/* TAB 5: PROFILE */}
       {activeTab === 'profile' && (
@@ -1343,7 +1327,16 @@ export default function ParentDashboard({ user, onLogout }: Props) {
       <BottomTabBar
         activeTab={activeTab}
         onTabChange={(t) => setActiveTab(t)}
-        notificationsCount={notifications.length}
+        notificationsCount={unreadNotifsCount}
+      />
+
+      {/* Real-Time Campus Notification Modal */}
+      <MobileNotificationCenter
+        user={user}
+        isModal
+        visible={showNotifModal}
+        onClose={() => setShowNotifModal(false)}
+        onUnreadCountChange={handleUnreadNotifsCountChange}
       />
 
       {/* Apply Leave Modal */}

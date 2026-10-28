@@ -3,7 +3,8 @@ import {
   Bus, MapPin, Users, Calendar, Navigation, Shield, AlertTriangle, 
   Clock, CheckCircle, ArrowRight, Play, Check, RotateCcw, 
   PhoneCall, ShieldAlert, Sparkles, Activity, Bell, Fuel, Gauge,
-  Compass, ChevronRight, ShieldCheck, Zap, IndianRupee, CheckSquare, Wrench
+  Compass, ChevronRight, ShieldCheck, Zap, IndianRupee, CheckSquare, Wrench,
+  RefreshCw, CalendarCheck, Award
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -15,11 +16,13 @@ import useRealtimeSync from '../../hooks/useRealtimeSync';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
 import './DriverDashboard.css';
 
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 const DriverDashboard = () => {
   const navigate = useNavigate();
   const [session, setSession] = useState({});
   const [loading, setLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
+  const [liveTime, setLiveTime] = useState(new Date());
   const [currentStopIndex, setCurrentStopIndex] = useState(0);
 
   const [dashboardData, setDashboardData] = useState({
@@ -39,7 +42,7 @@ const DriverDashboard = () => {
   // Live Digital Clock
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString());
+      setLiveTime(new Date());
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -274,99 +277,188 @@ const DriverDashboard = () => {
     );
   }
 
+  const attendanceMarkedToday = !!(dashboardData.attendance?.punchInTime || dashboardData.attendance?.inTime || dashboardData.attendance?.status === 'Present' || dashboardData.attendance?.status === 'Half-Day');
+
   return (
     <div className="driver-page-container">
       
-      {/* ── Breadcrumb & ERP Header ── */}
-      <div className="driver-header-bar">
+      {/* ── Real-time Enterprise Header Bar (Matching Image 2 Reference) ── */}
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', background: '#ffffff', padding: '18px 24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', marginBottom: '1.25rem' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
-            <span>Fleet Operations</span>
-            <ChevronRight size={12} />
-            <span style={{ color: '#0f172a' }}>Command Center</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.01em' }}>
-              Driver Command Center
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              Fleet Operations Console
             </h1>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '0.15rem 0.6rem', background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#16a34a' }}></span>
-              LIVE GPS ONLINE
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', fontWeight: 700, color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: '20px', border: '1px solid #a7f3d0' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }}></span>
+              LIVE GPS SYNC
             </span>
           </div>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.88rem', fontWeight: 500 }}>
+            Fleet Operations • Driver <strong>{driverDisplayName}</strong> ({driverDisplayId}) • Assigned Vehicle <strong>{dashboardData.vehicle?.vehicleNumber || 'TN 01 AB 1234'}</strong>
+          </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600, background: '#f8fafc', padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
-            ⏰ {currentTime}
-          </span>
-          <span style={{ fontSize: '0.78rem', color: '#2563eb', fontWeight: 700, background: '#eff6ff', padding: '0.25rem 0.65rem', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
-            ID: {driverDisplayId}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ textAlign: 'right', background: '#f8fafc', padding: '6px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Academic Session 2026-27</div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+              {liveTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} • {DAYS[liveTime.getDay()]}, {liveTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </div>
+          </div>
+          <button 
+            onClick={fetchDashboard}
+            title="Refresh Live Data"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '9px 14px', borderRadius: '10px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', color: '#334155' }}
+          >
+            <RefreshCw size={15} /> Refresh
+          </button>
         </div>
       </div>
+
+      {/* ── Transit Route & Shift Duty Alert Banner (Matching Image 2 ERP Banner) ── */}
+      {dashboardData.route && (
+        <div style={{ background: '#ffffff', color: '#0f172a', padding: '1.1rem 1.5rem', borderRadius: '12px', border: '1px solid #cbd5e1', borderLeft: '4px solid #0d9488', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem', marginBottom: '1.25rem', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+          <div style={{ background: '#f0fdf4', padding: '0.65rem', borderRadius: '12px', color: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Navigation size={26} />
+          </div>
+          <div style={{ flex: '1 1 200px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+                Transit Duty Assigned: Route {dashboardData.route.name || 'East'} ({dashboardData.route.routeId || 'R-01'})
+              </h2>
+              <span style={{ background: '#dcfce7', color: '#166534', border: '1px solid #86efac', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 800 }}>ACTIVE ROSTER</span>
+            </div>
+            <p style={{ margin: '0.2rem 0 0 0', color: '#475569', fontSize: '0.84rem' }}>
+              Upcoming: <strong style={{ color: '#0f172a' }}>{stops[0] || 'Origin'}</strong> → <strong style={{ color: '#0f172a' }}>{stops[stops.length - 1] || 'Campus Gate'}</strong> ({stops.length} Stops) • Vehicle: <strong style={{ color: '#0f172a' }}>{dashboardData.vehicle?.vehicleNumber || 'TN 01 AB 1234'}</strong> • Duty Status: <strong style={{ color: tripStatus === 'IN TRANSIT' ? '#2563eb' : tripStatus === 'ARRIVED' ? '#16a34a' : '#0d9488' }}>{tripStatus}</strong>
+            </p>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.6rem' }}>
+            <button 
+              onClick={() => navigate('/driver/trip')}
+              style={{ background: '#0d9488', color: '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '8px', fontWeight: 800, fontSize: '0.84rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 4px rgba(13,148,136,0.2)' }}
+            >
+              Trip Operations Center →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Daily Duty Attendance (Single Source of Truth Check-In / Check-Out) ── */}
       <div style={{ marginBottom: '1.25rem' }}>
         <EmployeeAttendanceCard layout="bar" />
       </div>
 
-      {/* ── 4 KPI Status Cards (Single Source of Truth) ── */}
-      <div className="driver-kpi-grid">
+      {/* ── 5 Interactive ERP KPI Cards (ERP Style matching Reference Image 2) ── */}
+      <div className="driver-stats-grid driver-kpi-grid">
         
-        {/* Assigned Vehicle */}
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Assigned Vehicle</span>
-            <Bus size={14} style={{ color: '#2563eb' }} />
+        {/* 1. Assigned Vehicle */}
+        <div 
+          onClick={() => navigate('/driver/vehicle')}
+          style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #6366F1', padding: '16px 18px', borderRadius: '14px', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Assigned Vehicle</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px', fontFamily: 'monospace' }}>
+                {dashboardData.vehicle?.vehicleNumber || 'TN 01 AB 1234'}
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Bus size={22} />
+            </div>
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem', fontFamily: 'monospace' }}>
-            {dashboardData.vehicle?.vehicleNumber || 'TN 01 AD 1234'}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>
-            ● Vehicle Ready (Cap: {capacity})
-          </div>
-        </div>
-
-        {/* Assigned Route */}
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Assigned Route</span>
-            <MapPin size={14} style={{ color: '#4f46e5' }} />
-          </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-            Route {dashboardData.route?.name || 'EAST'}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, marginTop: '0.15rem' }}>
-            {stops.length} Scheduled Stops
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#16a34a', fontWeight: 700 }}>● Ready (Cap: {capacity})</span>
+            <span style={{ color: '#6366F1', fontWeight: 700 }}>Vehicle Specs →</span>
           </div>
         </div>
 
-        {/* Passenger Load */}
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Passenger Load</span>
-            <Users size={14} style={{ color: '#16a34a' }} />
+        {/* 2. Daily Attendance Status */}
+        <div 
+          onClick={() => navigate('/driver/attendance')}
+          style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: `4px solid ${attendanceMarkedToday ? '#10B981' : '#F59E0B'}`, padding: '16px 18px', borderRadius: '14px', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Daily Attendance Status</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: attendanceMarkedToday ? '#10B981' : '#F59E0B', margin: '4px 0 2px' }}>
+                {attendanceMarkedToday ? 'Marked Present' : 'Pending Today'}
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: attendanceMarkedToday ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: attendanceMarkedToday ? '#10B981' : '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CalendarCheck size={22} />
+            </div>
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-            {studentReport?.presentCount ?? boardingCount} <span style={{ fontSize: '0.8rem', color: '#64748b' }}>/ {capacity}</span>
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>
-            {studentReport ? `${studentReport.presentCount} Boarded Today` : `${boardingPercentage}% Capacity Occupied`}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#64748b', fontWeight: 600 }}>{DAYS[liveTime.getDay()]} Roll Call</span>
+            <span style={{ color: attendanceMarkedToday ? '#10B981' : '#F59E0B', fontWeight: 700 }}>Attendance Log →</span>
           </div>
         </div>
 
-        {/* Duty Status */}
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Duty Status</span>
-            <Clock size={14} style={{ color: '#0284c7' }} />
+        {/* 3. Assigned Route */}
+        <div 
+          onClick={() => navigate('/driver/route')}
+          style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #0284c7', padding: '16px 18px', borderRadius: '14px', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Assigned Route</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                Route {dashboardData.route?.name || 'East'}
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <MapPin size={22} />
+            </div>
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: tripStatus === 'COMPLETED' ? '#166534' : tripStatus === 'IN TRANSIT' ? '#2563eb' : tripStatus === 'ARRIVED' ? '#16a34a' : '#b45309', marginTop: '0.2rem' }}>
-            {tripStatus}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#0284c7', fontWeight: 600 }}>{stops.length} Scheduled Stops</span>
+            <span style={{ color: '#0284c7', fontWeight: 700 }}>Waypoints →</span>
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '0.15rem' }}>
-            {tripStatus === 'IN TRANSIT' ? 'En Route to Stops' : tripStatus === 'ARRIVED' ? 'At Destination' : tripStatus === 'COMPLETED' ? 'Shift Concluded' : 'Ready to Start'}
+        </div>
+
+        {/* 4. Student Transit Load */}
+        <div 
+          onClick={() => navigate('/driver/students')}
+          style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #F59E0B', padding: '16px 18px', borderRadius: '14px', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Student Transit Load</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                {studentReport?.presentCount ?? boardingCount} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>/ {studentReport?.totalExpected ?? dashboardData.students.length}</span>
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Users size={22} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#16a34a', fontWeight: 700 }}>{studentReport ? `${studentReport.presentCount} Boarded Today` : `${boardingPercentage}% Occupied`}</span>
+            <span style={{ color: '#F59E0B', fontWeight: 700 }}>Roster →</span>
+          </div>
+        </div>
+
+        {/* 5. Business Referral & Incentives */}
+        <div 
+          onClick={() => navigate('/driver/business-referral')}
+          style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #10B981', padding: '16px 18px', borderRadius: '14px', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Business Referral</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                Referral Hub
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Award size={22} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#10b981', fontWeight: 700 }}>Earn Cash Incentives</span>
+            <span style={{ color: '#10B981', fontWeight: 700 }}>Explore →</span>
           </div>
         </div>
 

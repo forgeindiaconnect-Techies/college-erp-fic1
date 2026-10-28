@@ -865,6 +865,35 @@ const Dashboard = () => {
               </span>
             </div>
           </div>
+
+          {/* Watchman & Gate Monitoring Card */}
+          <div 
+            className="glass-card" 
+            style={{ padding: '1.25rem', cursor: 'pointer', borderLeft: '4px solid #dc2626', transition: 'transform 0.2s' }}
+            onClick={() => navigate('/admin/watchman-monitoring')}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '8px', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ShieldCheck size={18} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Watchman & Gate Security</h4>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Gate Control & Logistics</span>
+                </div>
+              </div>
+              <ArrowRight size={16} className="text-muted" />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+              <div>
+                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>Active Gate Control</span>
+                <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)' }}>Incidents, Deliveries & Passes</p>
+              </div>
+              <span className="text-xs font-bold px-2 py-1 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                Live Monitoring
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1017,6 +1046,29 @@ const Dashboard = () => {
             <div className="admin-quick-text">
               <h4 className="admin-quick-title">Manage Settings</h4>
               <p className="admin-quick-desc">Global Configuration & Security</p>
+            </div>
+            <div className="admin-quick-arrow">
+              <ChevronRight size={18} />
+            </div>
+          </button>
+
+          {/* Watchman Monitoring Portal */}
+          <button 
+            type="button"
+            className="admin-quick-btn"
+            onClick={() => navigate('/admin/watchman-monitoring')}
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.04) 0%, var(--bg-card, #ffffff) 100%)', 
+              borderLeft: '4px solid #2563eb',
+              '--btn-accent': '#2563eb'
+            }}
+          >
+            <div className="admin-quick-icon" style={{ background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.28)' }}>
+              <ShieldCheck size={22} />
+            </div>
+            <div className="admin-quick-text">
+              <h4 className="admin-quick-title">Watchman Gate Command</h4>
+              <p className="admin-quick-desc">Real-Time Security & Movement Monitor</p>
             </div>
             <div className="admin-quick-arrow">
               <ChevronRight size={18} />

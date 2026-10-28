@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, X, Megaphone, Calendar, Tag, User, MessageSquare, Clock, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { createNotification } from '../../api';
 import './AnnouncementsManagement.css';
 
 const DEFAULT_ANNOUNCEMENTS = [
@@ -73,9 +74,36 @@ const AnnouncementsManagement = () => {
     setEditTarget(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const today = new Date().toISOString().split('T')[0];
+
+    // Map selected audience to specific targetRoles
+    let targetRoles = ['All'];
+    if (form.targetAudience === 'Students') targetRoles = ['Student'];
+    else if (form.targetAudience === 'Staff') targetRoles = ['Staff'];
+    else if (form.targetAudience === 'HODs') targetRoles = ['HOD'];
+    else if (form.targetAudience === 'Parents') targetRoles = ['Parent'];
+    else if (form.targetAudience === 'Drivers') targetRoles = ['Driver'];
+    else if (form.targetAudience === 'Watchmen') targetRoles = ['Watchman'];
+    else if (form.targetAudience === 'Library') targetRoles = ['Library', 'Librarian'];
+    else if (form.targetAudience === 'Accounts') targetRoles = ['Accounts'];
+    else if (form.targetAudience === 'Principal') targetRoles = ['Principal'];
+    else if (form.targetAudience === 'Admin') targetRoles = ['Admin'];
+
+    try {
+      await createNotification({
+        title: form.title,
+        message: form.content,
+        category: 'announcement',
+        targetRoles,
+        priority: 'Normal',
+        type: 'Info'
+      });
+    } catch (apiErr) {
+      console.warn('API announcement creation notice:', apiErr.message);
+    }
+
     if (editTarget) {
       const updated = announcements.map(ann => ann.id === editTarget ? { ...ann, ...form, date: today } : ann);
       saveAnnouncements(updated);
@@ -358,10 +386,17 @@ const AnnouncementsManagement = () => {
                     onChange={e => setForm({ ...form, targetAudience: e.target.value })}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.88rem', background: '#ffffff', color: '#0f172a' }}
                   >
-                    <option value="All">All Roles / Public</option>
+                    <option value="All">All College Users (Broadcast)</option>
                     <option value="Students">Students Only</option>
                     <option value="Staff">Faculty Staff Only</option>
-                    <option value="HODs">HODs Only</option>
+                    <option value="HODs">Department Heads (HODs)</option>
+                    <option value="Parents">Parents Only</option>
+                    <option value="Drivers">Transport Drivers Only</option>
+                    <option value="Watchmen">Security & Watchmen Only</option>
+                    <option value="Library">Library Staff & Users</option>
+                    <option value="Accounts">Accounts & Finance Officers</option>
+                    <option value="Principal">Principal Office</option>
+                    <option value="Admin">College Administrators</option>
                   </select>
                 </div>
 

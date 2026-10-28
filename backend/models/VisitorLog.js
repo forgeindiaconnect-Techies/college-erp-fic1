@@ -49,7 +49,7 @@ const visitorLogSchema = new mongoose.Schema({
   },
   entryTime: {
     type: Date,
-    default: Date.now
+    default: null
   },
   exitTime: {
     type: Date,
@@ -57,8 +57,8 @@ const visitorLogSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Inside', 'Checked Out', 'Pre-Registered', 'Approved', 'Rejected', 'Expired'],
-    default: 'Inside'
+    enum: ['Registered', 'Inside Campus', 'Inside', 'Exited', 'Checked Out', 'Pre-Registered', 'Approved', 'Rejected', 'Expired'],
+    default: 'Registered'
   },
   isPreRegistered: {
     type: Boolean,

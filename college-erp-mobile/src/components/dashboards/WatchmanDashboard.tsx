@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
 import { type MobileUser } from '../../services/api';
 import BottomTabBar, { type MainNavTab } from '../navigation/BottomTabBar';
@@ -9,6 +9,7 @@ import WatchmanGateOperations from '../watchman/WatchmanGateOperations';
 import WatchmanVisitorModule from '../watchman/WatchmanVisitorModule';
 import WatchmanLogisticsModule from '../watchman/WatchmanLogisticsModule';
 import WatchmanAccountModule from '../watchman/WatchmanAccountModule';
+import MobileNotificationCenter from '../notifications/MobileNotificationCenter';
 
 type Props = {
   user: MobileUser;
@@ -20,6 +21,11 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
   const [activeTab, setActiveTab] = useState<MainNavTab>('home');
   const [assignedGate, setAssignedGate] = useState('Gate 1 (Main Entrance)');
   const [showReferralsHub, setShowReferralsHub] = useState(false);
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
+  const handleUnreadNotifsCountChange = useCallback((cnt: number) => {
+    setUnreadNotifsCount(prev => (prev === cnt ? prev : cnt));
+  }, []);
+  const [showNotifModal, setShowNotifModal] = useState(false);
 
   // Android hardware back button handler
   useEffect(() => {
@@ -79,6 +85,8 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
         roleBadge="SECURITY"
         avatarText="🛡️"
         userSubtitle={`${assignedGate} • On Duty`}
+        notificationsCount={unreadNotifsCount}
+        onNotificationsPress={() => setShowNotifModal(true)}
         onProfilePress={() => {
           setShowReferralsHub(false);
           setActiveTab('profile');
@@ -89,7 +97,7 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
       {/* 2. BODY CONTENT ROUTED ACCORDING TO USER'S SELECTED DESTINATION */}
       <View style={styles.bodyWrapper}>
         {showReferralsHub ? (
-          <ReferralHub user={user} />
+          <ReferralHub user={user} onBack={() => setShowReferralsHub(false)} />
         ) : activeTab === 'home' ? (
           /* MODULE 1: COMMAND CENTER */
           <WatchmanCommandCenter
@@ -153,6 +161,16 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
           notifications: '🚚',
           profile: '👤',
         }}
+        notificationsCount={unreadNotifsCount}
+      />
+
+      {/* Real-Time Security & Campus Notifications Modal */}
+      <MobileNotificationCenter
+        user={user}
+        isModal
+        visible={showNotifModal}
+        onClose={() => setShowNotifModal(false)}
+        onUnreadCountChange={handleUnreadNotifsCountChange}
       />
     </View>
   );

@@ -25,6 +25,7 @@ import QuickAccessGrid from './QuickAccessGrid';
 import HighlightCard from './HighlightCard';
 import DailyDutyAttendanceCard from '../common/DailyDutyAttendanceCard';
 import StaffPlacementModule from '../placement/StaffPlacementModule';
+import MobileNotificationCenter from '../notifications/MobileNotificationCenter';
 
 type Props = {
   user: MobileUser;
@@ -452,6 +453,11 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [classFilter, setClassFilter] = useState('All');
   const [searchStudent, setSearchStudent] = useState('');
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState<number>(0);
+  const [showNotifModal, setShowNotifModal] = useState<boolean>(false);
+  const handleUnreadNotifsCountChange = useCallback((cnt: number) => {
+    setUnreadNotifsCount(prev => (prev === cnt ? prev : cnt));
+  }, []);
 
   // Take Attendance State (Authorized Daily Attendance System)
   const [attendanceDate, setAttendanceDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -2387,6 +2393,8 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         roleBadge="FACULTY"
         avatarText={faculty.name.substring(0, 2).toUpperCase()}
         userSubtitle={`${faculty.dept} • ${faculty.designation}`}
+        notificationsCount={unreadNotifsCount}
+        onNotificationsPress={() => setShowNotifModal(true)}
         onProfilePress={() => {
           setActiveTab('profile');
           setMoreSection('profile');
@@ -2609,7 +2617,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               ))}
             </View>
 
-            {/* Dedicated Business Referral Program (Letters Fully Visible) */}
+            {/* Dedicated Business Referral Program (Compact 6-Icon Grid) */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
                 <View style={{ flex: 1, marginRight: 10 }}>
@@ -2623,37 +2631,36 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                 </TouchableOpacity>
               </View>
 
-              <View style={{ gap: 8, marginTop: 4 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
                 {[
-                  { id: 'cards', title: 'Credit Cards', desc: 'Pre-approved lifetime-free cards with airport lounge access', icon: '💳', bg: '#EFF6FF', badge: 'Up to ₹2,500' },
-                  { id: 'jobs', title: 'Job Openings', desc: 'Refer candidates for tech, teaching & executive vacancies', icon: '💼', bg: '#F5F3FF', badge: 'Placement Bonus' },
-                  { id: 'banking', title: 'Bank Accounts', desc: 'Corporate salary accounts & high-yield digital savings', icon: '🏛️', bg: '#FFFBEB', badge: 'Up to ₹750' },
+                  { id: 'cards', title: 'Credit Card', badge: 'Up to ₹2.5k', icon: '💳', bg: '#EFF6FF', border: '#BFDBFE', badgeColor: '#1D4ED8' },
+                  { id: 'insurance', title: 'Insurance', badge: 'Up to ₹5k', icon: '🛡️', bg: '#ECFDF5', border: '#A7F3D0', badgeColor: '#059669' },
+                  { id: 'jobs', title: 'Job Referral', badge: 'Bonus', icon: '💼', bg: '#F5F3FF', border: '#DDD6FE', badgeColor: '#7C3AED' },
+                  { id: 'banking', title: 'Bank Account', badge: 'Up to ₹750', icon: '🏛️', bg: '#FFFBEB', border: '#FDE68A', badgeColor: '#D97706' },
+                  { id: 'rules', title: 'Rules & Rewards', badge: 'Policies', icon: '📜', bg: '#EEF2FF', border: '#C7D2FE', badgeColor: '#4338CA' },
+                  { id: 'submissions', title: 'My Leads', badge: 'Audit', icon: '📊', bg: '#F8FAFC', border: '#CBD5E1', badgeColor: '#2563EB' },
                 ].map((item) => (
                   <TouchableOpacity
                     key={item.id}
                     style={{
+                      width: '48.5%',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                      padding: 10,
                       flexDirection: 'row',
                       alignItems: 'center',
-                      backgroundColor: item.bg,
-                      borderRadius: 12,
-                      padding: 12,
-                      borderWidth: 1,
-                      borderColor: 'rgba(0,0,0,0.05)',
                     }}
                     onPress={() => setActiveTab('referrals')}
                     activeOpacity={0.7}
                   >
-                    <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                      <Text style={{ fontSize: 20 }}>{item.icon}</Text>
+                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: item.bg, borderWidth: 1, borderColor: item.border, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                      <Text style={{ fontSize: 18 }}>{item.icon}</Text>
                     </View>
-                    <View style={{ flex: 1, marginRight: 6 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1, marginRight: 6 }} numberOfLines={1}>{item.title}</Text>
-                        <View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, flexShrink: 0 }}>
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#15803D' }}>{item.badge}</Text>
-                        </View>
-                      </View>
-                      <Text style={{ fontSize: 11, color: '#475569', marginTop: 2 }} numberOfLines={2}>{item.desc}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>{item.title}</Text>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: item.badgeColor, marginTop: 2 }}>{item.badge}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -4003,48 +4010,14 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         )}
 
         {/* TAB 3: REFERRALS */}
-        {activeTab === 'referrals' && <ReferralHub user={user} />}
+        {activeTab === 'referrals' && <ReferralHub user={user} onBack={() => setActiveTab('home')} />}
 
         {/* TAB 4: UPDATES */}
         {activeTab === 'notifications' && (
-          <View style={{ flex: 1 }}>
-            <View style={styles.pageHeaderBanner}>
-              <Text style={styles.pageHeaderTitle}>Campus Notices & Updates</Text>
-              <Text style={styles.pageHeaderDesc}>
-                Official announcements, department circulars, and institutional notifications.
-              </Text>
-            </View>
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
-            >
-              <View style={styles.card}>
-                <Text style={styles.cardHeaderTitle}>🔔 Campus Bulletins & Updates</Text>
-                <Text style={styles.sectionSubtitle}>Official institutional circulars and updates</Text>
-
-                {notices.length === 0 ? (
-                  <View style={styles.emptyStateContainer}>
-                    <Text style={styles.emptyStateEmoji}>📭</Text>
-                    <Text style={styles.emptyStateTitle}>No Unread Announcements</Text>
-                    <Text style={styles.emptyStateSubtitle}>You are completely up to date with institutional circulars.</Text>
-                  </View>
-                ) : (
-                  notices.map((n) => (
-                    <View key={n.id} style={styles.fullNoticeCard}>
-                      <View style={styles.noticeHeaderRow}>
-                        <View style={styles.noticeTagBadge}>
-                          <Text style={styles.noticeTagText}>{n.tag}</Text>
-                        </View>
-                        <Text style={styles.noticeDateText}>{n.date}</Text>
-                      </View>
-                      <Text style={styles.noticeFullTitle}>{n.title}</Text>
-                      <Text style={styles.noticeFullBody}>{n.body || 'Please refer to the academic notice board for additional instructions.'}</Text>
-                    </View>
-                  ))
-                )}
-              </View>
-            </ScrollView>
-          </View>
+          <MobileNotificationCenter
+            user={user}
+            onUnreadCountChange={handleUnreadNotifsCountChange}
+          />
         )}
 
         {/* TAB 5: PROFILE */}
@@ -5203,7 +5176,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
           }
           setActiveTab(t);
         }}
-        notificationsCount={notices.length}
+        notificationsCount={unreadNotifsCount}
         tabLabels={{
           home: 'Home',
           academics: 'Academics',
@@ -5211,6 +5184,15 @@ export default function StaffDashboard({ user, onLogout }: Props) {
           notifications: 'Updates',
           profile: 'Profile',
         }}
+      />
+
+      {/* Real-Time Campus Notification Modal */}
+      <MobileNotificationCenter
+        user={user}
+        isModal
+        visible={showNotifModal}
+        onClose={() => setShowNotifModal(false)}
+        onUnreadCountChange={handleUnreadNotifsCountChange}
       />
 
       {/* ============================================================== */}

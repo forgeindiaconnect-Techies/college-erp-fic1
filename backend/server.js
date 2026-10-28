@@ -2,7 +2,7 @@ import dns from 'dns';
 try {
   dns.setServers(['8.8.8.8', '8.8.4.4']);
   if (dns.setDefaultResultOrder) dns.setDefaultResultOrder('ipv4first');
-} catch (e) {}
+} catch (e) { }
 // Schema and routes updated for custom subscription plan & amount management
 
 import express from 'express';
@@ -207,22 +207,39 @@ io.on('connection', (socket) => {
       socket.join(userData);
       console.log(`🔌 Socket ${socket.id} joined room: ${userData}`);
     } else {
-      if (userData.userId) {
-        socket.join(userData.userId.toString());
-        console.log(`🔌 Socket ${socket.id} joined user room: ${userData.userId}`);
+      const userId = userData.userId || userData._id || userData.id;
+      const tenantId = userData.tenantId || userData.collegeId;
+      const role = userData.role;
+
+      if (userId) {
+        socket.join(userId.toString());
+        console.log(`🔌 Socket ${socket.id} joined user room: ${userId}`);
       }
-      if (userData.tenantId) {
-        socket.join("college:" + userData.tenantId);
-        console.log(`🔌 Socket ${socket.id} joined tenant room: ${userData.tenantId}`);
+      if (tenantId && tenantId !== 'system') {
+        const tStr = tenantId.toString();
+        socket.join("college:" + tStr);
+        socket.join(tStr);
+        console.log(`🔌 Socket ${socket.id} joined tenant room: college:${tStr}`);
+
+        if (role) {
+          socket.join(`college:${tStr}:role:${role}`);
+          socket.join(`college:${tStr}:role:${role.toLowerCase()}`);
+          console.log(`🔌 Socket ${socket.id} joined scoped role room: college:${tStr}:role:${role}`);
+        }
       }
-      if (userData.collegeId) {
-        socket.join("college:" + userData.collegeId);
-        console.log(`🔌 Socket ${socket.id} joined college room: ${userData.collegeId}`);
+      if (userData.collegeId && userData.collegeId !== tenantId) {
+        const cStr = userData.collegeId.toString();
+        socket.join("college:" + cStr);
+        socket.join(cStr);
+        if (role) {
+          socket.join(`college:${cStr}:role:${role}`);
+          socket.join(`college:${cStr}:role:${role.toLowerCase()}`);
+        }
       }
-      if (userData.role) {
-        socket.join(`role:${userData.role}`);
-        socket.join(`role:${userData.role.toLowerCase()}`);
-        console.log(`🔌 Socket ${socket.id} joined role room: role:${userData.role}`);
+      if (role && (role === 'Super Admin' || role === 'superadmin')) {
+        socket.join('role:Super Admin');
+        socket.join('role:superadmin');
+        console.log(`🔌 Socket ${socket.id} joined Super Admin room`);
       }
     }
   });
@@ -360,7 +377,7 @@ const autoSeedIfEmpty = async () => {
         { name: 'Dr. Ananya', email: 'ananya.hod@college.edu', password: 'password123', role: 'HOD', department: 'Computer Science', referenceId: 'HOD001', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Renuka', email: 'renuka.stf008@college.edu', password: 'password123', role: 'Staff', department: 'Computer Science', referenceId: 'STF008', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Renuka', email: 'renuka.stf002@college.edu', password: 'password123', role: 'Staff', department: 'Electronics & Comm.', referenceId: 'STF002', tenantId: 'COL001', collegeId: 'COL001' },
-        { name: 'Dr. Ramoorthy', email: 'ramoorthy@college.edu', password: 'password123', role: 'Staff', department: 'Mechanical Engg.', referenceId: 'STF010', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Dr. Ramoorthy', email: 'ramoorthy@college.edu', password: 'password123', role: 'Staff', department: 'Mechanical Engg.', referenceId: 'STF-0182', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Pooja (Staff)', email: 'pooja@gmail.com', password: 'pooja', role: 'Staff', department: 'Computer Science', referenceId: 'STF008', subjects: ['Data Structures'], tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Ramesh Kumar (Chief Watchman)', email: 'watchman@college.edu', password: 'password123', role: 'Watchman', referenceId: 'WMN-001', phone: '9876543299', tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Rajesh Driver (Senior Driver)', email: 'rajesh.driver@college.edu', password: 'password123', role: 'Driver', referenceId: 'DRV-001', phone: '9840212345', tenantId: 'COL001', collegeId: 'COL001' },
@@ -372,7 +389,7 @@ const autoSeedIfEmpty = async () => {
         { name: 'Mr. Robert Doe (Parent)', email: 'parent_john@college.edu', password: 'password123', role: 'Parent', referenceId: 'CS2022001', parentOf: 'John Doe', studentId: 'CS2022001', department: 'Computer Science', tenantId: 'COL001', collegeId: 'COL001' },
       ];
 
-      
+
       // Find the primary/active college in the system
       const adminCollege = (await College.findOne({
         $or: [
@@ -386,7 +403,7 @@ const autoSeedIfEmpty = async () => {
 
       for (const cred of customCredentials) {
         const u = await User.findOne({ email: cred.email });
-        
+
         let resolvedTenantId = cred.role === 'Super Admin' ? 'system' : defaultTenantId;
         const matchingCollege = await College.findOne({
           $or: [
@@ -428,13 +445,66 @@ const autoSeedIfEmpty = async () => {
         { id: 'HOD001', name: 'Dr. Ananya', email: 'ananya.hod@college.edu', phone: '9876543201', dept: 'Computer Science', designation: 'HOD' },
         { id: 'STF008', name: 'Renuka', email: 'renuka.stf008@college.edu', phone: '9876543208', dept: 'Computer Science', designation: 'Assistant Professor' },
         { id: 'STF002', name: 'Renuka', email: 'renuka.stf002@college.edu', phone: '9876543202', dept: 'Electronics & Comm.', designation: 'Assistant Professor' },
+        { id: 'STF-0182', name: 'Dr. Ramoorthy', email: 'ramoorthy@college.edu', phone: '9876543210', dept: 'Mechanical Engg.', designation: 'Professor' },
         { id: 'STF010', name: 'Dr. Ramoorthy', email: 'ramoorthy@college.edu', phone: '9876543210', dept: 'Mechanical Engg.', designation: 'Professor' }
       ];
       for (const ts of testStaffRecords) {
         const existing = await Staff.findOne({ $or: [{ id: ts.id }, { email: ts.email }] });
         if (!existing) {
           await Staff.create(ts);
+        } else if (existing.id !== ts.id && ts.id === 'STF-0182') {
+          existing.id = 'STF-0182';
+          await existing.save();
         }
+      }
+
+      // Ensure test parcel PCL-20261028-2686-RGRG exists and is mapped to Dr. Ramoorthy
+      try {
+        const ramoorthyUser = await User.findOne({ email: 'ramoorthy@college.edu' });
+        if (ramoorthyUser) {
+          if (!ramoorthyUser.referenceId || ramoorthyUser.referenceId === 'STF010') {
+            ramoorthyUser.referenceId = 'STF-0182';
+            await ramoorthyUser.save();
+          }
+          const targetParcel = await ParcelLog.findOne({ parcelId: 'PCL-20261028-2686-RGRG' });
+          if (!targetParcel) {
+            await ParcelLog.create({
+              parcelId: 'PCL-20261028-2686-RGRG',
+              type: 'Parcel',
+              deliveryCompany: 'Amazon',
+              recipientId: ramoorthyUser._id,
+              staffId: 'STF-0182',
+              recipientName: 'Dr. Ramoorthy',
+              recipientEmail: 'ramoorthy@college.edu',
+              recipientPhone: '9876543210',
+              recipientType: 'Staff',
+              department: 'Mechanical Engg.',
+              trackingNumber: 'TRK-AMZN-2686',
+              parcelDetails: 'Official Academic Courseware & Packages',
+              receivedAt: new Date(),
+              status: 'Pending Collection',
+              gate: 'Gate 1 (Main Entrance)',
+              watchmanName: 'Ramesh Kumar (Chief Watchman)',
+              tenantId: ramoorthyUser.tenantId || defaultTenantId,
+              collegeId: ramoorthyUser.collegeId || defaultTenantId
+            });
+            console.log('✅ Target test parcel PCL-20261028-2686-RGRG created and linked to Dr. Ramoorthy');
+          } else {
+            targetParcel.recipientId = ramoorthyUser._id;
+            targetParcel.staffId = 'STF-0182';
+            targetParcel.recipientName = 'Dr. Ramoorthy';
+            targetParcel.recipientEmail = 'ramoorthy@college.edu';
+            if (targetParcel.status !== 'Collected') {
+              targetParcel.status = 'Pending Collection';
+            }
+            targetParcel.tenantId = ramoorthyUser.tenantId || defaultTenantId;
+            targetParcel.collegeId = ramoorthyUser.collegeId || defaultTenantId;
+            await targetParcel.save();
+            console.log('✅ Target test parcel PCL-20261028-2686-RGRG synchronized to Dr. Ramoorthy');
+          }
+        }
+      } catch (pErr) {
+        console.warn('Parcel seed note:', pErr.message);
       }
 
       // Incremental patch: inject Principal if missing by checking email
@@ -459,14 +529,14 @@ const autoSeedIfEmpty = async () => {
       if (hodCount === 0) {
         console.log('🌱 Patching database: missing HOD and Staff demo users detected. Injecting them now...');
         await User.create([
-          { name: 'CSE HOD',          email: 'csehod@gmail.com',         password: 'password123', role: 'HOD', department: 'Computer Science', referenceId: 'STF001' },
-          { name: 'ECE HOD',          email: 'ecehod@gmail.com',         password: 'password123', role: 'HOD', department: 'Electronics & Comm.', referenceId: 'STF002' },
-          { name: 'EEE HOD',          email: 'eeehod@gmail.com',         password: 'password123', role: 'HOD', department: 'Electrical & Electronics', referenceId: 'STF003' },
-          { name: 'MECH HOD',         email: 'mechhod@gmail.com',        password: 'password123', role: 'HOD', department: 'Mechanical Engg.', referenceId: 'STF004' },
-          { name: 'BCA HOD',          email: 'bcahod@gmail.com',         password: 'password123', role: 'HOD', department: 'Bachelor of Computer App.', referenceId: 'STF005' },
-          { name: 'MBA HOD',          email: 'mbahod@gmail.com',         password: 'password123', role: 'HOD', department: 'Master of Business Admin.', referenceId: 'STF006' },
-          { name: 'Dr.Agila',         email: 'agila@gmail.com',          password: 'agila', role: 'HOD', department: 'Information Technology', referenceId: 'HOD001' },
-          { name: 'Prof. Karthik S.', email: 'karthik@college.edu',      password: 'password123', role: 'Staff', department: 'Computer Science', referenceId: 'STF007', subjects: ['OS', 'Machine Learning'] }
+          { name: 'CSE HOD', email: 'csehod@gmail.com', password: 'password123', role: 'HOD', department: 'Computer Science', referenceId: 'STF001' },
+          { name: 'ECE HOD', email: 'ecehod@gmail.com', password: 'password123', role: 'HOD', department: 'Electronics & Comm.', referenceId: 'STF002' },
+          { name: 'EEE HOD', email: 'eeehod@gmail.com', password: 'password123', role: 'HOD', department: 'Electrical & Electronics', referenceId: 'STF003' },
+          { name: 'MECH HOD', email: 'mechhod@gmail.com', password: 'password123', role: 'HOD', department: 'Mechanical Engg.', referenceId: 'STF004' },
+          { name: 'BCA HOD', email: 'bcahod@gmail.com', password: 'password123', role: 'HOD', department: 'Bachelor of Computer App.', referenceId: 'STF005' },
+          { name: 'MBA HOD', email: 'mbahod@gmail.com', password: 'password123', role: 'HOD', department: 'Master of Business Admin.', referenceId: 'STF006' },
+          { name: 'Dr.Agila', email: 'agila@gmail.com', password: 'agila', role: 'HOD', department: 'Information Technology', referenceId: 'HOD001' },
+          { name: 'Prof. Karthik S.', email: 'karthik@college.edu', password: 'password123', role: 'Staff', department: 'Computer Science', referenceId: 'STF007', subjects: ['OS', 'Machine Learning'] }
         ]);
         console.log('✅ Missing HOD/Staff demo users injected successfully.');
       } else {
@@ -532,12 +602,12 @@ const autoSeedIfEmpty = async () => {
       if (deptCount === 0) {
         console.log('🌱 Patching database: missing Departments detected. Injecting them now...');
         await Department.insertMany([
-          { id: 'DEPT001', name: 'Computer Science',          code: 'CSE',  hod: 'CSE HOD',          totalStudents: 3 },
-          { id: 'DEPT002', name: 'Electronics & Comm.',       code: 'ECE',  hod: 'ECE HOD',          totalStudents: 2 },
-          { id: 'DEPT003', name: 'Electrical & Electronics',  code: 'EEE',  hod: 'EEE HOD',          totalStudents: 2 },
-          { id: 'DEPT004', name: 'Mechanical Engg.',          code: 'MECH', hod: 'MECH HOD',         totalStudents: 1 },
-          { id: 'DEPT005', name: 'Bachelor of Computer App.', code: 'BCA',  hod: 'BCA HOD',          totalStudents: 1 },
-          { id: 'DEPT006', name: 'Master of Business Admin.', code: 'MBA',  hod: 'MBA HOD',          totalStudents: 1 },
+          { id: 'DEPT001', name: 'Computer Science', code: 'CSE', hod: 'CSE HOD', totalStudents: 3 },
+          { id: 'DEPT002', name: 'Electronics & Comm.', code: 'ECE', hod: 'ECE HOD', totalStudents: 2 },
+          { id: 'DEPT003', name: 'Electrical & Electronics', code: 'EEE', hod: 'EEE HOD', totalStudents: 2 },
+          { id: 'DEPT004', name: 'Mechanical Engg.', code: 'MECH', hod: 'MECH HOD', totalStudents: 1 },
+          { id: 'DEPT005', name: 'Bachelor of Computer App.', code: 'BCA', hod: 'BCA HOD', totalStudents: 1 },
+          { id: 'DEPT006', name: 'Master of Business Admin.', code: 'MBA', hod: 'MBA HOD', totalStudents: 1 },
         ]);
         console.log('✅ Departments seeded successfully.');
       }
@@ -547,16 +617,16 @@ const autoSeedIfEmpty = async () => {
       if (staffCount === 0) {
         console.log('🌱 Patching database: missing Staff detected. Injecting them now...');
         await Staff.insertMany([
-          { id: 'STF001', name: 'CSE HOD',          email: 'csehod@gmail.com',    phone: '9900000001', dept: 'Computer Science',          designation: 'HOD',             subjects: ['Algorithms', 'Compiler Design'], workload: 12, attendance: 98 },
-          { id: 'STF002', name: 'ECE HOD',          email: 'ecehod@gmail.com',    phone: '9900000002', dept: 'Electronics & Comm.',       designation: 'HOD',             subjects: ['Signals & Systems'],            workload: 10, attendance: 96 },
-          { id: 'STF003', name: 'EEE HOD',          email: 'eeehod@gmail.com',    phone: '9900000003', dept: 'Electrical & Electronics',  designation: 'HOD',             subjects: ['Circuits', 'Networks'],         workload: 14, attendance: 95 },
-          { id: 'STF004', name: 'MECH HOD',         email: 'mechhod@gmail.com',   phone: '9900000004', dept: 'Mechanical Engg.',          designation: 'HOD',             subjects: ['Thermodynamics'],               workload: 12, attendance: 93 },
-          { id: 'STF005', name: 'BCA HOD',          email: 'bcahod@gmail.com',    phone: '9900000005', dept: 'Bachelor of Computer App.', designation: 'HOD',             subjects: ['Java Programming'],             workload: 12, attendance: 97 },
-          { id: 'STF006', name: 'MBA HOD',          email: 'mbahod@gmail.com',    phone: '9900000006', dept: 'Master of Business Admin.', designation: 'HOD',             subjects: ['Strategic Management'],         workload: 10, attendance: 94 },
-          
-          { id: 'STF007', name: 'Prof. Karthik S.', email: 'karthik@college.edu', phone: '9823456789', dept: 'Computer Science',          designation: 'Assistant Prof.', subjects: ['OS', 'Machine Learning'],       workload: 20, attendance: 89 },
-          { id: 'STF008', name: 'Dr. Ananya Rao',   email: 'ananya@college.edu',  phone: '9876543210', dept: 'Computer Science',          designation: 'Professor',       subjects: ['Data Structures', 'DBMS'],      workload: 18, attendance: 97 },
-          { id: 'STF009', name: 'Dr. Meena Pillai', email: 'meena@college.edu',   phone: '9812987654', dept: 'Electronics & Comm.',       designation: 'Associate Prof.', subjects: ['Microprocessors'],              workload: 16, attendance: 92 },
+          { id: 'STF001', name: 'CSE HOD', email: 'csehod@gmail.com', phone: '9900000001', dept: 'Computer Science', designation: 'HOD', subjects: ['Algorithms', 'Compiler Design'], workload: 12, attendance: 98 },
+          { id: 'STF002', name: 'ECE HOD', email: 'ecehod@gmail.com', phone: '9900000002', dept: 'Electronics & Comm.', designation: 'HOD', subjects: ['Signals & Systems'], workload: 10, attendance: 96 },
+          { id: 'STF003', name: 'EEE HOD', email: 'eeehod@gmail.com', phone: '9900000003', dept: 'Electrical & Electronics', designation: 'HOD', subjects: ['Circuits', 'Networks'], workload: 14, attendance: 95 },
+          { id: 'STF004', name: 'MECH HOD', email: 'mechhod@gmail.com', phone: '9900000004', dept: 'Mechanical Engg.', designation: 'HOD', subjects: ['Thermodynamics'], workload: 12, attendance: 93 },
+          { id: 'STF005', name: 'BCA HOD', email: 'bcahod@gmail.com', phone: '9900000005', dept: 'Bachelor of Computer App.', designation: 'HOD', subjects: ['Java Programming'], workload: 12, attendance: 97 },
+          { id: 'STF006', name: 'MBA HOD', email: 'mbahod@gmail.com', phone: '9900000006', dept: 'Master of Business Admin.', designation: 'HOD', subjects: ['Strategic Management'], workload: 10, attendance: 94 },
+
+          { id: 'STF007', name: 'Prof. Karthik S.', email: 'karthik@college.edu', phone: '9823456789', dept: 'Computer Science', designation: 'Assistant Prof.', subjects: ['OS', 'Machine Learning'], workload: 20, attendance: 89 },
+          { id: 'STF008', name: 'Dr. Ananya Rao', email: 'ananya@college.edu', phone: '9876543210', dept: 'Computer Science', designation: 'Professor', subjects: ['Data Structures', 'DBMS'], workload: 18, attendance: 97 },
+          { id: 'STF009', name: 'Dr. Meena Pillai', email: 'meena@college.edu', phone: '9812987654', dept: 'Electronics & Comm.', designation: 'Associate Prof.', subjects: ['Microprocessors'], workload: 16, attendance: 92 },
         ]);
         console.log('✅ Staff seeded successfully.');
       }
@@ -566,16 +636,16 @@ const autoSeedIfEmpty = async () => {
       if (studentCount === 0) {
         console.log('🌱 Patching database: missing Students detected. Injecting them now...');
         await Student.insertMany([
-          { id: 'CS2022001', name: 'John Doe',       email: 'john@college.edu',    phone: '9876543210', dept: 'Computer Science',          sem: 'Sem 6', cgpa: 8.6, attendance: 85, status: 'Active',   feeStatus: 'Paid'    },
-          { id: 'CS2021004', name: 'Emily Davis',    email: 'emily@college.edu',   phone: '9823456789', dept: 'Computer Science',          sem: 'Sem 6', cgpa: 8.9, attendance: 98, status: 'Active',   feeStatus: 'Paid'    },
-          { id: 'CS2022002', name: 'David Lee',      email: 'david@college.edu',   phone: '9890123456', dept: 'Computer Science',          sem: 'Sem 3', cgpa: 8.2, attendance: 88, status: 'Active',   feeStatus: 'Partial' },
-          { id: 'EE2022001', name: 'Alice Smith',    email: 'alice@college.edu',   phone: '9845123456', dept: 'Electrical & Electronics',  sem: 'Sem 4', cgpa: 9.1, attendance: 95, status: 'Active',   feeStatus: 'Paid'    },
-          { id: 'EE2022002', name: 'Sarah Wilson',   email: 'sarah@college.edu',   phone: '9801234567', dept: 'Electrical & Electronics',  sem: 'Sem 4', cgpa: 9.5, attendance: 91, status: 'Active',   feeStatus: 'Paid'    },
-          { id: 'EC2022001', name: 'Vikram Seth',    email: 'vikram@college.edu',  phone: '9811122233', dept: 'Electronics & Comm.',       sem: 'Sem 6', cgpa: 8.8, attendance: 90, status: 'Active',   feeStatus: 'Paid'    },
-          { id: 'EC2022002', name: 'Neha Gupta',     email: 'neha@college.edu',    phone: '9822233344', dept: 'Electronics & Comm.',       sem: 'Sem 6', cgpa: 8.5, attendance: 75, status: 'Active',   feeStatus: 'Pending' },
-          { id: 'ME2023001', name: 'Robert Johnson', email: 'robert@college.edu',  phone: '9812987654', dept: 'Mechanical Engg.',          sem: 'Sem 2', cgpa: 7.8, attendance: 68, status: 'Active',   feeStatus: 'Partial' },
-          { id: 'BC2022001', name: 'Karan Malhotra', email: 'karan@college.edu',   phone: '9856789012', dept: 'Bachelor of Computer App.', sem: 'Sem 5', cgpa: 8.7, attendance: 94, status: 'Active',   feeStatus: 'Paid'    },
-          { id: 'MB2022001', name: 'Ritu Sen',       email: 'ritu@college.edu',    phone: '9867123456', dept: 'Master of Business Admin.', sem: 'Sem 4', cgpa: 9.2, attendance: 96, status: 'Active',   feeStatus: 'Paid'    },
+          { id: 'CS2022001', name: 'John Doe', email: 'john@college.edu', phone: '9876543210', dept: 'Computer Science', sem: 'Sem 6', cgpa: 8.6, attendance: 85, status: 'Active', feeStatus: 'Paid' },
+          { id: 'CS2021004', name: 'Emily Davis', email: 'emily@college.edu', phone: '9823456789', dept: 'Computer Science', sem: 'Sem 6', cgpa: 8.9, attendance: 98, status: 'Active', feeStatus: 'Paid' },
+          { id: 'CS2022002', name: 'David Lee', email: 'david@college.edu', phone: '9890123456', dept: 'Computer Science', sem: 'Sem 3', cgpa: 8.2, attendance: 88, status: 'Active', feeStatus: 'Partial' },
+          { id: 'EE2022001', name: 'Alice Smith', email: 'alice@college.edu', phone: '9845123456', dept: 'Electrical & Electronics', sem: 'Sem 4', cgpa: 9.1, attendance: 95, status: 'Active', feeStatus: 'Paid' },
+          { id: 'EE2022002', name: 'Sarah Wilson', email: 'sarah@college.edu', phone: '9801234567', dept: 'Electrical & Electronics', sem: 'Sem 4', cgpa: 9.5, attendance: 91, status: 'Active', feeStatus: 'Paid' },
+          { id: 'EC2022001', name: 'Vikram Seth', email: 'vikram@college.edu', phone: '9811122233', dept: 'Electronics & Comm.', sem: 'Sem 6', cgpa: 8.8, attendance: 90, status: 'Active', feeStatus: 'Paid' },
+          { id: 'EC2022002', name: 'Neha Gupta', email: 'neha@college.edu', phone: '9822233344', dept: 'Electronics & Comm.', sem: 'Sem 6', cgpa: 8.5, attendance: 75, status: 'Active', feeStatus: 'Pending' },
+          { id: 'ME2023001', name: 'Robert Johnson', email: 'robert@college.edu', phone: '9812987654', dept: 'Mechanical Engg.', sem: 'Sem 2', cgpa: 7.8, attendance: 68, status: 'Active', feeStatus: 'Partial' },
+          { id: 'BC2022001', name: 'Karan Malhotra', email: 'karan@college.edu', phone: '9856789012', dept: 'Bachelor of Computer App.', sem: 'Sem 5', cgpa: 8.7, attendance: 94, status: 'Active', feeStatus: 'Paid' },
+          { id: 'MB2022001', name: 'Ritu Sen', email: 'ritu@college.edu', phone: '9867123456', dept: 'Master of Business Admin.', sem: 'Sem 4', cgpa: 9.2, attendance: 96, status: 'Active', feeStatus: 'Paid' },
         ]);
         console.log('✅ Students seeded successfully.');
       }
@@ -585,11 +655,11 @@ const autoSeedIfEmpty = async () => {
       if (welfareCount === 0) {
         console.log('🌱 Patching database: missing WelfareRecords detected. Injecting them now...');
         await WelfareRecord.insertMany([
-          { studentName: 'Rohan Sharma', department: 'Computer Science', issueType: 'Disciplinary', reportedBy: 'HOD CSE', priority: 'High', date: '2026-05-24', status: 'Counselor Assigned', description: 'Caught proxying attendance in lab.', timeline: [{date: '2026-05-24', text: 'Misconduct incident reported by HOD CSE'}, {date: '2026-05-26', text: 'Counselor assigned for behavioral counseling assessment'}] },
-          { studentName: 'Ananya Sen', department: 'Electronics & Comm.', issueType: 'Scholarship', reportedBy: 'Accounts Board', priority: 'Medium', date: '2026-05-20', status: 'Resolved', description: 'Requires Principal approval for 20% fee waiver.', timeline: [{date: '2026-05-20', text: 'Scholarship application compiled by registrar'}, {date: '2026-05-23', text: 'Annual fee waiver disbursement successfully cleared'}] },
-          { studentName: 'Karan Malhotra', department: 'Mechanical Engg.', issueType: 'Anti-Ragging', reportedBy: 'Student Welfare', priority: 'High', date: '2026-05-25', status: 'Under Investigation', description: 'Reported bullying in hostel premises.', timeline: [{date: '2026-05-25', text: 'Hostel warden submitted report to Welfare Board'}, {date: '2026-05-26', text: 'Anti-ragging cell mobilized for campus security footage inspection'}] },
-          { studentName: 'Sneha Patil', department: 'Computer Science', issueType: 'Counseling', reportedBy: 'Self-referred', priority: 'Low', date: '2026-05-26', status: 'Scheduled', description: 'Requested professional guidance regarding high academic stress levels.', timeline: [{date: '2026-05-26', text: 'Mental health assessment request submitted'}, {date: '2026-05-27', text: 'Weekly session scheduled with Dr. Asha Roy'}] },
-          { studentName: 'Vikram Joshi', department: 'Electrical & Electronics', issueType: 'Complaint', reportedBy: 'Junior Student', priority: 'High', date: '2026-05-26', status: 'Pending', description: 'Altercation in college cafeteria.', timeline: [{date: '2026-05-26', text: 'Complaint registered'}] }
+          { studentName: 'Rohan Sharma', department: 'Computer Science', issueType: 'Disciplinary', reportedBy: 'HOD CSE', priority: 'High', date: '2026-05-24', status: 'Counselor Assigned', description: 'Caught proxying attendance in lab.', timeline: [{ date: '2026-05-24', text: 'Misconduct incident reported by HOD CSE' }, { date: '2026-05-26', text: 'Counselor assigned for behavioral counseling assessment' }] },
+          { studentName: 'Ananya Sen', department: 'Electronics & Comm.', issueType: 'Scholarship', reportedBy: 'Accounts Board', priority: 'Medium', date: '2026-05-20', status: 'Resolved', description: 'Requires Principal approval for 20% fee waiver.', timeline: [{ date: '2026-05-20', text: 'Scholarship application compiled by registrar' }, { date: '2026-05-23', text: 'Annual fee waiver disbursement successfully cleared' }] },
+          { studentName: 'Karan Malhotra', department: 'Mechanical Engg.', issueType: 'Anti-Ragging', reportedBy: 'Student Welfare', priority: 'High', date: '2026-05-25', status: 'Under Investigation', description: 'Reported bullying in hostel premises.', timeline: [{ date: '2026-05-25', text: 'Hostel warden submitted report to Welfare Board' }, { date: '2026-05-26', text: 'Anti-ragging cell mobilized for campus security footage inspection' }] },
+          { studentName: 'Sneha Patil', department: 'Computer Science', issueType: 'Counseling', reportedBy: 'Self-referred', priority: 'Low', date: '2026-05-26', status: 'Scheduled', description: 'Requested professional guidance regarding high academic stress levels.', timeline: [{ date: '2026-05-26', text: 'Mental health assessment request submitted' }, { date: '2026-05-27', text: 'Weekly session scheduled with Dr. Asha Roy' }] },
+          { studentName: 'Vikram Joshi', department: 'Electrical & Electronics', issueType: 'Complaint', reportedBy: 'Junior Student', priority: 'High', date: '2026-05-26', status: 'Pending', description: 'Altercation in college cafeteria.', timeline: [{ date: '2026-05-26', text: 'Complaint registered' }] }
         ]);
         console.log('✅ WelfareRecords seeded successfully.');
       }
@@ -687,81 +757,83 @@ const autoSeedIfEmpty = async () => {
 
     // 1. Users (bcrypt hash triggers via pre-save hook)
     const userDocs = await User.create([
-      { name: 'Global Super Admin', email: 'superadmin@erpsaas.com',     password: 'superadmin123', role: 'Super Admin' },
-      { name: 'System Admin',     email: 'admin@college.edu',        password: 'password123', role: 'Admin' },
-      { name: 'Dr. Suresh Kumar', email: 'principal@college.edu',    password: 'password123', role: 'Principal' },
-      
+      { name: 'Global Super Admin', email: 'superadmin@erpsaas.com', password: 'superadmin123', role: 'Super Admin' },
+      { name: 'System Admin', email: 'admin@college.edu', password: 'password123', role: 'Admin' },
+      { name: 'Dr. Suresh Kumar', email: 'principal@college.edu', password: 'password123', role: 'Principal' },
+
       // Custom credentials requested by user
-      { name: 'Vaideeswari (Admin)', email: 'vaidee@gmail.com',     password: 'vaidee', role: 'Admin' },
+      { name: 'Vaideeswari (Admin)', email: 'vaidee@gmail.com', password: 'vaidee', role: 'Admin' },
       { name: 'Vaideeswari (Admin)', email: 'vaideeswari@gmail.com', password: 'password123', role: 'Admin' },
-      { name: 'Sree (Principal)', email: 'sree@gmail.com',         password: 'sree123', role: 'Principal' },
-      { name: 'Pooja (Staff)',    email: 'pooja@gmail.com',        password: 'pooja', role: 'Staff', department: 'Computer Science', referenceId: 'STF008', subjects: ['Data Structures'] },
-      { name: 'Meena (Librarian)', email: 'meena@gmail.com',       password: 'meena', role: 'Librarian', referenceId: 'LIB001' },
-      
-      { name: 'Sub Admin',        email: 'subadmin@college.edu',     password: 'password123', role: 'Sub Admin', permissions: [
-        "view_departments",
-        "manage_students",
-        "manage_staff",
-        "view_attendance",
-        "create_announcements",
-        "view_reports"
-      ] },
-      
-      { name: 'John Doe',         email: 'john@college.edu',         password: 'password123', role: 'Student', department: 'Computer Science', referenceId: 'CS2022001', studentId: 'CS2022001' },
-      { name: 'Emily Davis',      email: 'emily@college.edu',        password: 'password123', role: 'Student', department: 'Computer Science', referenceId: 'CS2021004', studentId: 'CS2021004' },
-      { name: 'David Lee',        email: 'david@college.edu',        password: 'password123', role: 'Student', department: 'Computer Science', referenceId: 'CS2022002', studentId: 'CS2022002' },
-      { name: 'Alice Smith',      email: 'alice@college.edu',        password: 'password123', role: 'Student', department: 'Electrical & Electronics', referenceId: 'EE2022001', studentId: 'EE2022001' },
-      { name: 'Sarah Wilson',     email: 'sarah@college.edu',        password: 'password123', role: 'Student', department: 'Electrical & Electronics', referenceId: 'EE2022002', studentId: 'EE2022002' },
-      { name: 'Vikram Seth',      email: 'vikram@college.edu',       password: 'password123', role: 'Student', department: 'Electronics & Comm.', referenceId: 'EC2022001', studentId: 'EC2022001' },
-      { name: 'Neha Gupta',       email: 'neha@college.edu',         password: 'password123', role: 'Student', department: 'Electronics & Comm.', referenceId: 'EC2022002', studentId: 'EC2022002' },
-      { name: 'Robert Johnson',   email: 'robert@college.edu',       password: 'password123', role: 'Student', department: 'Mechanical Engg.', referenceId: 'ME2023001', studentId: 'ME2023001' },
-      { name: 'Karan Malhotra',   email: 'karan@college.edu',        password: 'password123', role: 'Student', department: 'Bachelor of Computer App.', referenceId: 'BC2022001', studentId: 'BC2022001' },
-      { name: 'Ritu Sen',         email: 'ritu@college.edu',         password: 'password123', role: 'Student', department: 'Master of Business Admin.', referenceId: 'MB2022001', studentId: 'MB2022001' },
+      { name: 'Sree (Principal)', email: 'sree@gmail.com', password: 'sree123', role: 'Principal' },
+      { name: 'Pooja (Staff)', email: 'pooja@gmail.com', password: 'pooja', role: 'Staff', department: 'Computer Science', referenceId: 'STF008', subjects: ['Data Structures'] },
+      { name: 'Meena (Librarian)', email: 'meena@gmail.com', password: 'meena', role: 'Librarian', referenceId: 'LIB001' },
+
+      {
+        name: 'Sub Admin', email: 'subadmin@college.edu', password: 'password123', role: 'Sub Admin', permissions: [
+          "view_departments",
+          "manage_students",
+          "manage_staff",
+          "view_attendance",
+          "create_announcements",
+          "view_reports"
+        ]
+      },
+
+      { name: 'John Doe', email: 'john@college.edu', password: 'password123', role: 'Student', department: 'Computer Science', referenceId: 'CS2022001', studentId: 'CS2022001' },
+      { name: 'Emily Davis', email: 'emily@college.edu', password: 'password123', role: 'Student', department: 'Computer Science', referenceId: 'CS2021004', studentId: 'CS2021004' },
+      { name: 'David Lee', email: 'david@college.edu', password: 'password123', role: 'Student', department: 'Computer Science', referenceId: 'CS2022002', studentId: 'CS2022002' },
+      { name: 'Alice Smith', email: 'alice@college.edu', password: 'password123', role: 'Student', department: 'Electrical & Electronics', referenceId: 'EE2022001', studentId: 'EE2022001' },
+      { name: 'Sarah Wilson', email: 'sarah@college.edu', password: 'password123', role: 'Student', department: 'Electrical & Electronics', referenceId: 'EE2022002', studentId: 'EE2022002' },
+      { name: 'Vikram Seth', email: 'vikram@college.edu', password: 'password123', role: 'Student', department: 'Electronics & Comm.', referenceId: 'EC2022001', studentId: 'EC2022001' },
+      { name: 'Neha Gupta', email: 'neha@college.edu', password: 'password123', role: 'Student', department: 'Electronics & Comm.', referenceId: 'EC2022002', studentId: 'EC2022002' },
+      { name: 'Robert Johnson', email: 'robert@college.edu', password: 'password123', role: 'Student', department: 'Mechanical Engg.', referenceId: 'ME2023001', studentId: 'ME2023001' },
+      { name: 'Karan Malhotra', email: 'karan@college.edu', password: 'password123', role: 'Student', department: 'Bachelor of Computer App.', referenceId: 'BC2022001', studentId: 'BC2022001' },
+      { name: 'Ritu Sen', email: 'ritu@college.edu', password: 'password123', role: 'Student', department: 'Master of Business Admin.', referenceId: 'MB2022001', studentId: 'MB2022001' },
 
       // Parents
-      { name: 'Parent of John',   email: 'parent_john@college.edu',  password: 'password123', role: 'Parent',  referenceId: 'CS2022001', parentOf: 'CS2022001' },
-      { name: 'Parent of Alice',  email: 'parent_alice@college.edu', password: 'password123', role: 'Parent',  referenceId: 'EE2022001', parentOf: 'EE2022001' },
-      
+      { name: 'Parent of John', email: 'parent_john@college.edu', password: 'password123', role: 'Parent', referenceId: 'CS2022001', parentOf: 'CS2022001' },
+      { name: 'Parent of Alice', email: 'parent_alice@college.edu', password: 'password123', role: 'Parent', referenceId: 'EE2022001', parentOf: 'EE2022001' },
+
       // Accounts
-      { name: 'Accounts Officer', email: 'accounts@college.edu',     password: 'password123', role: 'Accounts' },
+      { name: 'Accounts Officer', email: 'accounts@college.edu', password: 'password123', role: 'Accounts' },
 
       // HODs
-      { name: 'CSE HOD',          email: 'csehod@gmail.com',         password: 'password123', role: 'HOD', department: 'Computer Science', referenceId: 'STF001' },
-      { name: 'ECE HOD',          email: 'ecehod@gmail.com',         password: 'password123', role: 'HOD', department: 'Electronics & Comm.', referenceId: 'STF002' },
-      { name: 'EEE HOD',          email: 'eeehod@gmail.com',         password: 'password123', role: 'HOD', department: 'Electrical & Electronics', referenceId: 'STF003' },
-      { name: 'MECH HOD',         email: 'mechhod@gmail.com',        password: 'password123', role: 'HOD', department: 'Mechanical Engg.', referenceId: 'STF004' },
-      { name: 'BCA HOD',          email: 'bcahod@gmail.com',         password: 'password123', role: 'HOD', department: 'Bachelor of Computer App.', referenceId: 'STF005' },
-      { name: 'MBA HOD',          email: 'mbahod@gmail.com',         password: 'password123', role: 'HOD', department: 'Master of Business Admin.', referenceId: 'STF006' },
-      { name: 'Dr.Agila',         email: 'agila@gmail.com',          password: 'agila', role: 'HOD', department: 'Information Technology', referenceId: 'HOD001' },
+      { name: 'CSE HOD', email: 'csehod@gmail.com', password: 'password123', role: 'HOD', department: 'Computer Science', referenceId: 'STF001' },
+      { name: 'ECE HOD', email: 'ecehod@gmail.com', password: 'password123', role: 'HOD', department: 'Electronics & Comm.', referenceId: 'STF002' },
+      { name: 'EEE HOD', email: 'eeehod@gmail.com', password: 'password123', role: 'HOD', department: 'Electrical & Electronics', referenceId: 'STF003' },
+      { name: 'MECH HOD', email: 'mechhod@gmail.com', password: 'password123', role: 'HOD', department: 'Mechanical Engg.', referenceId: 'STF004' },
+      { name: 'BCA HOD', email: 'bcahod@gmail.com', password: 'password123', role: 'HOD', department: 'Bachelor of Computer App.', referenceId: 'STF005' },
+      { name: 'MBA HOD', email: 'mbahod@gmail.com', password: 'password123', role: 'HOD', department: 'Master of Business Admin.', referenceId: 'STF006' },
+      { name: 'Dr.Agila', email: 'agila@gmail.com', password: 'agila', role: 'HOD', department: 'Information Technology', referenceId: 'HOD001' },
 
       // Staff
-      { name: 'Prof. Karthik S.', email: 'karthik@college.edu',      password: 'password123', role: 'Staff', department: 'Computer Science', referenceId: 'STF007', subjects: ['OS', 'Machine Learning'] },
+      { name: 'Prof. Karthik S.', email: 'karthik@college.edu', password: 'password123', role: 'Staff', department: 'Computer Science', referenceId: 'STF007', subjects: ['OS', 'Machine Learning'] },
     ]);
 
     // 2. Departments
     if ((await Department.countDocuments()) === 0) {
       await Department.insertMany([
-        { id: 'DEPT001', name: 'Computer Science',          code: 'CSE',  hod: 'CSE HOD',          totalStudents: 3 },
-        { id: 'DEPT002', name: 'Electronics & Comm.',       code: 'ECE',  hod: 'ECE HOD',          totalStudents: 2 },
-        { id: 'DEPT003', name: 'Electrical & Electronics',  code: 'EEE',  hod: 'EEE HOD',          totalStudents: 2 },
-        { id: 'DEPT004', name: 'Mechanical Engg.',          code: 'MECH', hod: 'MECH HOD',         totalStudents: 1 },
-        { id: 'DEPT005', name: 'Bachelor of Computer App.', code: 'BCA',  hod: 'BCA HOD',          totalStudents: 1 },
-        { id: 'DEPT006', name: 'Master of Business Admin.', code: 'MBA',  hod: 'MBA HOD',          totalStudents: 1 },
+        { id: 'DEPT001', name: 'Computer Science', code: 'CSE', hod: 'CSE HOD', totalStudents: 3 },
+        { id: 'DEPT002', name: 'Electronics & Comm.', code: 'ECE', hod: 'ECE HOD', totalStudents: 2 },
+        { id: 'DEPT003', name: 'Electrical & Electronics', code: 'EEE', hod: 'EEE HOD', totalStudents: 2 },
+        { id: 'DEPT004', name: 'Mechanical Engg.', code: 'MECH', hod: 'MECH HOD', totalStudents: 1 },
+        { id: 'DEPT005', name: 'Bachelor of Computer App.', code: 'BCA', hod: 'BCA HOD', totalStudents: 1 },
+        { id: 'DEPT006', name: 'Master of Business Admin.', code: 'MBA', hod: 'MBA HOD', totalStudents: 1 },
       ]);
     }
 
     // 3. Students
     await Student.insertMany([
-      { id: 'CS2022001', name: 'John Doe',       email: 'john@college.edu',    phone: '9876543210', dept: 'Computer Science',          sem: 'Sem 6', cgpa: 8.6, attendance: 85, status: 'Active',   feeStatus: 'Paid'    },
-      { id: 'CS2021004', name: 'Emily Davis',    email: 'emily@college.edu',   phone: '9823456789', dept: 'Computer Science',          sem: 'Sem 6', cgpa: 8.9, attendance: 98, status: 'Active',   feeStatus: 'Paid'    },
-      { id: 'CS2022002', name: 'David Lee',      email: 'david@college.edu',   phone: '9890123456', dept: 'Computer Science',          sem: 'Sem 3', cgpa: 8.2, attendance: 88, status: 'Active',   feeStatus: 'Partial' },
-      { id: 'EE2022001', name: 'Alice Smith',    email: 'alice@college.edu',   phone: '9845123456', dept: 'Electrical & Electronics',  sem: 'Sem 4', cgpa: 9.1, attendance: 95, status: 'Active',   feeStatus: 'Paid'    },
-      { id: 'EE2022002', name: 'Sarah Wilson',   email: 'sarah@college.edu',   phone: '9801234567', dept: 'Electrical & Electronics',  sem: 'Sem 4', cgpa: 9.5, attendance: 91, status: 'Active',   feeStatus: 'Paid'    },
-      { id: 'EC2022001', name: 'Vikram Seth',    email: 'vikram@college.edu',  phone: '9811122233', dept: 'Electronics & Comm.',       sem: 'Sem 6', cgpa: 8.8, attendance: 90, status: 'Active',   feeStatus: 'Paid'    },
-      { id: 'EC2022002', name: 'Neha Gupta',     email: 'neha@college.edu',    phone: '9822233344', dept: 'Electronics & Comm.',       sem: 'Sem 6', cgpa: 8.5, attendance: 75, status: 'Active',   feeStatus: 'Pending' },
-      { id: 'ME2023001', name: 'Robert Johnson', email: 'robert@college.edu',  phone: '9812987654', dept: 'Mechanical Engg.',          sem: 'Sem 2', cgpa: 7.8, attendance: 68, status: 'Active',   feeStatus: 'Partial' },
-      { id: 'BC2022001', name: 'Karan Malhotra', email: 'karan@college.edu',   phone: '9856789012', dept: 'Bachelor of Computer App.', sem: 'Sem 5', cgpa: 8.7, attendance: 94, status: 'Active',   feeStatus: 'Paid'    },
-      { id: 'MB2022001', name: 'Ritu Sen',       email: 'ritu@college.edu',    phone: '9867123456', dept: 'Master of Business Admin.', sem: 'Sem 4', cgpa: 9.2, attendance: 96, status: 'Active',   feeStatus: 'Paid'    },
+      { id: 'CS2022001', name: 'John Doe', email: 'john@college.edu', phone: '9876543210', dept: 'Computer Science', sem: 'Sem 6', cgpa: 8.6, attendance: 85, status: 'Active', feeStatus: 'Paid' },
+      { id: 'CS2021004', name: 'Emily Davis', email: 'emily@college.edu', phone: '9823456789', dept: 'Computer Science', sem: 'Sem 6', cgpa: 8.9, attendance: 98, status: 'Active', feeStatus: 'Paid' },
+      { id: 'CS2022002', name: 'David Lee', email: 'david@college.edu', phone: '9890123456', dept: 'Computer Science', sem: 'Sem 3', cgpa: 8.2, attendance: 88, status: 'Active', feeStatus: 'Partial' },
+      { id: 'EE2022001', name: 'Alice Smith', email: 'alice@college.edu', phone: '9845123456', dept: 'Electrical & Electronics', sem: 'Sem 4', cgpa: 9.1, attendance: 95, status: 'Active', feeStatus: 'Paid' },
+      { id: 'EE2022002', name: 'Sarah Wilson', email: 'sarah@college.edu', phone: '9801234567', dept: 'Electrical & Electronics', sem: 'Sem 4', cgpa: 9.5, attendance: 91, status: 'Active', feeStatus: 'Paid' },
+      { id: 'EC2022001', name: 'Vikram Seth', email: 'vikram@college.edu', phone: '9811122233', dept: 'Electronics & Comm.', sem: 'Sem 6', cgpa: 8.8, attendance: 90, status: 'Active', feeStatus: 'Paid' },
+      { id: 'EC2022002', name: 'Neha Gupta', email: 'neha@college.edu', phone: '9822233344', dept: 'Electronics & Comm.', sem: 'Sem 6', cgpa: 8.5, attendance: 75, status: 'Active', feeStatus: 'Pending' },
+      { id: 'ME2023001', name: 'Robert Johnson', email: 'robert@college.edu', phone: '9812987654', dept: 'Mechanical Engg.', sem: 'Sem 2', cgpa: 7.8, attendance: 68, status: 'Active', feeStatus: 'Partial' },
+      { id: 'BC2022001', name: 'Karan Malhotra', email: 'karan@college.edu', phone: '9856789012', dept: 'Bachelor of Computer App.', sem: 'Sem 5', cgpa: 8.7, attendance: 94, status: 'Active', feeStatus: 'Paid' },
+      { id: 'MB2022001', name: 'Ritu Sen', email: 'ritu@college.edu', phone: '9867123456', dept: 'Master of Business Admin.', sem: 'Sem 4', cgpa: 9.2, attendance: 96, status: 'Active', feeStatus: 'Paid' },
     ]);
 
     // Create Student Profiles for matching user documents
@@ -770,7 +842,7 @@ const autoSeedIfEmpty = async () => {
     for (const s of studentUsers) {
       const semester = s.referenceId.startsWith('ME') ? 2 : s.referenceId.startsWith('CS2022002') ? 3 : s.referenceId.startsWith('EE') ? 4 : s.referenceId.startsWith('BC') ? 5 : 6;
       const cgpa = s.referenceId === 'CS2022001' ? 8.6 : s.referenceId === 'CS2021004' ? 8.9 : s.referenceId === 'CS2022002' ? 8.2 : s.referenceId === 'EE2022001' ? 9.1 : s.referenceId === 'EE2022002' ? 9.5 : s.referenceId === 'EC2022001' ? 8.8 : s.referenceId === 'EC2022002' ? 8.5 : s.referenceId === 'ME2023001' ? 7.8 : s.referenceId === 'BC2022001' ? 8.7 : 9.2;
-      
+
       const profile = await StudentProfile.create({
         user: s._id,
         regNo: s.referenceId,
@@ -788,16 +860,16 @@ const autoSeedIfEmpty = async () => {
 
     // 4. Staff
     await Staff.insertMany([
-      { id: 'STF001', name: 'CSE HOD',          email: 'csehod@gmail.com',    phone: '9900000001', dept: 'Computer Science',          designation: 'HOD',             subjects: ['Algorithms', 'Compiler Design'], workload: 12, attendance: 98 },
-      { id: 'STF002', name: 'ECE HOD',          email: 'ecehod@gmail.com',    phone: '9900000002', dept: 'Electronics & Comm.',       designation: 'HOD',             subjects: ['Signals & Systems'],            workload: 10, attendance: 96 },
-      { id: 'STF003', name: 'EEE HOD',          email: 'eeehod@gmail.com',    phone: '9900000003', dept: 'Electrical & Electronics',  designation: 'HOD',             subjects: ['Circuits', 'Networks'],         workload: 14, attendance: 95 },
-      { id: 'STF004', name: 'MECH HOD',         email: 'mechhod@gmail.com',   phone: '9900000004', dept: 'Mechanical Engg.',          designation: 'HOD',             subjects: ['Thermodynamics'],               workload: 12, attendance: 93 },
-      { id: 'STF005', name: 'BCA HOD',          email: 'bcahod@gmail.com',    phone: '9900000005', dept: 'Bachelor of Computer App.', designation: 'HOD',             subjects: ['Java Programming'],             workload: 12, attendance: 97 },
-      { id: 'STF006', name: 'MBA HOD',          email: 'mbahod@gmail.com',    phone: '9900000006', dept: 'Master of Business Admin.', designation: 'HOD',             subjects: ['Strategic Management'],         workload: 10, attendance: 94 },
-      
-      { id: 'STF007', name: 'Prof. Karthik S.', email: 'karthik@college.edu', phone: '9823456789', dept: 'Computer Science',          designation: 'Assistant Prof.', subjects: ['OS', 'Machine Learning'],       workload: 20, attendance: 89 },
-      { id: 'STF008', name: 'Dr. Ananya Rao',   email: 'ananya@college.edu',  phone: '9876543210', dept: 'Computer Science',          designation: 'Professor',       subjects: ['Data Structures', 'DBMS'],      workload: 18, attendance: 97 },
-      { id: 'STF009', name: 'Dr. Meena Pillai', email: 'meena@college.edu',   phone: '9812987654', dept: 'Electronics & Comm.',       designation: 'Associate Prof.', subjects: ['Microprocessors'],              workload: 16, attendance: 92 },
+      { id: 'STF001', name: 'CSE HOD', email: 'csehod@gmail.com', phone: '9900000001', dept: 'Computer Science', designation: 'HOD', subjects: ['Algorithms', 'Compiler Design'], workload: 12, attendance: 98 },
+      { id: 'STF002', name: 'ECE HOD', email: 'ecehod@gmail.com', phone: '9900000002', dept: 'Electronics & Comm.', designation: 'HOD', subjects: ['Signals & Systems'], workload: 10, attendance: 96 },
+      { id: 'STF003', name: 'EEE HOD', email: 'eeehod@gmail.com', phone: '9900000003', dept: 'Electrical & Electronics', designation: 'HOD', subjects: ['Circuits', 'Networks'], workload: 14, attendance: 95 },
+      { id: 'STF004', name: 'MECH HOD', email: 'mechhod@gmail.com', phone: '9900000004', dept: 'Mechanical Engg.', designation: 'HOD', subjects: ['Thermodynamics'], workload: 12, attendance: 93 },
+      { id: 'STF005', name: 'BCA HOD', email: 'bcahod@gmail.com', phone: '9900000005', dept: 'Bachelor of Computer App.', designation: 'HOD', subjects: ['Java Programming'], workload: 12, attendance: 97 },
+      { id: 'STF006', name: 'MBA HOD', email: 'mbahod@gmail.com', phone: '9900000006', dept: 'Master of Business Admin.', designation: 'HOD', subjects: ['Strategic Management'], workload: 10, attendance: 94 },
+
+      { id: 'STF007', name: 'Prof. Karthik S.', email: 'karthik@college.edu', phone: '9823456789', dept: 'Computer Science', designation: 'Assistant Prof.', subjects: ['OS', 'Machine Learning'], workload: 20, attendance: 89 },
+      { id: 'STF008', name: 'Dr. Ananya Rao', email: 'ananya@college.edu', phone: '9876543210', dept: 'Computer Science', designation: 'Professor', subjects: ['Data Structures', 'DBMS'], workload: 18, attendance: 97 },
+      { id: 'STF009', name: 'Dr. Meena Pillai', email: 'meena@college.edu', phone: '9812987654', dept: 'Electronics & Comm.', designation: 'Associate Prof.', subjects: ['Microprocessors'], workload: 16, attendance: 92 },
     ]);
 
     // 5. Attendance
@@ -805,7 +877,7 @@ const autoSeedIfEmpty = async () => {
       { tenantId: 'unassigned_college', studentId: 'CS2022001', studentName: 'John Doe', registerNo: 'CS2022001', department: 'Computer Science', semester: 'Sem 6', date: new Date('2026-05-20'), attendanceDate: new Date('2026-05-20'), status: 'Present', subject: 'Data Structures', markedBy: 'Dr. Ananya Rao' },
       { tenantId: 'unassigned_college', studentId: 'CS2022001', studentName: 'John Doe', registerNo: 'CS2022001', department: 'Computer Science', semester: 'Sem 6', date: new Date('2026-05-21'), attendanceDate: new Date('2026-05-21'), status: 'Present', subject: 'DBMS', markedBy: 'Dr. Ananya Rao' },
       { tenantId: 'unassigned_college', studentId: 'CS2022001', studentName: 'John Doe', registerNo: 'CS2022001', department: 'Computer Science', semester: 'Sem 6', date: new Date('2026-05-22'), attendanceDate: new Date('2026-05-22'), status: 'Present', subject: 'OS', markedBy: 'Prof. Karthik S.' },
-      
+
       { tenantId: 'unassigned_college', studentId: 'CS2021004', studentName: 'Emily Davis', registerNo: 'CS2021004', department: 'Computer Science', semester: 'Sem 6', date: new Date('2026-05-20'), attendanceDate: new Date('2026-05-20'), status: 'Present', subject: 'Data Structures', markedBy: 'Dr. Ananya Rao' },
       { tenantId: 'unassigned_college', studentId: 'CS2021004', studentName: 'Emily Davis', registerNo: 'CS2021004', department: 'Computer Science', semester: 'Sem 6', date: new Date('2026-05-21'), attendanceDate: new Date('2026-05-21'), status: 'Present', subject: 'DBMS', markedBy: 'Dr. Ananya Rao' },
       { tenantId: 'unassigned_college', studentId: 'CS2021004', studentName: 'Emily Davis', registerNo: 'CS2021004', department: 'Computer Science', semester: 'Sem 6', date: new Date('2026-05-22'), attendanceDate: new Date('2026-05-22'), status: 'Present', subject: 'OS', markedBy: 'Prof. Karthik S.' },
@@ -820,18 +892,18 @@ const autoSeedIfEmpty = async () => {
       { studentId: 'CS2022001', studentName: 'John Doe', registerNo: 'CS2022001', department: 'Computer Science', semester: 'Sem 6', subject: 'Data Structures', internalMarks: 42, semesterMarks: 85, totalMarks: 127, grade: 'O', gpa: 9.0, cgpa: 8.6, arrearStatus: 'Clear' },
       { studentId: 'CS2022001', studentName: 'John Doe', registerNo: 'CS2022001', department: 'Computer Science', semester: 'Sem 6', subject: 'Database Management Systems', internalMarks: 40, semesterMarks: 87, totalMarks: 127, grade: 'A+', gpa: 8.9, cgpa: 8.6, arrearStatus: 'Clear' },
       { studentId: 'CS2022001', studentName: 'John Doe', registerNo: 'CS2022001', department: 'Computer Science', semester: 'Sem 6', subject: 'Operating Systems', internalMarks: 44, semesterMarks: 78, totalMarks: 122, grade: 'A+', gpa: 8.2, cgpa: 8.6, arrearStatus: 'Clear' },
-      
+
       { studentId: 'CS2021004', studentName: 'Emily Davis', registerNo: 'CS2021004', department: 'Computer Science', semester: 'Sem 6', subject: 'Database Management Systems', internalMarks: 45, semesterMarks: 90, totalMarks: 135, grade: 'O', gpa: 9.5, cgpa: 8.9, arrearStatus: 'Clear' },
       { studentId: 'CS2021004', studentName: 'Emily Davis', registerNo: 'CS2021004', department: 'Computer Science', semester: 'Sem 6', subject: 'Operating Systems', internalMarks: 46, semesterMarks: 92, totalMarks: 138, grade: 'O', gpa: 9.6, cgpa: 8.9, arrearStatus: 'Clear' },
 
       { studentId: 'CS2022002', studentName: 'David Lee', registerNo: 'CS2022002', department: 'Computer Science', semester: 'Sem 3', subject: 'Data Structures', internalMarks: 38, semesterMarks: 72, totalMarks: 110, grade: 'A', gpa: 8.0, cgpa: 8.2, arrearStatus: 'Clear' },
-      
+
       { studentId: 'EE2022001', studentName: 'Alice Smith', registerNo: 'EE2022001', department: 'Electrical & Electronics', semester: 'Sem 4', subject: 'Circuits', internalMarks: 45, semesterMarks: 88, totalMarks: 133, grade: 'A+', gpa: 9.1, cgpa: 9.1, arrearStatus: 'Clear' },
       { studentId: 'EE2022002', studentName: 'Sarah Wilson', registerNo: 'EE2022002', department: 'Electrical & Electronics', semester: 'Sem 4', subject: 'Networks', internalMarks: 47, semesterMarks: 91, totalMarks: 138, grade: 'O', gpa: 9.5, cgpa: 9.5, arrearStatus: 'Clear' },
-      
+
       { studentId: 'EC2022001', studentName: 'Vikram Seth', registerNo: 'EC2022001', department: 'Electronics & Comm.', semester: 'Sem 6', subject: 'Microprocessors', internalMarks: 43, semesterMarks: 82, totalMarks: 125, grade: 'A+', gpa: 8.8, cgpa: 8.8, arrearStatus: 'Clear' },
       { studentId: 'EC2022002', studentName: 'Neha Gupta', registerNo: 'EC2022002', department: 'Electronics & Comm.', semester: 'Sem 6', subject: 'Signals & Systems', internalMarks: 42, semesterMarks: 80, totalMarks: 122, grade: 'A+', gpa: 8.5, cgpa: 8.5, arrearStatus: 'Clear' },
-      
+
       { studentId: 'ME2023001', studentName: 'Robert Johnson', registerNo: 'ME2023001', department: 'Mechanical Engg.', semester: 'Sem 2', subject: 'Thermodynamics', internalMarks: 36, semesterMarks: 65, totalMarks: 101, grade: 'B+', gpa: 7.8, cgpa: 7.8, arrearStatus: 'Clear' },
       { studentId: 'BC2022001', studentName: 'Karan Malhotra', registerNo: 'BC2022001', department: 'Bachelor of Computer App.', semester: 'Sem 5', subject: 'Web Programming', internalMarks: 41, semesterMarks: 83, totalMarks: 124, grade: 'A+', gpa: 8.7, cgpa: 8.7, arrearStatus: 'Clear' },
       { studentId: 'MB2022001', studentName: 'Ritu Sen', registerNo: 'MB2022001', department: 'Master of Business Admin.', semester: 'Sem 4', subject: 'Financial Accounting', internalMarks: 44, semesterMarks: 89, totalMarks: 133, grade: 'O', gpa: 9.2, cgpa: 9.2, arrearStatus: 'Clear' }
@@ -843,16 +915,16 @@ const autoSeedIfEmpty = async () => {
       { studentId: 'CS2022001', studentName: 'John Doe', registerNo: 'CS2022001', department: 'Computer Science', semester: 'Sem 6', totalFees: 120000, paidAmount: 120000, pendingAmount: 0, paymentDate: new Date('2026-05-15'), paymentMode: 'Online', status: 'Paid', receiptNo: 'REC-002' },
       { studentId: 'CS2022001', studentName: 'John Doe', registerNo: 'CS2022001', department: 'Computer Science', semester: 'Sem 6', totalFees: 340000, paidAmount: 340000, pendingAmount: 0, paymentDate: new Date('2026-05-16'), paymentMode: 'Net Banking', status: 'Paid', receiptNo: 'REC-003' },
       { studentId: 'CS2022001', studentName: 'John Doe', registerNo: 'CS2022001', department: 'Computer Science', semester: 'Sem 6', totalFees: 180000, paidAmount: 180000, pendingAmount: 0, paymentDate: new Date('2026-05-16'), paymentMode: 'UPI', status: 'Paid', receiptNo: 'REC-004' },
-      
+
       { studentId: 'CS2021004', studentName: 'Emily Davis', registerNo: 'CS2021004', department: 'Computer Science', semester: 'Sem 6', totalFees: 850000, paidAmount: 850000, pendingAmount: 0, paymentDate: new Date('2026-05-10'), paymentMode: 'Online', status: 'Paid', receiptNo: 'REC-005' },
       { studentId: 'CS2022002', studentName: 'David Lee', registerNo: 'CS2022002', department: 'Computer Science', semester: 'Sem 3', totalFees: 150000, paidAmount: 50000, pendingAmount: 100000, paymentDate: new Date('2026-05-18'), paymentMode: 'Cash', status: 'Partial', receiptNo: 'REC-006' },
-      
+
       { studentId: 'EE2022001', studentName: 'Alice Smith', registerNo: 'EE2022001', department: 'Electrical & Electronics', semester: 'Sem 4', totalFees: 150000, paidAmount: 150000, pendingAmount: 0, paymentDate: new Date('2026-05-12'), paymentMode: 'Online', status: 'Paid', receiptNo: 'REC-007' },
       { studentId: 'EE2022002', studentName: 'Sarah Wilson', registerNo: 'EE2022002', department: 'Electrical & Electronics', semester: 'Sem 4', totalFees: 150000, paidAmount: 150000, pendingAmount: 0, paymentDate: new Date('2026-05-12'), paymentMode: 'Online', status: 'Paid', receiptNo: 'REC-008' },
-      
+
       { studentId: 'EC2022001', studentName: 'Vikram Seth', registerNo: 'EC2022001', department: 'Electronics & Comm.', semester: 'Sem 6', totalFees: 120000, paidAmount: 120000, pendingAmount: 0, paymentDate: new Date('2026-05-11'), paymentMode: 'Online', status: 'Paid', receiptNo: 'REC-009' },
       { studentId: 'EC2022002', studentName: 'Neha Gupta', registerNo: 'EC2022002', department: 'Electronics & Comm.', semester: 'Sem 6', totalFees: 120000, paidAmount: 0, pendingAmount: 120000, status: 'Pending' },
-      
+
       { studentId: 'ME2023001', studentName: 'Robert Johnson', registerNo: 'ME2023001', department: 'Mechanical Engg.', semester: 'Sem 2', totalFees: 160000, paidAmount: 80000, pendingAmount: 80000, paymentDate: new Date('2026-05-14'), paymentMode: 'Online', status: 'Partial', receiptNo: 'REC-010' },
       { studentId: 'BC2022001', studentName: 'Karan Malhotra', registerNo: 'BC2022001', department: 'Bachelor of Computer App.', semester: 'Sem 5', totalFees: 140000, paidAmount: 140000, pendingAmount: 0, paymentDate: new Date('2026-05-13'), paymentMode: 'Online', status: 'Paid', receiptNo: 'REC-011' },
       { studentId: 'MB2022001', studentName: 'Ritu Sen', registerNo: 'MB2022001', department: 'Master of Business Admin.', semester: 'Sem 4', totalFees: 250000, paidAmount: 250000, pendingAmount: 0, paymentDate: new Date('2026-05-09'), paymentMode: 'Online', status: 'Paid', receiptNo: 'REC-012' }
@@ -1019,23 +1091,23 @@ const autoSeedIfEmpty = async () => {
 
     // 16. Salary / Payroll Seed
     await Salary.insertMany([
-      { staffId: 'STF001', staffName: 'CSE HOD',          designation: 'HOD',             department: 'Computer Science',          billingMonth: 'May 2026', basicPay: 85000, allowances: 15000, deductions: 5000, netSalary: 95000, status: 'Disbursed', paymentDate: new Date('2026-05-25'), paymentMode: 'Bank Transfer' },
-      { staffId: 'STF002', staffName: 'ECE HOD',          designation: 'HOD',             department: 'Electronics & Comm.',       billingMonth: 'May 2026', basicPay: 85000, allowances: 15000, deductions: 5000, netSalary: 95000, status: 'Disbursed', paymentDate: new Date('2026-05-25'), paymentMode: 'Bank Transfer' },
-      { staffId: 'STF003', staffName: 'EEE HOD',          designation: 'HOD',             department: 'Electrical & Electronics',  billingMonth: 'May 2026', basicPay: 85000, allowances: 15000, deductions: 5000, netSalary: 95000, status: 'Disbursed', paymentDate: new Date('2026-05-25'), paymentMode: 'Bank Transfer' },
-      { staffId: 'STF004', staffName: 'MECH HOD',         designation: 'HOD',             department: 'Mechanical Engg.',          billingMonth: 'May 2026', basicPay: 85000, allowances: 15000, deductions: 5000, netSalary: 95000, status: 'Pending',   paymentMode: 'Bank Transfer' },
-      { staffId: 'STF007', staffName: 'Prof. Karthik S.', designation: 'Assistant Prof.', department: 'Computer Science',          billingMonth: 'May 2026', basicPay: 65000, allowances: 10000, deductions: 3000, netSalary: 72000, status: 'Pending',   paymentMode: 'Bank Transfer' },
-      { staffId: 'STF008', staffName: 'Dr. Ananya Rao',   designation: 'Professor',       department: 'Computer Science',          billingMonth: 'May 2026', basicPay: 90000, allowances: 20000, deductions: 8000, netSalary: 102000, status: 'Disbursed', paymentDate: new Date('2026-05-25'), paymentMode: 'Bank Transfer' },
-      { staffId: 'STF009', staffName: 'Dr. Meena Pillai', designation: 'Associate Prof.', department: 'Electronics & Comm.',       billingMonth: 'May 2026', basicPay: 75000, allowances: 12000, deductions: 4000, netSalary: 83000, status: 'Pending',   paymentMode: 'Bank Transfer' },
+      { staffId: 'STF001', staffName: 'CSE HOD', designation: 'HOD', department: 'Computer Science', billingMonth: 'May 2026', basicPay: 85000, allowances: 15000, deductions: 5000, netSalary: 95000, status: 'Disbursed', paymentDate: new Date('2026-05-25'), paymentMode: 'Bank Transfer' },
+      { staffId: 'STF002', staffName: 'ECE HOD', designation: 'HOD', department: 'Electronics & Comm.', billingMonth: 'May 2026', basicPay: 85000, allowances: 15000, deductions: 5000, netSalary: 95000, status: 'Disbursed', paymentDate: new Date('2026-05-25'), paymentMode: 'Bank Transfer' },
+      { staffId: 'STF003', staffName: 'EEE HOD', designation: 'HOD', department: 'Electrical & Electronics', billingMonth: 'May 2026', basicPay: 85000, allowances: 15000, deductions: 5000, netSalary: 95000, status: 'Disbursed', paymentDate: new Date('2026-05-25'), paymentMode: 'Bank Transfer' },
+      { staffId: 'STF004', staffName: 'MECH HOD', designation: 'HOD', department: 'Mechanical Engg.', billingMonth: 'May 2026', basicPay: 85000, allowances: 15000, deductions: 5000, netSalary: 95000, status: 'Pending', paymentMode: 'Bank Transfer' },
+      { staffId: 'STF007', staffName: 'Prof. Karthik S.', designation: 'Assistant Prof.', department: 'Computer Science', billingMonth: 'May 2026', basicPay: 65000, allowances: 10000, deductions: 3000, netSalary: 72000, status: 'Pending', paymentMode: 'Bank Transfer' },
+      { staffId: 'STF008', staffName: 'Dr. Ananya Rao', designation: 'Professor', department: 'Computer Science', billingMonth: 'May 2026', basicPay: 90000, allowances: 20000, deductions: 8000, netSalary: 102000, status: 'Disbursed', paymentDate: new Date('2026-05-25'), paymentMode: 'Bank Transfer' },
+      { staffId: 'STF009', staffName: 'Dr. Meena Pillai', designation: 'Associate Prof.', department: 'Electronics & Comm.', billingMonth: 'May 2026', basicPay: 75000, allowances: 12000, deductions: 4000, netSalary: 83000, status: 'Pending', paymentMode: 'Bank Transfer' },
     ]);
 
     // 17. Welfare Records Seed
     await WelfareRecord.deleteMany();
     await WelfareRecord.insertMany([
-      { studentName: 'Rohan Sharma', department: 'Computer Science', issueType: 'Disciplinary', reportedBy: 'HOD CSE', priority: 'High', date: '2026-05-24', status: 'Counselor Assigned', description: 'Caught proxying attendance in lab.', timeline: [{date: '2026-05-24', text: 'Misconduct incident reported by HOD CSE'}, {date: '2026-05-26', text: 'Counselor assigned for behavioral counseling assessment'}] },
-      { studentName: 'Ananya Sen', department: 'Electronics & Comm.', issueType: 'Scholarship', reportedBy: 'Accounts Board', priority: 'Medium', date: '2026-05-20', status: 'Resolved', description: 'Requires Principal approval for 20% fee waiver.', timeline: [{date: '2026-05-20', text: 'Scholarship application compiled by registrar'}, {date: '2026-05-23', text: 'Annual fee waiver disbursement successfully cleared'}] },
-      { studentName: 'Karan Malhotra', department: 'Mechanical Engg.', issueType: 'Anti-Ragging', reportedBy: 'Student Welfare', priority: 'High', date: '2026-05-25', status: 'Under Investigation', description: 'Reported bullying in hostel premises.', timeline: [{date: '2026-05-25', text: 'Hostel warden submitted report to Welfare Board'}, {date: '2026-05-26', text: 'Anti-ragging cell mobilized for campus security footage inspection'}] },
-      { studentName: 'Sneha Patil', department: 'Computer Science', issueType: 'Counseling', reportedBy: 'Self-referred', priority: 'Low', date: '2026-05-26', status: 'Scheduled', description: 'Requested professional guidance regarding high academic stress levels.', timeline: [{date: '2026-05-26', text: 'Mental health assessment request submitted'}, {date: '2026-05-27', text: 'Weekly session scheduled with Dr. Asha Roy'}] },
-      { studentName: 'Vikram Joshi', department: 'Electrical & Electronics', issueType: 'Complaint', reportedBy: 'Junior Student', priority: 'High', date: '2026-05-26', status: 'Pending', description: 'Altercation in college cafeteria.', timeline: [{date: '2026-05-26', text: 'Complaint registered'}] }
+      { studentName: 'Rohan Sharma', department: 'Computer Science', issueType: 'Disciplinary', reportedBy: 'HOD CSE', priority: 'High', date: '2026-05-24', status: 'Counselor Assigned', description: 'Caught proxying attendance in lab.', timeline: [{ date: '2026-05-24', text: 'Misconduct incident reported by HOD CSE' }, { date: '2026-05-26', text: 'Counselor assigned for behavioral counseling assessment' }] },
+      { studentName: 'Ananya Sen', department: 'Electronics & Comm.', issueType: 'Scholarship', reportedBy: 'Accounts Board', priority: 'Medium', date: '2026-05-20', status: 'Resolved', description: 'Requires Principal approval for 20% fee waiver.', timeline: [{ date: '2026-05-20', text: 'Scholarship application compiled by registrar' }, { date: '2026-05-23', text: 'Annual fee waiver disbursement successfully cleared' }] },
+      { studentName: 'Karan Malhotra', department: 'Mechanical Engg.', issueType: 'Anti-Ragging', reportedBy: 'Student Welfare', priority: 'High', date: '2026-05-25', status: 'Under Investigation', description: 'Reported bullying in hostel premises.', timeline: [{ date: '2026-05-25', text: 'Hostel warden submitted report to Welfare Board' }, { date: '2026-05-26', text: 'Anti-ragging cell mobilized for campus security footage inspection' }] },
+      { studentName: 'Sneha Patil', department: 'Computer Science', issueType: 'Counseling', reportedBy: 'Self-referred', priority: 'Low', date: '2026-05-26', status: 'Scheduled', description: 'Requested professional guidance regarding high academic stress levels.', timeline: [{ date: '2026-05-26', text: 'Mental health assessment request submitted' }, { date: '2026-05-27', text: 'Weekly session scheduled with Dr. Asha Roy' }] },
+      { studentName: 'Vikram Joshi', department: 'Electrical & Electronics', issueType: 'Complaint', reportedBy: 'Junior Student', priority: 'High', date: '2026-05-26', status: 'Pending', description: 'Altercation in college cafeteria.', timeline: [{ date: '2026-05-26', text: 'Complaint registered' }] }
     ]);
 
     console.log('✅ Auto-seed successfully pre-populated! 22 users | 6 departments | 10 students | 9 staff | 9 attendance entries | 13 mark transcripts | 12 fee invoices | 5 books | 3 issues | Transport Setup | Hostel Setup | Placement Setup | Settings Setup | Notifications Setup | Approvals Setup | Exams Seeded | Salary Payroll Seeded | Welfare Records');

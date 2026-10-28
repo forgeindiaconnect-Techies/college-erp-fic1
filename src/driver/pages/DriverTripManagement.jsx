@@ -3,7 +3,7 @@ import {
   Bus, Clock, PlayCircle, StopCircle, CheckCircle, Navigation, 
   Users, MapPin, Check, AlertCircle, ArrowRight, Activity, RotateCcw, 
   Shield, Compass, Phone, Radio, ChevronRight, ShieldCheck, Search,
-  Play, ExternalLink
+  Play, ExternalLink, RefreshCw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { 
@@ -11,6 +11,8 @@ import {
   getTransportRoutes, getTransportDrivers, getTransportStudents, getTransportVehicles 
 } from '../../api/index';
 import './DriverDashboard.css';
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const DriverTripManagement = () => {
   const [session, setSession] = useState({});
@@ -24,6 +26,12 @@ const DriverTripManagement = () => {
   const [loading, setLoading] = useState(true);
   const [studentSearch, setStudentSearch] = useState('');
   const [activeStopIndex, setActiveStopIndex] = useState(0);
+  const [liveTime, setLiveTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setLiveTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const [studentStatus, setStudentStatus] = useState(() => {
     return JSON.parse(localStorage.getItem('driver_student_status') || '{}');
@@ -290,84 +298,112 @@ const DriverTripManagement = () => {
   return (
     <div className="driver-page-container">
       
-      {/* ── Breadcrumb & Compact Header Bar ── */}
-      <div className="driver-header-bar">
+      {/* ── Enterprise Real-Time Header Bar ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', background: '#ffffff', padding: '18px 24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', marginBottom: '1.25rem' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
-            <span>Fleet Operations</span>
-            <ChevronRight size={12} />
-            <span style={{ color: '#0f172a' }}>Trip Operations & Live Tracking</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.01em' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
               Transit Trip Operations & Dispatch
             </h1>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', fontWeight: 700, color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: '20px', border: '1px solid #a7f3d0' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }}></span>
+              LIVE GPS ACTIVE
+            </span>
           </div>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.88rem', fontWeight: 500 }}>
+            Fleet Telemetry • Driver <strong>{myDriverInfo?.name || session.name || 'Driver'}</strong> ({myDriverInfo?.driverId || session.referenceId || 'DRV-0001'}) • Assigned Vehicle <strong>{assignedVehicleName}</strong>
+          </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '0.2rem 0.6rem', background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700 }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }}></span>
-            GPS ACTIVE
-          </span>
-          <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600, background: '#f1f5f9', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
-            Driver: {myDriverInfo?.driverId || session.referenceId || 'DRV-0002'}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ textAlign: 'right', background: '#f8fafc', padding: '6px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Academic Session 2026-27</div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+              {liveTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} • {DAYS[liveTime.getDay()]}, {liveTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </div>
+          </div>
+          <button 
+            onClick={fetchData}
+            title="Refresh Trip Data"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '9px 14px', borderRadius: '10px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', color: '#334155' }}
+          >
+            <RefreshCw size={15} /> Refresh
+          </button>
         </div>
       </div>
 
-      {/* ── Compact Key Metric Row ── */}
-      <div className="driver-kpi-grid">
+      {/* ── 4 ERP Key Metric Cards ── */}
+      <div className="driver-stats-grid driver-kpi-grid">
         
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Assigned Vehicle</span>
-            <Bus size={14} style={{ color: '#2563eb' }} />
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #6366F1', padding: '16px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Assigned Vehicle</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px', fontFamily: 'monospace' }}>
+                {assignedVehicleName}
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Bus size={22} />
+            </div>
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem', fontFamily: 'monospace' }}>
-            {assignedVehicleName}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>
-            Ready (Capacity: {route?.capacity || 50})
-          </div>
-        </div>
-
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Transit Route</span>
-            <MapPin size={14} style={{ color: '#4f46e5' }} />
-          </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-            Route {assignedRouteName}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, marginTop: '0.15rem' }}>
-            {pointsList.length} Scheduled Stops
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#16a34a', fontWeight: 700 }}>● Ready (Capacity: {route?.capacity || 50})</span>
+            <span style={{ color: '#6366F1', fontWeight: 700 }}>Vehicle Specs →</span>
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Boarding Status</span>
-            <Users size={14} style={{ color: '#16a34a' }} />
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #0284c7', padding: '16px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Transit Route</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                Route {assignedRouteName}
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <MapPin size={22} />
+            </div>
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-            {boardedCount} / {students.length}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>
-            {students.length > 0 ? `${Math.round((boardedCount / students.length) * 100)}% Boarded` : 'Manifest Ready'}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#0284c7', fontWeight: 600 }}>{pointsList.length} Scheduled Stops</span>
+            <span style={{ color: '#0284c7', fontWeight: 700 }}>Waypoints →</span>
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Shift Duty Status</span>
-            <Activity size={14} style={{ color: '#0284c7' }} />
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #F59E0B', padding: '16px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Boarding Status</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                {boardedCount} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>/ {students.length}</span>
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Users size={22} />
+            </div>
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: currentTrip?.status === 'Started' ? '#2563eb' : currentTrip?.status === 'Arrived' ? '#16a34a' : completedToday ? '#166534' : '#b45309', marginTop: '0.2rem' }}>
-            {completedToday ? 'Completed' : currentTrip?.status === 'Started' ? 'In Transit' : currentTrip?.status === 'Arrived' ? 'At Destination' : 'Ready / Standby'}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#16a34a', fontWeight: 700 }}>{students.length > 0 ? `${Math.round((boardedCount / students.length) * 100)}% Boarded` : 'Manifest Ready'}</span>
+            <span style={{ color: '#F59E0B', fontWeight: 700 }}>Roster →</span>
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '0.15rem' }}>
-            Morning Shift
+        </div>
+
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: `4px solid ${currentTrip?.status === 'Started' ? '#2563eb' : currentTrip?.status === 'Arrived' ? '#16a34a' : completedToday ? '#166534' : '#b45309'}`, padding: '16px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Shift Duty Status</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: currentTrip?.status === 'Started' ? '#2563eb' : currentTrip?.status === 'Arrived' ? '#16a34a' : completedToday ? '#166534' : '#b45309', margin: '4px 0 2px' }}>
+                {completedToday ? 'Completed' : currentTrip?.status === 'Started' ? 'In Transit' : currentTrip?.status === 'Arrived' ? 'At Destination' : 'Ready / Standby'}
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Activity size={22} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#64748b', fontWeight: 600 }}>Active Dispatch Routine</span>
+            <span style={{ color: '#2563eb', fontWeight: 700 }}>Shift Controls →</span>
           </div>
         </div>
 

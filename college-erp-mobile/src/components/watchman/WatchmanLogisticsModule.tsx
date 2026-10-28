@@ -362,41 +362,54 @@ export default function WatchmanLogisticsModule({ user, assignedGate = 'Gate 1 (
   };
 
   // ----------------------------------------------------------------------
-  // EMERGENCY INCIDENTS (Report & Resolve)
   // ----------------------------------------------------------------------
+  // EMERGENCY INCIDENTS (Report & Status Tracking)
+  // ----------------------------------------------------------------------
+  const canResolveIncidents = ['Admin', 'Super Admin', 'Principal', 'Sub Admin'].includes(user.role);
+
   const handleReportIncident = async () => {
     if (!incLocation.trim() || !incDesc.trim()) {
-      Alert.alert('Required', 'Please provide location and incident description.');
+      Alert.alert('Required Fields', 'Please provide location and incident description.');
       return;
     }
     try {
       setSubmittingIncident(true);
-      await apiPost('watchman/incidents', {
-        incidentType: incType,
-        severity: incSeverity,
+      const payload = {
+        title: `${incType} at ${incLocation.trim()}`,
+        category: incType,
+        severity: incSeverity || 'Medium',
         location: incLocation.trim(),
         description: incDesc.trim(),
         reportedBy: user.name || 'Security Officer',
-        gate: assignedGate,
-      });
+        gate: assignedGate || 'Main Gate 1',
+        actionTaken: 'Reported via Watchman Mobile Terminal',
+      };
+      const res: any = await apiPost('watchman/incidents', payload);
+      if (res && res.success === false) {
+        throw new Error(res.message || 'Failed to dispatch incident report');
+      }
+
       setIncidentModalVisible(false);
       setIncDesc('');
-      Alert.alert('🚨 Incident Dispatched', 'Incident alert dispatched to campus command room.');
+      Alert.alert('🚨 Incident Dispatched', 'Incident alert successfully registered and dispatched to campus command room.');
       await loadData();
     } catch (err: any) {
-      Alert.alert('Notice', err?.message || 'Incident reported.');
-      setIncidentModalVisible(false);
-      await loadData();
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to submit incident report. Please verify connection.';
+      Alert.alert('Incident Report Error', errMsg);
     } finally {
       setSubmittingIncident(false);
     }
   };
 
   const handleResolveIncident = async (incident: any) => {
+    if (!canResolveIncidents) {
+      Alert.alert('Unauthorized', 'Security personnel are not authorized to resolve incidents. Resolution must be completed by College Administration.');
+      return;
+    }
     const incId = incident._id || incident.id;
     Alert.alert(
       'Resolve Incident',
-      `Mark incident "${incident.incidentType || incident.type}" as resolved?`,
+      `Mark incident "${incident.incidentType || incident.type || incident.title}" as resolved?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -406,13 +419,13 @@ export default function WatchmanLogisticsModule({ user, assignedGate = 'Gate 1 (
               setActionLoadingId(incId);
               await apiPatch(`watchman/incidents/${incId}`, {
                 status: 'Resolved',
-                resolvedBy: user.name || 'Security Officer',
-                resolutionNotes: 'Resolved on duty by security team',
+                resolvedBy: user.name || 'Administrator',
+                resolutionNotes: 'Resolved and closed via mobile console',
               });
               Alert.alert('✓ Incident Closed', 'Incident marked as resolved.');
               await loadData();
             } catch (err: any) {
-              Alert.alert('Notice', err?.message || 'Incident updated.');
+              Alert.alert('Resolution Failed', err?.message || 'Failed to update incident status.');
               await loadData();
             } finally {
               setActionLoadingId(null);
@@ -813,22 +826,31 @@ export default function WatchmanLogisticsModule({ user, assignedGate = 'Gate 1 (
                   <View key={incId} style={styles.incidentCard}>
                     <View style={styles.cardTopRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.incidentTitle}>{inc.incidentType || inc.type || 'Security Alert'}</Text>
-                        <Text style={styles.incidentLoc}>📍 {inc.location || assignedGate}</Text>
+                        <Text style={styles.incidentTitle}>{inc.title || inc.incidentType || inc.type || 'Security Alert'}</Text>
+                        <Text style={styles.incidentLoc}>📍 {inc.location || inc.gate || assignedGate}</Text>
                       </View>
                       <View style={[styles.statusTag, isResolved ? styles.statusTagIn : styles.statusTagOut]}>
                         <Text style={[styles.statusTagText, isResolved ? styles.statusTagTextIn : styles.statusTagTextOut]}>
-                          {isResolved ? '✓ Resolved' : '🚨 Active Alert'}
+                          {isResolved ? '✓ Resolved' : '🚨 Open Alert'}
                         </Text>
                       </View>
                     </View>
 
-                    <Text style={styles.incidentDesc}>{inc.description || inc.details}</Text>
+                    <Text style={styles.incidentDesc}>{inc.description || inc.details || 'Security incident recorded at gate.'}</Text>
                     <Text style={styles.incidentMeta}>
-                      Reported by: {inc.reportedBy || 'Gate Officer'} • Severity: {inc.severity || 'Medium'}
+                      Reported by: {inc.reportedBy || 'Gate Officer'} • Severity: {inc.severity || 'Medium'}{inc.incidentTime ? ` • ${new Date(inc.incidentTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
                     </Text>
 
-                    {!isResolved && (
+                    {isResolved && inc.resolutionNotes ? (
+                      <View style={{ backgroundColor: '#F0FDF4', padding: 8, borderRadius: 6, marginTop: 6, borderWidth: 1, borderColor: '#BBF7D0' }}>
+                        <Text style={{ fontSize: 11, color: '#166534', fontWeight: '700' }}>
+                          ✓ Resolution Notes ({inc.resolvedBy || 'Admin'}):
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#14532D', marginTop: 2 }}>{inc.resolutionNotes}</Text>
+                      </View>
+                    ) : null}
+
+                    {!isResolved && canResolveIncidents && (
                       <TouchableOpacity
                         style={[styles.resolveBtn, isActionLoading && { opacity: 0.6 }]}
                         onPress={() => handleResolveIncident(inc)}
@@ -841,6 +863,14 @@ export default function WatchmanLogisticsModule({ user, assignedGate = 'Gate 1 (
                           <Text style={styles.resolveBtnText}>Mark Resolved ✓</Text>
                         )}
                       </TouchableOpacity>
+                    )}
+
+                    {!isResolved && !canResolveIncidents && (
+                      <View style={{ backgroundColor: '#FEF3C7', padding: 8, borderRadius: 6, marginTop: 8, borderWidth: 1, borderColor: '#FCD34D', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 11, color: '#B45309', fontWeight: '700' }}>
+                          ⏳ Pending Administrative Review & Resolution
+                        </Text>
+                      </View>
                     )}
                   </View>
                 );

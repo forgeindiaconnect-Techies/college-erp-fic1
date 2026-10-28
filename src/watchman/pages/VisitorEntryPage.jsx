@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   UserPlus, UserCheck, CheckCircle2, QrCode, Printer, RotateCcw,
   Shield, Phone, Mail, Car, Building2, MapPin, AlertCircle, FileText,
-  LogOut as ExitIcon, ExternalLink, ArrowRight
+  LogOut as ExitIcon, ExternalLink, ArrowRight, Download, LogIn
 } from 'lucide-react';
-import { recordVisitorEntry } from '../../api/index';
+import { recordVisitorEntry, recordVisitorCampusIn } from '../../api/index';
 import '../watchman.css';
 
 const PURPOSES = [
@@ -50,19 +50,22 @@ const INITIAL_FORM = {
   idProofType: ID_TYPES[0],
   idProofNumber: '',
   gate: GATES[0],
-  notes: ''
+  notes: '',
+  immediateIn: false
 };
 
 const VisitorEntryPage = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
   const [createdPass, setCreatedPass] = useState(null);
   const [error, setError] = useState('');
+  const [successNotice, setSuccessNotice] = useState('');
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     if (error) setError('');
   };
 
@@ -81,8 +84,9 @@ const VisitorEntryPage = () => {
     try {
       setSubmitting(true);
       setError('');
+      setSuccessNotice('');
       const res = await recordVisitorEntry(payload);
-      if (res.data?.success) {
+      if (res.data?.success && res.data?.data) {
         setCreatedPass(res.data.data);
       }
     } catch (err) {
@@ -92,6 +96,46 @@ const VisitorEntryPage = () => {
     }
   };
 
+  const handleQuickCampusIn = async () => {
+    if (!createdPass?._id && !createdPass?.passNumber) return;
+    try {
+      setCheckingIn(true);
+      setError('');
+      const res = await recordVisitorCampusIn(createdPass._id || createdPass.passNumber, { gate: createdPass.gate || formData.gate });
+      if (res.data?.success && res.data?.data) {
+        setCreatedPass(res.data.data);
+        setSuccessNotice(`Campus In recorded! Visitor ${res.data.data.name} is now Inside Campus.`);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to record Campus In');
+    } finally {
+      setCheckingIn(false);
+    }
+  };
+
+  const handleDownloadQr = () => {
+    if (!createdPass) return;
+    const passCode = createdPass.passNumber || createdPass.visitorId;
+    const verifyUrl = `${window.location.origin}/watchman/qr-verification?type=visitor&code=${encodeURIComponent(passCode)}`;
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=10&data=${encodeURIComponent(verifyUrl)}`;
+
+    fetch(qrImageUrl)
+      .then(res => res.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `visitor_pass_${passCode}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      })
+      .catch(() => {
+        window.open(qrImageUrl, '_blank');
+      });
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -99,6 +143,8 @@ const VisitorEntryPage = () => {
   const handleReset = () => {
     setFormData(INITIAL_FORM);
     setCreatedPass(null);
+    setError('');
+    setSuccessNotice('');
   };
 
   return (
@@ -107,9 +153,9 @@ const VisitorEntryPage = () => {
         <div className="wmn-page-title-group">
           <h2>
             <UserPlus size={24} style={{ color: '#2563eb' }} />
-            <span>Visitor Entry & Pass Generation</span>
+            <span>Visitor Entry & Individual QR Pass Generation</span>
           </h2>
-          <p>Register campus visitors, verify statutory identification, and generate official visitor passes</p>
+          <p>Register campus visitors, generate individual QR passes, and manage entry/exit clearances</p>
         </div>
 
         {createdPass ? (
@@ -117,20 +163,15 @@ const VisitorEntryPage = () => {
             <button
               type="button"
               className="wmn-btn-sec"
-              onClick={() => navigate('/watchman/visitor-exit')}
-              title="View all active visitors currently on campus"
-            >
-              <ExitIcon size={16} style={{ color: '#dc2626' }} />
-              <span>Active Visitors Log</span>
-            </button>
-            <button
-              type="button"
-              className="wmn-btn-sec"
               onClick={() => navigate(`/watchman/qr-verification?type=visitor&code=${encodeURIComponent(createdPass.passNumber || createdPass.visitorId)}`)}
-              title="Test pass in Gate QR Scanner"
+              title="Open pass in Visitor Pass Verification"
             >
               <QrCode size={16} style={{ color: '#2563eb' }} />
-              <span>Gate QR Scanner</span>
+              <span>Verify Visitor Pass</span>
+            </button>
+            <button type="button" className="wmn-btn-sec" onClick={handleDownloadQr} title="Download pass QR image">
+              <Download size={16} />
+              <span>Download QR</span>
             </button>
             <button type="button" className="wmn-btn-sec" onClick={handlePrint}>
               <Printer size={16} />
@@ -178,63 +219,82 @@ const VisitorEntryPage = () => {
         <div style={{ maxWidth: '680px', margin: '0 auto' }}>
           {/* Storage & Lifecycle Info Banner */}
           <div style={{
-            background: '#f0fdf4',
-            border: '2px solid #86efac',
+            background: createdPass.status === 'Inside Campus' || createdPass.status === 'Inside' ? '#f0fdf4' : '#eff6ff',
+            border: `2px solid ${createdPass.status === 'Inside Campus' || createdPass.status === 'Inside' ? '#86efac' : '#93c5fd'}`,
             borderRadius: '14px',
             padding: '20px',
             marginBottom: '20px',
-            boxShadow: '0 4px 12px rgba(22, 101, 52, 0.08)'
+            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.08)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#dcfce7', color: '#166534', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: createdPass.status === 'Inside Campus' || createdPass.status === 'Inside' ? '#dcfce7' : '#dbeafe',
+                color: createdPass.status === 'Inside Campus' || createdPass.status === 'Inside' ? '#166534' : '#1e40af',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
                 <CheckCircle2 size={24} />
               </div>
-              <div>
-                <h3 style={{ margin: 0, color: '#14532d', fontSize: '1.15rem', fontWeight: 800 }}>
-                  Visitor Pass Issued & Logged Inside Campus!
+              <div style={{ flex: 1 }}>
+                <h3 style={{ margin: 0, color: createdPass.status === 'Inside Campus' || createdPass.status === 'Inside' ? '#14532d' : '#1e3a8a', fontSize: '1.15rem', fontWeight: 800 }}>
+                  {createdPass.status === 'Inside Campus' || createdPass.status === 'Inside'
+                    ? 'Visitor Pass Issued & Logged Inside Campus!'
+                    : 'Visitor Registered & Individual QR Pass Generated!'}
                 </h3>
-                <span style={{ fontSize: '0.82rem', color: '#166534' }}>
-                  Pass ID: <strong style={{ fontFamily: 'monospace' }}>{createdPass.passNumber}</strong> • Visitor: <strong>{createdPass.name}</strong>
+                <span style={{ fontSize: '0.82rem', color: createdPass.status === 'Inside Campus' || createdPass.status === 'Inside' ? '#166534' : '#1d4ed8' }}>
+                  Pass ID: <strong style={{ fontFamily: 'monospace' }}>{createdPass.passNumber}</strong> • Visitor: <strong>{createdPass.name}</strong> • Status: <strong>{createdPass.status || 'Registered'}</strong>
                 </span>
               </div>
             </div>
 
-            {/* Where It Is Stored Breakdown */}
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '10px',
-              padding: '14px',
-              border: '1px solid #bbf7d0',
-              marginTop: '10px'
-            }}>
-              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                📍 Where is this visitor record stored now?
+            {successNotice && (
+              <div style={{ background: '#dcfce7', border: '1px solid #86efac', color: '#166534', padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '10px', fontWeight: 700 }}>
+                ✓ {successNotice}
               </div>
-              <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.82rem', color: '#334155', lineHeight: 1.6 }}>
-                <li>
-                  <strong>Active Visitors & Exit:</strong> Stored under <em>Active Visitors</em> (Status: <strong>Inside Campus</strong>). When the visitor leaves, the watchman checks them out there.
-                </li>
-                <li>
-                  <strong>Campus In / Out Control:</strong> Recorded as an official campus <strong>Gate Entry (IN)</strong> movement with timestamp.
-                </li>
-                <li>
-                  <strong>Visitor History Logs:</strong> Saved permanently in the security database for audits and admin reporting.
-                </li>
-              </ul>
-            </div>
+            )}
+
+            {/* Quick Action If Registered: 1-Click Login / Campus In */}
+            {(createdPass.status === 'Registered' || (!createdPass.entryTime && createdPass.status !== 'Exited')) && (
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '10px',
+                padding: '14px',
+                border: '1.5px solid #bfdbfe',
+                marginTop: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 800, color: '#1e40af', fontSize: '0.92rem' }}>
+                    🟢 Ready for Campus In (Login)?
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '2px' }}>
+                    If the visitor is walking in now, record Campus In to mark them Inside Campus.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="wmn-btn-primary"
+                  style={{ background: '#059669', padding: '8px 16px', fontSize: '0.86rem', fontWeight: 800 }}
+                  onClick={handleQuickCampusIn}
+                  disabled={checkingIn}
+                >
+                  <LogIn size={16} />
+                  <span>{checkingIn ? 'Recording In...' : 'Confirm Login / Campus In'}</span>
+                </button>
+              </div>
+            )}
 
             {/* Guided Quick Navigation Buttons */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '10px', marginTop: '14px' }}>
-              <button
-                type="button"
-                className="wmn-btn-primary"
-                style={{ background: '#dc2626', justifyContent: 'center', fontSize: '0.84rem', padding: '10px 14px' }}
-                onClick={() => navigate('/watchman/visitor-exit')}
-              >
-                <ExitIcon size={16} />
-                <span>Go to Active Visitors & Exit</span>
-              </button>
-
               <button
                 type="button"
                 className="wmn-btn-primary"
@@ -242,7 +302,17 @@ const VisitorEntryPage = () => {
                 onClick={() => navigate(`/watchman/qr-verification?type=visitor&code=${encodeURIComponent(createdPass.passNumber || createdPass.visitorId)}`)}
               >
                 <QrCode size={16} />
-                <span>Open Pass in Gate Scanner</span>
+                <span>Verify Visitor Pass</span>
+              </button>
+
+              <button
+                type="button"
+                className="wmn-btn-sec"
+                style={{ justifyContent: 'center', fontSize: '0.84rem', padding: '10px 14px' }}
+                onClick={handleDownloadQr}
+              >
+                <Download size={16} />
+                <span>Download Pass QR</span>
               </button>
             </div>
           </div>
@@ -253,7 +323,7 @@ const VisitorEntryPage = () => {
               <div className="wmn-pass-header">
                 <div>
                   <div className="wmn-pass-org">CAMPUS VISITOR PASS</div>
-                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>SECURITY GATE ENTRY VOUCHER</span>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>INDIVIDUAL SECURITY ENTRY VOUCHER</span>
                 </div>
                 <div className="wmn-pass-badge">
                   PASS: {createdPass.passNumber}
@@ -290,59 +360,81 @@ const VisitorEntryPage = () => {
                   <strong style={{ display: 'block', color: '#0f172a', fontFamily: 'monospace' }}>{createdPass.vehicleNumber || 'Pedestrian'}</strong>
                 </div>
                 <div>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase' }}>Entry Timestamp</span>
-                  <strong style={{ display: 'block', color: '#059669' }}>
-                    {new Date(createdPass.entryTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} • {new Date(createdPass.entryTime).toLocaleDateString()}
-                  </strong>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase' }}>Current Status</span>
+                  <span style={{
+                    display: 'inline-block',
+                    marginTop: '2px',
+                    fontWeight: 800,
+                    fontSize: '0.76rem',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    background: createdPass.status === 'Inside Campus' || createdPass.status === 'Inside' ? '#dcfce7' : '#eff6ff',
+                    color: createdPass.status === 'Inside Campus' || createdPass.status === 'Inside' ? '#15803d' : '#1d4ed8',
+                    border: `1px solid ${createdPass.status === 'Inside Campus' || createdPass.status === 'Inside' ? '#86efac' : '#bfdbfe'}`
+                  }}>
+                    {createdPass.status === 'Inside Campus' || createdPass.status === 'Inside' ? '🟢 Inside Campus' : '🔵 Registered (Pending Login)'}
+                  </span>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase' }}>Entry Gate</span>
                   <strong style={{ display: 'block', color: '#0f172a' }}>{createdPass.gate}</strong>
                 </div>
+                <div>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase' }}>Actual Entry Timestamp</span>
+                  <strong style={{ display: 'block', color: createdPass.entryTime ? '#059669' : '#64748b' }}>
+                    {createdPass.entryTime ? `${new Date(createdPass.entryTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} • ${new Date(createdPass.entryTime).toLocaleDateString()}` : 'Not yet entered (Pending Login)'}
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase' }}>Registration Timestamp</span>
+                  <strong style={{ display: 'block', color: '#0f172a' }}>
+                    {createdPass.createdAt ? `${new Date(createdPass.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} • ${new Date(createdPass.createdAt).toLocaleDateString()}` : 'Today'}
+                  </strong>
+                </div>
               </div>
 
-              {/* Real Scannable QR Barcode Box */}
-              <div className="wmn-pass-qr-box" style={{ textAlign: 'center', padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              {/* Real Scannable Individual QR Pass Box */}
+              <div className="wmn-pass-qr-box" style={{ textAlign: 'center', padding: '18px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '16px' }}>
                 <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data=${encodeURIComponent(
-                    `${window.location.origin}/verify-gate-pass?code=${encodeURIComponent(createdPass.passNumber || createdPass.visitorId)}&type=visitor`
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=8&data=${encodeURIComponent(
+                    `${window.location.origin}/watchman/qr-verification?type=visitor&code=${encodeURIComponent(createdPass.passNumber || createdPass.visitorId)}`
                   )}`}
-                  alt={`QR Code for ${createdPass.passNumber}`}
+                  alt={`Unique QR Code for ${createdPass.passNumber}`}
                   style={{
-                    width: '140px',
-                    height: '140px',
+                    width: '150px',
+                    height: '150px',
                     margin: '0 auto 8px auto',
                     display: 'block',
                     borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
+                    border: '1.5px solid #cbd5e1',
                     background: '#ffffff',
-                    padding: '4px'
+                    padding: '6px'
                   }}
                 />
-                <div style={{ fontSize: '0.82rem', fontFamily: 'monospace', fontWeight: 800, color: '#0f172a', letterSpacing: '0.05em' }}>
+                <div style={{ fontSize: '0.9rem', fontFamily: 'monospace', fontWeight: 800, color: '#0f172a', letterSpacing: '0.05em' }}>
                   {createdPass.passNumber}
                 </div>
                 <div style={{ fontSize: '0.74rem', color: '#475569', marginTop: '4px' }}>
-                  <strong>How to scan:</strong> Point any smartphone camera or gate barcode reader at this QR to verify identity and check out at exit gate.
+                  <strong>Individual Visitor QR Pass:</strong> Linked specifically to {createdPass.name}. Scan or select in Visitor Pass Verification to record Campus In or Campus Out.
                 </div>
-                <div style={{ marginTop: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px' }}>
                   <button
                     type="button"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#2563eb',
-                      fontSize: '0.76rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
+                    className="wmn-btn-sec"
+                    style={{ fontSize: '0.76rem', padding: '4px 10px' }}
+                    onClick={handleDownloadQr}
+                  >
+                    <Download size={13} />
+                    <span>Download QR</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="wmn-btn-sec"
+                    style={{ fontSize: '0.76rem', padding: '4px 10px', color: '#2563eb' }}
                     onClick={() => navigate(`/watchman/qr-verification?type=visitor&code=${encodeURIComponent(createdPass.passNumber || createdPass.visitorId)}`)}
                   >
-                    <span>Click here to test scan this pass in Gate Scanner</span>
-                    <ExternalLink size={12} />
+                    <ExternalLink size={13} />
+                    <span>Open in Verification Page</span>
                   </button>
                 </div>
               </div>
@@ -350,17 +442,25 @@ const VisitorEntryPage = () => {
 
             {/* Bottom Actions */}
             <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button type="button" className="wmn-btn-primary" onClick={handlePrint}>
+              {(createdPass.status === 'Registered' || (!createdPass.entryTime && createdPass.status !== 'Exited')) && (
+                <button
+                  type="button"
+                  className="wmn-btn-primary"
+                  style={{ background: '#059669', borderColor: '#047857' }}
+                  onClick={handleQuickCampusIn}
+                  disabled={checkingIn}
+                >
+                  <LogIn size={16} />
+                  <span>{checkingIn ? 'Recording In...' : 'Login / Campus In'}</span>
+                </button>
+              )}
+              <button type="button" className="wmn-btn-sec" onClick={handleDownloadQr}>
+                <Download size={16} />
+                <span>Download QR Pass</span>
+              </button>
+              <button type="button" className="wmn-btn-sec" onClick={handlePrint}>
                 <Printer size={16} />
                 <span>Print Official Pass</span>
-              </button>
-              <button
-                type="button"
-                className="wmn-btn-sec"
-                onClick={() => navigate('/watchman/visitor-exit')}
-              >
-                <ExitIcon size={16} />
-                <span>Go to Active Visitors</span>
               </button>
               <button type="button" className="wmn-btn-sec" onClick={handleReset}>
                 <RotateCcw size={16} />
@@ -560,6 +660,29 @@ const VisitorEntryPage = () => {
                   onChange={handleChange}
                 />
               </div>
+              {/* Optional Immediate Campus In */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <input
+                  type="checkbox"
+                  id="immediateIn"
+                  name="immediateIn"
+                  checked={formData.immediateIn}
+                  onChange={handleChange}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <label htmlFor="immediateIn" style={{ cursor: 'pointer', fontSize: '0.86rem', color: '#0f172a', fontWeight: 600 }}>
+                  Immediately record Campus In / Login (Visitor is already at gate entering campus now)
+                </label>
+              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
@@ -575,7 +698,7 @@ const VisitorEntryPage = () => {
                 className="wmn-btn-primary"
                 disabled={submitting}
               >
-                {submitting ? 'Generating Pass...' : 'Confirm Entry & Issue Pass'}
+                {submitting ? 'Generating Pass...' : 'Register Visitor & Generate Individual QR Pass'}
               </button>
             </div>
           </form>

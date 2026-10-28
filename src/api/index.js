@@ -916,8 +916,11 @@ export const getWatchmanStats = () => api.get('/watchman/stats');
 
 // Visitor Operations
 export const getActiveVisitors = () => api.get('/watchman/visitors/active');
+export const getAllVisitors = (params = {}) => api.get('/watchman/visitors', { params });
 export const recordVisitorEntry = (data) => api.post('/watchman/visitors/entry', data);
-export const recordVisitorExit = (id, data = {}) => api.post(`/watchman/visitors/${id}/exit`, data);
+export const recordVisitorCampusIn = (id, data = {}) => api.post(`/watchman/visitors/${id}/in`, data);
+export const recordVisitorCampusOut = (id, data = {}) => api.post(`/watchman/visitors/${id}/out`, data);
+export const recordVisitorExit = (id, data = {}) => api.post(`/watchman/visitors/${id}/out`, data);
 export const verifyVisitorPass = (query) => {
   let cleanQuery = (query || '').toString().trim();
   if (cleanQuery.includes('code=')) {
@@ -931,7 +934,7 @@ export const verifyVisitorPass = (query) => {
 export const getPreRegisteredVisitors = () => api.get('/watchman/visitors/pre-registered');
 export const preRegisterVisitor = (data) => api.post('/watchman/visitors/pre-register', data);
 export const updateVisitorApproval = (id, data) => api.patch(`/watchman/visitors/${id}/approval`, data);
-export const admitPreRegisteredVisitor = (id, data = {}) => api.post(`/watchman/visitors/${id}/admit`, data);
+export const admitPreRegisteredVisitor = (id, data = {}) => api.post(`/watchman/visitors/${id}/in`, data);
 export const getVisitorHistory = (params = {}) => api.get('/watchman/visitors/history', { params });
 
 // Delivery & Parcel Operations

@@ -12,7 +12,7 @@ import {
   getTransportVehicles, createTransportVehicle, updateTransportVehicle, deleteTransportVehicle,
   getStudents, getTransportMaintenance, createTransportMaintenance,
   getTransportComplaints, createTransportComplaint, updateTransportComplaint,
-  getDriverAttendance, getUsers, getStudentTransportAttendanceReport
+  getDriverAttendance, getUsers, getStudentTransportAttendanceReport, getStudentTransportAttendance
 } from '../../api/index';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -37,6 +37,12 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
   const [drivers, setDrivers] = useState([]);
   const [students, setStudents] = useState([]);
   const [driverAttendanceLogs, setDriverAttendanceLogs] = useState([]);
+  const [attendanceSubTab, setAttendanceSubTab] = useState('student'); // 'student' | 'driver'
+  const [studentAttendanceRecords, setStudentAttendanceRecords] = useState([]);
+  const [studentAttLoading, setStudentAttLoading] = useState(false);
+  const [studentAttDate, setStudentAttDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [studentAttRoute, setStudentAttRoute] = useState('ALL');
+  const [studentAttTripType, setStudentAttTripType] = useState('Pickup');
 
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -500,8 +506,8 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
     e.preventDefault();
     if (!maintForm.vehicleNumber || !maintForm.serviceDate) return;
 
+    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
     const payload = {
-      _id: 'maint_' + Date.now().toString(),
       vehicleNumber: maintForm.vehicleNumber,
       serviceType: maintForm.serviceType,
       serviceDate: maintForm.serviceDate,
@@ -509,18 +515,23 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
       status: maintForm.status
     };
 
+    let savedItem = { _id: 'maint_' + Date.now().toString(), ...payload };
+
     // Save to server
     try {
-      await createTransportMaintenance(payload);
+      const res = await createTransportMaintenance(payload);
+      if (res?.data && res.data._id) {
+        savedItem = res.data;
+      }
     } catch (err) {
       console.warn('Backend failed, falling back to local storage', err);
     }
 
     // Save to local storage
-    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
     const key = `erp_transport_maintenance_${tenantId}`;
     const existing = JSON.parse(localStorage.getItem(key) || '[]');
-    localStorage.setItem(key, JSON.stringify([payload, ...existing]));
+    localStorage.setItem(key, JSON.stringify([savedItem, ...existing.filter(i => i._id !== savedItem._id)]));
+    localStorage.setItem('erp_transport_maintenance_mock_college_id', JSON.stringify([savedItem, ...existing.filter(i => i._id !== savedItem._id)]));
 
     showToast(`Successfully scheduled maintenance for vehicle ${maintForm.vehicleNumber}`);
     setShowMaintModal(false);
@@ -608,26 +619,24 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
   const handleViewTransitAttendanceReport = async () => {
     try {
       const todayStr = new Date().toISOString().split('T')[0];
-      const res = await getStudentTransportAttendanceReport({
-        routeId: 'R-01',
-        date: todayStr,
-        tripType: 'Pickup'
-      });
-      const data = res?.data;
-      const headers = ["Student ID", "Student Name", "Pickup Stop", "Attendance Status", "Boarded", "Route"];
-      const rows = (data?.studentAttendance || []).map(s => [
-        s.studentId,
-        s.name,
+      const res = await getStudentTransportAttendance({ date: todayStr });
+      const records = Array.isArray(res?.data) ? res.data : [];
+      const headers = ["Date", "Route", "Trip", "Student ID", "Student Name", "Pickup Stop", "Attendance Status", "Boarded"];
+      const rows = records.map(s => [
+        s.date || todayStr,
+        s.routeName || s.routeId || 'Default Route',
+        s.tripType || 'Pickup',
+        s.studentId || '-',
+        s.studentName || '-',
         s.pickupPoint || 'Campus Stop',
-        s.status,
-        s.boarded ? 'Yes' : 'No',
-        'R-01'
+        s.status || 'Present',
+        s.boarded ? 'Yes' : 'No'
       ]);
       setReportModal({
         isOpen: true,
         title: `Student Transit Attendance & Boarding Report (${todayStr})`,
         headers,
-        rows: rows.length > 0 ? rows : [["-", "No attendance records recorded today yet", "-", "-", "-", "-"]],
+        rows: rows.length > 0 ? rows : [["-", "-", "-", "-", "No attendance records recorded today yet", "-", "-", "-"]],
         filename: `Student_Transit_Attendance_${todayStr}.csv`
       });
     } catch (err) {
@@ -635,6 +644,36 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
       showToast('Failed to load student attendance report', 'error');
     }
   };
+
+  const fetchStudentAttendance = async () => {
+    setStudentAttLoading(true);
+    try {
+      const params = {
+        date: studentAttDate,
+      };
+      if (studentAttTripType && studentAttTripType !== 'ALL') {
+        params.tripType = studentAttTripType;
+      }
+      if (studentAttRoute && studentAttRoute !== 'ALL') {
+        params.routeId = studentAttRoute;
+      }
+      const res = await getStudentTransportAttendance(params);
+      if (res && res.data) {
+        setStudentAttendanceRecords(Array.isArray(res.data) ? res.data : []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch student transport attendance:', err);
+      showToast('Failed to load student attendance', 'error');
+    } finally {
+      setStudentAttLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'Attendance' && attendanceSubTab === 'student') {
+      fetchStudentAttendance();
+    }
+  }, [activeTab, attendanceSubTab, studentAttDate, studentAttRoute, studentAttTripType]);
 
   const fetchTransportData = async () => {
     try {
@@ -1218,7 +1257,7 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
                             </button>
                           )}
                           <Link
-                            to={`/transport/complaints/${comp.complaintId || comp._id}`}
+                            to={`/admin/transport/complaints/${comp.complaintId || comp._id}`}
                             className="tm-btn tm-btn-secondary"
                             style={{ padding: '0.25rem 0.45rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center' }}
                             title="View Full Details & Discussion"
@@ -1354,95 +1393,306 @@ const TransportManagement = ({ initialTab = 'Dashboard' }) => {
 
       {activeTab === 'Attendance' && (
         <div className="animate-fade-in tm-panel">
-          <div className="tm-panel-header">
-            <h2 className="tm-panel-title">Driver Attendance Logs</h2>
-            <div className="tm-search-box">
-              <Search size={16} />
-              <input
-                type="text"
-                className="tm-input"
-                placeholder="Search driver, route, or date..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+          {/* Sub Tab Switcher & Filters */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                className="tm-btn"
+                style={{
+                  background: attendanceSubTab === 'student' ? '#1e3a8a' : '#f1f5f9',
+                  color: attendanceSubTab === 'student' ? '#ffffff' : '#475569',
+                  border: '1px solid',
+                  borderColor: attendanceSubTab === 'student' ? '#1e3a8a' : '#cbd5e1',
+                  fontWeight: '700',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onClick={() => setAttendanceSubTab('student')}
+              >
+                <Users size={16} /> Student Transit Attendance
+              </button>
+              <button
+                className="tm-btn"
+                style={{
+                  background: attendanceSubTab === 'driver' ? '#1e3a8a' : '#f1f5f9',
+                  color: attendanceSubTab === 'driver' ? '#ffffff' : '#475569',
+                  border: '1px solid',
+                  borderColor: attendanceSubTab === 'driver' ? '#1e3a8a' : '#cbd5e1',
+                  fontWeight: '700',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onClick={() => setAttendanceSubTab('driver')}
+              >
+                <Clock size={16} /> Driver Shift Logs
+              </button>
             </div>
-          </div>
-          <div className="tm-table-container">
-            <table className="tm-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Driver Info</th>
-                  <th>Check In</th>
-                  <th>Check Out</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {driverAttendanceLogs
-                  .filter(log =>
-                    (log.driverName || '').toLowerCase().includes(search.toLowerCase()) ||
-                    (log.displayDriverId || '').toLowerCase().includes(search.toLowerCase()) ||
-                    (log.assignedRoute || '').toLowerCase().includes(search.toLowerCase()) ||
-                    (log.date || '').includes(search)
-                  )
-                  .map((log, index) => (
-                    <tr key={`${log.driverId || index}-${index}`}>
-                      <td style={{ fontWeight: '600' }}>
-                        {log.date ? new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#eff6ff', color: '#2563eb', fontWeight: '800', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #bfdbfe' }}>
-                            {(log.driverName || 'D').charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              {log.driverName}
-                              {log.assignedRoute && (
-                                <span className="tm-badge tm-badge-route">
-                                  {log.assignedRoute}
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                              <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>ID: {log.displayDriverId}</span>
-                              {log.phone && <span style={{ fontFamily: 'monospace' }}>• {log.phone}</span>}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ fontFamily: 'monospace', fontWeight: '700', color: '#16a34a' }}>
-                        {log.checkInTime ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            <Clock size={13} style={{ color: '#16a34a' }} />
-                            {log.checkInTime}
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td style={{ fontFamily: 'monospace', color: '#64748b' }}>
-                        {log.checkOutTime ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            <Clock size={13} style={{ color: '#94a3b8' }} />
-                            {log.checkOutTime}
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td>
-                        <span className={`tm-badge ${log.status === 'Present' ? 'tm-badge-paid' :
-                          log.status === 'On Leave' ? 'tm-badge-route' : 'tm-badge-pending'
-                          }`}>
-                          {log.status || 'Present'}
-                        </span>
-                      </td>
-                    </tr>
+
+            {attendanceSubTab === 'student' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <input
+                  type="date"
+                  className="tm-input"
+                  style={{ width: 'auto', padding: '0.4rem 0.6rem' }}
+                  value={studentAttDate}
+                  onChange={e => setStudentAttDate(e.target.value)}
+                />
+                <select
+                  className="tm-input"
+                  style={{ width: 'auto', padding: '0.4rem 0.6rem' }}
+                  value={studentAttRoute}
+                  onChange={e => setStudentAttRoute(e.target.value)}
+                >
+                  <option value="ALL">All Routes</option>
+                  {routes.map(r => (
+                    <option key={r.routeId || r._id} value={r.routeId || r.name}>{r.name || r.routeId}</option>
                   ))}
-                {driverAttendanceLogs.length === 0 && (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No attendance records found. Drivers can check in via their dashboard.</td></tr>
-                )}
-              </tbody>
-            </table>
+                </select>
+                <select
+                  className="tm-input"
+                  style={{ width: 'auto', padding: '0.4rem 0.6rem' }}
+                  value={studentAttTripType}
+                  onChange={e => setStudentAttTripType(e.target.value)}
+                >
+                  <option value="ALL">All Trips</option>
+                  <option value="Pickup">Pickup</option>
+                  <option value="Drop">Drop</option>
+                </select>
+                <button
+                  className="tm-btn tm-btn-secondary"
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                  onClick={fetchStudentAttendance}
+                >
+                  Refresh
+                </button>
+              </div>
+            )}
           </div>
+
+          {attendanceSubTab === 'student' ? (
+            <div>
+              {/* Summary Metrics */}
+              {(() => {
+                const total = studentAttendanceRecords.length;
+                const present = studentAttendanceRecords.filter(r => r.status === 'Present').length;
+                const absent = studentAttendanceRecords.filter(r => r.status === 'Absent').length;
+                const boarded = studentAttendanceRecords.filter(r => r.boarded).length;
+                const rate = total > 0 ? ((present / total) * 100).toFixed(1) : 0;
+
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+                    <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b' }}>TOTAL STUDENTS</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0f172a', marginTop: '0.25rem' }}>{total}</div>
+                    </div>
+                    <div style={{ background: '#ecfdf5', padding: '1rem', borderRadius: '10px', border: '1px solid #a7f3d0' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#047857' }}>PRESENT TODAY</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#059669', marginTop: '0.25rem' }}>{present}</div>
+                    </div>
+                    <div style={{ background: '#fef2f2', padding: '1rem', borderRadius: '10px', border: '1px solid #fecaca' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#b91c1c' }}>ABSENT STUDENTS</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#dc2626', marginTop: '0.25rem' }}>{absent}</div>
+                    </div>
+                    <div style={{ background: '#eff6ff', padding: '1rem', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#1d4ed8' }}>BOARDED ON BUS</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#2563eb', marginTop: '0.25rem' }}>{boarded}</div>
+                    </div>
+                    <div style={{ background: '#f5f3ff', padding: '1rem', borderRadius: '10px', border: '1px solid #ddd6fe' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#6d28d9' }}>ATTENDANCE RATE</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#7c3aed', marginTop: '0.25rem' }}>{rate}%</div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="tm-panel-header" style={{ marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                  Saved Student Attendance Records
+                </h3>
+                <div className="tm-search-box">
+                  <Search size={16} />
+                  <input
+                    type="text"
+                    className="tm-input"
+                    placeholder="Search student, roll no, stop, or route..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Student Attendance Records Table */}
+              <div className="tm-table-container">
+                <table className="tm-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Route / Trip</th>
+                      <th>Student Info</th>
+                      <th>Pickup Stop</th>
+                      <th>Attendance Status</th>
+                      <th>Boarded</th>
+                      <th>Driver / Vehicle</th>
+                      <th>Lock Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studentAttendanceRecords
+                      .filter(r =>
+                        (r.studentName || '').toLowerCase().includes(search.toLowerCase()) ||
+                        (r.studentId || '').toLowerCase().includes(search.toLowerCase()) ||
+                        (r.pickupPoint || '').toLowerCase().includes(search.toLowerCase()) ||
+                        (r.routeName || '').toLowerCase().includes(search.toLowerCase())
+                      )
+                      .map((r, idx) => (
+                        <tr key={r._id || `${r.studentId}-${idx}`}>
+                          <td style={{ fontWeight: '600' }}>{r.date}</td>
+                          <td>
+                            <div style={{ fontWeight: '700', color: '#0f172a' }}>{r.routeName || r.routeId || 'Default Route'}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Trip: {r.tripType}</div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: '700', color: '#0f172a' }}>{r.studentName || 'Student'}</div>
+                            <div style={{ fontSize: '0.78rem', color: '#64748b', fontFamily: 'monospace' }}>Roll: {r.rollNo || r.studentId}</div>
+                          </td>
+                          <td>
+                            <span style={{ fontWeight: '600', color: '#334155' }}>📍 {r.pickupPoint || 'Campus Stop'}</span>
+                          </td>
+                          <td>
+                            <span className={`tm-badge ${r.status === 'Present' ? 'tm-badge-paid' : 'tm-badge-overdue'}`}>
+                              {r.status === 'Present' ? '✓ Present' : '✕ Absent'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`tm-badge ${r.boarded ? 'tm-badge-paid' : 'tm-badge-pending'}`}>
+                              {r.boarded ? '🚌 Boarded' : '⏳ Not Boarded'}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ fontSize: '0.82rem', fontWeight: '600' }}>{r.driverName || 'Assigned Driver'}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{r.vehicleNumber || '-'}</div>
+                          </td>
+                          <td>
+                            {r.isLocked ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: '700', color: '#059669', background: '#ecfdf5', padding: '2px 6px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                                🔒 Locked
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Draft</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    {studentAttendanceRecords.length === 0 && (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '2.5rem', color: '#64748b' }}>
+                          {studentAttLoading ? 'Loading student transit attendance records...' : 'No student attendance records recorded yet for this date and route filter. Drivers submit attendance via Web/Mobile.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="tm-panel-header">
+                <h2 className="tm-panel-title">Driver Attendance Logs</h2>
+                <div className="tm-search-box">
+                  <Search size={16} />
+                  <input
+                    type="text"
+                    className="tm-input"
+                    placeholder="Search driver, route, or date..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="tm-table-container">
+                <table className="tm-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Driver Info</th>
+                      <th>Check In</th>
+                      <th>Check Out</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {driverAttendanceLogs
+                      .filter(log =>
+                        (log.driverName || '').toLowerCase().includes(search.toLowerCase()) ||
+                        (log.displayDriverId || '').toLowerCase().includes(search.toLowerCase()) ||
+                        (log.assignedRoute || '').toLowerCase().includes(search.toLowerCase()) ||
+                        (log.date || '').includes(search)
+                      )
+                      .map((log, index) => (
+                        <tr key={`${log.driverId || index}-${index}`}>
+                          <td style={{ fontWeight: '600' }}>
+                            {log.date ? new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#eff6ff', color: '#2563eb', fontWeight: '800', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #bfdbfe' }}>
+                                {(log.driverName || 'D').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  {log.driverName}
+                                  {log.assignedRoute && (
+                                    <span className="tm-badge tm-badge-route">
+                                      {log.assignedRoute}
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                                  <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>ID: {log.displayDriverId}</span>
+                                  {log.phone && <span style={{ fontFamily: 'monospace' }}>• {log.phone}</span>}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ fontFamily: 'monospace', fontWeight: '700', color: '#16a34a' }}>
+                            {log.checkInTime ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <Clock size={13} style={{ color: '#16a34a' }} />
+                                {log.checkInTime}
+                              </span>
+                            ) : '-'}
+                          </td>
+                          <td style={{ fontFamily: 'monospace', color: '#64748b' }}>
+                            {log.checkOutTime ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <Clock size={13} style={{ color: '#94a3b8' }} />
+                                {log.checkOutTime}
+                              </span>
+                            ) : '-'}
+                          </td>
+                          <td>
+                            <span className={`tm-badge ${log.status === 'Present' ? 'tm-badge-paid' :
+                              log.status === 'On Leave' ? 'tm-badge-route' : 'tm-badge-pending'
+                              }`}>
+                              {log.status || 'Present'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    {driverAttendanceLogs.length === 0 && (
+                      <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No attendance records found. Drivers can check in via their dashboard.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

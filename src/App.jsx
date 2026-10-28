@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { getSettings } from './api/index';
 import ScrollToTop from './components/ScrollToTop';
 
@@ -364,6 +364,15 @@ const WatchmanGuard = ({ children }) => {
   return <Navigate to="/login" replace />;
 };
 
+const TransportComplaintRedirect = () => {
+  const { id } = useParams();
+  const driverSession = sessionStorage.getItem('driver_session');
+  if (driverSession) {
+    return <Navigate to={`/driver/complaint/${id}`} replace />;
+  }
+  return <Navigate to={`/admin/transport/complaints/${id}`} replace />;
+};
+
 function App() {
   const [theme, setTheme] = useState('light');
   const [collegeSettings, setCollegeSettings] = useState({
@@ -547,6 +556,7 @@ function App() {
               <Route path="accounts-management" element={<AccountsOfficerManagement />} />
               <Route path="watchman" element={<AdminWatchmanManagement />} />
               <Route path="watchman-management" element={<AdminWatchmanManagement />} />
+              <Route path="watchman-monitoring" element={<AdminWatchmanTracking />} />
               <Route path="watchman-tracking" element={<AdminWatchmanTracking />} />
               <Route path="student-entry-management" element={<AdminWatchmanTracking />} />
               <Route path="parcels" element={<AdminDeliveryParcelManagement />} />
@@ -890,6 +900,8 @@ function App() {
             <Route path="/watchman/verify" element={<QrVerificationPage />} />
 
             {/* Convenience Aliases */}
+            <Route path="/transport/complaints/:id" element={<TransportComplaintRedirect />} />
+            <Route path="/transport" element={<Navigate to="/admin/transport" replace />} />
             <Route path="/delivery-dashboard" element={<Navigate to="/admin/parcels" replace />} />
             <Route path="/parcels" element={<Navigate to="/admin/parcels" replace />} />
             <Route path="/deliveries" element={<Navigate to="/admin/parcels" replace />} />

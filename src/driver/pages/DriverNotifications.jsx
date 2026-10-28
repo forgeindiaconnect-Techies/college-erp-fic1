@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, AlertTriangle, Info, ShieldAlert, CheckCircle, Search, Filter } from 'lucide-react';
+import { Bell, AlertTriangle, Info, ShieldAlert, CheckCircle, Search, Filter, RefreshCw } from 'lucide-react';
 import { getTransportNotifications } from '../../api/index';
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const DriverNotifications = () => {
   const [session, setSession] = useState({});
@@ -8,28 +10,36 @@ const DriverNotifications = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
+  const [liveTime, setLiveTime] = useState(new Date());
 
   useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const data = JSON.parse(sessionStorage.getItem('driver_session') || '{}');
-        setSession(data);
-        
-        const res = await getTransportNotifications();
-        const relevantNotifs = res.data.filter(n => 
-          n.targetRole === 'All' || n.targetRole === 'Driver' || n.targetRole === 'Staff'
-        );
-        
-        // Sort by newest first
-        relevantNotifs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        
-        setNotifications(relevantNotifs);
-      } catch (err) {
-        console.error('Failed to load notifications', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    const timer = setInterval(() => setLiveTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      const data = JSON.parse(sessionStorage.getItem('driver_session') || '{}');
+      setSession(data);
+      
+      const res = await getTransportNotifications();
+      const relevantNotifs = res.data.filter(n => 
+        n.targetRole === 'All' || n.targetRole === 'Driver' || n.targetRole === 'Staff'
+      );
+      
+      // Sort by newest first
+      relevantNotifs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      
+      setNotifications(relevantNotifs);
+    } catch (err) {
+      console.error('Failed to load notifications', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchNotifications();
   }, []);
 
@@ -70,21 +80,86 @@ const DriverNotifications = () => {
   const filters = ['All', 'Info', 'Warning', 'Emergency', 'Alert'];
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div className="driver-page-container" style={{ maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
       
-      {/* Header Area */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '2.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#111827', margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ padding: '0.5rem', backgroundColor: '#fef9c3', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Bell size={24} style={{ color: '#ca8a04' }} />
-              </div>
-              Notifications Inbox
+      {/* ── Enterprise Real-Time Header Bar ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', background: '#ffffff', padding: '18px 24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', marginBottom: '1.25rem' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              Fleet Dispatch & Alerts Console
             </h1>
-            <p style={{ color: '#6b7280', margin: 0, fontSize: '1rem' }}>Stay updated with important alerts from the Transport Admin.</p>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', fontWeight: 700, color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: '20px', border: '1px solid #a7f3d0' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }}></span>
+              LIVE ALERTS SYNC
+            </span>
+          </div>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.88rem', fontWeight: 500 }}>
+            Fleet Communications • Driver <strong>{session.name || 'Driver'}</strong> ({session.referenceId || 'DRV-0001'}) • Central Dispatch Broadcasts
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ textAlign: 'right', background: '#f8fafc', padding: '6px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Academic Session 2026-27</div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+              {liveTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} • {DAYS[liveTime.getDay()]}, {liveTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </div>
+          </div>
+          <button 
+            onClick={fetchNotifications}
+            title="Refresh Alerts"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '9px 14px', borderRadius: '10px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', color: '#334155' }}
+          >
+            <RefreshCw size={15} /> Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* ── 3 Mini KPI Summary Cards ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #2563eb', padding: '14px 18px', borderRadius: '12px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Notifications</span>
+            <Bell size={18} style={{ color: '#2563eb' }} />
+          </div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+            {notifications.length} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Messages</span>
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600 }}>
+            Broadcasts Received from Central Control
           </div>
         </div>
+
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #dc2626', padding: '14px 18px', borderRadius: '12px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Emergency & Safety</span>
+            <ShieldAlert size={18} style={{ color: '#dc2626' }} />
+          </div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#dc2626', margin: '4px 0 2px' }}>
+            {notifications.filter(n => n.type === 'Emergency' || n.type === 'Alert').length} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Urgent</span>
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 600 }}>
+            High-Priority Transport Directives
+          </div>
+        </div>
+
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #10b981', padding: '14px 18px', borderRadius: '12px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Operational Bulletins</span>
+            <CheckCircle size={18} style={{ color: '#10b981' }} />
+          </div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#16a34a', margin: '4px 0 2px' }}>
+            {notifications.filter(n => n.type === 'Info' || n.type === 'Warning' || n.type === 'Success').length} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b' }}>Active</span>
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600 }}>
+            ● Regular Dispatch Schedules & Logs
+          </div>
+        </div>
+      </div>
+
+      {/* Main Filter & List Container */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
         {/* Filters & Search Row */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'white', padding: '1rem', borderRadius: '1rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>

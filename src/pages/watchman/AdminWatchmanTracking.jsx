@@ -25,6 +25,8 @@ import {
   getVehicles,
   getParcels,
   getSecurityIncidents,
+  updateSecurityIncident,
+  getWatchmen,
   getCampusMovements,
   getCampusMovementStats,
   getWatchmanStats,
@@ -34,7 +36,8 @@ import {
   recordStudentCheckout,
   recordStudentCheckin,
   lookupStudentQr,
-  verifyVisitorPass
+  verifyVisitorPass,
+  getDepartments
 } from '../../api/index';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
@@ -79,7 +82,7 @@ const AdminWatchmanTracking = () => {
   const navigate = useNavigate();
 
   // Navigation Tabs:
-  // 'dashboard' | 'student_tracking' | 'staff_movements' | 'campus_movements' | 'visitors_logistics' | 'attendance' | 'live_feed' | 'daily_report' | 'student_qr_directory'
+  // 'dashboard' | 'student_tracking' | 'staff_movements' | 'campus_movements' | 'visitors_logistics' | 'incidents' | 'security_personnel' | 'attendance' | 'daily_report' | 'student_qr_directory'
   const [activeTab, setActiveTab] = useState('dashboard');
   const [logisticsSubtab, setLogisticsSubtab] = useState('visitors'); // 'visitors' | 'vehicles' | 'parcels' | 'pre_registered'
 
@@ -176,6 +179,57 @@ const AdminWatchmanTracking = () => {
   const [staffSearch, setStaffSearch] = useState('');
   const [staffDirectionFilter, setStaffDirectionFilter] = useState('All');
   const [staffDeptFilter, setStaffDeptFilter] = useState('All');
+
+  // Real-time Dynamic Departments from Database & Campus Records
+  const [dbDepartments, setDbDepartments] = useState([]);
+
+  useEffect(() => {
+    getDepartments()
+      .then(res => {
+        const list = Array.isArray(res.data) ? res.data : (res.data?.departments || []);
+        const names = list.map(d => (typeof d === 'string' ? d : (d.name || d.department || d.deptName))).filter(Boolean);
+        setDbDepartments(names);
+      })
+      .catch(err => {
+        console.warn('Realtime departments fetch notice:', err.message);
+      });
+  }, []);
+
+  const availableDepartments = useMemo(() => {
+    const set = new Set();
+    dbDepartments.forEach(d => {
+      if (d && typeof d === 'string' && d.trim()) set.add(d.trim());
+    });
+    qrDirectory.forEach(s => {
+      const d = s.dept || s.department;
+      if (d && typeof d === 'string' && d.trim()) set.add(d.trim());
+    });
+    staffMovements.forEach(m => {
+      if (m.department && typeof m.department === 'string' && m.department.trim()) set.add(m.department.trim());
+    });
+    campusMovements.forEach(m => {
+      if (m.department && typeof m.department === 'string' && m.department.trim()) set.add(m.department.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [dbDepartments, qrDirectory, staffMovements, campusMovements]);
+
+  // 9. Security Incidents State
+  const [incidentsList, setIncidentsList] = useState([]);
+  const [loadingIncidents, setLoadingIncidents] = useState(false);
+  const [incidentSearch, setIncidentSearch] = useState('');
+  const [incidentStatusFilter, setIncidentStatusFilter] = useState('All');
+  const [incidentSeverityFilter, setIncidentSeverityFilter] = useState('All');
+  const [selectedIncidentForResolution, setSelectedIncidentForResolution] = useState(null);
+  const [resolutionModalOpen, setResolutionModalOpen] = useState(false);
+  const [resolutionStatus, setResolutionStatus] = useState('Resolved');
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [resolutionActionTaken, setResolutionActionTaken] = useState('');
+  const [resolvingIncident, setResolvingIncident] = useState(false);
+
+  // 10. Watchman Personnel Directory State
+  const [personnelList, setPersonnelList] = useState([]);
+  const [loadingPersonnel, setLoadingPersonnel] = useState(false);
+  const [personnelSearch, setPersonnelSearch] = useState('');
 
   // Quick Scanner / Gate Pass Lookup Modal
   const [scanModalOpen, setScanModalOpen] = useState(false);
@@ -389,6 +443,74 @@ const AdminWatchmanTracking = () => {
     }
   }, [staffSearch, staffDirectionFilter]);
 
+  // 9. Fetch Security Incidents
+  const fetchIncidents = useCallback(async (showLoader = false) => {
+    try {
+      if (showLoader) setLoadingIncidents(true);
+      const res = await getSecurityIncidents({
+        search: incidentSearch,
+        status: incidentStatusFilter !== 'All' ? incidentStatusFilter : undefined,
+        severity: incidentSeverityFilter !== 'All' ? incidentSeverityFilter : undefined
+      });
+      const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res?.data?.data) ? res.data.data : []);
+      setIncidentsList(list);
+    } catch (err) {
+      console.error('Failed to load security incidents:', err);
+      setIncidentsList([]);
+    } finally {
+      if (showLoader) setLoadingIncidents(false);
+    }
+  }, [incidentSearch, incidentStatusFilter, incidentSeverityFilter]);
+
+  // 10. Fetch Watchman Personnel Directory
+  const fetchWatchmanPersonnel = useCallback(async (showLoader = false) => {
+    try {
+      if (showLoader) setLoadingPersonnel(true);
+      const res = await getWatchmen();
+      const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res?.data?.data) ? res.data.data : []);
+      setPersonnelList(list);
+    } catch (err) {
+      console.error('Failed to load watchman personnel:', err);
+      setPersonnelList([]);
+    } finally {
+      if (showLoader) setLoadingPersonnel(false);
+    }
+  }, []);
+
+  // Admin Incident Resolution Handlers
+  const handleOpenResolutionModal = (incident) => {
+    setSelectedIncidentForResolution(incident);
+    setResolutionStatus(incident.status === 'Resolved' || incident.status === 'Closed' ? incident.status : 'Resolved');
+    setResolutionNotes(incident.resolutionNotes || '');
+    setResolutionActionTaken(incident.actionTaken || '');
+    setResolutionModalOpen(true);
+  };
+
+  const handleSubmitResolution = async (e) => {
+    e?.preventDefault();
+    if (!selectedIncidentForResolution) return;
+    try {
+      setResolvingIncident(true);
+      const res = await updateSecurityIncident(selectedIncidentForResolution._id || selectedIncidentForResolution.id, {
+        status: resolutionStatus,
+        resolutionNotes,
+        actionTaken: resolutionActionTaken
+      });
+      if (res.data?.success) {
+        setResolutionModalOpen(false);
+        setSelectedIncidentForResolution(null);
+        fetchIncidents(false);
+        fetchWatchmanStats();
+      } else {
+        alert(res.data?.message || 'Failed to update incident');
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to resolve incident');
+    } finally {
+      setResolvingIncident(false);
+    }
+  };
+
   // Handle Quick Student Checkout from Admin
   const handleQuickStudentCheckout = async (student) => {
     const sId = student.studentId || student.id;
@@ -567,12 +689,13 @@ const AdminWatchmanTracking = () => {
     fetchBusStats();
     fetchStaffMovements();
     fetchTracking(true);
-    fetchActivities();
     fetchAttendance();
     fetchLogistics();
     fetchReport();
     fetchDirectory();
     fetchCampusMovementsData();
+    fetchIncidents();
+    fetchWatchmanPersonnel();
   }, []);
 
   // Reload data when switching active tab
@@ -583,21 +706,23 @@ const AdminWatchmanTracking = () => {
       fetchTracking(false);
       fetchStaffMovements(false);
       fetchLogistics();
-      fetchActivities();
       fetchCampusMovementsData(false);
+      fetchIncidents(false);
+      fetchWatchmanPersonnel(false);
     } else if (activeTab === 'student_tracking') fetchTracking(true);
     else if (activeTab === 'staff_movements') fetchStaffMovements(true);
-    else if (activeTab === 'live_feed') fetchActivities();
     else if (activeTab === 'attendance') fetchAttendance();
     else if (activeTab === 'visitors_logistics') fetchLogistics();
     else if (activeTab === 'daily_report') fetchReport();
     else if (activeTab === 'student_qr_directory') fetchDirectory();
     else if (activeTab === 'campus_movements') fetchCampusMovementsData(true);
-  }, [activeTab, fetchWatchmanStats, fetchBusStats, fetchStaffMovements, fetchTracking, fetchActivities, fetchAttendance, fetchLogistics, fetchReport, fetchDirectory, fetchCampusMovementsData]);
+    else if (activeTab === 'incidents') fetchIncidents(true);
+    else if (activeTab === 'security_personnel') fetchWatchmanPersonnel(true);
+  }, [activeTab, fetchWatchmanStats, fetchBusStats, fetchStaffMovements, fetchTracking, fetchAttendance, fetchLogistics, fetchReport, fetchDirectory, fetchCampusMovementsData, fetchIncidents, fetchWatchmanPersonnel]);
 
   // Real-time synchronization via WebSockets
   useRealtimeSync({
-    modules: ['watchman', 'student_tracking', 'campus_gate', 'campus_movement', 'campus_people', 'buses', 'employee-attendance', 'visitor', 'parcel'],
+    modules: ['watchman', 'student_tracking', 'campus_gate', 'campus_movement', 'campus_people', 'buses', 'employee-attendance', 'visitor', 'parcel', 'incident'],
     onSync: () => {
       if (autoRefresh) {
         fetchWatchmanStats();
@@ -606,15 +731,16 @@ const AdminWatchmanTracking = () => {
           fetchTracking(false);
           fetchStaffMovements(false);
           fetchLogistics();
-          fetchActivities();
+          fetchIncidents(false);
         } else if (activeTab === 'student_tracking') fetchTracking(false);
         else if (activeTab === 'staff_movements') fetchStaffMovements(false);
-        else if (activeTab === 'live_feed') fetchActivities();
         else if (activeTab === 'attendance') fetchAttendance();
         else if (activeTab === 'visitors_logistics') fetchLogistics();
         else if (activeTab === 'daily_report') fetchReport();
         else if (activeTab === 'student_qr_directory') fetchDirectory();
         else if (activeTab === 'campus_movements') fetchCampusMovementsData(false);
+        else if (activeTab === 'incidents') fetchIncidents(false);
+        else if (activeTab === 'security_personnel') fetchWatchmanPersonnel(false);
       }
     }
   });
@@ -625,11 +751,11 @@ const AdminWatchmanTracking = () => {
     const timer = setInterval(() => {
       fetchWatchmanStats();
       if (activeTab === 'dashboard' || activeTab === 'student_tracking') fetchTracking(false);
-      if (activeTab === 'dashboard' || activeTab === 'live_feed') fetchActivities();
       if (activeTab === 'dashboard' || activeTab === 'staff_movements') fetchStaffMovements(false);
+      if (activeTab === 'dashboard' || activeTab === 'incidents') fetchIncidents(false);
     }, 15000);
     return () => clearInterval(timer);
-  }, [autoRefresh, activeTab, fetchWatchmanStats, fetchTracking, fetchActivities, fetchStaffMovements]);
+  }, [autoRefresh, activeTab, fetchWatchmanStats, fetchTracking, fetchStaffMovements, fetchIncidents]);
 
   // Copy QR helper
   const handleCopyQr = (qrString) => {
@@ -763,6 +889,8 @@ const AdminWatchmanTracking = () => {
               fetchReport();
               fetchDirectory();
               fetchCampusMovementsData(true);
+              fetchIncidents(true);
+              fetchWatchmanPersonnel(true);
             }}
             title="Refresh all real-time registers"
           >
@@ -835,6 +963,31 @@ const AdminWatchmanTracking = () => {
 
         <button
           type="button"
+          className={`awt-tab ${activeTab === 'incidents' ? 'active' : ''}`}
+          onClick={() => setActiveTab('incidents')}
+        >
+          <ShieldAlert size={16} />
+          <span>Security Incidents</span>
+          <span className="awt-tab-badge" style={{
+            background: (watchmanStats.openIncidents > 0 || incidentsList.filter(i => i.status === 'Reported' || i.status === 'Under Investigation').length > 0) ? '#fee2e2' : undefined,
+            color: (watchmanStats.openIncidents > 0 || incidentsList.filter(i => i.status === 'Reported' || i.status === 'Under Investigation').length > 0) ? '#dc2626' : undefined
+          }}>
+            {incidentsList.filter(i => i.status === 'Reported' || i.status === 'Under Investigation').length || watchmanStats.openIncidents || 0} Open
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className={`awt-tab ${activeTab === 'security_personnel' ? 'active' : ''}`}
+          onClick={() => setActiveTab('security_personnel')}
+        >
+          <ShieldCheck size={16} />
+          <span>Watchman Personnel</span>
+          <span className="awt-tab-badge">{personnelList.length}</span>
+        </button>
+
+        <button
+          type="button"
           className={`awt-tab ${activeTab === 'attendance' ? 'active' : ''}`}
           onClick={() => setActiveTab('attendance')}
         >
@@ -843,15 +996,6 @@ const AdminWatchmanTracking = () => {
           <span className="awt-tab-badge">{attendanceList.length}</span>
         </button>
 
-        <button
-          type="button"
-          className={`awt-tab ${activeTab === 'live_feed' ? 'active' : ''}`}
-          onClick={() => setActiveTab('live_feed')}
-        >
-          <Activity size={16} />
-          <span>Live Security Feed</span>
-          <span className="awt-tab-badge">{activities.length}</span>
-        </button>
 
         <button
           type="button"
@@ -939,7 +1083,7 @@ const AdminWatchmanTracking = () => {
             </div>
 
             {/* 6. Active Security Alerts */}
-            <div className="awt-kpi-card" style={{ '--accent-bar': '#dc2626' }} onClick={() => setActiveTab('live_feed')}>
+            <div className="awt-kpi-card" style={{ '--accent-bar': '#dc2626' }} onClick={() => setActiveTab('incidents')}>
               <div className="awt-kpi-info">
                 <h5>Security Alerts</h5>
                 <div className="val" style={{ color: watchmanStats.openIncidents > 0 ? '#dc2626' : '#16a34a' }}>
@@ -1520,33 +1664,33 @@ const AdminWatchmanTracking = () => {
               )}
             </div>
 
-            {/* Spotlight Right: Security Activity Feed */}
+            {/* Spotlight Right: Security Incidents & Gate Alerts */}
             <div className="awt-spotlight-card">
               <div className="awt-spotlight-title">
-                <h3><Activity size={18} style={{ color: '#2563eb' }} /> Live Security Activity Stream</h3>
-                <button type="button" className="awt-btn awt-btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }} onClick={() => setActiveTab('live_feed')}>
-                  Full Audit Log ({activities.length}) →
+                <h3><ShieldAlert size={18} style={{ color: '#dc2626' }} /> Security Incidents & Gate Alerts</h3>
+                <button type="button" className="awt-btn awt-btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }} onClick={() => setActiveTab('incidents')}>
+                  All Incidents ({incidentsList.length}) →
                 </button>
               </div>
 
-              {activities.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No real-time security events logged yet today.</div>
+              {incidentsList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>No security incidents reported today. Perimeter all clear.</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {activities.slice(0, 4).map((act, i) => (
-                    <div key={act._id || i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  {incidentsList.slice(0, 4).map((inc, i) => (
+                    <div key={inc._id || i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Shield size={18} />
+                        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <ShieldAlert size={18} />
                         </div>
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>{act.title || act.action || 'Gate Event'}</div>
-                          <div style={{ fontSize: '0.74rem', color: '#475569' }}>{act.description}</div>
+                          <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>{inc.title || inc.incidentType || 'Gate Incident'}</div>
+                          <div style={{ fontSize: '0.74rem', color: '#64748b' }}>Gate: {inc.gate || 'Gate 1'} • Guard: {inc.watchmanName || 'Security'} • Severity: {inc.severity}</div>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', background: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>
-                          {formatRelativeTime(act.timestamp)}
+                        <span className={`awt-badge ${inc.status === 'Resolved' || inc.status === 'Closed' ? 'inside' : 'checked-out'}`} style={{ fontSize: '0.72rem' }}>
+                          {inc.status}
                         </span>
                       </div>
                     </div>
@@ -1668,12 +1812,9 @@ const AdminWatchmanTracking = () => {
               onChange={(e) => setDeptFilter(e.target.value)}
             >
               <option value="All">All Departments</option>
-              <option value="Computer Science">Computer Science</option>
-              <option value="Mechanical">Mechanical</option>
-              <option value="Civil">Civil</option>
-              <option value="Electrical">Electrical</option>
-              <option value="Electronics">Electronics</option>
-              <option value="Information Technology">Information Technology</option>
+              {availableDepartments.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
             </select>
 
             <button
@@ -1929,15 +2070,9 @@ const AdminWatchmanTracking = () => {
               onChange={(e) => setStaffDeptFilter(e.target.value)}
             >
               <option value="All">All Departments</option>
-              <option value="Computer Science">Computer Science</option>
-              <option value="Mechanical">Mechanical</option>
-              <option value="Civil">Civil</option>
-              <option value="Electrical">Electrical</option>
-              <option value="Electronics">Electronics</option>
-              <option value="Mathematics">Mathematics</option>
-              <option value="Physics">Physics</option>
-              <option value="Chemistry">Chemistry</option>
-              <option value="Administration">Administration</option>
+              {availableDepartments.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
             </select>
 
             <button
@@ -2006,7 +2141,7 @@ const AdminWatchmanTracking = () => {
                   ) : (
                     staffMovements
                       .filter(s => {
-                        if (staffDeptFilter !== 'All' && s.department !== staffDeptFilter) return false;
+                        if (staffDeptFilter !== 'All' && (s.department || '').toLowerCase() !== staffDeptFilter.toLowerCase()) return false;
                         return true;
                       })
                       .map((s) => {
@@ -2085,112 +2220,7 @@ const AdminWatchmanTracking = () => {
         </>
       )}
 
-      {/* ──────────────── TAB 2: LIVE ACTIVITY FEED ──────────────── */}
-      {activeTab === 'live_feed' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div className="awt-filter-card">
-            <div className="awt-search-wrap">
-              <Search size={16} />
-              <input
-                type="text"
-                className="awt-search-input"
-                placeholder="Search live activities by description, person, or gate..."
-                value={activitySearch}
-                onChange={(e) => setActivitySearch(e.target.value)}
-              />
-            </div>
 
-            <select
-              className="awt-select"
-              value={activityCategory}
-              onChange={(e) => setActivityCategory(e.target.value)}
-            >
-              <option value="All">All Categories</option>
-              <option value="Student Entry">Student Gate Movements</option>
-              <option value="Visitor Entry">Visitor Passes</option>
-              <option value="Vehicle Entry">Vehicle Logs</option>
-              <option value="Delivery / Parcel">Parcel Deliveries</option>
-              <option value="Attendance Clock In">Guard Duty Shifts</option>
-            </select>
-
-            <button
-              type="button"
-              className="awt-btn awt-btn-primary"
-              onClick={fetchActivities}
-            >
-              <RefreshCw size={15} />
-              <span>Update Stream</span>
-            </button>
-          </div>
-
-          <div className="awt-table-card">
-            <div className="awt-table-header">
-              <h2>
-                <Activity size={18} style={{ color: '#2563eb' }} />
-                <span>Live Security Gate Operations Feed ({activities.length})</span>
-              </h2>
-            </div>
-
-            <div style={{ padding: '1.25rem' }}>
-              {loadingActivities ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                  <RefreshCw size={24} className="awt-spin" style={{ margin: '0 auto 8px auto', display: 'block', color: '#2563eb' }} />
-                  Loading activity timeline...
-                </div>
-              ) : activities.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                  No security activities logged yet for this category.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {activities.map((act, i) => (
-                    <div
-                      key={act._id || i}
-                      style={{
-                        padding: '14px 16px',
-                        background: '#f8fafc',
-                        borderRadius: '10px',
-                        border: '1px solid #e2e8f0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                        flexWrap: 'wrap'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Shield size={20} />
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0f172a' }}>
-                            {act.title || act.action || 'Security Gate Event'}
-                          </div>
-                          <div style={{ fontSize: '0.82rem', color: '#475569', marginTop: '2px' }}>
-                            {act.description}
-                          </div>
-                          <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px' }}>
-                            Guard: <strong>{act.watchmanName || 'Security Guard'}</strong> • Gate: <strong>{act.gate || 'Main Gate'}</strong>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2563eb', background: '#eff6ff', padding: '2px 8px', borderRadius: '6px' }}>
-                          {formatRelativeTime(act.timestamp)}
-                        </span>
-                        <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
-                          {formatDateTime(act.timestamp)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ──────────────── TAB 3: GUARD ATTENDANCE & SHIFTS ──────────────── */}
       {activeTab === 'attendance' && (
@@ -2896,12 +2926,9 @@ const AdminWatchmanTracking = () => {
               onChange={(e) => setDeptFilter(e.target.value)}
             >
               <option value="All">All Departments</option>
-              <option value="Computer Science">Computer Science</option>
-              <option value="Mechanical">Mechanical</option>
-              <option value="Civil">Civil</option>
-              <option value="Electrical">Electrical</option>
-              <option value="Electronics">Electronics</option>
-              <option value="Information Technology">Information Technology</option>
+              {availableDepartments.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
             </select>
 
             <button
@@ -3294,6 +3321,409 @@ const AdminWatchmanTracking = () => {
         </>
       )}
 
+      {/* ──────────────── TAB: SECURITY INCIDENTS ──────────────── */}
+      {activeTab === 'incidents' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Incidents Filter & Control Bar */}
+          <div className="awt-filter-card" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
+              <div className="awt-search-wrap" style={{ minWidth: '260px', flex: 1 }}>
+                <Search size={16} />
+                <input
+                  type="text"
+                  className="awt-search-input"
+                  placeholder="Search incidents by title, location, reporter..."
+                  value={incidentSearch}
+                  onChange={(e) => setIncidentSearch(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <Filter size={16} style={{ color: '#64748b' }} />
+                <select
+                  className="awt-select"
+                  value={incidentStatusFilter}
+                  onChange={(e) => setIncidentStatusFilter(e.target.value)}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Reported">Reported (Active)</option>
+                  <option value="Under Investigation">Under Investigation</option>
+                  <option value="Resolved">Resolved</option>
+                  <option value="Closed">Closed</option>
+                </select>
+
+                <select
+                  className="awt-select"
+                  value={incidentSeverityFilter}
+                  onChange={(e) => setIncidentSeverityFilter(e.target.value)}
+                >
+                  <option value="All">All Severities</option>
+                  <option value="Critical">Critical</option>
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="awt-btn awt-btn-secondary"
+              onClick={() => fetchIncidents(true)}
+              disabled={loadingIncidents}
+            >
+              <RefreshCw size={15} className={loadingIncidents ? 'awt-spin' : ''} />
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          {/* Incidents Table */}
+          <div className="awt-table-card">
+            <div className="awt-table-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2>
+                  <ShieldAlert size={18} style={{ color: '#dc2626' }} />
+                  <span>Campus Security Incident Register</span>
+                </h2>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                  Live incident stream reported by watchmen & security personnel. Administrative review and resolution.
+                </p>
+              </div>
+              <span className="awt-badge inside" style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+                {incidentsList.filter(i => i.status === 'Reported' || i.status === 'Under Investigation').length} Active Alerts
+              </span>
+            </div>
+
+            <div className="awt-table-responsive">
+              <table className="awt-table">
+                <thead>
+                  <tr>
+                    <th>Ref / Code</th>
+                    <th>Incident Title & Category</th>
+                    <th>Severity</th>
+                    <th>Location / Gate</th>
+                    <th>Reporter</th>
+                    <th>Reported Time</th>
+                    <th>Status</th>
+                    <th>Resolution Notes</th>
+                    <th style={{ textAlign: 'center' }}>Admin Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingIncidents ? (
+                    <tr>
+                      <td colSpan="9" style={{ textAlign: 'center', padding: '3rem' }}>
+                        <RefreshCw size={24} className="awt-spin" style={{ margin: '0 auto 8px auto', display: 'block', color: '#2563eb' }} />
+                        <span style={{ color: '#64748b', fontSize: '0.88rem' }}>Loading security incidents...</span>
+                      </td>
+                    </tr>
+                  ) : incidentsList.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" style={{ textAlign: 'center', padding: '3rem' }}>
+                        <ShieldCheck size={32} style={{ margin: '0 auto 8px auto', display: 'block', color: '#16a34a' }} />
+                        <div style={{ fontWeight: 700, color: '#16a34a' }}>No security incidents reported.</div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>All campus gates and perimeters are operating normally.</div>
+                      </td>
+                    </tr>
+                  ) : (
+                    incidentsList.map((inc) => {
+                      const isClosed = inc.status === 'Resolved' || inc.status === 'Closed';
+                      const sevColor = inc.severity === 'Critical' ? '#dc2626' : inc.severity === 'High' ? '#ea580c' : inc.severity === 'Medium' ? '#d97706' : '#2563eb';
+                      const sevBg = inc.severity === 'Critical' ? '#fef2f2' : inc.severity === 'High' ? '#fff7ed' : inc.severity === 'Medium' ? '#fffbeb' : '#eff6ff';
+
+                      return (
+                        <tr key={inc._id || inc.incidentId}>
+                          <td style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem' }}>
+                            {inc.incidentId || (inc._id ? inc._id.substring(inc._id.length - 8).toUpperCase() : 'INC')}
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{inc.title || inc.incidentType}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                              Category: {inc.category || 'General Security'}
+                            </div>
+                            {inc.description && (
+                              <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '2px', maxWidth: '300px', whiteSpace: 'normal' }}>
+                                {inc.description}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              background: sevBg,
+                              color: sevColor,
+                              border: `1px solid ${sevColor}33`
+                            }}>
+                              <AlertTriangle size={12} />
+                              {inc.severity || 'Medium'}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{inc.location || inc.gate || 'Main Gate'}</div>
+                            {inc.gate && inc.location && inc.gate !== inc.location && (
+                              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Gate: {inc.gate}</div>
+                            )}
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{inc.reportedByName || inc.reportedBy?.name || 'Gate Watchman'}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Guard / Staff</div>
+                          </td>
+                          <td>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{formatDateTime(inc.createdAt || inc.reportedAt || inc.timestamp)}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{formatRelativeTime(inc.createdAt || inc.reportedAt || inc.timestamp)}</div>
+                          </td>
+                          <td>
+                            <span className={`awt-badge ${isClosed ? 'checked-out' : 'inside'}`} style={{
+                              background: isClosed ? '#ecfdf5' : inc.status === 'Under Investigation' ? '#fffbeb' : '#fef2f2',
+                              color: isClosed ? '#059669' : inc.status === 'Under Investigation' ? '#d97706' : '#dc2626',
+                              borderColor: isClosed ? '#a7f3d0' : inc.status === 'Under Investigation' ? '#fde68a' : '#fecaca'
+                            }}>
+                              {inc.status || 'Reported'}
+                            </span>
+                          </td>
+                          <td>
+                            {inc.resolutionNotes ? (
+                              <div style={{ fontSize: '0.78rem', color: '#334155', maxWidth: '240px', whiteSpace: 'normal' }}>
+                                <strong>Notes:</strong> {inc.resolutionNotes}
+                                {inc.resolvedBy && (
+                                  <div style={{ fontSize: '0.7rem', color: '#059669', marginTop: '2px' }}>
+                                    ✓ Resolved by {typeof inc.resolvedBy === 'object' ? inc.resolvedBy.name : inc.resolvedBy}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: '0.76rem', color: '#94a3b8', fontStyle: 'italic' }}>Pending resolution</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              className="awt-btn"
+                              style={{
+                                background: isClosed ? '#f1f5f9' : '#2563eb',
+                                color: isClosed ? '#334155' : '#ffffff',
+                                border: isClosed ? '1px solid #cbd5e1' : 'none',
+                                padding: '6px 12px',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                              }}
+                              onClick={() => handleOpenResolutionModal(inc)}
+                            >
+                              <ShieldCheck size={14} />
+                              <span>{isClosed ? 'Update Notes' : 'Review & Resolve'}</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ──────────────── TAB: WATCHMAN PERSONNEL ──────────────── */}
+      {activeTab === 'security_personnel' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Personnel Filter & Control Bar */}
+          <div className="awt-filter-card" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="awt-search-wrap" style={{ minWidth: '260px', flex: 1 }}>
+              <Search size={16} />
+              <input
+                type="text"
+                className="awt-search-input"
+                placeholder="Search guards by name, employee ID, phone..."
+                value={personnelSearch}
+                onChange={(e) => setPersonnelSearch(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="awt-btn awt-btn-primary"
+                onClick={() => navigate('/admin/watchman-management')}
+              >
+                <UserPlus size={16} />
+                <span>Manage Guards & Credentials</span>
+              </button>
+              <button
+                type="button"
+                className="awt-btn awt-btn-secondary"
+                onClick={() => fetchWatchmanPersonnel(true)}
+                disabled={loadingPersonnel}
+              >
+                <RefreshCw size={15} className={loadingPersonnel ? 'awt-spin' : ''} />
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Personnel Table */}
+          <div className="awt-table-card">
+            <div className="awt-table-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2>
+                  <ShieldCheck size={18} style={{ color: '#2563eb' }} />
+                  <span>Campus Security Personnel Directory</span>
+                </h2>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                  Registered watchmen, assigned gate stations, shift schedules, and live duty status.
+                </p>
+              </div>
+              <span className="awt-badge inside">
+                {personnelList.length} Guards Registered
+              </span>
+            </div>
+
+            <div className="awt-table-responsive">
+              <table className="awt-table">
+                <thead>
+                  <tr>
+                    <th>Guard Name</th>
+                    <th>Employee / Badge ID</th>
+                    <th>Phone / Contact</th>
+                    <th>Assigned Gate</th>
+                    <th>Shift</th>
+                    <th>Account Status</th>
+                    <th>Today's Gate Duty</th>
+                    <th>Shift Hours</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingPersonnel ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '3rem' }}>
+                        <RefreshCw size={24} className="awt-spin" style={{ margin: '0 auto 8px auto', display: 'block', color: '#2563eb' }} />
+                        <span style={{ color: '#64748b', fontSize: '0.88rem' }}>Loading watchman directory...</span>
+                      </td>
+                    </tr>
+                  ) : personnelList.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '3rem' }}>
+                        <Users size={32} style={{ margin: '0 auto 8px auto', display: 'block', color: '#94a3b8' }} />
+                        <div style={{ fontWeight: 700, color: '#475569' }}>No watchmen found in the directory.</div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+                          Add security guards via the Watchman Management module.
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    personnelList
+                      .filter(p => {
+                        if (!personnelSearch.trim()) return true;
+                        const q = personnelSearch.toLowerCase();
+                        return (
+                          (p.name && p.name.toLowerCase().includes(q)) ||
+                          (p.employeeId && p.employeeId.toLowerCase().includes(q)) ||
+                          (p.phone && p.phone.toLowerCase().includes(q)) ||
+                          (p.assignedGate && p.assignedGate.toLowerCase().includes(q))
+                        );
+                      })
+                      .map((guard) => {
+                        const guardAttendance = attendanceList.find(a =>
+                          (a.watchmanId && (a.watchmanId === guard._id || a.watchmanId?._id === guard._id)) ||
+                          (a.employeeId && a.employeeId === guard.employeeId) ||
+                          (a.name && guard.name && a.name.toLowerCase() === guard.name.toLowerCase())
+                        );
+                        const isOnDuty = guardAttendance && (guardAttendance.status === 'Active' || guardAttendance.status === 'On Duty' || !guardAttendance.clockOutTime);
+
+                        return (
+                          <tr key={guard._id}>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{
+                                  width: '36px',
+                                  height: '36px',
+                                  borderRadius: '50%',
+                                  background: '#eff6ff',
+                                  color: '#2563eb',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 700,
+                                  fontSize: '0.9rem',
+                                  border: '1px solid #bfdbfe'
+                                }}>
+                                  {guard.name?.charAt(0)?.toUpperCase() || 'W'}
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 700, color: '#0f172a' }}>{guard.name}</div>
+                                  <div style={{ fontSize: '0.74rem', color: '#64748b' }}>{guard.email || guard.username}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.84rem' }}>
+                              {guard.employeeId || guard.badgeId || '—'}
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.84rem' }}>
+                                <Phone size={13} style={{ color: '#64748b' }} />
+                                <span>{guard.phone || guard.contactNumber || '—'}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 600 }}>{guard.assignedGate || 'Main Gate (Gate 1)'}</div>
+                            </td>
+                            <td>
+                              <span style={{ fontSize: '0.82rem', color: '#475569' }}>
+                                {guard.shift || 'Day Shift'}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`awt-badge ${guard.status === 'Active' ? 'inside' : 'checked-out'}`}>
+                                {guard.status || 'Active'}
+                              </span>
+                            </td>
+                            <td>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '3px 8px',
+                                borderRadius: '12px',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                background: isOnDuty ? '#ecfdf5' : '#f8fafc',
+                                color: isOnDuty ? '#059669' : '#64748b',
+                                border: isOnDuty ? '1px solid #a7f3d0' : '1px solid #e2e8f0'
+                              }}>
+                                <span style={{
+                                  width: '6px',
+                                  height: '6px',
+                                  borderRadius: '50%',
+                                  background: isOnDuty ? '#10b981' : '#94a3b8'
+                                }} />
+                                {isOnDuty ? 'On Duty' : 'Off Duty'}
+                              </span>
+                            </td>
+                            <td style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                              {guard.shiftHours || '08:00 AM - 04:00 PM'}
+                            </td>
+                          </tr>
+                        );
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ──────────────── MODAL: QUICK SCANNER & GATE PASS VERIFICATION ──────────────── */}
       {scanModalOpen && (
         <div className="awt-modal-overlay" onClick={() => { setScanModalOpen(false); setScanResult(null); }}>
@@ -3538,6 +3968,136 @@ const AdminWatchmanTracking = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ──────────────── MODAL: ADMIN INCIDENT RESOLUTION ──────────────── */}
+      {resolutionModalOpen && selectedIncidentForResolution && (
+        <div className="awt-modal-overlay" onClick={() => setResolutionModalOpen(false)}>
+          <div className="awt-modal" style={{ maxWidth: '580px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="awt-modal-header" style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', color: '#ffffff' }}>
+              <h3 style={{ color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={20} style={{ color: '#38bdf8' }} />
+                <span>Administrative Incident Review & Resolution</span>
+              </h3>
+              <button
+                type="button"
+                className="awt-modal-close"
+                style={{ color: '#ffffff' }}
+                onClick={() => setResolutionModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitResolution}>
+              <div className="awt-modal-body" style={{ padding: '1.5rem', textAlign: 'left' }}>
+                {/* Incident Summary Card */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748b' }}>
+                        Incident Ref: {selectedIncidentForResolution.incidentId || selectedIncidentForResolution._id}
+                      </span>
+                      <h4 style={{ margin: '2px 0 0 0', fontSize: '1.05rem', color: '#0f172a' }}>
+                        {selectedIncidentForResolution.title || selectedIncidentForResolution.incidentType}
+                      </h4>
+                    </div>
+                    <span style={{
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      background: selectedIncidentForResolution.severity === 'Critical' ? '#fef2f2' : '#fffbeb',
+                      color: selectedIncidentForResolution.severity === 'Critical' ? '#dc2626' : '#d97706',
+                      border: '1px solid currentColor'
+                    }}>
+                      {selectedIncidentForResolution.severity || 'Medium'}
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '8px' }}>
+                    <strong>Location:</strong> {selectedIncidentForResolution.location || selectedIncidentForResolution.gate || 'Gate Area'} • <strong>Reported By:</strong> {selectedIncidentForResolution.reportedByName || selectedIncidentForResolution.reportedBy?.name || 'Watchman'}
+                  </div>
+
+                  {selectedIncidentForResolution.description && (
+                    <div style={{ fontSize: '0.8rem', color: '#334155', background: '#ffffff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                      <strong>Description:</strong> {selectedIncidentForResolution.description}
+                    </div>
+                  )}
+                </div>
+
+                {/* Status Selection */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Update Resolution Status *
+                  </label>
+                  <select
+                    className="awt-select"
+                    style={{ width: '100%', padding: '10px 12px' }}
+                    value={resolutionStatus}
+                    onChange={(e) => setResolutionStatus(e.target.value)}
+                    required
+                  >
+                    <option value="Under Investigation">Under Investigation</option>
+                    <option value="Resolved">Resolved (Immediate action taken & perimeter secured)</option>
+                    <option value="Closed">Closed (Administrative case formally archived)</option>
+                  </select>
+                </div>
+
+                {/* Action Taken */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Action Taken / Immediate Measures
+                  </label>
+                  <input
+                    type="text"
+                    className="awt-search-input"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px' }}
+                    placeholder="e.g. Dispatched campus quick response team, inspected perimeter..."
+                    value={resolutionActionTaken}
+                    onChange={(e) => setResolutionActionTaken(e.target.value)}
+                  />
+                </div>
+
+                {/* Resolution Notes */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Administrative Resolution Notes & Findings *
+                  </label>
+                  <textarea
+                    rows={4}
+                    className="awt-search-input"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', resize: 'vertical', fontFamily: 'inherit' }}
+                    placeholder="Enter thorough resolution notes, security findings, or corrective instructions..."
+                    value={resolutionNotes}
+                    onChange={(e) => setResolutionNotes(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    className="awt-btn awt-btn-secondary"
+                    onClick={() => setResolutionModalOpen(false)}
+                    disabled={resolvingIncident}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="awt-btn awt-btn-primary"
+                    style={{ background: '#059669', borderColor: '#059669' }}
+                    disabled={resolvingIncident || !resolutionNotes.trim()}
+                  >
+                    <CheckCircle2 size={16} />
+                    <span>{resolvingIncident ? 'Submitting...' : 'Save & Confirm Resolution'}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Bell, Mail, MessageSquare, Smartphone, AlertTriangle, CheckCircle, Clock, Calendar, Send, X } from 'lucide-react';
+import { getNotifications, createNotification } from '../../api';
 import './SubAdminNotifications.css';
 
 const NOTIFICATION_MODULES = [
@@ -11,13 +12,6 @@ const NOTIFICATION_MODULES = [
 const TARGET_AUDIENCES = [
   'Entire College', 'Students', 'Staff', 'HODs', 'Parents', 
   'Only CSE Dept', 'Only ECE Dept', 'Only Mech Dept'
-];
-
-const MOCK_HISTORY = [
-  { id: 'NOTIF001', title: 'End Semester Exam Schedule Released', module: 'Exam Alerts', target: 'Students', type: 'Standard', methods: ['email', 'app'], status: 'Sent', date: '2026-05-25 10:00 AM' },
-  { id: 'NOTIF002', title: 'Campus Closed due to Heavy Rain', module: 'Holiday Announcements', target: 'Entire College', type: 'Emergency', methods: ['email', 'sms', 'app'], status: 'Sent', date: '2026-05-24 06:30 AM' },
-  { id: 'NOTIF003', title: 'Pending Fee Reminder (Final Notice)', module: 'Fee Due Alerts', target: 'Parents', type: 'Standard', methods: ['email', 'sms'], status: 'Sent', date: '2026-05-20 02:15 PM' },
-  { id: 'NOTIF004', title: 'Google Campus Placement Drive', module: 'Placement Notifications', target: 'Only CSE Dept', type: 'Standard', methods: ['email', 'app'], status: 'Scheduled', date: '2026-06-01 09:00 AM' },
 ];
 
 const SubAdminNotifications = () => {
@@ -38,49 +32,66 @@ const SubAdminNotifications = () => {
     methods: { email: true, sms: false, app: true }
   });
 
-  useEffect(() => {
-    // Simulate fetch
-    setTimeout(() => {
-      setNotifications([]);
+  const loadNotifications = async () => {
+    setLoading(true);
+    try {
+      const { data } = await getNotifications();
+      const list = Array.isArray(data) ? data : (data?.notifications || []);
+      const mapped = list.map(n => ({
+        id: n._id || n.id,
+        title: n.title,
+        module: n.category ? n.category.toUpperCase() : 'ALERT',
+        target: (n.targetRoles && n.targetRoles.length > 0) ? n.targetRoles.join(', ') : 'All',
+        type: n.priority === 'Urgent' || n.type === 'Warning' || n.type === 'Error' ? 'Emergency' : 'Standard',
+        methods: ['app'],
+        status: 'Sent',
+        date: new Date(n.createdAt || Date.now()).toLocaleString('en-IN', {
+          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        })
+      }));
+      setNotifications(mapped);
+    } catch (e) {
+      console.warn('Failed to load notifications from API:', e.message);
+    } finally {
       setLoading(false);
-    }, 400);
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
   }, []);
 
   const handleCheckbox = (key) => {
     setForm(prev => ({ ...prev, methods: { ...prev.methods, [key]: !prev.methods[key] } }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.methods.email && !form.methods.sms && !form.methods.app) {
       alert("Please select at least one delivery method (Email, SMS, or In-App).");
       return;
     }
 
-    const now = new Date();
-    let dateStr = now.toLocaleString('en-IN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-    
-    let finalStatus = 'Sent';
-    if (form.sendMethod === 'schedule') {
-      if (!form.scheduleDate) { alert("Please select a schedule date & time."); return; }
-      finalStatus = 'Scheduled';
-      dateStr = new Date(form.scheduleDate).toLocaleString('en-IN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    let targetRoles = ['All'];
+    if (form.target === 'Students') targetRoles = ['Student'];
+    else if (form.target === 'Staff') targetRoles = ['Staff'];
+    else if (form.target === 'HODs') targetRoles = ['HOD'];
+    else if (form.target === 'Parents') targetRoles = ['Parent'];
+
+    try {
+      await createNotification({
+        title: form.title,
+        message: form.message,
+        category: form.module ? form.module.toLowerCase().replace(/\s+alerts?/g, '') : 'announcement',
+        targetRoles,
+        priority: form.isEmergency ? 'Urgent' : 'Normal',
+        type: form.isEmergency ? 'Warning' : 'Info'
+      });
+      await loadNotifications();
+    } catch (err) {
+      console.warn('Failed to dispatch notification to API:', err.message);
     }
 
-    const selectedMethods = Object.keys(form.methods).filter(k => form.methods[k]);
-
-    const newNotif = {
-      id: `NOTIF00${notifications.length + 5}`,
-      title: form.title,
-      module: form.module,
-      target: form.target,
-      type: form.isEmergency ? 'Emergency' : 'Standard',
-      methods: selectedMethods,
-      status: finalStatus,
-      date: dateStr
-    };
-
-    setNotifications([newNotif, ...notifications]);
     setModalOpen(false);
   };
 

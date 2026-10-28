@@ -6,6 +6,7 @@ const CLOUD_API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://college-erp-so
 
 // Track active base URL for synchronous reads
 let currentBaseUrl: string = CLOUD_API_URL;
+let hasLocalFailed = false;
 
 export type MobileUser = {
   _id: string;
@@ -129,6 +130,12 @@ export async function getApiBaseUrl(): Promise<string> {
     return currentBaseUrl;
   }
 
+  // If local host has previously timed out / failed, stay on cloud fallback
+  if (hasLocalFailed) {
+    currentBaseUrl = CLOUD_API_URL;
+    return currentBaseUrl;
+  }
+
   // 2. In development, detect developer machine LAN IP from Expo's Metro hostUri
   const hostUri =
     Constants.expoConfig?.hostUri ||
@@ -163,6 +170,7 @@ export function getCurrentBaseUrl(): string {
 }
 
 export async function setCustomApiUrl(url: string | null): Promise<void> {
+  hasLocalFailed = false;
   if (url && url.trim()) {
     await storage.setItem('mobile_custom_api_url', url.trim());
     currentBaseUrl = url.trim().replace(/\/+$/, '');
@@ -238,6 +246,8 @@ async function fetchWithFailover(
 
     if (primaryUrl !== CLOUD_API_URL && process.env.EXPO_PUBLIC_API_URL) {
       try {
+        hasLocalFailed = true;
+        currentBaseUrl = CLOUD_API_URL;
         console.warn(`[API] Host ${primaryUrl} unreachable. Falling back to: ${CLOUD_API_URL}`);
         const cloudRes = await fetch(`${CLOUD_API_URL}/${cleanPath}`, init);
         return cloudRes;
@@ -597,5 +607,43 @@ export async function apiDelete<T>(path: string): Promise<T> {
   return data as T;
 }
 
+export type NotificationItem = {
+  _id: string;
+  id?: string;
+  title: string;
+  message: string;
+  category?: string;
+  type?: 'Info' | 'Warning' | 'Success' | 'Error' | string;
+  priority?: 'Low' | 'Normal' | 'High' | 'Urgent' | string;
+  targetRoles?: string[];
+  createdAt: string;
+  isRead?: boolean;
+  link?: string | null;
+  eventType?: string | null;
+  entityId?: string | null;
+};
+
+export async function getMobileNotifications(category?: string): Promise<{ notifications: NotificationItem[]; unreadCount: number }> {
+  const query = category && category !== 'All' && category !== 'all' ? `?category=${encodeURIComponent(category)}` : '';
+  const res = await apiGet<any>(`notifications${query}`);
+  if (Array.isArray(res)) {
+    const unread = res.filter((n: any) => !n.isRead).length;
+    return { notifications: res, unreadCount: unread };
+  }
+  return {
+    notifications: Array.isArray(res?.notifications) ? res.notifications : [],
+    unreadCount: typeof res?.unreadCount === 'number' ? res.unreadCount : (res?.notifications?.filter((n: any) => !n.isRead)?.length || 0),
+  };
+}
+
+export async function markMobileNotificationRead(id: string): Promise<NotificationItem> {
+  return await apiPut<NotificationItem>(`notifications/${id}/read`);
+}
+
+export async function markAllMobileNotificationsRead(): Promise<void> {
+  await apiPut<any>('notifications/read-all');
+}
+
 // Pre-initialize base URL on import
 getApiBaseUrl().catch(() => {});
+

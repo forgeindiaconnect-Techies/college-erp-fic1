@@ -658,12 +658,22 @@
   border-bottom: 1px solid #e2e8f0;
 }
 
-/* 2. 4-KPI Grid (Auto on desktop, strict 2x2 on mobile) */
+/* 2. 5-KPI Grid (Auto on desktop, strict 2x2 on mobile) */
+.driver-stats-grid,
 .driver-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
   margin-bottom: 1.25rem;
+}
+
+.driver-kpi-grid > div {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.driver-kpi-grid > div:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
 }
 
 /* 3. Two-Column Operational Split */

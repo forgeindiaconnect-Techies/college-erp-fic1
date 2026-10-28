@@ -38,18 +38,50 @@ const ResolveComplaintPage = () => {
   const isStudent = !!studentSession;
   const isAdminOrStaff = !isDriver && !isStudent;
 
+  const handleBack = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else if (isDriver) {
+      navigate('/driver/tasks');
+    } else {
+      navigate('/admin/transport');
+    }
+  };
+
   const fetchComplaint = async () => {
     try {
       const [res, staffRes, driversRes] = await Promise.all([
-        getTransportComplaintById(id),
+        getTransportComplaintById(id).catch(err => {
+          const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+          const localComplaints = [
+            ...JSON.parse(localStorage.getItem(`erp_transport_complaints_${tenantId}`) || '[]'),
+            ...JSON.parse(localStorage.getItem('erp_transport_complaints_mock_college_id') || '[]'),
+            ...JSON.parse(localStorage.getItem('erp_transport_complaints') || '[]')
+          ];
+          const found = localComplaints.find(c => c._id === id || c.complaintId === id);
+          if (found) return { data: found };
+          throw err;
+        }),
         getStaff().catch(() => ({ data: [] })),
         getTransportDrivers().catch(() => ({ data: [] }))
       ]);
-      setComplaint(res.data);
+      if (res?.data) {
+        setComplaint(res.data);
+      }
       setStaffList(staffRes.data || []);
       setDriversList(driversRes.data || []);
     } catch (err) {
       console.error(err);
+      const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const localComplaints = [
+        ...JSON.parse(localStorage.getItem(`erp_transport_complaints_${tenantId}`) || '[]'),
+        ...JSON.parse(localStorage.getItem('erp_transport_complaints_mock_college_id') || '[]'),
+        ...JSON.parse(localStorage.getItem('erp_transport_complaints') || '[]')
+      ];
+      const found = localComplaints.find(c => c._id === id || c.complaintId === id);
+      if (found) {
+        setComplaint(found);
+      }
     } finally {
       setLoading(false);
     }
@@ -228,7 +260,7 @@ const ResolveComplaintPage = () => {
       <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', marginBottom: '0.5rem' }}>Complaint Not Found</h2>
       <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>The complaint you are looking for does not exist or was removed.</p>
       <button 
-        onClick={() => navigate(-1)} 
+        onClick={handleBack} 
         style={{ padding: '0.5rem 1rem', background: '#2563eb', color: 'white', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 600 }}
       >
         Go Back
@@ -246,10 +278,10 @@ const ResolveComplaintPage = () => {
       {/* Top Navigation */}
       <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <button
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
           style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'none', border: 'none', color: '#475569', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
         >
-          <ArrowLeft size={16} /> Back to Transport Management
+          <ArrowLeft size={16} /> {isDriver ? 'Back to Driver Tasks' : 'Back to Transport Management'}
         </button>
       </div>
 

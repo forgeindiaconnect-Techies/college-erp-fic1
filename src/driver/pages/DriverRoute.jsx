@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   MapPin, Navigation, Clock, Users, ArrowRight, AlertTriangle, 
   Route as RouteIcon, Target, Activity, ChevronRight, Bus, 
-  Phone, UserCheck, Search, ShieldCheck, Download, ExternalLink, Compass
+  Phone, UserCheck, Search, ShieldCheck, Download, ExternalLink, Compass, RefreshCw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getTransportRoutes, getTransportStudents, getTransportDrivers, getTransportVehicles, getStudentTransportAttendanceReport } from '../../api/index';
 import './DriverDashboard.css';
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const DriverRoute = () => {
   const [session, setSession] = useState({});
@@ -18,6 +20,12 @@ const DriverRoute = () => {
   const [loading, setLoading] = useState(true);
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedStopFilter, setSelectedStopFilter] = useState('ALL');
+  const [liveTime, setLiveTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setLiveTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const fetchRouteData = async () => {
@@ -224,94 +232,118 @@ const DriverRoute = () => {
   return (
     <div className="driver-page-container" style={{ maxWidth: '1440px', margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: '#0f172a' }}>
       
-      {/* ── ERP Breadcrumb & Compact Header Bar ── */}
-      <div className="driver-header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
+      {/* ── Enterprise Real-Time Header Bar ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', background: '#ffffff', padding: '18px 24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', marginBottom: '1.25rem' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
-            <span>Fleet Operations</span>
-            <ChevronRight size={12} />
-            <span>Routes</span>
-            <ChevronRight size={12} />
-            <span style={{ color: '#0f172a' }}>Route {route.name} ({route.routeId})</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.01em' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
               Route Master: {route.name}
             </h1>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '0.15rem 0.6rem', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
-              ID: {route.routeId}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', fontWeight: 700, color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: '20px', border: '1px solid #a7f3d0' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }}></span>
+              ACTIVE ROUTE ({route.routeId})
             </span>
           </div>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.88rem', fontWeight: 500 }}>
+            Fleet Transit • Driver <strong>{driverInfo?.name || session.name || 'Driver'}</strong> ({driverInfo?.driverId || session.referenceId || 'DRV-0001'}) • Vehicle <strong>{route.vehicle || 'TN 01 AB 1234'}</strong>
+          </p>
         </div>
 
-        <div className="driver-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <Link 
             to="/driver/trip"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem', backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.8rem', textDecoration: 'none', cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '8px 14px', backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.82rem', textDecoration: 'none', cursor: 'pointer' }}
           >
-            <Compass size={14} /> Start Trip Operations
+            <Compass size={15} /> Start Trip Ops →
           </Link>
           <Link 
             to="/driver/students"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem', backgroundColor: '#ffffff', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: 700, fontSize: '0.8rem', textDecoration: 'none' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '8px 14px', backgroundColor: '#ffffff', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '8px', fontWeight: 700, fontSize: '0.82rem', textDecoration: 'none' }}
           >
-            <Users size={14} /> Student Transit List
+            <Users size={15} /> Student Roster
           </Link>
+          <button 
+            onClick={() => window.location.reload()}
+            title="Refresh Route Data"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', color: '#334155' }}
+          >
+            <RefreshCw size={15} /> Refresh
+          </button>
         </div>
       </div>
 
-      {/* ── Compact Key Metric Row ── */}
-      <div className="driver-kpi-grid" style={{ marginBottom: '1.25rem' }}>
+      {/* ── 4 ERP Key Metric Cards ── */}
+      <div className="driver-stats-grid driver-kpi-grid" style={{ marginBottom: '1.25rem' }}>
         
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Operating Bus</span>
-            <Bus size={14} style={{ color: '#2563eb' }} />
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #6366F1', padding: '16px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Operating Bus</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px', fontFamily: 'monospace' }}>
+                {route.vehicle || 'TN 01 AB 1234'}
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Bus size={22} />
+            </div>
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-            {route.vehicle || 'TN 01 AD 1234'}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>
-            Capacity: {route.capacity || 50} Seats
-          </div>
-        </div>
-
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Stops & Waypoints</span>
-            <MapPin size={14} style={{ color: '#4f46e5' }} />
-          </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-            {pointsList.length} Scheduled Stops
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '0.15rem' }}>
-            Origin: {startStop}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#16a34a', fontWeight: 700 }}>● Capacity: {route.capacity || 50} Seats</span>
+            <span style={{ color: '#6366F1', fontWeight: 700 }}>Vehicle Specs →</span>
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Passenger Load</span>
-            <Users size={14} style={{ color: '#16a34a' }} />
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #0284c7', padding: '16px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Stops & Waypoints</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                {pointsList.length} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>Scheduled</span>
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <MapPin size={22} />
+            </div>
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-            {students.length} / {route.capacity || 50}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>
-            {Math.round((students.length / (route.capacity || 50)) * 100)}% Booked
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#0284c7', fontWeight: 600 }}>Origin: {startStop}</span>
+            <span style={{ color: '#0284c7', fontWeight: 700 }}>Sequence →</span>
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Estimated Runtime</span>
-            <Clock size={14} style={{ color: '#0284c7' }} />
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #F59E0B', padding: '16px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Passenger Load</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                {students.length} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>/ {route.capacity || 50}</span>
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Users size={22} />
+            </div>
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-            ~45 Minutes
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#16a34a', fontWeight: 700 }}>{Math.round((students.length / (route.capacity || 50)) * 100)}% Booked</span>
+            <span style={{ color: '#F59E0B', fontWeight: 700 }}>Roster →</span>
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '0.15rem' }}>
-            Shift: Morning & Evening
+        </div>
+
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #10B981', padding: '16px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Estimated Runtime</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                ~45 Minutes
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Clock size={22} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#16a34a', fontWeight: 600 }}>● Regular Traffic Window</span>
+            <span style={{ color: '#10B981', fontWeight: 700 }}>Live Dispatch →</span>
           </div>
         </div>
 

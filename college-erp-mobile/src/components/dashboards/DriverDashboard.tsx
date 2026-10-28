@@ -23,6 +23,7 @@ import DashboardHeroBanner from './DashboardHeroBanner';
 import QuickAccessGrid from './QuickAccessGrid';
 import HighlightCard from './HighlightCard';
 import DailyDutyAttendanceCard from '../common/DailyDutyAttendanceCard';
+import MobileNotificationCenter from '../notifications/MobileNotificationCenter';
 
 type Props = {
   user: MobileUser;
@@ -170,6 +171,11 @@ export default function DriverDashboard({ user, onLogout }: Props) {
   const [salaries, setSalaries] = useState<SalaryRecord[]>([]);
   const [attendanceLogs, setAttendanceLogs] = useState<DriverAttendanceRecord[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState<number>(0);
+  const handleUnreadNotifsCountChange = useCallback((cnt: number) => {
+    setUnreadNotifsCount(prev => (prev === cnt ? prev : cnt));
+  }, []);
+  const [showNotifModal, setShowNotifModal] = useState<boolean>(false);
 
   // Active Trip State
   const [activeTrip, setActiveTrip] = useState<TransportTrip | null>(null);
@@ -227,6 +233,12 @@ export default function DriverDashboard({ user, onLogout }: Props) {
   const [attendanceReport, setAttendanceReport] = useState<any>(null);
   const [attendanceLoadingId, setAttendanceLoadingId] = useState<string | null>(null);
   const [attendanceToast, setAttendanceToast] = useState<string | null>(null);
+
+  // Bulk Attendance & Customization Draft State
+  const [attendanceDraft, setAttendanceDraft] = useState<Record<string, 'Present' | 'Absent'>>({});
+  const [isCustomizing, setIsCustomizing] = useState<boolean>(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [isSavingBulk, setIsSavingBulk] = useState<boolean>(false);
 
   // Attendance Correction Modal State
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
@@ -530,10 +542,149 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     return () => clearInterval(interval);
   }, [showDiscussionModal, selectedComplaintForChat]);
 
+  // Resolve effective status from draft first, then saved map, default to PENDING
+  const getActiveStatus = (studentId: string): string => {
+    if (attendanceDraft[studentId]) return attendanceDraft[studentId];
+    if (attendanceMap[studentId]) return attendanceMap[studentId].status;
+    return 'PENDING';
+  };
+
+  // Bulk Action: Mark All Present
+  const handleMarkAllPresent = () => {
+    if (passengers.length === 0) return;
+    const draft: Record<string, 'Present' | 'Absent'> = {};
+    passengers.forEach((s) => {
+      const sId = s.rollNo || s.id;
+      draft[sId] = 'Present';
+    });
+    setAttendanceDraft(draft);
+    setHasUnsavedChanges(true);
+    setAttendanceToast(`✓ Marked all ${passengers.length} students as Present (draft). Tap "Save Attendance" to persist.`);
+    setTimeout(() => setAttendanceToast(null), 3500);
+  };
+
+  // Bulk Action: Mark All Absent
+  const handleMarkAllAbsent = () => {
+    if (passengers.length === 0) return;
+    const draft: Record<string, 'Present' | 'Absent'> = {};
+    passengers.forEach((s) => {
+      const sId = s.rollNo || s.id;
+      draft[sId] = 'Absent';
+    });
+    setAttendanceDraft(draft);
+    setHasUnsavedChanges(true);
+    setAttendanceToast(`✕ Marked all ${passengers.length} students as Absent (draft). Tap "Save Attendance" to persist.`);
+    setTimeout(() => setAttendanceToast(null), 3500);
+  };
+
+  // Bulk Action: Toggle Customize Attendance Mode
+  const handleToggleCustomize = () => {
+    setIsCustomizing((prev) => {
+      const next = !prev;
+      if (next && Object.keys(attendanceDraft).length === 0) {
+        // Preload draft with existing or default Present so driver can freely adjust individual students
+        const initialDraft: Record<string, 'Present' | 'Absent'> = {};
+        passengers.forEach((s) => {
+          const sId = s.rollNo || s.id;
+          initialDraft[sId] = (attendanceMap[sId]?.status as 'Present' | 'Absent') || 'Present';
+        });
+        setAttendanceDraft(initialDraft);
+        setHasUnsavedChanges(true);
+      }
+      return next;
+    });
+  };
+
+  // Individual Customization: updates ONLY the selected student's status without altering others
+  const handleSetStudentDraft = (student: StudentPassenger, status: 'Present' | 'Absent') => {
+    const sId = student.rollNo || student.id;
+    setAttendanceDraft((prev) => {
+      let base: Record<string, 'Present' | 'Absent'>;
+      if (Object.keys(prev).length > 0) {
+        base = { ...prev };
+      } else {
+        base = {};
+        passengers.forEach((p) => {
+          const pId = p.rollNo || p.id;
+          base[pId] = (attendanceMap[pId]?.status as 'Present' | 'Absent') || 'Present';
+        });
+      }
+      base[sId] = status;
+      return base;
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  // Bulk Action: Save Attendance to Database
+  const handleSaveBulkAttendance = async () => {
+    if (passengers.length === 0) {
+      Alert.alert('No Students', 'No students registered on this route.');
+      return;
+    }
+    setIsSavingBulk(true);
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const studentsToSave = passengers.map((s) => {
+        const sId = s.rollNo || s.id;
+        const curStatus = attendanceDraft[sId] || (attendanceMap[sId]?.status as 'Present' | 'Absent') || 'Present';
+        return {
+          studentId: sId,
+          studentName: s.name,
+          rollNo: s.rollNo || sId,
+          pickupPoint: s.stop,
+          status: curStatus,
+          boarded: curStatus === 'Present',
+        };
+      });
+
+      const payload = {
+        date: todayStr,
+        tripType: 'Pickup',
+        routeId: activeRoute?.routeId || 'R-01',
+        routeName: activeRoute?.name || 'Assigned Route',
+        vehicleNumber: myVehicle?.vehicleNumber || myVehicle?.registrationNumber || 'Bus-01',
+        driverId: user?.referenceId || user?.userId || user?._id || 'DRV-CURRENT',
+        driverName: user?.name || 'Driver',
+        students: studentsToSave,
+      };
+
+      const res = await apiPost<any>('transport/student-attendance', payload);
+      if (res && (res.success || res.savedCount !== undefined)) {
+        const updatedMap: Record<string, { status: string; isLocked: boolean; boarded: boolean }> = { ...attendanceMap };
+        studentsToSave.forEach((s) => {
+          updatedMap[s.studentId] = {
+            status: s.status,
+            isLocked: true,
+            boarded: s.boarded,
+          };
+        });
+        setAttendanceMap(updatedMap);
+        setAttendanceDraft({});
+        setHasUnsavedChanges(false);
+        setIsCustomizing(false);
+        Alert.alert(
+          'Attendance Saved',
+          `Attendance successfully saved for ${res.savedCount || studentsToSave.length} students.\nPresent: ${res.presentCount ?? studentsToSave.filter((s) => s.status === 'Present').length} | Absent: ${res.absentCount ?? studentsToSave.filter((s) => s.status === 'Absent').length}`
+        );
+
+        // Refresh aggregate report
+        const rep = await apiGet<any>(`transport/student-attendance/report?date=${todayStr}&tripType=Pickup&routeId=${activeRoute?.routeId || 'R-01'}`).catch(() => null);
+        if (rep) setAttendanceReport(rep);
+      } else {
+        Alert.alert('Save Failed', res?.message || 'Server did not acknowledge attendance saving.');
+      }
+    } catch (err: any) {
+      console.error('Failed to save bulk attendance:', err);
+      Alert.alert('Save Error', err?.message || 'Failed to save attendance. Your selections remain intact in draft.');
+    } finally {
+      setIsSavingBulk(false);
+    }
+  };
+
   // Mark Student Attendance: Present or Absent with backend persistence & duplicate locking
   const handleMarkAttendance = async (student: StudentPassenger, status: 'Present' | 'Absent') => {
     const studentId = student.rollNo || student.id;
-    if (attendanceMap[studentId]?.isLocked) {
+    if (attendanceMap[studentId]?.isLocked && !attendanceDraft[studentId]) {
       Alert.alert('Record Locked', 'Attendance for this student has already been saved and locked. Use "Correct" to submit an authorized change with reason.');
       return;
     }
@@ -1029,6 +1180,8 @@ export default function DriverDashboard({ user, onLogout }: Props) {
         roleBadge="DRIVER"
         avatarText={driverProfile.name.substring(0, 2).toUpperCase()}
         userSubtitle={`Bus: ${driverProfile.busNo} • ${driverProfile.route}`}
+        notificationsCount={unreadNotifsCount}
+        onNotificationsPress={() => setShowNotifModal(true)}
         onProfilePress={() => {
           setActiveNavTab('profile');
           setMoreSection('profile');
@@ -1666,6 +1819,123 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                         );
                       })}
                     </ScrollView>
+
+                    {/* Live KPI Attendance Stats */}
+                    {(() => {
+                      const presentCount = passengers.filter((s) => getActiveStatus(s.rollNo || s.id) === 'Present').length;
+                      const absentCount = passengers.filter((s) => getActiveStatus(s.rollNo || s.id) === 'Absent').length;
+                      const pendingCount = Math.max(0, passengers.length - presentCount - absentCount);
+
+                      return (
+                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 10, marginBottom: 8 }}>
+                          <View style={{ flex: 1, backgroundColor: '#F8FAFC', borderRadius: 8, padding: 6, alignItems: 'center', borderWidth: 1, borderColor: '#CBD5E1' }}>
+                            <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>{passengers.length}</Text>
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#64748B' }}>TOTAL</Text>
+                          </View>
+                          <View style={{ flex: 1, backgroundColor: '#ECFDF5', borderRadius: 8, padding: 6, alignItems: 'center', borderWidth: 1, borderColor: '#A7F3D0' }}>
+                            <Text style={{ fontSize: 15, fontWeight: '800', color: '#059669' }}>{presentCount}</Text>
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#047857' }}>PRESENT</Text>
+                          </View>
+                          <View style={{ flex: 1, backgroundColor: '#FEF2F2', borderRadius: 8, padding: 6, alignItems: 'center', borderWidth: 1, borderColor: '#FECACA' }}>
+                            <Text style={{ fontSize: 15, fontWeight: '800', color: '#DC2626' }}>{absentCount}</Text>
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#B91C1C' }}>ABSENT</Text>
+                          </View>
+                          <View style={{ flex: 1, backgroundColor: '#FFFBEB', borderRadius: 8, padding: 6, alignItems: 'center', borderWidth: 1, borderColor: '#FDE68A' }}>
+                            <Text style={{ fontSize: 15, fontWeight: '800', color: '#D97706' }}>{pendingCount}</Text>
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#B45309' }}>PENDING</Text>
+                          </View>
+                        </View>
+                      );
+                    })()}
+
+                    {/* 4 Bulk Action Buttons */}
+                    <View style={{ marginTop: 4 }}>
+                      <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
+                        <TouchableOpacity
+                          style={{
+                            flex: 1,
+                            backgroundColor: '#059669',
+                            paddingVertical: 8,
+                            paddingHorizontal: 6,
+                            borderRadius: 6,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          onPress={handleMarkAllPresent}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>✓ Mark All Present</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={{
+                            flex: 1,
+                            backgroundColor: '#DC2626',
+                            paddingVertical: 8,
+                            paddingHorizontal: 6,
+                            borderRadius: 6,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          onPress={handleMarkAllAbsent}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>✕ Mark All Absent</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <TouchableOpacity
+                          style={{
+                            flex: 1,
+                            backgroundColor: isCustomizing ? '#4338CA' : '#EEF2FF',
+                            borderWidth: 1,
+                            borderColor: isCustomizing ? '#3730A3' : '#C7D2FE',
+                            paddingVertical: 8,
+                            paddingHorizontal: 6,
+                            borderRadius: 6,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          onPress={handleToggleCustomize}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: isCustomizing ? '#FFFFFF' : '#4338CA' }}>
+                            {isCustomizing ? '✓ Customizing...' : '⚙️ Customize Attendance'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={{
+                            flex: 1,
+                            backgroundColor: isSavingBulk ? '#6B7280' : '#1D4ED8',
+                            paddingVertical: 8,
+                            paddingHorizontal: 6,
+                            borderRadius: 6,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexDirection: 'row',
+                            gap: 4,
+                          }}
+                          onPress={handleSaveBulkAttendance}
+                          disabled={isSavingBulk}
+                        >
+                          {isSavingBulk ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>
+                              💾 Save Attendance {hasUnsavedChanges ? '(*)' : ''}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Customizing Info Banner */}
+                    {(isCustomizing || hasUnsavedChanges) && (
+                      <View style={{ backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', padding: 8, borderRadius: 6, marginTop: 8 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#1E40AF' }}>
+                          ✏️ Customization Active: Tap 'Present' or 'Absent' on any student below to modify their status individually. Other students will remain unchanged. Tap 'Save Attendance' when finished.
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Passenger List */}
@@ -1676,9 +1946,9 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                   ) : (
                     filteredStudents.map((student) => {
                       const studentKey = student.rollNo || student.id;
-                      const rec = attendanceMap[studentKey];
-                      const status = rec ? rec.status : 'PENDING';
-                      const isLocked = rec ? rec.isLocked : false;
+                      const status = getActiveStatus(studentKey);
+                      const isDrafted = attendanceDraft[studentKey] !== undefined;
+                      const isLocked = attendanceMap[studentKey]?.isLocked && !isDrafted && !isCustomizing;
                       const isLoadingThis = attendanceLoadingId === studentKey;
 
                       return (
@@ -1753,38 +2023,42 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                             <View style={{ flexDirection: 'column', gap: 6, marginLeft: 8 }}>
                               <TouchableOpacity
                                 style={{
-                                  backgroundColor: '#16A34A',
-                                  paddingHorizontal: 12,
-                                  paddingVertical: 7,
+                                  backgroundColor: status === 'Present' ? '#16A34A' : '#F0FDF4',
+                                  borderWidth: 1,
+                                  borderColor: status === 'Present' ? '#15803D' : '#86EFAC',
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 6,
                                   borderRadius: 6,
-                                  minWidth: 80,
+                                  minWidth: 78,
                                   alignItems: 'center',
                                   opacity: isLoadingThis ? 0.6 : 1,
                                 }}
-                                onPress={() => handleMarkAttendance(student, 'Present')}
+                                onPress={() => handleSetStudentDraft(student, 'Present')}
                                 disabled={isLoadingThis}
                               >
-                                {isLoadingThis ? (
-                                  <ActivityIndicator size="small" color="#FFFFFF" />
-                                ) : (
-                                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>✓ Present</Text>
-                                )}
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: status === 'Present' ? '#FFFFFF' : '#15803D' }}>
+                                  ✓ Present
+                                </Text>
                               </TouchableOpacity>
 
                               <TouchableOpacity
                                 style={{
-                                  backgroundColor: '#DC2626',
-                                  paddingHorizontal: 12,
-                                  paddingVertical: 7,
+                                  backgroundColor: status === 'Absent' ? '#DC2626' : '#FEF2F2',
+                                  borderWidth: 1,
+                                  borderColor: status === 'Absent' ? '#B91C1C' : '#FCA5A5',
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 6,
                                   borderRadius: 6,
-                                  minWidth: 80,
+                                  minWidth: 78,
                                   alignItems: 'center',
                                   opacity: isLoadingThis ? 0.6 : 1,
                                 }}
-                                onPress={() => handleMarkAttendance(student, 'Absent')}
+                                onPress={() => handleSetStudentDraft(student, 'Absent')}
                                 disabled={isLoadingThis}
                               >
-                                <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>✕ Absent</Text>
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: status === 'Absent' ? '#FFFFFF' : '#B91C1C' }}>
+                                  ✕ Absent
+                                </Text>
                               </TouchableOpacity>
                             </View>
                           )}
@@ -1918,7 +2192,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
         {/* TAB 3: BUSINESS REFERRALS */}
         {activeNavTab === 'referrals' && (
           <View style={styles.flexOne}>
-            <ReferralHub user={user} />
+            <ReferralHub user={user} onBack={() => setActiveNavTab('home')} />
           </View>
         )}
 
@@ -1959,7 +2233,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                     tasksNotifSubTab === 'notices' && styles.profileToggleTabTextActive,
                   ]}
                 >
-                  🔔 Notices ({notifications.length})
+                  🔔 Notices ({unreadNotifsCount})
                 </Text>
               </TouchableOpacity>
             </View>
@@ -2297,145 +2571,11 @@ export default function DriverDashboard({ user, onLogout }: Props) {
 
               {/* Sub-view: Transit Notices & Advisories */}
               {tasksNotifSubTab === 'notices' && (
-                <View>
-                  <View style={styles.guidanceTipBox}>
-                    <Text style={styles.guidanceTipEmoji}>🔔</Text>
-                    <Text style={styles.guidanceTipText}>
-                      Official campus transit announcements, road route advisories, and administration circulars.
-                    </Text>
-                  </View>
-
-                  {/* Search bar */}
-                  <View
-                    style={{
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: 10,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingHorizontal: 12,
-                      borderWidth: 1,
-                      borderColor: '#E2E8F0',
-                      marginBottom: 10,
-                    }}
-                  >
-                    <Text style={{ marginRight: 8, fontSize: 14 }}>🔍</Text>
-                    <TextInput
-                      style={{ flex: 1, height: 40, fontSize: 13, color: '#0F172A' }}
-                      placeholder="Search announcements..."
-                      placeholderTextColor="#94A3B8"
-                      value={noticeSearch}
-                      onChangeText={setNoticeSearch}
-                    />
-                    {noticeSearch ? (
-                      <TouchableOpacity onPress={() => setNoticeSearch('')}>
-                        <Text style={{ color: '#94A3B8', fontSize: 14 }}>✕</Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-
-                  {/* Filter chips */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-                    {['All', 'Emergency', 'Alert', 'Warning', 'Info'].map((cat) => (
-                      <TouchableOpacity
-                        key={cat}
-                        style={{
-                          paddingHorizontal: 14,
-                          paddingVertical: 6,
-                          borderRadius: 20,
-                          backgroundColor: noticeFilter === cat ? '#1E3A8A' : '#FFFFFF',
-                          marginRight: 8,
-                          borderWidth: 1,
-                          borderColor: noticeFilter === cat ? '#1E3A8A' : '#E2E8F0',
-                        }}
-                        onPress={() => setNoticeFilter(cat)}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: '700',
-                            color: noticeFilter === cat ? '#FFFFFF' : '#64748B',
-                          }}
-                        >
-                          {cat}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-
-                  {/* Notifications list */}
-                  {(() => {
-                    const filteredNotifs = notifications.filter((n: any) => {
-                      const matchesSearch =
-                        (n.title || n.subject || '').toLowerCase().includes(noticeSearch.toLowerCase()) ||
-                        (n.message || n.description || n.text || '').toLowerCase().includes(noticeSearch.toLowerCase());
-                      const matchesCat = noticeFilter === 'All' || n.type === noticeFilter;
-                      return matchesSearch && matchesCat;
-                    });
-
-                    if (filteredNotifs.length === 0) {
-                      return (
-                        <View style={styles.emptyCardBox}>
-                          <Text style={{ fontSize: 32, marginBottom: 8 }}>📭</Text>
-                          <Text style={styles.emptyCardText}>No transit announcements found matching your filter.</Text>
-                        </View>
-                      );
-                    }
-
-                    return filteredNotifs.map((n: any, idx: number) => {
-                      const isAlert = n.type === 'Emergency' || n.type === 'Alert';
-                      const isWarn = n.type === 'Warning';
-                      return (
-                        <View
-                          key={n._id || idx}
-                          style={{
-                            backgroundColor: '#FFFFFF',
-                            borderRadius: 14,
-                            padding: 14,
-                            marginBottom: 12,
-                            borderLeftWidth: 4,
-                            borderLeftColor: isAlert ? '#EF4444' : isWarn ? '#F59E0B' : '#2563EB',
-                            borderWidth: 1,
-                            borderColor: '#E2E8F0',
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 1 },
-                            shadowOpacity: 0.05,
-                            shadowRadius: 2,
-                            elevation: 1,
-                          }}
-                        >
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                            <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A', flex: 1, marginRight: 8 }}>
-                              {n.title || n.subject || 'Campus Notice'}
-                            </Text>
-                            <View
-                              style={{
-                                backgroundColor: isAlert ? '#FEE2E2' : isWarn ? '#FEF3C7' : '#EFF6FF',
-                                paddingHorizontal: 8,
-                                paddingVertical: 2,
-                                borderRadius: 6,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 10,
-                                  fontWeight: '800',
-                                  color: isAlert ? '#DC2626' : isWarn ? '#B45309' : '#1D4ED8',
-                                }}
-                              >
-                                {n.type || 'Notice'}
-                              </Text>
-                            </View>
-                          </View>
-                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 18, marginBottom: 6 }}>
-                            {n.message || n.description || n.text || ''}
-                          </Text>
-                          <Text style={{ fontSize: 11, color: '#94A3B8' }}>
-                            {n.createdAt ? new Date(n.createdAt).toLocaleString() : 'Posted today'}
-                          </Text>
-                        </View>
-                      );
-                    });
-                  })()}
+                <View style={{ flex: 1, minHeight: 460 }}>
+                  <MobileNotificationCenter
+                    user={user}
+                    onUnreadCountChange={handleUnreadNotifsCountChange}
+                  />
                 </View>
               )}
             </ScrollView>
@@ -3547,7 +3687,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
       {/* ================= DEDICATED STUDENT ATTENDANCE REPORT MODAL ================= */}
       <Modal visible={showAttendanceReportModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalBox, { maxHeight: '90%', padding: 16 }]}>
+          <View style={[styles.modalBox, { height: '82%', maxHeight: '90%', padding: 16 }]}>
             {/* Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingBottom: 10, marginBottom: 12 }}>
               <View>
@@ -3566,12 +3706,12 @@ export default function DriverDashboard({ user, onLogout }: Props) {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ flex: 1 }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={true}>
               {/* Summary KPI Cards */}
               {(() => {
                 const totalStudents = passengers.length;
-                const presentCount = Object.values(attendanceMap).filter(a => a.status === 'Present').length;
-                const absentCount = Object.values(attendanceMap).filter(a => a.status === 'Absent').length;
+                const presentCount = passengers.filter((s) => getActiveStatus(s.rollNo || s.id) === 'Present').length;
+                const absentCount = passengers.filter((s) => getActiveStatus(s.rollNo || s.id) === 'Absent').length;
                 const pendingCount = Math.max(0, totalStudents - (presentCount + absentCount));
 
                 return (
@@ -3601,43 +3741,56 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                 📍 Stop-Wise Boarding Breakdown
               </Text>
 
-              <View style={{ backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14 }}>
-                {(attendanceReport?.stopBreakdown || [
-                  { stopName: 'Stop A', expectedStudents: 3, boardedCount: 0, absentCount: 0, pendingCount: 3 },
-                  { stopName: 'Stop B', expectedStudents: 2, boardedCount: 0, absentCount: 0, pendingCount: 2 },
-                  { stopName: 'Stop C', expectedStudents: 2, boardedCount: 0, absentCount: 0, pendingCount: 2 },
-                  { stopName: 'Stop D', expectedStudents: 1, boardedCount: 0, absentCount: 0, pendingCount: 1 },
-                  { stopName: 'College Campus', expectedStudents: 0, boardedCount: 0, absentCount: 0, pendingCount: 0 },
-                ]).map((s: any, idx: number) => (
-                  <View
-                    key={idx}
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      paddingVertical: 8,
-                      borderBottomWidth: idx < 4 ? 1 : 0,
-                      borderBottomColor: '#E2E8F0',
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
-                        {idx + 1}. {s.stopName}
-                      </Text>
-                      <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
-                        Absent: {s.absentCount} • Pending: {s.pendingCount}
-                      </Text>
-                    </View>
+              {(() => {
+                const computedStops = uniqueStops.filter((s) => s !== 'All Stops').map((stopName) => {
+                  const stopStudents = passengers.filter((p) => (p.stop || '').toLowerCase() === stopName.toLowerCase());
+                  const boarded = stopStudents.filter((p) => getActiveStatus(p.rollNo || p.id) === 'Present').length;
+                  const absent = stopStudents.filter((p) => getActiveStatus(p.rollNo || p.id) === 'Absent').length;
+                  const pending = Math.max(0, stopStudents.length - boarded - absent);
+                  return {
+                    stopName,
+                    expectedStudents: stopStudents.length,
+                    boardedCount: boarded,
+                    absentCount: absent,
+                    pendingCount: pending,
+                  };
+                });
+                const displayStops = computedStops.length > 0 ? computedStops : (attendanceReport?.stopBreakdown || []);
 
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 14, fontWeight: '900', color: s.boardedCount > 0 ? '#15803D' : '#0F172A' }}>
-                        {s.boardedCount} / {s.expectedStudents}
-                      </Text>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748B' }}>Boarded</Text>
-                    </View>
+                return (
+                  <View style={{ backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14 }}>
+                    {displayStops.map((s: any, idx: number) => (
+                      <View
+                        key={idx}
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingVertical: 8,
+                          borderBottomWidth: idx < displayStops.length - 1 ? 1 : 0,
+                          borderBottomColor: '#E2E8F0',
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                            {idx + 1}. {s.stopName}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
+                            Absent: {s.absentCount} • Pending: {s.pendingCount}
+                          </Text>
+                        </View>
+
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ fontSize: 14, fontWeight: '900', color: s.boardedCount > 0 ? '#15803D' : '#0F172A' }}>
+                            {s.boardedCount} / {s.expectedStudents}
+                          </Text>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748B' }}>Boarded</Text>
+                        </View>
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
+                );
+              })()}
 
               {/* Detailed Student Status List */}
               <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 8 }}>
@@ -3645,8 +3798,8 @@ export default function DriverDashboard({ user, onLogout }: Props) {
               </Text>
 
               {passengers.map((p, idx) => {
+                const status = getActiveStatus(p.rollNo || p.id);
                 const rec = attendanceMap[p.rollNo || p.id];
-                const status = rec ? rec.status : 'Pending';
                 const isLocked = rec ? rec.isLocked : false;
 
                 return (
@@ -3715,7 +3868,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
           }
           setActiveNavTab(t);
         }}
-        notificationsCount={complaintTasks.filter((c) => c.status !== 'Resolved' && c.status !== 'Closed').length + notifications.length}
+        notificationsCount={complaintTasks.filter((c) => c.status !== 'Resolved' && c.status !== 'Closed').length + unreadNotifsCount}
         tabsList={['home', 'academics', 'referrals', 'notifications', 'profile']}
         tabLabels={{
           home: 'Home',
@@ -3731,6 +3884,15 @@ export default function DriverDashboard({ user, onLogout }: Props) {
           notifications: '📋',
           profile: '👤',
         }}
+      />
+
+      {/* Real-Time Campus Notification Modal */}
+      <MobileNotificationCenter
+        user={user}
+        isModal
+        visible={showNotifModal}
+        onClose={() => setShowNotifModal(false)}
+        onUnreadCountChange={handleUnreadNotifsCountChange}
       />
     </View>
   );

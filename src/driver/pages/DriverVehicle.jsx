@@ -249,95 +249,118 @@ const DriverVehicle = () => {
   return (
     <div className="driver-page-container">
       
-      {/* ── ERP Breadcrumb & Compact Header Bar ── */}
-      <div className="driver-header-bar">
+      {/* ── Enterprise Real-Time Header Bar ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', background: '#ffffff', padding: '18px 24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', marginBottom: '1.25rem' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '0.2rem' }}>
-            <span>Fleet Management</span>
-            <ChevronRight size={12} />
-            <span>Vehicles</span>
-            <ChevronRight size={12} />
-            <span style={{ color: '#0f172a' }}>{vehicle?.registrationNumber || 'TN 01 AD 1234'}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.01em' }}>
-              Vehicle Master: {vehicle?.registrationNumber || 'TN 01 AD 1234'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              Vehicle Master: {vehicle?.registrationNumber || 'TN 01 AB 1234'}
             </h1>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '0.15rem 0.6rem', background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
-              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#16a34a' }}></span>
-              ACTIVE
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', fontWeight: 700, color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: '20px', border: '1px solid #a7f3d0' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }}></span>
+              ACTIVE VEHICLE
             </span>
           </div>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.88rem', fontWeight: 500 }}>
+            Fleet Telemetry • Driver <strong>{driverInfo?.name || session.name || 'Driver'}</strong> ({driverInfo?.driverId || session.referenceId || 'DRV-0001'}) • Route <strong>{vehicle?.assignedRoute || 'EAST'}</strong>
+          </p>
         </div>
 
-        <div className="driver-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <button 
             onClick={() => setShowIssueModal(true)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem', backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '8px 14px', backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '8px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
           >
-            <ShieldAlert size={14} /> Report Vehicle Defect
+            <ShieldAlert size={15} /> Report Defect
           </button>
           <Link 
             to="/driver/trip"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem', backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.8rem', textDecoration: 'none', cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '8px 14px', backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.82rem', textDecoration: 'none', cursor: 'pointer' }}
           >
-            <Compass size={14} /> Trip Operations
+            <Compass size={15} /> Trip Ops →
           </Link>
+          <button 
+            onClick={() => window.location.reload()}
+            title="Refresh Vehicle Data"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', color: '#334155' }}
+          >
+            <RefreshCw size={15} /> Refresh
+          </button>
         </div>
       </div>
 
-      {/* ── Compact Real-Time Telemetry & Metric Row ── */}
-      <div className="driver-kpi-grid">
+      {/* ── 4 ERP Key Metric Cards ── */}
+      <div className="driver-stats-grid driver-kpi-grid">
         
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Assigned Route</span>
-            <MapPin size={14} style={{ color: '#2563eb' }} />
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #6366F1', padding: '16px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Assigned Route</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                {vehicle?.assignedRoute || 'EAST'}
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(99, 102, 241, 0.1)', color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <MapPin size={22} />
+            </div>
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-            {vehicle?.assignedRoute || 'EAST'}
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, marginTop: '0.15rem' }}>
-            {routeInfo ? `${routeInfo.points?.length || 0} Scheduled Stops` : 'Shift Route 01'}
-          </div>
-        </div>
-
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Seating Capacity</span>
-            <Bus size={14} style={{ color: '#4f46e5' }} />
-          </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-            {vehicle?.capacity || 50} Seats
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>
-            Standard Passenger Layout
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#0284c7', fontWeight: 600 }}>{routeInfo ? `${routeInfo.points?.length || 0} Scheduled Stops` : 'Shift Route 01'}</span>
+            <span style={{ color: '#6366F1', fontWeight: 700 }}>Route Specs →</span>
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>Health & Compliance</span>
-            <ShieldCheck size={14} style={{ color: '#16a34a' }} />
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #0284c7', padding: '16px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Seating Capacity</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                {vehicle?.capacity || 50} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>Seats</span>
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Bus size={22} />
+            </div>
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#16a34a', marginTop: '0.2rem' }}>
-            Certified Safe
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '0.15rem' }}>
-            Next Service: 15 Days
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#16a34a', fontWeight: 600 }}>● Standard Passenger Layout</span>
+            <span style={{ color: '#0284c7', fontWeight: 700 }}>Manifest →</span>
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            <span>GPS Tracking Device</span>
-            <Radio size={14} style={{ color: '#10b981' }} />
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #10B981', padding: '16px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Health & Compliance</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#16a34a', margin: '4px 0 2px' }}>
+                Certified Safe
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShieldCheck size={22} />
+            </div>
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
-            Connected
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#64748b', fontWeight: 600 }}>Next Service: 15 Days</span>
+            <span style={{ color: '#10B981', fontWeight: 700 }}>Log Defect →</span>
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.15rem' }}>
-            Speed Governor: 50 km/h
+        </div>
+
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderLeft: '4px solid #8B5CF6', padding: '16px 18px', borderRadius: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>GPS Tracking Device</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                Connected
+              </div>
+            </div>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(139, 92, 246, 0.1)', color: '#8B5CF6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Radio size={22} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.75rem' }}>
+            <span style={{ color: '#16a34a', fontWeight: 600 }}>● Speed Governor: 50 km/h</span>
+            <span style={{ color: '#8B5CF6', fontWeight: 700 }}>Telemetry →</span>
           </div>
         </div>
 

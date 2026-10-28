@@ -40,7 +40,31 @@ const StaffTasks = () => {
 
   const handleUpdateMaintenance = async (id, status) => {
     try {
-      await updateTransportMaintenance(id, { status });
+      try {
+        await updateTransportMaintenance(id, { status });
+      } catch (apiErr) {
+        console.warn('API update failed, updating local storage:', apiErr);
+      }
+
+      const session = JSON.parse(sessionStorage.getItem('staff_session') || '{}');
+      const tenantId = session.tenantId || sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const keys = [
+        `erp_transport_maintenance_${tenantId}`,
+        'erp_transport_maintenance_mock_college_id',
+        'erp_transport_maintenance'
+      ];
+
+      keys.forEach(key => {
+        try {
+          const list = JSON.parse(localStorage.getItem(key) || '[]');
+          if (Array.isArray(list) && list.length > 0) {
+            const updated = list.map(m => ((m._id === id || m.id === id) ? { ...m, status } : m));
+            localStorage.setItem(key, JSON.stringify(updated));
+          }
+        } catch (e) {}
+      });
+
+      setMaintenanceTasks(prev => prev.map(m => ((m._id === id || m.id === id) ? { ...m, status } : m)));
       fetchData();
       alert(`Maintenance marked as ${status}`);
     } catch (err) {
@@ -50,7 +74,31 @@ const StaffTasks = () => {
 
   const handleUpdateComplaint = async (id, status) => {
     try {
-      await updateTransportComplaint(id, { status });
+      try {
+        await updateTransportComplaint(id, { status });
+      } catch (apiErr) {
+        console.warn('API complaint update failed, updating local storage:', apiErr);
+      }
+
+      const session = JSON.parse(sessionStorage.getItem('staff_session') || '{}');
+      const tenantId = session.tenantId || sessionStorage.getItem('tenantId') || 'mock_college_id';
+      const keys = [
+        `erp_transport_complaints_${tenantId}`,
+        'erp_transport_complaints_mock_college_id',
+        'erp_transport_complaints'
+      ];
+
+      keys.forEach(key => {
+        try {
+          const list = JSON.parse(localStorage.getItem(key) || '[]');
+          if (Array.isArray(list) && list.length > 0) {
+            const updated = list.map(c => ((c._id === id || c.complaintId === id) ? { ...c, status } : c));
+            localStorage.setItem(key, JSON.stringify(updated));
+          }
+        } catch (e) {}
+      });
+
+      setComplaintTasks(prev => prev.map(c => ((c._id === id || c.complaintId === id) ? { ...c, status } : c)));
       fetchData();
       alert(`Complaint marked as ${status}`);
     } catch (err) {

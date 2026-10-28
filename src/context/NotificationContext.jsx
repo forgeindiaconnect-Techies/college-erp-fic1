@@ -56,10 +56,16 @@ export const NotificationProvider = ({ children }) => {
     setToastAlerts(prev => prev.filter(t => t._id !== id));
   };
 
+  const ALL_SESSION_KEYS = [
+    'admin_session', 'superadmin_session', 'subadmin_session', 'principal_session',
+    'hod_session', 'staff_session', 'student_session', 'parent_session',
+    'accounts_session', 'driver_session', 'watchman_session', 'librarian_session',
+    'placement_session', 'hostel_session'
+  ];
+
   const fetchNotifications = async (params = {}) => {
     // Check if session exists in sessionStorage
-    const sessionKeys = ['admin_session','superadmin_session','subadmin_session','principal_session','hod_session','staff_session','student_session','parent_session','accounts_session'];
-    const activeSessionKey = sessionKeys.find(k => sessionStorage.getItem(k));
+    const activeSessionKey = ALL_SESSION_KEYS.find(k => sessionStorage.getItem(k));
     if (!activeSessionKey && !user) return;
 
     try {
@@ -88,8 +94,15 @@ export const NotificationProvider = ({ children }) => {
         }
       } catch (e) {}
 
-      setNotifications(combined);
-      setUnreadCount(combined.filter(n => !n.isRead).length);
+      // Ensure strict college isolation on client side as an extra safeguard
+      const filtered = combined.filter(n => {
+        if (!tenantId || tenantId === 'mock_college_id' || tenantId === 'system') return true;
+        const notifTenant = n.tenantId || n.collegeId;
+        return !notifTenant || notifTenant === 'system' || notifTenant === tenantId;
+      });
+
+      setNotifications(filtered);
+      setUnreadCount(filtered.filter(n => !n.isRead).length);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
@@ -97,6 +110,11 @@ export const NotificationProvider = ({ children }) => {
 
   useEffect(() => {
     fetchNotifications();
+
+    // Polling fallback every 20 seconds to guarantee fresh data even if socket temporarily reconnects
+    const pollInterval = setInterval(() => {
+      fetchNotifications();
+    }, 20000);
 
     const handleLocalNotifEvent = (e) => {
       const notif = e.detail;
@@ -124,9 +142,8 @@ export const NotificationProvider = ({ children }) => {
       console.log('⚡ Connected to Notification Socket.IO server:', socket.id);
 
       // Extract user info from active session
-      const sessionKeys = ['admin_session','superadmin_session','subadmin_session','principal_session','hod_session','staff_session','student_session','parent_session','accounts_session'];
       let sessionData = null;
-      for (const k of sessionKeys) {
+      for (const k of ALL_SESSION_KEYS) {
         const val = sessionStorage.getItem(k);
         if (val) {
           try {
@@ -146,7 +163,7 @@ export const NotificationProvider = ({ children }) => {
       }
     });
 
-socket.on('dataUpdated', (payload) => {
+    socket.on('dataUpdated', (payload) => {
       console.log('⚡ Live ERP Data Update:', payload);
 
       if (payload?.module === 'placement') {
@@ -158,22 +175,29 @@ socket.on('dataUpdated', (payload) => {
 
     socket.on('newNotification', (notif) => {
       console.log('🔔 Live Notification Received via Socket:', notif);
-      
-      setNotifications(prev => [notif, ...prev.filter(n => n._id !== notif._id)]);
+
+      // Verify college isolation on client
+      const activeTenant = sessionStorage.getItem('tenantId');
+      if (activeTenant && activeTenant !== 'system' && notif.tenantId && notif.tenantId !== 'system' && notif.tenantId !== activeTenant) {
+        return; // Ignore other colleges' notifications
+      }
+
+      setNotifications(prev => [notif, ...prev.filter(n => (n._id || n.id) !== (notif._id || notif.id))]);
       setUnreadCount(prev => prev + 1);
 
       showToast(notif);
 
       // Handle immediate College Deactivation
       if (notif.title === 'College Deactivated') {
-        const sessionKeys = ['admin_session','subadmin_session','hod_session','staff_session','student_session','parent_session','accounts_session'];
-        sessionKeys.forEach(k => {
+        ALL_SESSION_KEYS.forEach(k => {
           if (k !== 'superadmin_session') sessionStorage.removeItem(k);
         });
+        window.location.reload();
       }
     });
 
     return () => {
+      clearInterval(pollInterval);
       window.removeEventListener('erp_notification_received', handleLocalNotifEvent);
       window.removeEventListener('erp_notification_updated', handleLocalNotifEvent);
       socket.disconnect();

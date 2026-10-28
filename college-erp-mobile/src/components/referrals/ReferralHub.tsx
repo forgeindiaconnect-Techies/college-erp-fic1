@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -29,12 +29,29 @@ interface Props {
   initialCategory?: ReferralCategory;
   initialScreen?: ActiveScreen;
   onBack?: () => void;
+  hideHeader?: boolean;
 }
 
-export default function ReferralHub({ user, initialCategory, initialScreen = 'home', onBack }: Props) {
+export default function ReferralHub({ user, initialCategory, initialScreen = 'home', onBack, hideHeader }: Props) {
   const [currentScreen, setCurrentScreen] = useState<ActiveScreen>(initialCategory ? 'category' : initialScreen);
   const [selectedCategory, setSelectedCategory] = useState<ReferralCategory>(initialCategory || 'Credit Card');
   const [categoryTab, setCategoryTab] = useState<CategoryTab>('overview');
+
+  // Ref to smoothly scroll horizontal tab bar so Leaderboard is never hidden
+  const tabScrollRef = useRef<any>(null);
+
+  // Auto-scroll tab bar when currentScreen changes (e.g. to reveal Leaderboard)
+  useEffect(() => {
+    if (currentScreen === 'leaderboard') {
+      setTimeout(() => {
+        tabScrollRef.current?.scrollToEnd({ animated: true });
+      }, 60);
+    } else if (currentScreen === 'home') {
+      setTimeout(() => {
+        tabScrollRef.current?.scrollTo({ x: 0, animated: true });
+      }, 60);
+    }
+  }, [currentScreen]);
 
   // Pre-fill parameters when user taps "Refer" on an offer
   const [selectedOfferBank, setSelectedOfferBank] = useState<string>('');
@@ -302,6 +319,98 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
     });
   }, [topPerformers, perfSearchQuery]);
 
+  // Current user's performer record for personal leaderboard standing
+  const currentUserPerformer = useMemo(() => {
+    return topPerformers.find((p) => {
+      const matchId =
+        (user?._id && p.userId === user._id) ||
+        (user?.userId && p.userId === user.userId) ||
+        (user?.referenceId && p.userId === user.referenceId);
+      const matchName =
+        p.name && user?.name && p.name.trim().toLowerCase() === user.name.trim().toLowerCase();
+      return matchId || matchName;
+    });
+  }, [topPerformers, user]);
+
+  // Render a clean, compact leaderboard row for mobile
+  const renderCompactLeaderboardRow = (performer: any, idx: number) => {
+    const rankNum = performer.rank || idx + 1;
+    const isFirst = rankNum === 1;
+    const isSecond = rankNum === 2;
+    const isThird = rankNum === 3;
+
+    const rankBadgeBg = isFirst ? '#FEF3C7' : isSecond ? '#F1F5F9' : isThird ? '#FFEDD5' : '#F8FAFC';
+    const rankBadgeBorder = isFirst ? '#FCD34D' : isSecond ? '#CBD5E1' : isThird ? '#FDBA74' : '#E2E8F0';
+    const rankTextColor = isFirst ? '#B45309' : isSecond ? '#475569' : isThird ? '#C2410C' : '#64748B';
+    const medalEmoji = isFirst ? '🥇' : isSecond ? '🥈' : isThird ? '🥉' : null;
+
+    const avatarBg = isFirst ? '#D97706' : isSecond ? '#475569' : isThird ? '#EA580C' : '#2563EB';
+
+    const isCurrentUser =
+      (user?._id && performer.userId === user._id) ||
+      (user?.userId && performer.userId === user.userId) ||
+      (user?.referenceId && performer.userId === user.referenceId) ||
+      (performer.name && user?.name && performer.name.trim().toLowerCase() === user.name.trim().toLowerCase());
+
+    return (
+      <View
+        key={performer.userId || `perf-${idx}`}
+        style={[
+          styles.compactPerfRow,
+          isCurrentUser && styles.currentUserRowHighlight,
+          isFirst && styles.firstPerfRowHighlight,
+        ]}
+      >
+        {/* Rank Badge */}
+        <View style={[styles.compactRankBadge, { backgroundColor: rankBadgeBg, borderColor: rankBadgeBorder }]}>
+          {medalEmoji ? (
+            <Text style={styles.compactRankMedal}>{medalEmoji}</Text>
+          ) : null}
+          <Text style={[styles.compactRankText, { color: rankTextColor }]}>
+            {rankNum}
+          </Text>
+        </View>
+
+        {/* Profile Avatar with Initials */}
+        <View style={[styles.compactAvatar, { backgroundColor: avatarBg }]}>
+          <Text style={styles.compactAvatarText}>{getInitials(performer.name)}</Text>
+        </View>
+
+        {/* Name, Role & Approval Count */}
+        <View style={styles.compactPerfInfo}>
+          <View style={styles.compactPerfNameRow}>
+            <Text style={styles.compactPerfName} numberOfLines={1}>
+              {performer.name}
+            </Text>
+            {isCurrentUser && (
+              <View style={styles.youBadge}>
+                <Text style={styles.youBadgeText}>YOU</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.compactPerfMeta} numberOfLines={1}>
+            {performer.role || 'Member'} • <Text style={styles.compactApprovedCount}>✓ {performer.successfulReferrals} Approved</Text>
+          </Text>
+        </View>
+
+        {/* Actual Earned Incentive & Status */}
+        <View style={styles.compactPerfRewardBox}>
+          <Text style={styles.compactPerfAmount}>
+            ₹{Number(performer.earnedIncentive || 0).toLocaleString('en-IN')}
+          </Text>
+          <Text
+            style={[
+              styles.compactPerfStatus,
+              { color: performer.paidIncentive > 0 ? '#15803D' : '#D97706' },
+            ]}
+          >
+            {performer.paidIncentive > 0 ? '✓ Paid' : 'Clearance'}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
   // --------------------------------------------------------------------------
   // Default Catalog Offerings
   // --------------------------------------------------------------------------
@@ -499,96 +608,122 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
 
   return (
     <View style={styles.container}>
-      {/* Top Header Bar */}
-      <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          {currentScreen !== 'home' ? (
-            <TouchableOpacity
-              style={styles.backButton}
-              activeOpacity={0.7}
-              onPress={() => {
-                if (currentScreen === 'category' && categoryTab !== 'overview') {
-                  setCategoryTab('overview');
-                } else {
-                  setCurrentScreen('home');
-                }
-              }}
-            >
-              <Text style={styles.backButtonText}>← Back</Text>
-            </TouchableOpacity>
-          ) : onBack ? (
-            <TouchableOpacity style={styles.backButton} activeOpacity={0.7} onPress={onBack}>
-              <Text style={styles.backButtonText}>← Exit</Text>
-            </TouchableOpacity>
-          ) : null}
+      {/* Category Sub-navigation Breadcrumb (Only when drilling into a category form) */}
+      {currentScreen === 'category' && (
+        <View style={styles.categoryBreadcrumbBar}>
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.7}
+            onPress={() => {
+              if (categoryTab !== 'overview') {
+                setCategoryTab('overview');
+              } else {
+                setCurrentScreen('home');
+              }
+            }}
+          >
+            <Text style={styles.backButtonText}>← Categories</Text>
+          </TouchableOpacity>
+          <Text style={styles.categoryBreadcrumbTitle} numberOfLines={1}>{selectedCategory}</Text>
+        </View>
+      )}
 
-          <View>
-            <Text style={styles.topBarTitle}>Business Referral Hub</Text>
-            <Text style={styles.topBarSubtitle}>
-              {currentScreen === 'home'
-                ? 'Authorized Institutional Partner Program'
-                : currentScreen === 'category'
-                ? selectedCategory
-                : currentScreen === 'submissions'
-                ? 'Referral Tracking & Audit'
-                : currentScreen === 'leaderboard'
-                ? 'Campus Referral Leaderboard'
-                : 'Program Guidelines & Rewards'}
-            </Text>
+      {/* Standalone Top Header Bar (Only when NOT embedded in a dashboard that has its own header) */}
+      {!hideHeader && !onBack && (
+        <View style={styles.topBar}>
+          <View style={styles.topBarLeft}>
+            {currentScreen !== 'home' ? (
+              <TouchableOpacity
+                style={styles.backButton}
+                activeOpacity={0.7}
+                onPress={() => {
+                  if (currentScreen === 'category' && categoryTab !== 'overview') {
+                    setCategoryTab('overview');
+                  } else {
+                    setCurrentScreen('home');
+                  }
+                }}
+              >
+                <Text style={styles.backButtonText}>← Back</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            <View>
+              <Text style={styles.topBarTitle}>Business Referral Hub</Text>
+              <Text style={styles.topBarSubtitle}>
+                {currentScreen === 'home'
+                  ? 'Authorized Institutional Partner Program'
+                  : currentScreen === 'category'
+                  ? selectedCategory
+                  : currentScreen === 'submissions'
+                  ? 'Referral Tracking & Audit'
+                  : currentScreen === 'leaderboard'
+                  ? 'Campus Referral Leaderboard'
+                  : 'Program Guidelines & Rewards'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.roleBadge}>
+            <Text style={styles.roleBadgeText}>{user.role || 'Member'}</Text>
           </View>
         </View>
+      )}
 
-        <View style={styles.roleBadge}>
-          <Text style={styles.roleBadgeText}>{user.role || 'Member'}</Text>
-        </View>
-      </View>
-
-      {/* Main Tab Navigation */}
-      <View style={styles.mainTabBar}>
-        <TouchableOpacity
-          style={[styles.mainTabBtn, currentScreen === 'home' && styles.mainTabBtnActive]}
-          activeOpacity={0.7}
-          onPress={() => setCurrentScreen('home')}
+      {/* Main Tab Navigation - Horizontally scrollable so all tabs including Leaderboard are 100% visible */}
+      <View style={styles.mainTabBarWrapper}>
+        <ScrollView
+          ref={tabScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.mainTabBarContent}
+          style={styles.mainTabBar}
         >
-          <Text style={[styles.mainTabBtnText, currentScreen === 'home' && styles.mainTabBtnTextActive]}>
-            🏢 Categories
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.mainTabBtn, currentScreen === 'home' && styles.mainTabBtnActive]}
+            activeOpacity={0.7}
+            onPress={() => setCurrentScreen('home')}
+          >
+            <Text style={[styles.mainTabBtnText, currentScreen === 'home' && styles.mainTabBtnTextActive]}>
+              🏢 Categories
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.mainTabBtn, currentScreen === 'submissions' && styles.mainTabBtnActive]}
-          activeOpacity={0.7}
-          onPress={() => setCurrentScreen('submissions')}
-        >
-          <Text style={[styles.mainTabBtnText, currentScreen === 'submissions' && styles.mainTabBtnTextActive]}>
-            📋 Submissions
-          </Text>
-          {submissions.length > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{submissions.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.mainTabBtn, currentScreen === 'submissions' && styles.mainTabBtnActive]}
+            activeOpacity={0.7}
+            onPress={() => setCurrentScreen('submissions')}
+          >
+            <Text style={[styles.mainTabBtnText, currentScreen === 'submissions' && styles.mainTabBtnTextActive]}>
+              📋 Submissions
+            </Text>
+            {submissions.length > 0 && (
+              <View style={styles.tabBadge}>
+                <Text style={styles.tabBadgeText}>{submissions.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.mainTabBtn, currentScreen === 'rules' && styles.mainTabBtnActive]}
-          activeOpacity={0.7}
-          onPress={() => setCurrentScreen('rules')}
-        >
-          <Text style={[styles.mainTabBtnText, currentScreen === 'rules' && styles.mainTabBtnTextActive]}>
-            📜 Incentives
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.mainTabBtn, currentScreen === 'rules' && styles.mainTabBtnActive]}
+            activeOpacity={0.7}
+            onPress={() => setCurrentScreen('rules')}
+          >
+            <Text style={[styles.mainTabBtnText, currentScreen === 'rules' && styles.mainTabBtnTextActive]}>
+              📜 Incentives
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.mainTabBtn, currentScreen === 'leaderboard' && styles.mainTabBtnActive]}
-          activeOpacity={0.7}
-          onPress={() => setCurrentScreen('leaderboard')}
-        >
-          <Text style={[styles.mainTabBtnText, currentScreen === 'leaderboard' && styles.mainTabBtnTextActive]}>
-            🏆 Leaderboard
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.mainTabBtn, currentScreen === 'leaderboard' && styles.mainTabBtnActive]}
+            activeOpacity={0.7}
+            onPress={() => setCurrentScreen('leaderboard')}
+          >
+            <Text style={[styles.mainTabBtnText, currentScreen === 'leaderboard' && styles.mainTabBtnTextActive]}>
+              🏆 Leaderboard
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {/* =========================================================================
@@ -627,79 +762,104 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
             </View>
           </View>
 
-          <Text style={styles.sectionHeaderTitle}>Select Referral Category</Text>
-          <Text style={styles.sectionHeaderSub}>Each category features a dedicated workflow, fields, and rewards</Text>
+          {/* Section Heading */}
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={styles.sectionHeaderTitle}>Referral Categories</Text>
+              <Text style={styles.sectionHeaderSub}>Tap a category to explore offers or submit verified leads</Text>
+            </View>
+          </View>
 
-          {/* 4 Category Cards */}
-          {[
-            {
-              cat: 'Credit Card' as ReferralCategory,
-              title: 'Credit Cards',
-              desc: 'Pre-approved lifetime-free cards, fuel & travel cards from top banks',
-              icon: '💳',
-              badge: 'Up to ₹2,500',
-              bgColor: '#EFF6FF',
-              borderColor: '#BFDBFE',
-              partners: 'HDFC, ICICI, SBI, Axis, Kotak',
-            },
-            {
-              cat: 'Insurance' as ReferralCategory,
-              title: 'Insurance Policies',
-              desc: 'Comprehensive campus mediclaim, family health & motor coverage',
-              icon: '🛡️',
-              badge: 'Up to ₹5,000',
-              bgColor: '#ECFDF5',
-              borderColor: '#A7F3D0',
-              partners: 'Star Health, HDFC ERGO, ICICI Lombard, Tata AIG',
-            },
-            {
-              cat: 'Job' as ReferralCategory,
-              title: 'Job Candidate Referrals',
-              desc: 'Corporate hiring, tech engineering & campus placement roles',
-              icon: '💼',
-              badge: 'Placement Bonus',
-              bgColor: '#F5F3FF',
-              borderColor: '#DDD6FE',
-              partners: 'TCS, Infosys, Wipro, CTS, Deloitte, L&T',
-            },
-            {
-              cat: 'Bank Account' as ReferralCategory,
-              title: 'Bank Accounts',
-              desc: 'Zero-balance student accounts & corporate faculty salary suites',
-              icon: '🏛️',
-              badge: 'Up to ₹750',
-              bgColor: '#FFFBEB',
-              borderColor: '#FDE68A',
-              partners: 'HDFC Bank, ICICI Bank, SBI, Axis Bank',
-            },
-          ].map((item) => (
-            <TouchableOpacity
-              key={item.cat}
-              style={[styles.categoryCard, { backgroundColor: item.bgColor, borderColor: item.borderColor }]}
-              activeOpacity={0.8}
-              onPress={() => handleOpenCategory(item.cat, 'overview')}
-            >
-              <View style={styles.categoryCardTop}>
-                <View style={styles.categoryIconCircle}>
-                  <Text style={{ fontSize: 24 }}>{item.icon}</Text>
+          {/* Clean 6 Icon-Based Navigation Grid */}
+          <View style={styles.iconNavGrid}>
+            {[
+              {
+                id: 'cc',
+                title: 'Credit Card Referral',
+                badge: 'Up to ₹2,500',
+                icon: '💳',
+                bg: '#EFF6FF',
+                borderColor: '#BFDBFE',
+                badgeBg: '#DBEAFE',
+                badgeColor: '#1D4ED8',
+                onPress: () => handleOpenCategory('Credit Card', 'overview'),
+              },
+              {
+                id: 'ins',
+                title: 'Insurance Referral',
+                badge: 'Up to ₹5,000',
+                icon: '🛡️',
+                bg: '#ECFDF5',
+                borderColor: '#A7F3D0',
+                badgeBg: '#D1FAE5',
+                badgeColor: '#059669',
+                onPress: () => handleOpenCategory('Insurance', 'overview'),
+              },
+              {
+                id: 'job',
+                title: 'Job Referral',
+                badge: 'Placement Bonus',
+                icon: '💼',
+                bg: '#F5F3FF',
+                borderColor: '#DDD6FE',
+                badgeBg: '#EDE9FE',
+                badgeColor: '#7C3AED',
+                onPress: () => handleOpenCategory('Job', 'overview'),
+              },
+              {
+                id: 'bank',
+                title: 'Bank Account Referral',
+                badge: 'Up to ₹750',
+                icon: '🏛️',
+                bg: '#FFFBEB',
+                borderColor: '#FDE68A',
+                badgeBg: '#FEF3C7',
+                badgeColor: '#D97706',
+                onPress: () => handleOpenCategory('Bank Account', 'overview'),
+              },
+              {
+                id: 'rules',
+                title: 'Incentives & Rules',
+                badge: `${rules.length || 'Campus'} Policies`,
+                icon: '📜',
+                bg: '#EEF2FF',
+                borderColor: '#C7D2FE',
+                badgeBg: '#E0E7FF',
+                badgeColor: '#4338CA',
+                onPress: () => setCurrentScreen('rules'),
+              },
+              {
+                id: 'submissions',
+                title: 'My Submissions',
+                badge: `${stats.totalReferrals} Records`,
+                icon: '📊',
+                bg: '#F8FAFC',
+                borderColor: '#CBD5E1',
+                badgeBg: '#F1F5F9',
+                badgeColor: '#2563EB',
+                onPress: () => setCurrentScreen('submissions'),
+              },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.iconNavTile}
+                activeOpacity={0.72}
+                onPress={item.onPress}
+              >
+                <View style={[styles.iconNavCircle, { backgroundColor: item.bg, borderColor: item.borderColor }]}>
+                  <Text style={styles.iconNavEmoji}>{item.icon}</Text>
                 </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Text style={styles.categoryCardTitle}>{item.title}</Text>
-                    <View style={styles.categoryBadge}>
-                      <Text style={styles.categoryBadgeText}>{item.badge}</Text>
-                    </View>
+                <View style={styles.iconNavContent}>
+                  <Text style={styles.iconNavTitle} numberOfLines={1}>{item.title}</Text>
+                  <View style={[styles.iconNavBadgeBox, { backgroundColor: item.badgeBg }]}>
+                    <Text style={[styles.iconNavBadgeText, { color: item.badgeColor }]} numberOfLines={1}>
+                      {item.badge}
+                    </Text>
                   </View>
-                  <Text style={styles.categoryCardDesc}>{item.desc}</Text>
-                  <Text style={styles.categoryPartnerText}>Partners: {item.partners}</Text>
                 </View>
-              </View>
-
-              <View style={styles.categoryCardFooter}>
-                <Text style={styles.categoryCardActionText}>Open Category Hub →</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            ))}
+          </View>
 
           {/* Top Referral Performers Section (Mobile Native Spotlight) */}
           <View style={styles.perfSectionContainer}>
@@ -729,60 +889,9 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
                 <Text style={styles.perfEmptySub}>Submit approved referrals across banking, cards & insurance to claim the #1 rank!</Text>
               </View>
             ) : (
-              topPerformers.slice(0, 3).map((performer, idx) => {
-                const rankNum = performer.rank || idx + 1;
-                const isFirst = rankNum === 1;
-                const isSecond = rankNum === 2;
-                const isThird = rankNum === 3;
-                const medal = isFirst ? '🥇 #1' : isSecond ? '🥈 #2' : isThird ? '🥉 #3' : `#${rankNum}`;
-
-                const badgeBg = isFirst ? '#FEF3C7' : isSecond ? '#F1F5F9' : isThird ? '#FFEDD5' : '#EFF6FF';
-                const badgeBorder = isFirst ? '#FCD34D' : isSecond ? '#CBD5E1' : isThird ? '#FDBA74' : '#BFDBFE';
-                const badgeText = isFirst ? '#B45309' : isSecond ? '#475569' : isThird ? '#C2410C' : '#1D4ED8';
-
-                const avatarBg = isFirst ? '#D97706' : isSecond ? '#475569' : isThird ? '#EA580C' : '#2563EB';
-
-                return (
-                  <View key={performer.userId || idx} style={styles.perfCard}>
-                    {/* Top Row: Rank & Success Badge */}
-                    <View style={styles.perfCardHeader}>
-                      <View style={[styles.perfRankBadge, { backgroundColor: badgeBg, borderColor: badgeBorder }]}>
-                        <Text style={[styles.perfRankBadgeText, { color: badgeText }]}>{medal}</Text>
-                      </View>
-                      <View style={styles.perfVerifiedBadge}>
-                        <Text style={styles.perfVerifiedBadgeText}>✓ {performer.successfulReferrals} Verified</Text>
-                      </View>
-                    </View>
-
-                    {/* Middle Row: Avatar & Name */}
-                    <View style={styles.perfCardProfileRow}>
-                      <View style={[styles.perfAvatar, { backgroundColor: avatarBg }]}>
-                        <Text style={styles.perfAvatarText}>{getInitials(performer.name)}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.perfNameText}>{performer.name}</Text>
-                        <Text style={styles.perfRoleText}>
-                          {performer.role || 'Member'} • {performer.department || 'Campus'}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Bottom Row: Metrics Strip */}
-                    <View style={styles.perfMetricsStrip}>
-                      <View>
-                        <Text style={styles.perfMetricSub}>EARNED INCENTIVE</Text>
-                        <Text style={styles.perfMetricVal}>₹{Number(performer.earnedIncentive || 0).toLocaleString('en-IN')}</Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={styles.perfMetricSub}>STATUS</Text>
-                        <Text style={[styles.perfMetricStatus, { color: performer.paidIncentive > 0 ? '#1D4ED8' : '#D97706' }]}>
-                          {performer.paidIncentive > 0 ? `Paid: ₹${performer.paidIncentive}` : 'Verified & Queued'}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })
+              <View style={{ gap: 8 }}>
+                {topPerformers.slice(0, 3).map((performer, idx) => renderCompactLeaderboardRow(performer, idx))}
+              </View>
             )}
           </View>
         </ScrollView>
@@ -1316,8 +1425,43 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
             <Text style={styles.heroTag}>CAMPUS RECOGNITION & REWARDS</Text>
             <Text style={styles.heroTitle}>🏆 Top Referral Performers</Text>
             <Text style={styles.heroDesc}>
-              Celebrating faculty, staff, drivers, and students leading verified partner referrals and approved institutional incentives.
+              Celebrating students, faculty, staff, drivers, and parents leading verified institutional referrals and earned rewards.
             </Text>
+          </View>
+
+          {/* Current User Personal Performance Summary Card */}
+          <View style={styles.myRankCard}>
+            <View style={styles.myRankHeaderRow}>
+              <View style={styles.myRankPill}>
+                <Text style={styles.myRankPillText}>
+                  {currentUserPerformer?.rank ? `🏆 CAMPUS RANK #${currentUserPerformer.rank}` : 'YOUR REFERRAL STANDING'}
+                </Text>
+              </View>
+              <Text style={styles.myRankRoleBadge}>{user?.role || 'Member'}</Text>
+            </View>
+
+            <View style={styles.myRankBodyRow}>
+              <View style={styles.myRankStatItem}>
+                <Text style={styles.myRankStatVal}>
+                  {currentUserPerformer?.rank ? `#${currentUserPerformer.rank}` : (stats.successfulCount > 0 ? 'Rank Queued' : 'Unranked')}
+                </Text>
+                <Text style={styles.myRankStatLabel}>Current Rank</Text>
+              </View>
+              <View style={styles.myRankDivider} />
+              <View style={styles.myRankStatItem}>
+                <Text style={[styles.myRankStatVal, { color: '#15803D' }]}>
+                  {currentUserPerformer?.successfulReferrals ?? stats.successfulCount}
+                </Text>
+                <Text style={styles.myRankStatLabel}>Approved Leads</Text>
+              </View>
+              <View style={styles.myRankDivider} />
+              <View style={styles.myRankStatItem}>
+                <Text style={[styles.myRankStatVal, { color: '#2563EB' }]}>
+                  ₹{Number(currentUserPerformer?.earnedIncentive ?? stats.totalIncentives).toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.myRankStatLabel}>Earned Rewards</Text>
+              </View>
+            </View>
           </View>
 
           {/* Quick Metrics */}
@@ -1341,7 +1485,7 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
             <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
             <TextInput
               style={styles.perfSearchInput}
-              placeholder="Search by name, role, or department..."
+              placeholder="Search performer by name, role, or dept..."
               placeholderTextColor="#94A3B8"
               value={perfSearchQuery}
               onChangeText={setPerfSearchQuery}
@@ -1354,7 +1498,12 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
           </View>
 
           {/* List of Performers */}
-          {filteredPerformers.length === 0 ? (
+          {loading && topPerformers.length === 0 ? (
+            <View style={styles.perfLoadingCard}>
+              <ActivityIndicator size="large" color="#2563EB" />
+              <Text style={styles.perfLoadingText}>Loading verified campus performers...</Text>
+            </View>
+          ) : filteredPerformers.length === 0 ? (
             <View style={styles.perfEmptyCard}>
               <Text style={{ fontSize: 32, marginBottom: 8 }}>🏅</Text>
               <Text style={styles.perfEmptyTitle}>No Performers Found</Text>
@@ -1365,89 +1514,9 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
               </Text>
             </View>
           ) : (
-            filteredPerformers.map((performer, idx) => {
-              const rankNum = performer.rank || idx + 1;
-              const isFirst = rankNum === 1;
-              const isSecond = rankNum === 2;
-              const isThird = rankNum === 3;
-              const medal = isFirst ? '🥇 #1 Champion' : isSecond ? '🥈 #2 Runner-Up' : isThird ? '🥉 #3 Performer' : `Rank #${rankNum}`;
-
-              const badgeBg = isFirst ? '#FEF3C7' : isSecond ? '#F1F5F9' : isThird ? '#FFEDD5' : '#EFF6FF';
-              const badgeBorder = isFirst ? '#FCD34D' : isSecond ? '#CBD5E1' : isThird ? '#FDBA74' : '#BFDBFE';
-              const badgeText = isFirst ? '#B45309' : isSecond ? '#475569' : isThird ? '#C2410C' : '#1D4ED8';
-
-              const avatarBg = isFirst ? '#D97706' : isSecond ? '#475569' : isThird ? '#EA580C' : '#2563EB';
-
-              const categoriesList = Array.isArray(performer.categories)
-                ? performer.categories
-                : (typeof performer.categories === 'object' && performer.categories !== null)
-                  ? Object.keys(performer.categories)
-                  : [];
-
-              return (
-                <View key={performer.userId || idx} style={styles.perfCard}>
-                  {/* Top Bar: Rank & Verified Badge */}
-                  <View style={styles.perfCardHeader}>
-                    <View style={[styles.perfRankBadge, { backgroundColor: badgeBg, borderColor: badgeBorder }]}>
-                      <Text style={[styles.perfRankBadgeText, { color: badgeText }]}>{medal}</Text>
-                    </View>
-                    <View style={styles.perfVerifiedBadge}>
-                      <Text style={styles.perfVerifiedBadgeText}>✓ {performer.successfulReferrals} Approved</Text>
-                    </View>
-                  </View>
-
-                  {/* Profile Row: Avatar & Name */}
-                  <View style={styles.perfCardProfileRow}>
-                    <View style={[styles.perfAvatar, { backgroundColor: avatarBg }]}>
-                      <Text style={styles.perfAvatarText}>{getInitials(performer.name)}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.perfNameText}>{performer.name}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
-                        <Text style={styles.perfRoleBadgeText}>{performer.role || 'Member'}</Text>
-                        <Text style={styles.perfRoleText}> • {performer.department || 'Campus'}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Metrics Strip */}
-                  <View style={styles.perfMetricsStrip}>
-                    <View>
-                      <Text style={styles.perfMetricSub}>ACTUAL INCENTIVE EARNED</Text>
-                      <Text style={styles.perfMetricVal}>₹{Number(performer.earnedIncentive || 0).toLocaleString('en-IN')}</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={styles.perfMetricSub}>SETTLEMENT STATUS</Text>
-                      {performer.paidIncentive > 0 ? (
-                        <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 2 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#15803D' }}>
-                            Paid: ₹{Number(performer.paidIncentive).toLocaleString('en-IN')}
-                          </Text>
-                        </View>
-                      ) : (
-                        <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 2 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#B45309' }}>
-                            Pending Clearance
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Active Streams Chips */}
-                  {categoriesList.length > 0 && (
-                    <View style={styles.perfStreamsRow}>
-                      <Text style={styles.perfStreamsLabel}>Streams: </Text>
-                      {categoriesList.map((catName: string, cIdx: number) => (
-                        <View key={cIdx} style={styles.perfStreamPill}>
-                          <Text style={styles.perfStreamPillText}>{catName}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              );
-            })
+            <View style={{ gap: 8 }}>
+              {filteredPerformers.map((performer, idx) => renderCompactLeaderboardRow(performer, idx))}
+            </View>
           )}
         </ScrollView>
       )}
@@ -1554,28 +1623,53 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1D4ED8',
   },
-  mainTabBar: {
+  categoryBreadcrumbBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  categoryBreadcrumbTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginLeft: 8,
+    flex: 1,
+  },
+  mainTabBarWrapper: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  mainTabBar: {
+    flexGrow: 0,
+  },
+  mainTabBarContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
   },
   mainTabBtn: {
     paddingVertical: 12,
-    marginRight: 20,
+    paddingHorizontal: 10,
+    marginRight: 8,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
   },
   mainTabBtnActive: {
     borderBottomColor: '#2563EB',
   },
   mainTabBtnText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '600',
     color: '#64748B',
+    flexShrink: 0,
   },
   mainTabBtnTextActive: {
     color: '#2563EB',
@@ -1702,6 +1796,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#64748B',
     marginTop: 2,
+  },
+  sectionHeaderRow: {
+    marginBottom: 10,
   },
   sectionHeaderTitle: {
     fontSize: 15,
@@ -2398,5 +2495,249 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     lineHeight: 17,
+  },
+
+  // Clean 6 Icon-Based Navigation Grid Styles
+  iconNavGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 20,
+  },
+  iconNavTile: {
+    width: '48.5%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  iconNavCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconNavEmoji: {
+    fontSize: 20,
+  },
+  iconNavContent: {
+    flex: 1,
+    marginLeft: 9,
+    justifyContent: 'center',
+  },
+  iconNavTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 3,
+  },
+  iconNavBadgeBox: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    alignSelf: 'flex-start',
+  },
+  iconNavBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+
+  // Personal Rank Summary Card Styles
+  myRankCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    padding: 14,
+    marginBottom: 16,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  myRankHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  myRankPill: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  myRankPillText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#1D4ED8',
+    letterSpacing: 0.5,
+  },
+  myRankRoleBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  myRankBodyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  myRankStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  myRankStatVal: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  myRankStatLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  myRankDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#E2E8F0',
+  },
+
+  // Compact Leaderboard Row Styles
+  compactPerfRow: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  currentUserRowHighlight: {
+    backgroundColor: '#F0F9FF',
+    borderColor: '#93C5FD',
+  },
+  firstPerfRowHighlight: {
+    borderColor: '#FCD34D',
+    backgroundColor: '#FFFEF5',
+  },
+  compactRankBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    minWidth: 32,
+    marginRight: 8,
+  },
+  compactRankMedal: {
+    fontSize: 12,
+    marginRight: 2,
+  },
+  compactRankText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  compactAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactAvatarText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  compactPerfInfo: {
+    flex: 1,
+    marginLeft: 10,
+    marginRight: 8,
+  },
+  compactPerfNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  compactPerfName: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F172A',
+    flexShrink: 1,
+  },
+  youBadge: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  youBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  compactPerfMeta: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  compactApprovedCount: {
+    color: '#15803D',
+    fontWeight: '700',
+  },
+  compactPerfRewardBox: {
+    alignItems: 'flex-end',
+    flexShrink: 0,
+  },
+  compactPerfAmount: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  compactPerfStatus: {
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  perfLoadingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  perfLoadingText: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '600',
+    marginTop: 10,
   },
 });
