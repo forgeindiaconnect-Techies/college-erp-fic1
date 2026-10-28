@@ -198,6 +198,7 @@ export default function ParentDashboard({ user, onLogout }: Props) {
         notifRes,
         transportRes,
         periodsRes,
+        leavesRes,
       ] = await Promise.all([
         apiGet<any>(`class-advisor/class/${encodeURIComponent(dept)}/${encodeURIComponent(sem)}/${encodeURIComponent(sec)}`).catch(() => null),
         resolvedStudentId ? apiGet<any[]>(`attendance/student/${encodeURIComponent(resolvedStudentId)}`).catch(() => []) : [],
@@ -207,6 +208,9 @@ export default function ParentDashboard({ user, onLogout }: Props) {
         apiGet<any>(`notifications`).catch(() => []),
         apiGet<any[]>(`transport/routes`).catch(() => []),
         apiGet<any[]>('period-master').catch(() => apiGet<any[]>('period-masters').catch(() => [])),
+        resolvedStudentId
+          ? apiGet<any[]>(`leaves/student/${encodeURIComponent(resolvedStudentId)}`).catch(() => apiGet<any[]>('leaves').catch(() => []))
+          : apiGet<any[]>('leaves').catch(() => []),
       ]);
 
       // 3. Process Advisor Info
@@ -427,7 +431,22 @@ export default function ParentDashboard({ user, onLogout }: Props) {
       }));
       setNotifications(parsedNotifs);
 
-      // 10. Update Ward State
+      // 10. Process Ward Leaves
+      const rawLeaves = Array.isArray(leavesRes) ? leavesRes : [];
+      if (rawLeaves.length > 0) {
+        const parsedLeaves: LeaveRequest[] = rawLeaves.map((l: any) => ({
+          id: l.id || l._id || `LV-${Math.random().toString().slice(2, 6)}`,
+          type: l.type || l.leaveType || l.subType || 'Medical Leave',
+          startDate: l.startDate || 'Recent',
+          endDate: l.endDate || l.startDate || 'Recent',
+          days: Number(l.daysCount || l.days || 1),
+          reason: l.reason || l.description || '',
+          status: l.status || 'Pending',
+        }));
+        setLeaves(parsedLeaves);
+      }
+
+      // 11. Update Ward State
       let computedCgpa = Number(studentRes?.cgpa || 0);
       if (computedCgpa === 0 && parsedMarks.length > 0) {
         const validGpas = parsedMarks.filter((m) => m.gpa && m.gpa > 0);
@@ -479,30 +498,48 @@ export default function ParentDashboard({ user, onLogout }: Props) {
     }
     try {
       setLoading(true);
-      await apiPost('staff-support', {
-        requestType: 'Leave',
-        staffName: ward.name,
-        staffId: ward.id,
-        department: ward.dept,
-        subject: `Parent Leave Request (${newLeaveType})`,
-        description: `Ward: ${ward.name} (${ward.id}) | Requested Dates: ${newLeaveDates} | Reason: ${newLeaveReason.trim()}`,
+      const studentId = ward.id || user.parentOf || user.referenceId || 'N/A';
+      const studentName = ward.name || user.parentOf || 'Student Scholar';
+      const payload = {
+        role: 'Parent',
+        staffName: user.name || 'Parent',
+        parentName: user.name || 'Parent',
+        studentName: studentName,
+        studentId: studentId,
+        staffId: studentId,
+        department: ward.dept || 'General',
+        type: newLeaveType,
+        leaveType: newLeaveType,
+        subType: newLeaveType,
+        startDate: newLeaveDates.trim(),
+        endDate: newLeaveDates.trim(),
+        daysCount: 1,
+        reason: newLeaveReason.trim(),
+        description: `[Parent Request by ${user.name || 'Parent'}] Ward: ${studentName} (${studentId}) | Reason: ${newLeaveReason.trim()}`,
         priority: 'Medium',
-      }).catch(() => null);
+      };
+
+      const res: any = await apiPost('leaves', payload);
 
       const newReq: LeaveRequest = {
-        id: `LV-${Date.now().toString().slice(-4)}`,
+        id: res?.id || res?._id || `LV-${Date.now().toString().slice(-4)}`,
         type: newLeaveType,
-        startDate: newLeaveDates,
-        endDate: newLeaveDates,
+        startDate: newLeaveDates.trim(),
+        endDate: newLeaveDates.trim(),
         days: 1,
-        reason: newLeaveReason,
-        status: 'Pending',
+        reason: newLeaveReason.trim(),
+        status: res?.status || 'Pending',
       };
-      setLeaves([newReq, ...leaves]);
+      setLeaves((prev) => [newReq, ...prev.filter((x) => x.id !== newReq.id)]);
       setLeaveModalVisible(false);
       setNewLeaveDates('');
       setNewLeaveReason('');
-      Alert.alert('Leave Submitted', 'Leave application has been submitted to the Class Advisor.');
+      Alert.alert('Leave Submitted', 'Leave application has been submitted to the Class Advisor, HOD, and Admin.');
+
+      // Refresh in background to stay permanently synced with DB
+      setTimeout(() => {
+        loadData();
+      }, 600);
     } catch (err: any) {
       Alert.alert('Notice', err?.message || 'Leave application submitted.');
       setLeaveModalVisible(false);
@@ -680,9 +717,9 @@ export default function ParentDashboard({ user, onLogout }: Props) {
                   id: 'attendance',
                   label: 'Child Attendance',
                   icon: '📅',
-                  bg: '#EFF6FF',
-                  borderColor: '#DBEAFE',
-                  textColor: '#1E40AF',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   badge: `${ward.attendance}%`,
                   onPress: () => {
                     setActiveTab('academics');
@@ -693,9 +730,9 @@ export default function ParentDashboard({ user, onLogout }: Props) {
                   id: 'academics',
                   label: 'Academic Progress',
                   icon: '📈',
-                  bg: '#ECFDF5',
-                  borderColor: '#D1FAE5',
-                  textColor: '#065F46',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   badge: ward.cgpa > 0 ? `${ward.cgpa} CGPA` : undefined,
                   onPress: () => {
                     setActiveTab('academics');
@@ -706,9 +743,9 @@ export default function ParentDashboard({ user, onLogout }: Props) {
                   id: 'fees',
                   label: 'Fee Status',
                   icon: '💳',
-                  bg: '#F5F3FF',
-                  borderColor: '#EDE9FE',
-                  textColor: '#5B21B6',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   badge: ward.pendingFees > 0 ? `₹${ward.pendingFees.toLocaleString()} Due` : 'Cleared',
                   onPress: () => {
                     setActiveTab('academics');
@@ -719,9 +756,9 @@ export default function ParentDashboard({ user, onLogout }: Props) {
                   id: 'notifications',
                   label: 'Notifications',
                   icon: '🔔',
-                  bg: '#FFFBEB',
-                  borderColor: '#FEF3C7',
-                  textColor: '#92400E',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   badge: notifications.length > 0 ? `${notifications.length}` : undefined,
                   onPress: () => setActiveTab('notifications'),
                 },
@@ -1619,7 +1656,7 @@ export default function ParentDashboard({ user, onLogout }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F9FAFB',
   },
   topHeaderBar: {
     backgroundColor: '#FFFFFF',
@@ -1630,7 +1667,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#E5E7EB',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -1641,7 +1678,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#1E3A8A',
+    backgroundColor: '#111827',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
@@ -1660,13 +1697,15 @@ const styles = StyleSheet.create({
   roleTag: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#6B7280',
   },
   rollNoTag: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#2563EB',
-    backgroundColor: '#EFF6FF',
+    color: '#111827',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 4,
@@ -1674,14 +1713,16 @@ const styles = StyleSheet.create({
   headerNameText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#111827',
   },
   headerSubText: {
     fontSize: 11,
-    color: '#64748B',
+    color: '#6B7280',
   },
   headerSignOutBtn: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1692,31 +1733,31 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   advisorQuickBar: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     paddingVertical: 7,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#E5E7EB',
   },
   advisorBarText: {
     fontSize: 12,
-    color: '#475569',
+    color: '#374151',
   },
   callAdvisorPill: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F3F4F6',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#E5E7EB',
   },
   callAdvisorPillText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#1D4ED8',
+    color: '#111827',
   },
   bodyWrapper: {
     flex: 1,
@@ -1735,42 +1776,44 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: '47%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderLeftWidth: 4,
-    shadowColor: '#0F172A',
+    borderColor: '#E5E7EB',
+    borderLeftWidth: 3,
+    borderLeftColor: '#111827',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
     elevation: 1,
   },
   kpiLabel: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#6B7280',
     fontWeight: '600',
     marginBottom: 4,
   },
   kpiValue: {
     fontSize: 20,
     fontWeight: '800',
+    color: '#111827',
     marginBottom: 2,
   },
   kpiSub: {
     fontSize: 11,
-    color: '#64748B',
+    color: '#6B7280',
   },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
     elevation: 1,
   },
   cardHeaderRow: {
@@ -1780,15 +1823,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardHeaderTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#111827',
     marginBottom: 2,
   },
   cardHeaderLink: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#2563EB',
+    color: '#111827',
   },
   sectionSubtitle: {
     fontSize: 12,

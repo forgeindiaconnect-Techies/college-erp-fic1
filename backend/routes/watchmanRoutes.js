@@ -162,63 +162,71 @@ export const ensureWatchmanRealtimeData = async () => {
     let natrajan = await Watchman.findOne({ $or: [{ name: /natrajan/i }, { employeeId: 'WMN-7430' }, { employeeId: 'WMN-002' }] });
 
     if (!ramesh) {
-      let rameshUser = await User.findOne({ email: 'watchman@college.edu' });
-      if (!rameshUser) {
-        rameshUser = await User.create({
-          name: 'Ramesh Kumar (Chief Watchman)',
-          email: 'watchman@college.edu',
-          password: 'password123',
-          role: 'Watchman',
-          referenceId: 'WMN-001',
+      try {
+        let rameshUser = await User.findOne({ email: 'watchman@college.edu' });
+        if (!rameshUser) {
+          rameshUser = await User.create({
+            name: 'Ramesh Kumar (Chief Watchman)',
+            email: 'watchman@college.edu',
+            password: 'password123',
+            role: 'Watchman',
+            referenceId: 'WMN-001',
+            phone: '9876543299',
+            tenantId: 'COL001',
+            collegeId: 'COL001',
+            isActive: true
+          });
+        }
+        ramesh = await Watchman.create({
+          user: rameshUser._id,
+          employeeId: 'WMN-001',
+          name: 'Ramesh Kumar',
           phone: '9876543299',
+          email: 'watchman@college.edu',
+          address: 'Staff Quarters, Campus North',
+          shift: 'Morning',
+          assignedGate: 'Gate 1 (Main Entrance)',
+          status: 'Active',
           tenantId: 'COL001',
-          collegeId: 'COL001',
-          isActive: true
+          collegeId: 'COL001'
         });
+      } catch (err) {
+        ramesh = await Watchman.findOne({ employeeId: 'WMN-001' });
       }
-      ramesh = await Watchman.create({
-        user: rameshUser._id,
-        employeeId: 'WMN-001',
-        name: 'Ramesh Kumar',
-        phone: '9876543299',
-        email: 'watchman@college.edu',
-        address: 'Staff Quarters, Campus North',
-        shift: 'Morning',
-        assignedGate: 'Gate 1 (Main Entrance)',
-        status: 'Active',
-        tenantId: 'COL001',
-        collegeId: 'COL001'
-      });
     }
 
     if (!natrajan) {
-      let natUser = await User.findOne({ email: 'natrajan.security@college.edu' });
-      if (!natUser) {
-        natUser = await User.create({
+      try {
+        let natUser = await User.findOne({ email: 'natrajan.security@college.edu' });
+        if (!natUser) {
+          natUser = await User.create({
+            name: 'Natrajan',
+            email: 'natrajan.security@college.edu',
+            password: 'password123',
+            role: 'Watchman',
+            referenceId: 'WMN-7430',
+            phone: '9876543218',
+            tenantId: 'COL004-3190860',
+            collegeId: 'COL004-3190860',
+            isActive: true
+          });
+        }
+        natrajan = await Watchman.create({
+          user: natUser._id,
+          employeeId: 'WMN-7430',
           name: 'Natrajan',
-          email: 'natrajan.security@college.edu',
-          password: 'password123',
-          role: 'Watchman',
-          referenceId: 'WMN-7430',
           phone: '9876543218',
+          email: 'natrajan.security@college.edu',
+          address: 'Security Barracks, Gate 1',
+          shift: 'Morning',
+          assignedGate: 'Gate 1 (Main Entrance)',
+          status: 'Active',
           tenantId: 'COL004-3190860',
-          collegeId: 'COL004-3190860',
-          isActive: true
+          collegeId: 'COL004-3190860'
         });
+      } catch (err) {
+        natrajan = await Watchman.findOne({ $or: [{ name: /natrajan/i }, { employeeId: 'WMN-7430' }, { employeeId: 'WMN-002' }] });
       }
-      natrajan = await Watchman.create({
-        user: natUser._id,
-        employeeId: 'WMN-7430',
-        name: 'Natrajan',
-        phone: '9876543218',
-        email: 'natrajan.security@college.edu',
-        address: 'Security Barracks, Gate 1',
-        shift: 'Morning',
-        assignedGate: 'Gate 1 (Main Entrance)',
-        status: 'Active',
-        tenantId: 'COL004-3190860',
-        collegeId: 'COL004-3190860'
-      });
     }
 
     // 2. Ensure Guard Attendance for today

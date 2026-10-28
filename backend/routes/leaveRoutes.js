@@ -9,6 +9,18 @@ const router = express.Router();
 router.use(protect);
 router.use(collegeScope);
 
+const normalizeRole = (r) => (r || '').toLowerCase().trim();
+
+const isDeptMatch = (leaveDept, userDept) => {
+  if (!leaveDept || !userDept) return true;
+  const l = leaveDept.toLowerCase().trim();
+  const u = userDept.toLowerCase().trim();
+  if (l === u) return true;
+  if (l.includes(u) || u.includes(l)) return true;
+  const norm = s => s.replace(/engineering|engg|\.|\s+/g, '');
+  return norm(l).includes(norm(u)) || norm(u).includes(norm(l));
+};
+
 const formatLeave = (doc) => {
   const d = doc.toObject ? doc.toObject() : doc;
   let daysDiff = d.daysCount || 1;
@@ -21,11 +33,24 @@ const formatLeave = (doc) => {
     } catch {}
   }
 
+  // Detect student name from studentName or if role is Parent/Student
+  let sName = d.studentName || '';
+  if (!sName && d.role === 'Student') sName = d.staffName;
+  if (!sName && d.description) {
+    const match = d.description.match(/Ward:\s*([^|(]+)/i);
+    if (match && match[1]) sName = match[1].trim();
+  }
+
+  let pName = d.parentName || '';
+  if (!pName && d.role === 'Parent') pName = d.staffName;
+
   return {
     id: d._id.toString(),
     _id: d._id,
     staffId: d.staffId || d.studentId || '',
     studentId: d.studentId || d.staffId || '',
+    studentName: sName,
+    parentName: pName,
     staffName: d.staffName,
     name: d.staffName,
     role: d.role || 'Staff',
@@ -42,17 +67,32 @@ const formatLeave = (doc) => {
     description: d.description || d.reason || '',
     priority: d.priority || 'Medium',
     status: d.status || 'Pending',
+    approvedBy: d.approvedBy || '',
+    approvedAt: d.approvedAt || null,
+    hodApprovedBy: d.hodApprovedBy || '',
+    hodApprovedAt: d.hodApprovedAt || null,
+    rejectedBy: d.rejectedBy || '',
+    rejectionReason: d.rejectionReason || '',
     collegeId: d.collegeId,
     createdAt: d.createdAt ? new Date(d.createdAt).toISOString().split('T')[0] : (d.startDate || new Date().toISOString().split('T')[0]),
     timeline: d.timeline || []
   };
 };
 
+const broadcastUpdate = (req, formattedData, action = 'updated') => {
+  const io = req.app.get('io');
+  if (io) {
+    io.emit('dataUpdated', { module: 'leaves', action, data: formattedData });
+    io.emit('dataUpdated', { module: 'staffSupportUpdated' });
+    io.emit('leaveUpdated', formattedData);
+  }
+};
+
 // 1. GET ALL LEAVES (with role-based filtering)
 router.get('/', async (req, res) => {
   try {
     const tenantId = req.collegeId || req.user?.collegeId || req.user?.tenantId || 'COL001';
-    const role = (req.user?.role || '').toLowerCase();
+    const role = normalizeRole(req.user?.role);
     const query = {
       requestType: 'Leave',
       $or: [
@@ -75,18 +115,40 @@ router.get('/', async (req, res) => {
       delete query.$or;
     } else if (role === 'student') {
       const studentFilter = [{ staffName: req.user.name }];
-      if (req.user.referenceId) studentFilter.push({ studentId: req.user.referenceId });
+      if (req.user.referenceId) studentFilter.push({ studentId: req.user.referenceId }, { staffId: req.user.referenceId });
       if (req.user.email) studentFilter.push({ email: req.user.email });
       query.$and = [{ $or: query.$or }, { $or: studentFilter }];
       delete query.$or;
     } else if (role === 'parent') {
       const childId = req.user.referenceId || req.user.parentOf || req.user.studentId;
+      const parentName = req.user.name;
+      const parentFilter = [];
       if (childId) {
-        query.$and = [{ $or: query.$or }, { $or: [{ studentId: childId }, { staffId: childId }] }];
+        parentFilter.push({ studentId: childId }, { staffId: childId });
+      }
+      if (parentName) {
+        parentFilter.push({ staffName: parentName }, { parentName: parentName });
+      }
+      if (req.user.parentOf) {
+        parentFilter.push({ studentName: req.user.parentOf });
+      }
+      if (parentFilter.length > 0) {
+        query.$and = [{ $or: query.$or }, { $or: parentFilter }];
         delete query.$or;
       }
     } else if (role === 'hod' && req.user.department) {
-      query.$and = [{ $or: query.$or }, { department: req.user.department }];
+      const deptPattern = new RegExp(req.user.department.trim(), 'i');
+      query.$and = [
+        { $or: query.$or },
+        {
+          $or: [
+            { department: deptPattern },
+            { dept: deptPattern },
+            { staffName: req.user.name },
+            { role: 'HOD' }
+          ]
+        }
+      ];
       delete query.$or;
     }
 
@@ -107,7 +169,8 @@ router.get('/student/:studentId', async (req, res) => {
       $or: [
         { studentId: targetId },
         { staffId: targetId },
-        { staffName: new RegExp(`^${targetId}$`, 'i') }
+        { staffName: new RegExp(`^${targetId}$`, 'i') },
+        { studentName: new RegExp(`^${targetId}$`, 'i') }
       ]
     };
     const records = await StaffSupportRecord.find(query).sort({ createdAt: -1 });
@@ -117,7 +180,7 @@ router.get('/student/:studentId', async (req, res) => {
   }
 });
 
-// 3. POST NEW LEAVE APPLICATION
+// 3. POST NEW LEAVE APPLICATION (Enforcing initial workflow status per role)
 router.post('/', async (req, res) => {
   try {
     const tenantId = req.collegeId || req.user?.collegeId || req.user?.tenantId || 'COL001';
@@ -126,6 +189,8 @@ router.post('/', async (req, res) => {
       name,
       staffId,
       studentId,
+      studentName,
+      parentName,
       role,
       email,
       department,
@@ -141,12 +206,28 @@ router.post('/', async (req, res) => {
       priority
     } = req.body;
 
-    const applicantName = staffName || name || req.user?.name || 'Applicant';
+    const applicantRole = role || req.user?.role || 'Staff';
+    const applicantName = staffName || name || req.user?.name || (applicantRole === 'Parent' ? 'Parent' : 'Applicant');
     const applicantDept = department || dept || req.user?.department || 'General';
     const leaveCategory = type || leaveType || subType || 'Casual Leave';
     const desc = reason || description || 'Leave Application';
     const sDate = startDate || new Date().toISOString().split('T')[0];
     const eDate = endDate || sDate;
+
+    let targetStudentId = studentId;
+    if (!targetStudentId) {
+      if (applicantRole === 'Student') targetStudentId = req.user?.referenceId;
+      else if (applicantRole === 'Parent') targetStudentId = staffId || req.user?.referenceId || req.user?.parentOf;
+    }
+
+    let targetStudentName = studentName;
+    if (!targetStudentName) {
+      if (applicantRole === 'Student') targetStudentName = applicantName;
+      else if (applicantRole === 'Parent' && desc) {
+        const match = desc.match(/Ward:\s*([^|(]+)/i);
+        if (match && match[1]) targetStudentName = match[1].trim();
+      }
+    }
 
     let calculatedDays = Number(daysCount) || 1;
     if (!daysCount && sDate && eDate) {
@@ -158,11 +239,34 @@ router.post('/', async (req, res) => {
       } catch {}
     }
 
+    // Role-based Initial Status & Audit Trail
+    // Staff & Student -> 'Pending HOD Approval'
+    // HOD & Parent -> 'Pending Admin Approval'
+    const normRole = normalizeRole(applicantRole);
+    let initialStatus = 'Pending HOD Approval';
+    let initialNote = `Leave application submitted (${leaveCategory}). Awaiting HOD review.`;
+
+    if (normRole === 'parent' || !!parentName) {
+      initialStatus = 'Pending Admin Approval';
+      initialNote = `Parent leave application submitted for ward (${targetStudentName || 'Student'}). Awaiting Central Admin approval.`;
+    } else if (normRole === 'hod') {
+      initialStatus = 'Pending Admin Approval';
+      initialNote = `HOD leave application submitted (${leaveCategory}). Forwarded directly to Admin for approval.`;
+    } else if (normRole === 'student') {
+      initialStatus = 'Pending HOD Approval';
+      initialNote = `Student leave application submitted (${leaveCategory}). Awaiting Department HOD review.`;
+    } else {
+      initialStatus = 'Pending HOD Approval';
+      initialNote = `Staff leave application submitted (${leaveCategory}). Awaiting Department HOD review.`;
+    }
+
     const newLeave = new StaffSupportRecord({
       staffName: applicantName,
       staffId: staffId || req.user?.referenceId,
-      studentId: studentId || (req.user?.role === 'Student' ? req.user?.referenceId : undefined),
-      role: role || req.user?.role || 'Staff',
+      studentId: targetStudentId,
+      studentName: targetStudentName,
+      parentName: parentName || (applicantRole === 'Parent' ? applicantName : undefined),
+      role: applicantRole,
       email: email || req.user?.email,
       department: applicantDept,
       requestType: 'Leave',
@@ -174,38 +278,36 @@ router.post('/', async (req, res) => {
       description: desc,
       reason: desc,
       priority: priority || 'Medium',
-      status: 'Pending',
+      status: initialStatus,
       collegeId: tenantId,
       timeline: [
-        { date: new Date().toISOString().split('T')[0], text: `Leave application submitted (${leaveCategory})` }
+        { date: new Date().toISOString().split('T')[0], text: initialNote }
       ]
     });
 
     const saved = await newLeave.save();
     const formatted = formatLeave(saved);
 
-    // Notify approver
+    // Notification routing:
+    // If Staff or Student -> Notify HOD
+    // If HOD or Parent -> Notify Admin
     try {
-      const targetRole = req.user?.role === 'Student' ? 'Class Advisor' : 'HOD';
+      let targetRoles = ['HOD'];
+      if (initialStatus === 'Pending Admin Approval') {
+        targetRoles = ['Admin', 'Principal', 'Superadmin'];
+      }
       await new Notification({
-        targetRoles: [targetRole, 'Principal', 'Admin'],
-        title: 'New Leave Application',
-        message: `${applicantName} (${applicantDept}) applied for ${leaveCategory} (${sDate} to ${eDate}).`,
+        targetRoles,
+        title: initialStatus === 'Pending Admin Approval' ? 'New Leave (Admin Action Required)' : 'New Leave (HOD Action Required)',
+        message: `${applicantName} (${applicantDept}) applied for ${leaveCategory} (${sDate} to ${eDate}). Status: ${initialStatus}.`,
         type: 'Info',
-        link: '/leaves',
+        link: initialStatus === 'Pending Admin Approval' ? '/admin/leaves' : '/hod/leaves',
         collegeId: tenantId,
         tenantId: tenantId
       }).save();
     } catch {}
 
-    // Real-time broadcast
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('dataUpdated', { module: 'leaves', action: 'created', data: formatted });
-      io.emit('dataUpdated', { module: 'staffSupportUpdated' });
-      io.emit('leaveUpdated', formatted);
-    }
-
+    broadcastUpdate(req, formatted, 'created');
     res.status(201).json(formatted);
   } catch (err) {
     console.error('Error creating leave:', err);
@@ -213,38 +315,221 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 4. PATCH / PUT UPDATE LEAVE STATUS (Approve, Reject, Cancel)
+// 4. PATCH / PUT UPDATE LEAVE STATUS (Strict Role-Based Approval Workflow)
 const handleStatusUpdate = async (req, res) => {
   try {
-    const { status, remarks } = req.body;
+    const { status, action, remarks, reason } = req.body;
     const leave = await StaffSupportRecord.findById(req.params.id);
     if (!leave) {
       return res.status(404).json({ success: false, message: 'Leave request not found' });
     }
 
-    const validStatuses = ['Approved', 'Rejected', 'Pending', 'In Progress', 'Under Review', 'Cancelled'];
-    if (status && !validStatuses.includes(status)) {
-      return res.status(400).json({ success: false, message: `Invalid status: ${status}` });
+    const userRole = normalizeRole(req.user?.role);
+    const isAdmin = ['admin', 'superadmin', 'super admin', 'sub admin', 'principal'].includes(userRole);
+    const isHOD = userRole === 'hod';
+    const reviewerName = req.user?.name || req.user?.role || 'Authority';
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const applicantRole = normalizeRole(leave.role);
+    const isParentRequest = applicantRole === 'parent' || !!leave.parentName || (leave.description && leave.description.includes('Parent Request'));
+    const isHodRequest = applicantRole === 'hod';
+    const isStaffOrStudentRequest = !isParentRequest && !isHodRequest;
+
+    // Detect desired decision intent
+    let isApproving = false;
+    let isRejecting = false;
+
+    if (
+      action === 'approve' ||
+      status === 'Approved' ||
+      status === 'HOD Approved – Pending Admin Approval' ||
+      (status && String(status).toLowerCase().includes('approve'))
+    ) {
+      isApproving = true;
+    } else if (
+      action === 'reject' ||
+      status === 'Rejected' ||
+      (status && String(status).toLowerCase().includes('reject'))
+    ) {
+      isRejecting = true;
+    } else if (status === 'Cancelled') {
+      leave.status = 'Cancelled';
+      leave.timeline = leave.timeline || [];
+      leave.timeline.push({ date: todayStr, text: `Leave application cancelled by ${reviewerName}` });
+      const updated = await leave.save();
+      const formatted = formatLeave(updated);
+      broadcastUpdate(req, formatted);
+      return res.json(formatted);
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const reviewerName = req.user?.name || req.user?.role || 'Authority';
-    const note = remarks || `Status marked as ${status} by ${reviewerName}`;
+    if (!isApproving && !isRejecting) {
+      return res.status(400).json({ success: false, message: 'Invalid action or status specified. Must be Approve or Reject.' });
+    }
 
-    leave.status = status || leave.status;
-    leave.timeline = leave.timeline || [];
-    leave.timeline.push({ date: todayStr, text: note });
+    // ─────────────────────────────────────────────────────────────
+    // 1. HOD PERMISSION RULES
+    // ─────────────────────────────────────────────────────────────
+    if (isHOD) {
+      // Rule 4: HOD MUST NOT have approve or reject permissions for Parent-submitted leave requests
+      if (isParentRequest) {
+        return res.status(403).json({
+          success: false,
+          message: 'Permission Denied: HODs do not have approval permissions for Parent-submitted requests. Parent leave requests must be approved directly by Admin.'
+        });
+      }
+
+      // Rule 2: HOD requests must go directly to Admin; HOD cannot approve HOD requests
+      if (isHodRequest) {
+        return res.status(403).json({
+          success: false,
+          message: 'Permission Denied: HOD leave requests cannot be approved by an HOD. HOD requests must be approved directly by Admin.'
+        });
+      }
+
+      // Department Match Check
+      if (req.user?.department && leave.department && !isDeptMatch(leave.department, req.user.department)) {
+        return res.status(403).json({
+          success: false,
+          message: `Permission Denied: Leave belongs to ${leave.department} department, but you are assigned to ${req.user.department}.`
+        });
+      }
+
+      // Rule 1 & 3: Staff & Student Leave Approval Workflow by HOD
+      if (isApproving) {
+        if (leave.status === 'Approved') {
+          return res.status(400).json({ success: false, message: 'Leave request is already fully approved.' });
+        }
+
+        // HOD approval moves request to 'HOD Approved – Pending Admin Approval'
+        leave.status = 'HOD Approved – Pending Admin Approval';
+        leave.hodApprovedBy = reviewerName;
+        leave.hodApprovedAt = new Date();
+        const note = remarks || `Approved by Department HOD (${reviewerName}). Forwarded to Admin for final confirmation.`;
+        leave.timeline = leave.timeline || [];
+        leave.timeline.push({ date: todayStr, text: note });
+
+        // Notify Admin for final review
+        try {
+          await new Notification({
+            targetRoles: ['Admin', 'Principal', 'Superadmin'],
+            title: 'Leave Pending Admin Confirmation',
+            message: `HOD ${reviewerName} (${leave.department}) approved ${leave.staffName}'s leave. Final Admin authorization required.`,
+            type: 'Info',
+            link: '/admin/leaves',
+            collegeId: leave.collegeId,
+            tenantId: leave.collegeId
+          }).save();
+        } catch {}
+
+        // Notify Requester
+        try {
+          await new Notification({
+            targetUsers: [leave.staffId, leave.studentId].filter(Boolean),
+            title: 'HOD Approved Leave',
+            message: `Your leave request has been approved by your HOD (${reviewerName}) and forwarded to Admin for final review.`,
+            type: 'Info',
+            link: applicantRole === 'student' ? '/student/leaves' : '/staff/leaves',
+            collegeId: leave.collegeId,
+            tenantId: leave.collegeId
+          }).save();
+        } catch {}
+
+      } else if (isRejecting) {
+        leave.status = 'Rejected';
+        leave.rejectedBy = reviewerName;
+        leave.rejectionReason = remarks || reason || 'Declined by HOD';
+        const note = remarks || `Rejected by Department HOD (${reviewerName}): ${leave.rejectionReason}`;
+        leave.timeline = leave.timeline || [];
+        leave.timeline.push({ date: todayStr, text: note });
+
+        // Notify Requester
+        try {
+          await new Notification({
+            targetUsers: [leave.staffId, leave.studentId].filter(Boolean),
+            title: 'Leave Request Rejected by HOD',
+            message: `Your leave request for ${leave.startDate} was rejected by your HOD (${reviewerName}). Reason: ${leave.rejectionReason}`,
+            type: 'Warning',
+            link: applicantRole === 'student' ? '/student/leaves' : '/staff/leaves',
+            collegeId: leave.collegeId,
+            tenantId: leave.collegeId
+          }).save();
+        } catch {}
+      }
+
+    // ─────────────────────────────────────────────────────────────
+    // 2. ADMIN / PRINCIPAL PERMISSION RULES (Final Approver)
+    // ─────────────────────────────────────────────────────────────
+    } else if (isAdmin) {
+      if (isApproving) {
+        // Staff or Student leave: Only after Admin confirms approval should it receive final Approved status
+        leave.status = 'Approved';
+        leave.approvedBy = reviewerName || 'Admin Office';
+        leave.approvedAt = new Date();
+        const note = remarks || `Final approval confirmed by Admin Office (${reviewerName})`;
+        leave.timeline = leave.timeline || [];
+        leave.timeline.push({ date: todayStr, text: note });
+
+        // Notify Requester & Parent
+        try {
+          const targetUsers = [leave.staffId, leave.studentId].filter(Boolean);
+          await new Notification({
+            targetUsers,
+            title: 'Leave Application Approved! ✓',
+            message: `Leave application for ${leave.staffName} (${leave.startDate} to ${leave.endDate}) has received final approval from Central Admin.`,
+            type: 'Success',
+            link: isParentRequest ? '/parent/leaves' : (applicantRole === 'student' ? '/student/leaves' : '/staff/leaves'),
+            collegeId: leave.collegeId,
+            tenantId: leave.collegeId
+          }).save();
+        } catch {}
+
+        // Notify HOD (informational)
+        try {
+          if (isStaffOrStudentRequest) {
+            await new Notification({
+              targetRoles: ['HOD'],
+              title: 'Leave Finalized by Admin',
+              message: `${leave.staffName}'s leave (${leave.startDate}) has been officially authorized by Central Admin.`,
+              type: 'Info',
+              link: '/hod/leaves',
+              collegeId: leave.collegeId,
+              tenantId: leave.collegeId
+            }).save();
+          }
+        } catch {}
+
+      } else if (isRejecting) {
+        leave.status = 'Rejected';
+        leave.rejectedBy = reviewerName || 'Admin Office';
+        leave.rejectionReason = remarks || reason || 'Declined by Admin Office';
+        const note = remarks || `Rejected by Admin Office (${reviewerName}): ${leave.rejectionReason}`;
+        leave.timeline = leave.timeline || [];
+        leave.timeline.push({ date: todayStr, text: note });
+
+        // Notify Requester
+        try {
+          await new Notification({
+            targetUsers: [leave.staffId, leave.studentId].filter(Boolean),
+            title: 'Leave Request Rejected by Admin',
+            message: `Leave application for ${leave.staffName} (${leave.startDate}) was declined by Central Admin. Reason: ${leave.rejectionReason}`,
+            type: 'Warning',
+            link: isParentRequest ? '/parent/leaves' : (applicantRole === 'student' ? '/student/leaves' : '/staff/leaves'),
+            collegeId: leave.collegeId,
+            tenantId: leave.collegeId
+          }).save();
+        } catch {}
+      }
+
+    } else {
+      return res.status(403).json({
+        success: false,
+        message: 'Permission Denied: You do not have authorization to approve or reject leave requests.'
+      });
+    }
 
     const updated = await leave.save();
     const formatted = formatLeave(updated);
-
-    // Real-time broadcast
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('dataUpdated', { module: 'leaves', action: 'updated', data: formatted });
-      io.emit('dataUpdated', { module: 'staffSupportUpdated' });
-      io.emit('leaveUpdated', formatted);
-    }
+    broadcastUpdate(req, formatted);
 
     res.json(formatted);
   } catch (err) {
@@ -266,13 +551,7 @@ router.delete('/:id', async (req, res) => {
 
     await StaffSupportRecord.findByIdAndDelete(req.params.id);
 
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('dataUpdated', { module: 'leaves', action: 'deleted', id: req.params.id });
-      io.emit('dataUpdated', { module: 'staffSupportUpdated' });
-      io.emit('leaveUpdated', { id: req.params.id, status: 'Cancelled' });
-    }
-
+    broadcastUpdate(req, { id: req.params.id, status: 'Cancelled' }, 'deleted');
     res.json({ success: true, message: 'Leave application cancelled successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to cancel leave', error: err.message });

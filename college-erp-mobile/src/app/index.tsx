@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Dimensions,
   Easing,
   Image,
   KeyboardAvoidingView,
@@ -32,6 +33,137 @@ import ParentDashboard from '../components/dashboards/ParentDashboard';
 import DriverDashboard from '../components/dashboards/DriverDashboard';
 import StaffDashboard from '../components/dashboards/StaffDashboard';
 import WatchmanDashboard from '../components/dashboards/WatchmanDashboard';
+
+// ── Screen and Image Scale Calculations for Exact 1:1 Reference ──
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const LOGIN_REF_IMAGE = require('../../assets/images/login_reference.jpg');
+const loginAsset = Image.resolveAssetSource(LOGIN_REF_IMAGE);
+const IMG_RATIO =
+  loginAsset && loginAsset.width && loginAsset.height
+    ? loginAsset.height / loginAsset.width
+    : 844 / 390;
+const SCALED_IMG_HEIGHT = SCREEN_WIDTH * IMG_RATIO;
+const TOP_BANNER_HEIGHT = Math.round(SCALED_IMG_HEIGHT * 0.25);
+const TOP_OFFSET = Math.round(SCALED_IMG_HEIGHT * 0.045);
+const BOTTOM_NAV_OFFSET = Math.round(SCALED_IMG_HEIGHT * 0.024);
+const BOTTOM_SECTION_HEIGHT = Math.round(SCALED_IMG_HEIGHT * 0.21);
+
+// ── Sleek Minimal Vector Outline Icons (Exact Match to Reference Mockup) ──
+function OutlineMailIcon({ focused }: { focused?: boolean }) {
+  const strokeColor = focused ? '#2878E5' : '#64748B';
+  return (
+    <View style={iconStyles.envelopeBox}>
+      <View style={[iconStyles.envelopeBody, { borderColor: strokeColor }]} />
+      <View style={[iconStyles.envelopeFlap, { borderColor: strokeColor }]} />
+    </View>
+  );
+}
+
+function OutlineLockIcon({ focused }: { focused?: boolean }) {
+  const strokeColor = focused ? '#2878E5' : '#64748B';
+  return (
+    <View style={iconStyles.lockContainer}>
+      <View style={[iconStyles.lockShackle, { borderColor: strokeColor }]} />
+      <View style={[iconStyles.lockBody, { borderColor: strokeColor }]}>
+        <View style={[iconStyles.lockKeyhole, { backgroundColor: strokeColor }]} />
+      </View>
+    </View>
+  );
+}
+
+function OutlineEyeIcon({ active }: { active?: boolean }) {
+  const strokeColor = '#64748B';
+  return (
+    <View style={iconStyles.eyeContainer}>
+      <View style={[iconStyles.eyeOutline, { borderColor: strokeColor }]}>
+        <View style={[iconStyles.eyePupil, { backgroundColor: strokeColor }]} />
+      </View>
+      {!active && <View style={[iconStyles.eyeSlash, { backgroundColor: strokeColor }]} />}
+    </View>
+  );
+}
+
+const iconStyles = StyleSheet.create({
+  envelopeBox: {
+    width: 22,
+    height: 16,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  envelopeBody: {
+    width: 20,
+    height: 14,
+    borderRadius: 3,
+    borderWidth: 1.5,
+  },
+  envelopeFlap: {
+    position: 'absolute',
+    top: -6,
+    width: 12,
+    height: 12,
+    borderBottomWidth: 1.5,
+    borderRightWidth: 1.5,
+    transform: [{ rotate: '45deg' }],
+  },
+  lockContainer: {
+    width: 22,
+    height: 20,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  lockShackle: {
+    width: 11,
+    height: 8,
+    borderTopLeftRadius: 5.5,
+    borderTopRightRadius: 5.5,
+    borderWidth: 1.6,
+    borderBottomWidth: 0,
+    marginBottom: -1,
+  },
+  lockBody: {
+    width: 18,
+    height: 12,
+    borderRadius: 3,
+    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockKeyhole: {
+    width: 2.2,
+    height: 4.5,
+    borderRadius: 1,
+  },
+  eyeContainer: {
+    width: 24,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eyeOutline: {
+    width: 20,
+    height: 13,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eyePupil: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  eyeSlash: {
+    position: 'absolute',
+    width: 22,
+    height: 1.6,
+    transform: [{ rotate: '-40deg' }],
+  },
+});
 
 export default function MobileApp() {
   const [currentUser, setCurrentUser] = useState<MobileUser | null>(null);
@@ -214,9 +346,9 @@ export default function MobileApp() {
         <View style={styles.brandIconCircle}>
           <Text style={styles.brandIconText}>🎓</Text>
         </View>
-        <Text style={styles.splashTitle}>Arignar Anna College ERP</Text>
+        <Text style={styles.splashTitle}>Campus ERP Portal</Text>
         <Text style={styles.splashSubtitle}>Verifying secure institutional session...</Text>
-        <ActivityIndicator size="large" color="#1E3A8A" style={{ marginTop: 28 }} />
+        <ActivityIndicator size="large" color="#0284C7" style={{ marginTop: 28 }} />
       </SafeAreaView>
     );
   }
@@ -304,7 +436,7 @@ export default function MobileApp() {
     );
   }
 
-  // ── Exact Reference College ERP Login Screen ──
+  // ── Premium College ERP Mobile App Login Screen ──
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar style="dark" />
@@ -316,92 +448,33 @@ export default function MobileApp() {
       >
         <ScrollView
           ref={scrollViewRef}
+          style={{ flex: 1 }}
           contentContainerStyle={styles.loginScrollContainer}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           bounces={false}
           overScrollMode="never"
         >
-          <Animated.View
-            style={{
-              opacity: fadeAnim,
-              width: '100%',
-              maxWidth: 460,
-              alignSelf: 'center',
-              flex: 1,
-              justifyContent: 'space-between',
-            }}
-          >
-            {/* ── Top Header Brand ── */}
-            <View style={styles.topBrandRow}>
-              <View style={styles.brandBadge}>
-                <Text style={{ fontSize: 20 }}>🎓</Text>
-              </View>
-              <View style={{ marginLeft: 10 }}>
-                <Text style={styles.brandTitle}>College ERP</Text>
-                <Text style={styles.brandSubtitle}>Connect • Manage • Grow</Text>
-              </View>
-            </View>
+          {/* ── Top Branding Section (Exact 1:1 Reference Mockup Header) ── */}
+          <View style={[styles.topHeaderContainer, { height: TOP_BANNER_HEIGHT }]}>
+            <Image
+              source={LOGIN_REF_IMAGE}
+              style={{
+                width: SCREEN_WIDTH,
+                height: SCALED_IMG_HEIGHT,
+                position: 'absolute',
+                top: -TOP_OFFSET,
+                left: 0,
+              }}
+              resizeMode="cover"
+            />
+          </View>
 
-            {/* ── Hero Split Section: Welcome & Badges (Left) + Student Mascot (Right) ── */}
-            <View style={styles.heroSplitSection}>
-              {/* Left Column */}
-              <View style={styles.heroLeftCol}>
-                <Text style={styles.heroHeadline}>
-                  Welcome <Text style={styles.heroHeadlineHighlight}>Back!</Text>
-                </Text>
-                <Text style={styles.heroSubtext}>
-                  Sign in to your College ERP and stay connected with your campus life.
-                </Text>
-
-                {/* 4 Feature Badges */}
-                <View style={styles.featuresRow}>
-                  <View style={styles.featureItem}>
-                    <View style={[styles.featureCircle, { backgroundColor: '#E0F2FE' }]}>
-                      <Text style={{ fontSize: 16 }}>🎓</Text>
-                    </View>
-                    <Text style={styles.featureLabel}>Academics</Text>
-                  </View>
-
-                  <View style={styles.featureItem}>
-                    <View style={[styles.featureCircle, { backgroundColor: '#EDE9FE' }]}>
-                      <Text style={{ fontSize: 16 }}>👥</Text>
-                    </View>
-                    <Text style={styles.featureLabel}>Campus Life</Text>
-                  </View>
-
-                  <View style={styles.featureItem}>
-                    <View style={[styles.featureCircle, { backgroundColor: '#DCFCE7' }]}>
-                      <Text style={{ fontSize: 16 }}>💼</Text>
-                    </View>
-                    <Text style={styles.featureLabel}>Career</Text>
-                  </View>
-
-                  <View style={styles.featureItem}>
-                    <View style={[styles.featureCircle, { backgroundColor: '#FEE2E2' }]}>
-                      <Text style={{ fontSize: 16 }}>🌐</Text>
-                    </View>
-                    <Text style={styles.featureLabel}>More</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Right Column: 3D Student Mascot Image */}
-              <View style={styles.heroRightCol}>
-                <View style={styles.mascotImageWrapper}>
-                  <Image
-                    source={require('../../assets/images/student_hero_mascot.jpg')}
-                    style={styles.mascotImage}
-                    resizeMode="cover"
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* ── Main Form Card ("Login to Your Account") ── */}
-            <View style={styles.formCard}>
-              <Text style={styles.formCardTitle}>Login to Your Account</Text>
-              <Text style={styles.formCardSubtitle}>Enter your credentials to continue</Text>
+          <Animated.View style={{ opacity: fadeAnim, width: '100%', flex: 1, justifyContent: 'center' }}>
+            {/* ── Login Form Section (Dominant & Centered) ── */}
+            <View style={styles.formContainer}>
+              <Text style={styles.formHeading}>Welcome Back!</Text>
+              <Text style={styles.formSubtitle}>Sign in to your college account</Text>
 
               {/* Error Alert Banner */}
               {errorMessage ? (
@@ -417,24 +490,19 @@ export default function MobileApp() {
                 </View>
               ) : null}
 
-              {/* Input 1: Student / Staff / Parent ID */}
+              {/* Input 1: Email ID */}
               <View
                 style={[
-                  styles.modernInputContainer,
-                  emailFocused && styles.modernInputFocused,
-                  !email && errorMessage && styles.modernInputError,
+                  styles.roundedInputContainer,
+                  emailFocused && styles.roundedInputFocused,
+                  !email && errorMessage && styles.roundedInputError,
                 ]}
               >
-                <Text
-                  style={styles.modernInputIcon}
-                  onPress={() => emailInputRef.current?.focus()}
-                >
-                  👤
-                </Text>
+                <OutlineMailIcon focused={emailFocused} />
                 <TextInput
                   ref={emailInputRef}
-                  style={styles.modernTextInput}
-                  placeholder="Student / Staff / Parent ID"
+                  style={styles.roundedTextInput}
+                  placeholder="Email ID"
                   placeholderTextColor="#94A3B8"
                   value={email}
                   onChangeText={(val) => {
@@ -444,21 +512,20 @@ export default function MobileApp() {
                   onFocus={() => setEmailFocused(true)}
                   onBlur={() => setEmailFocused(false)}
                   autoCapitalize="none"
-                  keyboardType="default"
+                  keyboardType="email-address"
                   autoCorrect={false}
                   returnKeyType="next"
                   onSubmitEditing={() => passwordInputRef.current?.focus()}
                   blurOnSubmit={false}
-                  cursorColor="#2563EB"
-                  selectionColor="#BFDBFE"
-                  
+                  cursorColor="#123B70"
+                  selectionColor="#D0E4FF"
                 />
                 {email.length > 0 && !isSubmitting && (
                   <TouchableOpacity
                     onPress={() => setEmail('')}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Text style={styles.inputClearIcon}>✕</Text>
+                    <Text style={styles.clearIconText}>✕</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -466,20 +533,16 @@ export default function MobileApp() {
               {/* Input 2: Password */}
               <View
                 style={[
-                  styles.modernInputContainer,
-                  passwordFocused && styles.modernInputFocused,
-                  !password && errorMessage && styles.modernInputError,
+                  styles.roundedInputContainer,
+                  { marginTop: 16 },
+                  passwordFocused && styles.roundedInputFocused,
+                  !password && errorMessage && styles.roundedInputError,
                 ]}
               >
-                <Text
-                  style={styles.modernInputIcon}
-                  onPress={() => passwordInputRef.current?.focus()}
-                >
-                  🔒
-                </Text>
+                <OutlineLockIcon focused={passwordFocused} />
                 <TextInput
                   ref={passwordInputRef}
-                  style={styles.modernTextInput}
+                  style={styles.roundedTextInput}
                   placeholder="Password"
                   placeholderTextColor="#94A3B8"
                   value={password}
@@ -494,8 +557,8 @@ export default function MobileApp() {
                   autoCorrect={false}
                   returnKeyType="done"
                   onSubmitEditing={handleLogin}
-                  cursorColor="#2563EB"
-                  selectionColor="#BFDBFE"
+                  cursorColor="#123B70"
+                  selectionColor="#D0E4FF"
                 />
                 <TouchableOpacity
                   style={styles.eyeToggleBtn}
@@ -504,23 +567,12 @@ export default function MobileApp() {
                   accessibilityRole="button"
                   accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  <Text style={styles.eyeToggleIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                  <OutlineEyeIcon active={showPassword} />
                 </TouchableOpacity>
               </View>
 
-              {/* Utility Row: Remember Me & Forgot Password */}
-              <View style={styles.utilityRow}>
-                <TouchableOpacity
-                  style={styles.rememberMeBtn}
-                  onPress={() => setRememberMe(!rememberMe)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
-                    {rememberMe && <Text style={styles.checkboxCheck}>✓</Text>}
-                  </View>
-                  <Text style={styles.rememberMeText}>Remember me</Text>
-                </TouchableOpacity>
-
+              {/* Forgot Password Right-Aligned Link */}
+              <View style={styles.forgotPasswordRow}>
                 <TouchableOpacity
                   onPress={() => {
                     setForgotEmail(email);
@@ -528,51 +580,51 @@ export default function MobileApp() {
                     setShowForgotModal(true);
                   }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  activeOpacity={0.75}
                 >
-                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                  <Text style={styles.forgotPasswordLinkText}>Forgot Password?</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Submit Button */}
+              {/* Royal Blue Full-Width Login Button */}
               <TouchableOpacity
                 style={[
-                  styles.modernSubmitBtn,
-                  isSubmitting && styles.modernSubmitBtnDisabled,
+                  styles.primaryLoginBtn,
+                  isSubmitting && styles.primaryLoginBtnDisabled,
                 ]}
                 onPress={handleLogin}
                 disabled={isSubmitting}
                 activeOpacity={0.88}
               >
                 {isSubmitting ? (
-                  <View style={styles.submitLoadingContent}>
+                  <View style={styles.loginLoadingRow}>
                     <ActivityIndicator size="small" color="#FFFFFF" />
-                    <Text style={styles.modernSubmitBtnText}>Signing In...</Text>
+                    <Text style={styles.primaryLoginBtnText}>Signing in...</Text>
                   </View>
                 ) : (
-                  <View style={styles.submitBtnContent}>
-                    <Text style={styles.modernSubmitBtnArrow}>➔</Text>
-                    <Text style={styles.modernSubmitBtnText}>Login</Text>
+                  <View style={styles.loginBtnContentRow}>
+                    <Text style={styles.primaryLoginBtnText}>Login</Text>
+                    <Text style={styles.loginBtnArrowIcon}>→</Text>
                   </View>
                 )}
               </TouchableOpacity>
-
-              {/* Divider & Security Badge */}
-              <View style={styles.securityDividerRow}>
-                <View style={styles.dividerLine} />
-                <View style={styles.securityPill}>
-                  <Text style={styles.securityPillIcon}>🛡️</Text>
-                  <Text style={styles.securityPillText}>Secure & Trusted</Text>
-                </View>
-                <View style={styles.dividerLine} />
-              </View>
-            </View>
-
-            {/* ── Slogan & Doodle Footer ── */}
-            <View style={styles.brandFooter}>
-              <Text style={styles.sloganText}>Better Education, Brighter Future</Text>
-              <Text style={styles.subSloganText}>✈️ Arignar Anna College Campus ERP</Text>
             </View>
           </Animated.View>
+
+          {/* ── Bottom Educational Illustration (Exact 1:1 Reference Mockup Bottom) ── */}
+          <View style={[styles.bottomIllustrationContainer, { height: BOTTOM_SECTION_HEIGHT }]}>
+            <Image
+              source={LOGIN_REF_IMAGE}
+              style={{
+                width: SCREEN_WIDTH,
+                height: SCALED_IMG_HEIGHT,
+                position: 'absolute',
+                bottom: -BOTTOM_NAV_OFFSET,
+                left: 0,
+              }}
+              resizeMode="cover"
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -619,13 +671,13 @@ export default function MobileApp() {
             )}
 
             <View style={{ marginVertical: 14 }}>
-              <Text style={[styles.formCardSubtitle, { marginBottom: 6, fontWeight: '700', color: '#1E293B' }]}>
+              <Text style={styles.modalInputLabel}>
                 Registered Email
               </Text>
-              <View style={styles.modernInputContainer}>
-                <Text style={styles.modernInputIcon}>✉️</Text>
+              <View style={styles.modalInputContainer}>
+                <Text style={styles.modalInputIcon}>✉️</Text>
                 <TextInput
-                  style={styles.modernTextInput}
+                  style={styles.modalTextInput}
                   placeholder="e.g. user@college.edu"
                   placeholderTextColor="#94A3B8"
                   value={forgotEmail}
@@ -637,23 +689,23 @@ export default function MobileApp() {
                   keyboardType="email-address"
                   autoCorrect={false}
                   editable={!isSubmittingForgot}
-                  cursorColor="#2563EB"
-                  selectionColor="#BFDBFE"
+                  cursorColor="#111827"
+                  selectionColor="#E5E7EB"
                 />
               </View>
             </View>
 
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
               <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: '#F1F5F9', flex: 1 }]}
+                style={[styles.modalBtn, { backgroundColor: '#F3F4F6', flex: 1, borderWidth: 1, borderColor: '#E5E7EB' }]}
                 onPress={() => setShowForgotModal(false)}
                 disabled={isSubmittingForgot}
               >
-                <Text style={[styles.modalBtnText, { color: '#475569' }]}>Close</Text>
+                <Text style={[styles.modalBtnText, { color: '#374151' }]}>Close</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: '#2563EB', flex: 2 }]}
+                style={[styles.modalBtn, { backgroundColor: '#111827', flex: 2 }]}
                 onPress={handleForgotPasswordSubmit}
                 disabled={isSubmittingForgot}
               >
@@ -674,180 +726,80 @@ export default function MobileApp() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EEF5FF',
+    backgroundColor: '#FFFFFF',
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#EEF5FF',
+    backgroundColor: '#F0F9FF',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
   brandIconCircle: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: '#EFF6FF',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#0284C7',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#BFDBFE',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowColor: '#0284C7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
     elevation: 4,
   },
   brandIconText: {
-    fontSize: 38,
+    fontSize: 36,
   },
   splashTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 6,
+    color: '#0369A1',
+    marginBottom: 4,
     letterSpacing: -0.3,
   },
   splashSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: 13,
+    color: '#0284C7',
   },
 
   // ── Scroll Layout ──
   loginScrollContainer: {
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 14 : 10,
-    paddingBottom: 20,
     flexGrow: 1,
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
   },
 
-  // ── Top Brand Row ──
-  topBrandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    marginBottom: 12,
-  },
-  brandBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: '#DBEAFE',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandTitle: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#1E3A8A',
-    letterSpacing: -0.3,
-  },
-  brandSubtitle: {
-    fontSize: 11,
-    color: '#64748B',
-    fontWeight: '500',
-    marginTop: 1,
+  // ── Top Header Container (Exact Crop of Reference Mockup) ──
+  topHeaderContainer: {
+    width: '100%',
+    overflow: 'hidden',
+    backgroundColor: '#F0F7FF',
+    position: 'relative',
   },
 
-  // ── Split Hero Section ──
-  heroSplitSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 4,
+  // ── Form Container (Compact & Professional Mobile Layout) ──
+  formContainer: {
+    width: '100%',
+    maxWidth: 390,
+    alignSelf: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
   },
-  heroLeftCol: {
-    flex: 1.15,
-    paddingRight: 8,
-  },
-  heroHeadline: {
+  formHeading: {
     fontSize: 23,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#123B70',
     letterSpacing: -0.4,
+    marginBottom: 6,
   },
-  heroHeadlineHighlight: {
-    color: '#2563EB',
-  },
-  heroSubtext: {
-    fontSize: 12,
+  formSubtitle: {
+    fontSize: 13.5,
     color: '#64748B',
-    lineHeight: 16.5,
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  featuresRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingRight: 4,
-  },
-  featureItem: {
-    alignItems: 'center',
-  },
-  featureCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  featureLabel: {
-    fontSize: 9.5,
-    color: '#475569',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  heroRightCol: {
-    flex: 0.85,
-    alignItems: 'flex-end',
-  },
-  mascotImageWrapper: {
-    width: 135,
-    height: 155,
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: '#DBEAFE',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 4,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  mascotImage: {
-    width: '100%',
-    height: '100%',
-  },
-
-  // ── Main Form Card ──
-  formCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    paddingHorizontal: 22,
-    paddingTop: 26,
-    paddingBottom: 24,
-    shadowColor: '#1E293B',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  formCardTitle: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.3,
-  },
-  formCardSubtitle: {
-    fontSize: 12.5,
-    color: '#64748B',
-    marginTop: 3,
-    marginBottom: 16,
+    marginBottom: 24,
+    fontWeight: '400',
   },
 
   // ── Error Alert ──
@@ -856,204 +808,142 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#FCA5A5',
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 14,
+    paddingVertical: 8,
+    marginBottom: 12,
     gap: 8,
   },
   errorAlertIcon: {
-    fontSize: 15,
+    fontSize: 14,
   },
   errorAlertText: {
     flex: 1,
-    fontSize: 12.5,
+    fontSize: 12,
     color: '#DC2626',
     fontWeight: '600',
-    lineHeight: 17,
+    lineHeight: 16,
   },
   errorDismissText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#991B1B',
-    fontWeight: '800',
+    fontWeight: '700',
     paddingHorizontal: 4,
   },
 
-  // ── Modern Inputs ──
-  modernInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+  // ── Rounded Input Fields (Standard 48px) ──
+  roundedInputContainer: {
+    height: 48,
+    borderRadius: 12,
     borderWidth: 1.2,
     borderColor: '#E2E8F0',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 52,
-    marginBottom: 14,
-  },
-  modernInputFocused: {
-    borderColor: '#2563EB',
     backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    shadowColor: '#2878E5',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  modernInputError: {
-    borderColor: '#EF4444',
-    backgroundColor: '#FEF2F2',
+  roundedInputFocused: {
+    borderColor: '#2878E5',
+    borderWidth: 1.5,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  modernInputIcon: {
-    fontSize: 16,
-    marginRight: 10,
-    color: '#94A3B8',
-    paddingVertical: 10,
+  roundedInputError: {
+    borderColor: '#DC2626',
   },
-  modernTextInput: {
-    flex: 1,
-    height: '100%',
-    minHeight: 48,
+  inputPrefixIcon: {
     fontSize: 15,
-    color: '#0F172A',
-    fontWeight: '500',
-    paddingVertical: 0,
+    color: '#64748B',
+    marginRight: 10,
   },
-  inputClearIcon: {
+  inputPrefixIconActive: {
+    color: '#2878E5',
+  },
+  roundedTextInput: {
+    flex: 1,
+    fontSize: 14.5,
+    color: '#123B70',
+    fontWeight: '500',
+    height: '100%',
+  },
+  clearIconText: {
     fontSize: 13,
     color: '#94A3B8',
-    padding: 4,
+    padding: 6,
   },
   eyeToggleBtn: {
     padding: 6,
   },
   eyeToggleIcon: {
     fontSize: 16,
-  },
-
-  // ── Utility Row ──
-  utilityRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 2,
-    marginBottom: 18,
-  },
-  rememberMeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 5,
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  checkboxActive: {
-    backgroundColor: '#2563EB',
-    borderColor: '#2563EB',
-  },
-  checkboxCheck: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  rememberMeText: {
-    fontSize: 12.5,
-    color: '#475569',
-    fontWeight: '500',
-  },
-  forgotPasswordText: {
-    fontSize: 12.5,
-    color: '#2563EB',
-    fontWeight: '700',
-  },
-
-  // ── Submit Button ──
-  modernSubmitBtn: {
-    backgroundColor: '#2563EB',
-    borderRadius: 14,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  modernSubmitBtnDisabled: {
-    opacity: 0.65,
-  },
-  submitBtnContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  submitLoadingContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  modernSubmitBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15.5,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-  },
-  modernSubmitBtnArrow: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-
-  // ── Divider & Security Badge ──
-  securityDividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 18,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E2E8F0',
-  },
-  securityPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    gap: 5,
-  },
-  securityPillIcon: {
-    fontSize: 12,
-  },
-  securityPillText: {
-    fontSize: 11.5,
     color: '#64748B',
+  },
+
+  // ── Forgot Password ──
+  forgotPasswordRow: {
+    alignItems: 'flex-end',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  forgotPasswordLinkText: {
+    fontSize: 13.5,
+    color: '#2878E5',
     fontWeight: '600',
   },
 
-  // ── Slogan & Doodle Footer ──
-  brandFooter: {
+  // ── Royal Blue Button (Standard 48px) ──
+  primaryLoginBtn: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#2878E5',
     alignItems: 'center',
-    marginTop: 18,
-    marginBottom: 6,
+    justifyContent: 'center',
+    shadowColor: '#2878E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  sloganText: {
+  primaryLoginBtnDisabled: {
+    opacity: 0.65,
+  },
+  primaryLoginBtnText: {
+    color: '#FFFFFF',
     fontSize: 15,
-    color: '#2563EB',
     fontWeight: '700',
-    fontStyle: 'italic',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
-  subSloganText: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 3,
-    fontWeight: '500',
+  loginBtnContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  loginBtnArrowIcon: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  loginLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+
+  // ── Bottom Educational Illustration Container ──
+  bottomIllustrationContainer: {
+    width: '100%',
+    overflow: 'hidden',
+    backgroundColor: '#EBF5FF',
+    position: 'relative',
   },
 
   // ── Unsupported Role Gate ──
@@ -1064,86 +954,88 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   unsupportedIconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: '#FEF2F2',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#FECACA',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
   unsupportedIcon: {
-    fontSize: 38,
+    fontSize: 32,
   },
   unsupportedTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#111827',
     marginBottom: 6,
   },
   unsupportedText: {
-    fontSize: 15,
-    color: '#334155',
+    fontSize: 14,
+    color: '#374151',
     textAlign: 'center',
     marginBottom: 10,
   },
   unsupportedBadge: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#E5E7EB',
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 6,
     marginBottom: 14,
   },
   unsupportedBadgeText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#1D4ED8',
+    fontWeight: '700',
+    color: '#111827',
   },
   unsupportedSubtext: {
     fontSize: 13,
-    color: '#64748B',
+    color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 19,
+    lineHeight: 18,
     marginBottom: 24,
-    maxWidth: 340,
+    maxWidth: 320,
   },
   primaryActionButton: {
     width: '100%',
-    maxWidth: 320,
-    backgroundColor: '#1E3A8A',
-    paddingVertical: 14,
-    borderRadius: 12,
+    maxWidth: 300,
+    backgroundColor: '#111827',
+    paddingVertical: 13,
+    borderRadius: 10,
     alignItems: 'center',
   },
   primaryActionButtonText: {
     color: '#FFFFFF',
-    fontSize: 14.5,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
   },
 
   // ── Modals ──
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: 'rgba(17, 24, 39, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   forgotModalContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 22,
+    borderRadius: 14,
+    padding: 20,
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 400,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   forgotModalHeader: {
     flexDirection: 'row',
@@ -1152,29 +1044,29 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   forgotModalIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#EFF6FF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
   },
   forgotModalTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
   },
   forgotModalSubtitle: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#6B7280',
     lineHeight: 16,
     marginTop: 2,
   },
   forgotFeedbackBanner: {
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 6,
     borderWidth: 1,
     marginBottom: 8,
   },
@@ -1193,12 +1085,37 @@ const styles = StyleSheet.create({
   },
   modalBtn: {
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalBtnText: {
-    fontSize: 13.5,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modalInputLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  modalInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+  },
+  modalInputIcon: {
+    fontSize: 15,
+    marginRight: 8,
+  },
+  modalTextInput: {
+    flex: 1,
+    height: 44,
+    fontSize: 14,
+    color: '#111827',
   },
 });

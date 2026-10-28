@@ -5,7 +5,7 @@ import {
   FileText, Calendar, User, AlertCircle, RefreshCw, 
   X, Info, ExternalLink
 } from 'lucide-react';
-import { getStudentById, getStudents } from '../../api/index';
+import { getStudentById, getStudents, getStudentLeaves, getLeaves } from '../../api/index';
 import './ParentDashboard.css';
 
 const formatDate = (rawDate) => {
@@ -112,17 +112,53 @@ const ParentLeaves = () => {
         window.dispatchEvent(new Event('parent_session_updated'));
       }
 
-      // Check localStorage for any student leave applications
+      // Fetch real leaves from API
       let records = [];
       try {
-        const localLeaves = JSON.parse(localStorage.getItem(`erp_leaves_${tenantId}`) || localStorage.getItem('erp_leaves') || '[]');
-        const matched = localLeaves.filter(l => 
-          l.studentId === childInfo.id || 
-          l.registerNo === childInfo.id ||
-          (l.studentName && String(l.studentName).toLowerCase() === String(childInfo.name).toLowerCase())
-        );
-        if (matched.length > 0) records = matched;
+        const apiRes = await getStudentLeaves(childInfo.id).catch(() => getLeaves().catch(() => null));
+        const rawLeaves = Array.isArray(apiRes?.data) ? apiRes.data : [];
+        if (rawLeaves.length > 0) {
+          records = rawLeaves.map(l => ({
+            id: l.id || l._id || 'LV-01',
+            dates: l.startDate === l.endDate ? l.startDate : `${l.startDate} - ${l.endDate}`,
+            days: `${l.daysCount || l.days || 1} Day${(l.daysCount || l.days || 1) > 1 ? 's' : ''}`,
+            type: l.type || l.leaveType || 'Medical Leave',
+            reason: l.reason || l.description || 'Absence',
+            appliedOn: l.createdAt || l.startDate || 'Recent',
+            approvedBy: l.approvedBy || (l.status === 'Approved' ? 'Class Advisor / HOD' : 'Under Review'),
+            status: l.status || 'Pending',
+            document: null,
+            remarks: l.timeline?.[l.timeline.length - 1]?.text || 'Application routed through Leave Desk.'
+          }));
+        }
       } catch (e) {}
+
+      // Fallback to localStorage if API is empty
+      if (records.length === 0) {
+        try {
+          const localLeaves = JSON.parse(localStorage.getItem(`erp_leave_requests_${tenantId}`) || localStorage.getItem(`erp_leaves_${tenantId}`) || '[]');
+          const matched = localLeaves.filter(l => 
+            l.studentId === childInfo.id || 
+            l.registerNo === childInfo.id ||
+            l.staffId === childInfo.id ||
+            (l.studentName && String(l.studentName).toLowerCase() === String(childInfo.name).toLowerCase())
+          );
+          if (matched.length > 0) {
+            records = matched.map(l => ({
+              id: l.id || 'LV-01',
+              dates: l.startDate === l.endDate ? l.startDate : `${l.startDate} - ${l.endDate}`,
+              days: `${l.daysCount || l.days || 1} Day${(l.daysCount || l.days || 1) > 1 ? 's' : ''}`,
+              type: l.type || 'Medical Leave',
+              reason: l.reason || 'Absence',
+              appliedOn: l.createdAt || l.startDate || 'Recent',
+              approvedBy: l.approvedBy || (l.status === 'Approved' ? 'Class Advisor / HOD' : 'Under Review'),
+              status: l.status || 'Pending',
+              document: null,
+              remarks: 'Application logged.'
+            }));
+          }
+        } catch (e) {}
+      }
 
       // If empty, supply verified structured academic leave history
       if (records.length === 0) {

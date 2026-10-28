@@ -12,60 +12,60 @@
 import { Platform, StyleSheet } from 'react-native';
 
 export const Colors = {
-  // Brand Primary (Royal Blue)
-  primary: '#1E3A8A',         // Deep Royal Blue (Headers, Brand, Key Action Highlights)
-  primaryAccent: '#2563EB',   // Vibrant Royal Blue (Primary Buttons, Active Tabs, Highlights)
-  primaryLight: '#EFF6FF',    // Soft Ice Blue (Active Pills, Icon Backgrounds)
-  primaryBorder: '#BFDBFE',   // Subtle Blue Border
-  primaryMuted: '#3B82F6',
+  // Brand Primary & Accent (Monochrome / Jet Black)
+  primary: '#111827',         // Deep Jet Black / Near-Black (Headers, Key Highlights)
+  primaryAccent: '#000000',   // Pure Black for Primary Buttons & Focus States
+  primaryLight: '#F3F4F6',    // Subtle Light Grey for Active Pills & Backgrounds
+  primaryBorder: '#E5E7EB',   // Subtle 1px Light Grey Border
+  primaryMuted: '#4B5563',    // Dark Slate Grey for Secondary Interactive Elements
 
   // Neutrals & Surfaces
-  background: '#F8FAFC',      // Clean Slate / Very Light Blue-Grey Screen Background
+  background: '#F9FAFB',      // Soft Off-White Clean Background
   surface: '#FFFFFF',         // Pure White Cards & Panels
-  surfaceBorder: '#E2E8F0',   // Subtle Card & Row Borders
-  borderLight: '#E2E8F0',
-  border: '#E2E8F0',
-  surfaceHover: '#F1F5F9',
+  surfaceBorder: '#E5E7EB',   // Subtle Card & Row Borders (1px clean)
+  borderLight: '#F3F4F6',
+  border: '#E5E7EB',
+  surfaceHover: '#F9FAFB',
 
   // Typography Palette
-  textPrimary: '#0F172A',     // High-contrast Dark Navy / Slate for Headings & Titles
-  textSecondary: '#334155',   // Medium-dark Slate for Body Content
-  textMuted: '#64748B',       // Neutral Grey for Subtitles, Descriptions, Meta
-  textLight: '#94A3B8',       // Light Neutral Grey for Captions & Timestamps
+  textPrimary: '#111827',     // Crisp Near-Black for Headings & Titles
+  textSecondary: '#374151',   // Neutral Charcoal for Body Content
+  textMuted: '#6B7280',       // Neutral Grey for Subtitles, Descriptions, Meta
+  textLight: '#9CA3AF',       // Light Neutral Grey for Captions & Timestamps
   textWhite: '#FFFFFF',
 
-  // Semantic Status Tints
-  success: '#16A34A',
-  successBg: '#DCFCE7',
-  successText: '#15803D',
-  successBorder: '#BBF7D0',
+  // Semantic Status Tints (Restrained, accessible, professional)
+  success: '#059669',
+  successBg: '#ECFDF5',
+  successText: '#065F46',
+  successBorder: '#A7F3D0',
 
   warning: '#D97706',
-  warningBg: '#FEF3C7',
-  warningText: '#B45309',
+  warningBg: '#FFFBEB',
+  warningText: '#92400E',
   warningBorder: '#FDE68A',
 
   danger: '#DC2626',
-  dangerBg: '#FEE2E2',
-  dangerText: '#B91C1C',
+  dangerBg: '#FEF2F2',
+  dangerText: '#991B1B',
   dangerBorder: '#FECACA',
 
-  info: '#0284C7',
-  infoBg: '#E0F2FE',
-  infoText: '#0369A1',
-  infoBorder: '#BAE6FD',
+  info: '#2563EB',
+  infoBg: '#EFF6FF',
+  infoText: '#1E40AF',
+  infoBorder: '#BFDBFE',
 
-  purple: '#7C3AED',
-  purpleBg: '#F5F3FF',
-  purpleText: '#6D28D9',
+  purple: '#6B7280',
+  purpleBg: '#F3F4F6',
+  purpleText: '#374151',
 
   amber: '#D97706',
   amberBg: '#FFFBEB',
-  amberText: '#B45309',
+  amberText: '#92400E',
 
-  cyan: '#0891B2',
-  cyanBg: '#ECFEFF',
-  cyanText: '#0E7490',
+  cyan: '#4B5563',
+  cyanBg: '#F3F4F6',
+  cyanText: '#1F2937',
 } as const;
 
 export const Typography = {
@@ -77,7 +77,7 @@ export const Typography = {
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '800' as const,
+    fontWeight: '700' as const,
     color: Colors.textPrimary,
     letterSpacing: -0.2,
   },
@@ -131,55 +131,55 @@ export const Spacing = {
 export const Radius = {
   xs: 4,
   sm: 6,
-  md: 10,
-  lg: 14,
-  xl: 18,
+  md: 8,
+  lg: 10,
+  xl: 12,
   pill: 999,
   full: 999,
 };
 
 export const Shadows = StyleSheet.create({
   soft: {
-    shadowColor: '#0F172A',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  medium: {
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 2,
   },
-  medium: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
-  },
   banner: {
-    shadowColor: '#1E3A8A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   sm: {
-    shadowColor: '#0F172A',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  md: {
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
-  md: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
   lg: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
 });
 
@@ -208,17 +208,17 @@ export const SharedStyles = StyleSheet.create({
     alignItems: 'center',
   },
   cardHeaderTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
     color: Colors.textPrimary,
   },
   cardHeaderLink: {
     fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primaryAccent,
+    fontWeight: '600',
+    color: Colors.textMuted,
   },
   primaryButton: {
-    backgroundColor: Colors.primaryAccent,
+    backgroundColor: '#111827',
     borderRadius: Radius.md,
     paddingVertical: 12,
     paddingHorizontal: Spacing.lg,
@@ -228,12 +228,12 @@ export const SharedStyles = StyleSheet.create({
   primaryButtonText: {
     color: Colors.textWhite,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   secondaryButton: {
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: Colors.primaryBorder,
+    borderColor: Colors.surfaceBorder,
     borderRadius: Radius.md,
     paddingVertical: 10,
     paddingHorizontal: Spacing.md,
@@ -241,8 +241,8 @@ export const SharedStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryButtonText: {
-    color: Colors.primary,
+    color: Colors.textPrimary,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
 });

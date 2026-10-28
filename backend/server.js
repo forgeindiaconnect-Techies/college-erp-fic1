@@ -39,6 +39,16 @@ try {
     console.log('✅ Exact reference modern college campus hero image synced to public!');
   }
 
+  // Sync user's exact reference login screen design image
+  const userUploadedRef = 'C:/Users/Forgeindiaconnect/.gemini/antigravity-ide/brain/c2ad6bb3-4001-4622-a7b8-8f455ae0c88a/.user_uploaded/media_1793185574265.jpg';
+  const mobileRefDest = path.join(__dirname, '../college-erp-mobile/assets/images/login_reference.jpg');
+  const publicRefDest = path.join(__dirname, '../public/login_reference.jpg');
+  if (fs.existsSync(userUploadedRef)) {
+    fs.copyFileSync(userUploadedRef, mobileRefDest);
+    fs.copyFileSync(userUploadedRef, publicRefDest);
+    console.log('✅ Exact user reference login image copied to mobile and public!');
+  }
+
   // Sync the 5 high-quality dashboard hero images
   const brainDir = 'C:/Users/Forgeindiaconnect/.gemini/antigravity-ide/brain/d2254b0d-4b8e-41b0-aad3-5cd2ce41c73d';
   const mobileDashboardsDir = path.join(__dirname, '../college-erp-mobile/assets/images/dashboards');

@@ -89,9 +89,9 @@ router.post('/', async (req, res) => {
       reason: description,
       daysCount,
       collegeId: tenantId,
-      status: req.body.status || 'Pending',
+      status: req.body.status || (requestType === 'Leave' ? ((req.user?.role || '').toLowerCase() === 'hod' || (req.user?.role || '').toLowerCase() === 'parent' ? 'Pending Admin Approval' : 'Pending HOD Approval') : 'Pending'),
       priority: req.body.priority || 'Medium',
-      timeline: [{ date: new Date().toISOString().split('T')[0], text: 'Request submitted successfully' }]
+      timeline: [{ date: new Date().toISOString().split('T')[0], text: `Request submitted successfully (${requestType})` }]
     });
     await newRecord.save();
     

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText, Calendar, Plus, Clock, CheckCircle2,
   XCircle, AlertCircle, ArrowLeft, Send
 } from 'lucide-react';
+import { getLeaves, createLeave } from '../../api';
+import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
 import './StudentLeaves.css';
 
 const DEFAULT_STUDENT = {
@@ -28,68 +30,87 @@ const StudentLeaves = () => {
   const [form, setForm] = useState({ type: 'Casual Leave', startDate: '', endDate: '', reason: '' });
   const [success, setSuccess] = useState(false);
 
+  const loadLeaves = useCallback(async () => {
+    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+    try {
+      const res = await getLeaves();
+      const records = Array.isArray(res.data) ? res.data : [];
+      if (records.length > 0) {
+        localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(records));
+        setLeaves(records);
+        return;
+      }
+    } catch (err) {
+      console.warn('API leave fetch fallback to cache:', err.message);
+    }
+    const saved = localStorage.getItem(`erp_leave_requests_${tenantId}`);
+    if (saved) {
+      setLeaves(JSON.parse(saved));
+    }
+  }, []);
+
   useEffect(() => {
     // 1. Session check
     const session = sessionStorage.getItem('student_session');
-    let activeStud = DEFAULT_STUDENT;
     if (session) {
-      activeStud = JSON.parse(session);
-      setStudentSession(activeStud);
+      setStudentSession(JSON.parse(session));
     } else {
       navigate('/student/login');
       return;
     }
 
-    // 2. Load leaves
-    const loadLeaves = () => {
-      const savedLeaves = localStorage.getItem(`erp_leave_requests_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
-      if (savedLeaves) {
-        setLeaves(JSON.parse(savedLeaves));
-      } else {
-        localStorage.setItem(`erp_leave_requests_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(MOCK_LEAVES));
-        setLeaves([]);
-      }
-    };
-
     loadLeaves();
     window.addEventListener('storage', loadLeaves);
     setLoading(false);
     return () => window.removeEventListener('storage', loadLeaves);
-  }, [navigate]);
+  }, [navigate, loadLeaves]);
+
+  useRealtimeSync(loadLeaves, ['leaves', 'staffSupportUpdated']);
 
   const studentId = studentSession.id;
   const studentName = studentSession.name || 'Student';
 
   // Filter leaves to current student
-  const myLeaves = leaves.filter(l => l.staffId === studentId || l.name === studentName || l.staffName === studentName);
+  const myLeaves = leaves.filter(l => l.staffId === studentId || l.studentId === studentId || l.name === studentName || l.staffName === studentName);
 
   // Form Submit
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const newLeave = {
       id: `leave_${Date.now()}`,
       staffId: studentId,
+      studentId: studentId,
       name: studentName,
       staffName: studentName,
       role: 'Student',
       dept: studentSession.dept || 'Computer Science',
+      department: studentSession.dept || 'Computer Science',
       type: form.type,
       startDate: form.startDate,
       endDate: form.endDate,
       reason: form.reason,
-      status: 'Pending',
+      status: 'Pending HOD Approval',
       createdAt: new Date().toLocaleDateString('en-CA')
     };
 
-    const savedLeaves = localStorage.getItem(`erp_leave_requests_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`);
+    const tenantId = sessionStorage.getItem('tenantId') || 'mock_college_id';
+    const savedLeaves = localStorage.getItem(`erp_leave_requests_${tenantId}`);
     const existing = savedLeaves ? JSON.parse(savedLeaves) : [];
     const updated = [newLeave, ...existing];
     setLeaves(updated);
-    localStorage.setItem(`erp_leave_requests_${sessionStorage.getItem('tenantId') || 'mock_college_id'}`, JSON.stringify(updated));
+    localStorage.setItem(`erp_leave_requests_${tenantId}`, JSON.stringify(updated));
     window.dispatchEvent(new Event('storage'));
 
     setSuccess(true);
     setForm({ type: 'Casual Leave', startDate: '', endDate: '', reason: '' });
+
+    try {
+      await createLeave(newLeave);
+      emitERPDataUpdate(['leaves', 'staffSupportUpdated'], 'created', newLeave);
+    } catch (err) {
+      console.warn('Failed to submit student leave to API:', err.message);
+    }
+
     setTimeout(() => {
       setSuccess(false);
     }, 1500);
@@ -283,17 +304,45 @@ const StudentLeaves = () => {
               </div>
             ) : (
               myLeaves.map(l => {
-                const isApproved = l.status === 'Approved';
-                const isPending = l.status === 'Pending';
+                const status = l.status || 'Pending';
+                const isApproved = status === 'Approved';
+                const isHodApproved = status === 'HOD Approved – Pending Admin Approval';
+                const isRejected = status === 'Rejected';
+
+                let bg = '#fffbeb';
+                let border = '1px solid #fde68a';
+                let badgeBg = '#fef3c7';
+                let badgeColor = '#b45309';
+                let badgeText = '⏳ Pending HOD Review';
+
+                if (isApproved) {
+                  bg = '#f0fdf4';
+                  border = '1px solid #bbf7d0';
+                  badgeBg = '#dcfce7';
+                  badgeColor = '#15803d';
+                  badgeText = '✓ Approved by Admin';
+                } else if (isHodApproved) {
+                  bg = '#eff6ff';
+                  border = '1px solid #bfdbfe';
+                  badgeBg = '#dbeafe';
+                  badgeColor = '#1d4ed8';
+                  badgeText = '⏳ HOD Approved – Awaiting Admin';
+                } else if (isRejected) {
+                  bg = '#fef2f2';
+                  border = '1px solid #fecaca';
+                  badgeBg = '#fee2e2';
+                  badgeColor = '#b91c1c';
+                  badgeText = '✕ Rejected';
+                }
 
                 return (
                   <div
-                    key={l.id}
+                    key={l.id || l._id}
                     style={{
                       padding: '14px 16px',
                       borderRadius: '12px',
-                      background: isApproved ? '#f0fdf4' : (isPending ? '#fffbeb' : '#fef2f2'),
-                      border: isApproved ? '1px solid #bbf7d0' : (isPending ? '1px solid #fde68a' : '1px solid #fecaca'),
+                      background: bg,
+                      border: border,
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '6px'
@@ -308,10 +357,10 @@ const StudentLeaves = () => {
                         fontWeight: 800,
                         padding: '3px 9px',
                         borderRadius: '20px',
-                        background: isApproved ? '#dcfce7' : (isPending ? '#fef3c7' : '#fee2e2'),
-                        color: isApproved ? '#15803d' : (isPending ? '#b45309' : '#b91c1c')
+                        background: badgeBg,
+                        color: badgeColor
                       }}>
-                        {isApproved ? '✓ Approved' : (isPending ? '⏳ Pending HOD Review' : 'Rejected')}
+                        {badgeText}
                       </span>
                     </div>
 

@@ -1244,9 +1244,9 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                   id: 'trip',
                   label: 'My Trip',
                   icon: '🚌',
-                  bg: '#EFF6FF',
-                  borderColor: '#DBEAFE',
-                  textColor: '#1E40AF',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   badge: activeTrip ? 'Active' : undefined,
                   onPress: () => {
                     setActiveNavTab('academics');
@@ -1257,9 +1257,9 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                   id: 'vehicle',
                   label: 'My Vehicle',
                   icon: '🚐',
-                  bg: '#ECFDF5',
-                  borderColor: '#D1FAE5',
-                  textColor: '#065F46',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   badge: myVehicle?.status || 'Good',
                   onPress: () => {
                     setActiveNavTab('academics');
@@ -1270,9 +1270,9 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                   id: 'route',
                   label: 'My Route',
                   icon: '📍',
-                  bg: '#F5F3FF',
-                  borderColor: '#EDE9FE',
-                  textColor: '#5B21B6',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   badge: stops.length > 0 ? `${stops.length} Stops` : undefined,
                   onPress: () => {
                     setActiveNavTab('academics');
@@ -1283,9 +1283,9 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                   id: 'students',
                   label: 'Student List',
                   icon: '🧑‍🤝‍🧑',
-                  bg: '#FFFBEB',
-                  borderColor: '#FEF3C7',
-                  textColor: '#92400E',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   badge: passengers.length > 0 ? `${passengers.length} Roster` : undefined,
                   onPress: () => {
                     setActiveNavTab('academics');
@@ -3901,7 +3901,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F9FAFB',
   },
   flexOne: {
     flex: 1,
@@ -3913,24 +3913,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#E5E7EB',
     gap: 10,
   },
   profileToggleTab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 9,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   profileToggleTabActive: {
-    backgroundColor: '#1E3A8A',
+    backgroundColor: '#111827',
+    borderColor: '#111827',
   },
   profileToggleTabText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#4B5563',
   },
   profileToggleTabTextActive: {
     color: '#FFFFFF',
@@ -3941,7 +3944,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? 12 : 8,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#E5E7EB',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -3955,7 +3958,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#1E3A8A',
+    backgroundColor: '#111827',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
@@ -3974,8 +3977,10 @@ const styles = StyleSheet.create({
   roleBadge: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#2563EB',
-    backgroundColor: '#EFF6FF',
+    color: '#111827',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 4,
@@ -3993,14 +3998,16 @@ const styles = StyleSheet.create({
   driverNameText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#111827',
   },
   driverSubText: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#6B7280',
   },
   signOutBtn: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,

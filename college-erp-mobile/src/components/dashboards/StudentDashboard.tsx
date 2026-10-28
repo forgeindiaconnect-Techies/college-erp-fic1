@@ -994,7 +994,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
         startDate: leaveDates,
         endDate: leaveDates,
         reason: leaveReason.trim(),
-        status: 'Pending',
+        status: 'Pending HOD Approval',
         createdAt: new Date().toISOString().split('T')[0],
       }).catch(async () => {
         await apiPost('staff-support', {
@@ -1015,13 +1015,13 @@ export default function StudentDashboard({ user, onLogout }: Props) {
         endDate: leaveDates,
         days: 1,
         reason: leaveReason.trim(),
-        status: 'Pending',
+        status: 'Pending HOD Approval',
       };
       setLeavesList([newReq, ...leavesList]);
       setLeaveModalVisible(false);
       setLeaveDates('');
       setLeaveReason('');
-      Alert.alert('Leave Submitted Successfully 📄', 'Your leave request has been submitted to your Class Advisor and Department HOD.');
+      Alert.alert('Leave Submitted Successfully 📄', 'Your leave application has been submitted to your Department HOD for initial approval.');
       loadData();
     } catch (err: any) {
       Alert.alert('Notice', err?.message || 'Leave request submitted.');
@@ -4679,7 +4679,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={{ alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingBottom: 12, marginBottom: 14 }}>
                 <Text style={{ fontSize: 13, fontWeight: '800', color: '#1E3A8A', letterSpacing: 0.5, textAlign: 'center' }}>
-                  ARIGNAR ANNA COLLEGE OF ARTS & SCIENCE
+                  INSTITUTIONAL CAMPUS ERP
                 </Text>
                 <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2, textAlign: 'center' }}>
                   Affiliated to University • Autonomous Examination Wing
@@ -5014,7 +5014,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
           <View style={[styles.modalCard, { maxHeight: 520 }]}>
             <View style={{ alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingBottom: 12, marginBottom: 14 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: '#1E3A8A', letterSpacing: 0.5, textAlign: 'center' }}>
-                ARIGNAR ANNA COLLEGE OF ARTS & SCIENCE
+                INSTITUTIONAL CAMPUS ERP
               </Text>
               <Text style={{ fontSize: 10, color: '#64748B', marginTop: 2, textAlign: 'center' }}>
                 Office of Finance & Accounts • Institutional Clearance Wing
@@ -7336,14 +7336,14 @@ const styles = StyleSheet.create({
   },
   nativeStudentHeroCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 12,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E5E7EB',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     elevation: 2,
   },
   studentHeroTopRow: {
@@ -7352,29 +7352,29 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   studentHeroAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#1E3A8A',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#111827',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#BFDBFE',
+    borderWidth: 1,
+    borderColor: '#374151',
   },
   studentHeroAvatarText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
   },
   studentHeroGreeting: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '600',
-    color: '#64748B',
+    color: '#6B7280',
   },
   studentHeroName: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#111827',
   },
   studentHeroBadgeRow: {
     flexDirection: 'row',
@@ -7382,7 +7382,9 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   studentHeroPill: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
@@ -7390,7 +7392,7 @@ const styles = StyleSheet.create({
   studentHeroPillText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#1E40AF',
+    color: '#111827',
   },
   native6Grid: {
     flexDirection: 'row',
@@ -7401,21 +7403,24 @@ const styles = StyleSheet.create({
   native6GridItem: {
     width: '31%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E5E7EB',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
     elevation: 1,
   },
   native6GridIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
@@ -7423,11 +7428,13 @@ const styles = StyleSheet.create({
   native6GridLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#1E293B',
+    color: '#111827',
     textAlign: 'center',
   },
   native6GridBadge: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
@@ -7435,8 +7442,8 @@ const styles = StyleSheet.create({
   },
   native6GridBadgeText: {
     fontSize: 9,
-    fontWeight: '800',
-    color: '#15803D',
+    fontWeight: '700',
+    color: '#111827',
   },
   libReturnBtn: {
     backgroundColor: '#EFF6FF',

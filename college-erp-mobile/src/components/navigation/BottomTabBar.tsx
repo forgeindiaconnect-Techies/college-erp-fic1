@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors } from '../../constants/designSystem';
 
 export type MainNavTab = 'home' | 'academics' | 'referrals' | 'notifications' | 'profile';
 
@@ -69,8 +70,6 @@ export default function BottomTabBar({
     </View>
   );
 }
-
-import { Colors } from '../../constants/designSystem';
 
 const styles = StyleSheet.create({
   tabBarWrapper: {

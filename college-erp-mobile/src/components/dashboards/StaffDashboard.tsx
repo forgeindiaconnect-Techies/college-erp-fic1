@@ -137,11 +137,26 @@ type StaffLeaveItem = {
   to: string;
   days: number;
   reason: string;
-  status: 'Approved' | 'Pending' | 'Rejected';
+  status: 'Approved' | 'Pending' | 'Rejected' | string;
   startDate?: string;
   endDate?: string;
   subType?: string;
   timeline?: { date: string; text: string }[];
+};
+
+type DeptApprovalLeaveItem = {
+  id: string;
+  applicantName: string;
+  role: 'Student' | 'Staff' | 'Parent' | string;
+  department: string;
+  type: string;
+  from: string;
+  to: string;
+  days: number;
+  reason: string;
+  status: string;
+  studentId?: string;
+  staffId?: string;
 };
 
 type PayrollSlip = {
@@ -496,7 +511,15 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   const [submittingAssignment, setSubmittingAssignment] = useState(false);
 
   // Leaves & Quota
+  const userRoleNormalized = (user.role || '').toLowerCase().trim();
+  const isHOD = userRoleNormalized.includes('hod');
+  const isAdmin = ['admin', 'superadmin', 'super admin', 'sub admin', 'principal'].includes(userRoleNormalized);
+  const canApproveLeaves = isHOD || isAdmin;
+
   const [leaves, setLeaves] = useState<StaffLeaveItem[]>([]);
+  const [deptLeaves, setDeptLeaves] = useState<DeptApprovalLeaveItem[]>([]);
+  const [leaveDeskTab, setLeaveDeskTab] = useState<'my' | 'approvals'>('my');
+  const [actioningLeaveId, setActioningLeaveId] = useState<string | null>(null);
   const [leaveModalVisible, setLeaveModalVisible] = useState(false);
   const [newLeaveType, setNewLeaveType] = useState('Casual Leave');
   const [newLeaveDates, setNewLeaveDates] = useState('');
@@ -971,10 +994,29 @@ export default function StaffDashboard({ user, onLogout }: Props) {
           to: l.endDate || l.to || l.startDate || 'Tomorrow',
           days: Number(l.daysCount || l.days || 1),
           reason: l.description || l.reason || 'Personal / Academic Commitment',
-          status: l.status === 'Approved' ? 'Approved' : (l.status === 'Rejected' ? 'Rejected' : 'Pending'),
+          status: l.status || 'Pending',
           timeline: l.timeline || [],
         }));
       setLeaves(staffLeaves);
+
+      // Department & Institutional Approval Queue (for HOD / Admin)
+      const approvalLeaves: DeptApprovalLeaveItem[] = Array.from(leaveMap.values())
+        .filter((r: any) => !isMyStaffRecord(r))
+        .map((l: any, idx: number) => ({
+          id: l._id || l.id || String(idx),
+          applicantName: l.studentName || l.staffName || l.name || (l.role === 'Parent' ? 'Parent / Ward' : 'Applicant'),
+          role: l.role || (l.studentId ? 'Student' : 'Staff'),
+          department: l.department || l.dept || 'General',
+          type: l.subType || l.leaveType || l.type || 'Leave',
+          from: l.startDate || l.from || 'Today',
+          to: l.endDate || l.to || l.startDate || 'Tomorrow',
+          days: Number(l.daysCount || l.days || 1),
+          reason: l.description || l.reason || 'Leave requested',
+          status: l.status || 'Pending',
+          studentId: l.studentId,
+          staffId: l.staffId,
+        }));
+      setDeptLeaves(approvalLeaves);
 
       const allSupportTickets: SupportTicketItem[] = rawSupport
         .filter((r: any) => isMyStaffRecord(r))
@@ -1637,6 +1679,9 @@ export default function StaffDashboard({ user, onLogout }: Props) {
     }
     try {
       setSubmittingLeave(true);
+      const initialStatus = isHOD || isAdmin ? 'Pending Admin Approval' : 'Pending HOD Approval';
+      const applicantRole = isHOD ? 'HOD' : (isAdmin ? 'Admin' : 'Staff');
+
       const leavePayload = {
         staffName: user.name || faculty.name,
         name: user.name || faculty.name,
@@ -1644,6 +1689,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         email: user.email || faculty.email,
         staffEmail: user.email || faculty.email,
         department: user.department || faculty.dept,
+        role: applicantRole,
         requestType: 'Leave',
         subType: newLeaveType,
         type: newLeaveType,
@@ -1653,6 +1699,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
         reason: reason,
         description: reason,
         priority: 'Medium',
+        status: initialStatus,
       };
 
       try {
@@ -1666,7 +1713,12 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       setNewLeaveStartDate('');
       setNewLeaveEndDate('');
       setNewLeaveReason('');
-      Alert.alert('Leave Application Submitted', 'Leave request has been forwarded to the Head of Department (HOD) for review.');
+      Alert.alert(
+        'Leave Application Submitted',
+        isHOD
+          ? 'Leave application submitted directly to Central Admin for approval.'
+          : 'Leave request has been forwarded to the Head of Department (HOD) for review.'
+      );
       await loadData();
     } catch (err: any) {
       Alert.alert('Notice', err?.message || 'Leave application registered successfully.');
@@ -1674,6 +1726,42 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       await loadData();
     } finally {
       setSubmittingLeave(false);
+    }
+  };
+
+  const handleReviewLeaveAction = async (leaveId: string, action: 'approve' | 'reject') => {
+    try {
+      setActioningLeaveId(leaveId);
+      const decisionStatus = action === 'approve'
+        ? (isHOD ? 'HOD Approved – Pending Admin Approval' : 'Approved')
+        : 'Rejected';
+      const remarks = action === 'approve'
+        ? (isHOD ? `Sanctioned by HOD (${user.name || 'HOD'}). Forwarded to Central Admin for final confirmation.` : `Approved by Admin (${user.name || 'Admin'}).`)
+        : `Rejected by ${isHOD ? 'HOD' : 'Admin'} (${user.name || 'Authority'}).`;
+
+      await apiPatch(`leaves/${leaveId}/status`, {
+        action,
+        status: decisionStatus,
+        remarks,
+      }).catch(async () => {
+        await apiPut(`leaves/${leaveId}`, {
+          action,
+          status: decisionStatus,
+          remarks,
+        });
+      });
+
+      Alert.alert(
+        action === 'approve' ? '✓ Leave Sanctioned' : '✕ Leave Rejected',
+        action === 'approve'
+          ? (isHOD ? 'Leave sanctioned and forwarded to Central Admin.' : 'Leave officially approved.')
+          : 'Leave application marked as rejected.'
+      );
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Action Failed', err?.message || 'Could not update leave status.');
+    } finally {
+      setActioningLeaveId(null);
     }
   };
 
@@ -2026,8 +2114,23 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   // 4. Staff Leaves Filtered List
   const filteredLeaves = useMemo(() => {
     if (leaveStatusFilter === 'All') return leaves;
+    if (leaveStatusFilter === 'Pending') {
+      return leaves.filter((l) => l.status !== 'Approved' && l.status !== 'Rejected' && l.status !== 'Cancelled');
+    }
     return leaves.filter((l) => l.status === leaveStatusFilter);
   }, [leaves, leaveStatusFilter]);
+
+  const filteredDeptLeaves = useMemo(() => {
+    if (leaveStatusFilter === 'All') return deptLeaves;
+    if (leaveStatusFilter === 'Pending') {
+      return deptLeaves.filter((l) => l.status !== 'Approved' && l.status !== 'Rejected' && l.status !== 'Cancelled');
+    }
+    return deptLeaves.filter((l) => l.status === leaveStatusFilter);
+  }, [deptLeaves, leaveStatusFilter]);
+
+  const pendingDeptLeavesCount = useMemo(() => {
+    return deptLeaves.filter((l) => l.status !== 'Approved' && l.status !== 'Rejected' && l.status !== 'Cancelled').length;
+  }, [deptLeaves]);
 
   // 5. Campus Support Filtered Tickets
   const filteredSupportTickets = useMemo(() => {
@@ -2458,9 +2561,9 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   id: 'attendance',
                   label: 'Take Attendance',
                   icon: '👥',
-                  bg: '#EFF6FF',
-                  borderColor: '#DBEAFE',
-                  textColor: '#1E40AF',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   badge: todayClasses.filter((c) => !c.attendanceMarked).length > 0 ? `${todayClasses.filter((c) => !c.attendanceMarked).length} Pending` : undefined,
                   onPress: () => {
                     setActiveTab('academics');
@@ -2471,9 +2574,9 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   id: 'marks',
                   label: 'Upload Marks',
                   icon: '📤',
-                  bg: '#ECFDF5',
-                  borderColor: '#D1FAE5',
-                  textColor: '#065F46',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   onPress: () => {
                     setActiveTab('academics');
                     setAcademicsTab('marks');
@@ -2483,9 +2586,9 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   id: 'assignments',
                   label: 'Assignments',
                   icon: '📑',
-                  bg: '#F5F3FF',
-                  borderColor: '#EDE9FE',
-                  textColor: '#5B21B6',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   onPress: () => {
                     setActiveTab('academics');
                     setAcademicsTab('assignments');
@@ -2495,9 +2598,9 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   id: 'myclass',
                   label: 'My Class',
                   icon: '🧑‍🤝‍🧑',
-                  bg: '#FFFBEB',
-                  borderColor: '#FEF3C7',
-                  textColor: '#92400E',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   badge: students.length > 0 ? `${students.length} Scholars` : undefined,
                   onPress: () => {
                     setActiveTab('academics');
@@ -2520,9 +2623,9 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   id: 'parcels',
                   label: 'Gate Parcels',
                   icon: '📦',
-                  bg: '#F0FDF4',
-                  borderColor: '#DCFCE7',
-                  textColor: '#166534',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   badge: pendingParcelCount > 0 ? `${pendingParcelCount} Ready` : undefined,
                   onPress: () => {
                     setActiveTab('profile');
@@ -2533,9 +2636,9 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   id: 'support',
                   label: 'Campus Support',
                   icon: '🛟',
-                  bg: '#EFF6FF',
-                  borderColor: '#DBEAFE',
-                  textColor: '#1E40AF',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   onPress: () => {
                     setActiveTab('profile');
                     setMoreSection('support');
@@ -2545,9 +2648,9 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   id: 'complaints',
                   label: 'Log Complaints',
                   icon: '🚨',
-                  bg: '#FEF2F2',
-                  borderColor: '#FEE2E2',
-                  textColor: '#991B1B',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   onPress: () => {
                     setActiveTab('profile');
                     setMoreSection('complaints');
@@ -2557,9 +2660,9 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   id: 'leaves',
                   label: 'Leave Desk',
                   icon: '📄',
-                  bg: '#FAF5FF',
-                  borderColor: '#F3E8FF',
-                  textColor: '#6B21A8',
+                  bg: '#FFFFFF',
+                  borderColor: '#E5E7EB',
+                  textColor: '#111827',
                   onPress: () => {
                     setActiveTab('profile');
                     setMoreSection('leaves');
@@ -4618,94 +4721,298 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   </TouchableOpacity>
                 </View>
 
-                {/* Leave Quota Grid */}
-                <View style={styles.leaveQuotaRow}>
-                  <View style={styles.leaveQuotaBox}>
-                    <Text style={styles.leaveQuotaCount}>{faculty.casualLeavesLeft}</Text>
-                    <Text style={styles.leaveQuotaLabel}>Casual Leave</Text>
-                  </View>
-                  <View style={styles.leaveQuotaBox}>
-                    <Text style={styles.leaveQuotaCount}>{faculty.sickLeavesLeft}</Text>
-                    <Text style={styles.leaveQuotaLabel}>Sick Leave</Text>
-                  </View>
-                  <View style={styles.leaveQuotaBox}>
-                    <Text style={styles.leaveQuotaCount}>15</Text>
-                    <Text style={styles.leaveQuotaLabel}>On-Duty (OD)</Text>
-                  </View>
-                </View>
-
-                {/* Leave Status Filter Pills */}
-                <View style={styles.serviceFilterScrollRow}>
-                  {(['All', 'Pending', 'Approved', 'Rejected'] as const).map((st) => (
+                {/* Sub-tabs for HOD / Admin: My Leaves vs Dept Approval Queue */}
+                {canApproveLeaves && (
+                  <View style={styles.serviceSubTabsContainer}>
                     <TouchableOpacity
-                      key={st}
-                      style={[styles.serviceFilterPill, leaveStatusFilter === st && styles.serviceFilterPillActive]}
-                      onPress={() => setLeaveStatusFilter(st)}
+                      style={[styles.serviceSubTab, leaveDeskTab === 'my' && styles.serviceSubTabActive]}
+                      onPress={() => setLeaveDeskTab('my')}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.serviceFilterPillText, leaveStatusFilter === st && styles.serviceFilterPillTextActive]}>
-                        {st}
+                      <Text style={[styles.serviceSubTabText, leaveDeskTab === 'my' && styles.serviceSubTabTextActive]}>
+                        My Leaves ({leaves.length})
                       </Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-
-                {filteredLeaves.length === 0 ? (
-                  <View style={styles.emptyStateContainer}>
-                    <Text style={styles.emptyStateEmoji}>📝</Text>
-                    <Text style={styles.emptyStateTitle}>No Leave Applications Found</Text>
-                    <Text style={styles.emptyStateSubtitle}>
-                      {leaveStatusFilter === 'All'
-                        ? "Tap '+ Apply Leave' above to submit a new leave application to the HOD."
-                        : `No applications with status '${leaveStatusFilter}'.`}
-                    </Text>
-                  </View>
-                ) : (
-                  filteredLeaves.map((l) => (
-                    <View key={l.id} style={styles.serviceCardBox}>
-                      <View style={styles.serviceCardTopRow}>
-                        <Text style={styles.serviceCardTitle}>{l.type}</Text>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            l.status === 'Approved'
-                              ? { backgroundColor: '#DCFCE7' }
-                              : l.status === 'Rejected'
-                              ? { backgroundColor: '#FEE2E2' }
-                              : { backgroundColor: '#FEF3C7' },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusBadgeText,
-                              l.status === 'Approved'
-                                ? { color: '#15803D' }
-                                : l.status === 'Rejected'
-                                ? { color: '#DC2626' }
-                                : { color: '#B45309' },
-                            ]}
-                          >
-                            {l.status}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={styles.leaveHistoryDates}>
-                        📅 Period: {l.from} - {l.to} ({l.days} Day{l.days > 1 ? 's' : ''})
+                    <TouchableOpacity
+                      style={[styles.serviceSubTab, leaveDeskTab === 'approvals' && styles.serviceSubTabActive]}
+                      onPress={() => setLeaveDeskTab('approvals')}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.serviceSubTabText, leaveDeskTab === 'approvals' && styles.serviceSubTabTextActive]}>
+                        Dept Approvals ({pendingDeptLeavesCount})
                       </Text>
-                      <Text style={styles.leaveHistoryReason}>Reason: {l.reason}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
-                      {l.timeline && l.timeline.length > 0 && (
-                        <View style={styles.leaveTimelineBox}>
-                          <Text style={styles.leaveTimelineTitle}>Review Timeline:</Text>
-                          {l.timeline.map((step, idx) => (
-                            <Text key={idx} style={styles.leaveTimelineItem}>
-                              • {step.text} ({step.date})
-                            </Text>
-                          ))}
-                        </View>
-                      )}
+                {/* TAB 1: MY LEAVES */}
+                {leaveDeskTab === 'my' && (
+                  <View>
+                    {/* Leave Quota Grid */}
+                    <View style={styles.leaveQuotaRow}>
+                      <View style={styles.leaveQuotaBox}>
+                        <Text style={styles.leaveQuotaCount}>{faculty.casualLeavesLeft}</Text>
+                        <Text style={styles.leaveQuotaLabel}>Casual Leave</Text>
+                      </View>
+                      <View style={styles.leaveQuotaBox}>
+                        <Text style={styles.leaveQuotaCount}>{faculty.sickLeavesLeft}</Text>
+                        <Text style={styles.leaveQuotaLabel}>Sick Leave</Text>
+                      </View>
+                      <View style={styles.leaveQuotaBox}>
+                        <Text style={styles.leaveQuotaCount}>15</Text>
+                        <Text style={styles.leaveQuotaLabel}>On-Duty (OD)</Text>
+                      </View>
                     </View>
-                  ))
+
+                    {/* Leave Status Filter Pills */}
+                    <View style={styles.serviceFilterScrollRow}>
+                      {(['All', 'Pending', 'Approved', 'Rejected'] as const).map((st) => (
+                        <TouchableOpacity
+                          key={st}
+                          style={[styles.serviceFilterPill, leaveStatusFilter === st && styles.serviceFilterPillActive]}
+                          onPress={() => setLeaveStatusFilter(st)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.serviceFilterPillText, leaveStatusFilter === st && styles.serviceFilterPillTextActive]}>
+                            {st}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {filteredLeaves.length === 0 ? (
+                      <View style={styles.emptyStateContainer}>
+                        <Text style={styles.emptyStateEmoji}>📝</Text>
+                        <Text style={styles.emptyStateTitle}>No Leave Applications Found</Text>
+                        <Text style={styles.emptyStateSubtitle}>
+                          {leaveStatusFilter === 'All'
+                            ? "Tap '+ Apply Leave' above to submit a new leave application."
+                            : `No applications with status '${leaveStatusFilter}'.`}
+                        </Text>
+                      </View>
+                    ) : (
+                      filteredLeaves.map((l) => {
+                        const isApproved = l.status === 'Approved';
+                        const isHodApproved = l.status === 'HOD Approved – Pending Admin Approval';
+                        const isPendingAdmin = l.status === 'Pending Admin Approval';
+                        const isRejected = l.status === 'Rejected';
+
+                        let badgeBg = '#FEF3C7';
+                        let badgeColor = '#B45309';
+                        let badgeText = '⏳ Pending Review';
+
+                        if (isApproved) {
+                          badgeBg = '#DCFCE7';
+                          badgeColor = '#15803D';
+                          badgeText = '✓ Approved by Admin';
+                        } else if (isHodApproved) {
+                          badgeBg = '#EFF6FF';
+                          badgeColor = '#1D4ED8';
+                          badgeText = '⏳ HOD Approved – Awaiting Admin';
+                        } else if (isPendingAdmin) {
+                          badgeBg = '#EFF6FF';
+                          badgeColor = '#2563EB';
+                          badgeText = '⏳ Pending Admin Approval';
+                        } else if (l.status === 'Pending HOD Approval' || l.status === 'Pending') {
+                          badgeBg = '#FEF3C7';
+                          badgeColor = '#B45309';
+                          badgeText = '⏳ Pending HOD Review';
+                        } else if (isRejected) {
+                          badgeBg = '#FEE2E2';
+                          badgeColor = '#DC2626';
+                          badgeText = '✕ Rejected';
+                        }
+
+                        return (
+                          <View key={l.id} style={styles.serviceCardBox}>
+                            <View style={styles.serviceCardTopRow}>
+                              <Text style={styles.serviceCardTitle}>{l.type}</Text>
+                              <View style={[styles.statusBadge, { backgroundColor: badgeBg }]}>
+                                <Text style={[styles.statusBadgeText, { color: badgeColor }]}>
+                                  {badgeText}
+                                </Text>
+                              </View>
+                            </View>
+                            <Text style={styles.leaveHistoryDates}>
+                              📅 Period: {l.from} - {l.to} ({l.days} Day{l.days > 1 ? 's' : ''})
+                            </Text>
+                            <Text style={styles.leaveHistoryReason}>Reason: {l.reason}</Text>
+
+                            {l.timeline && l.timeline.length > 0 && (
+                              <View style={styles.leaveTimelineBox}>
+                                <Text style={styles.leaveTimelineTitle}>Review Timeline:</Text>
+                                {l.timeline.map((step, idx) => (
+                                  <Text key={idx} style={styles.leaveTimelineItem}>
+                                    • {step.text} ({step.date})
+                                  </Text>
+                                ))}
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
+                )}
+
+                {/* TAB 2: DEPARTMENT APPROVAL QUEUE (HOD / Admin) */}
+                {leaveDeskTab === 'approvals' && (
+                  <View>
+                    <View style={[styles.serviceCardBox, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', marginBottom: 12 }]}>
+                      <Text style={{ fontSize: 12, color: '#1E40AF', fontWeight: '600', lineHeight: 18 }}>
+                        💡 <Text style={{ fontWeight: '800' }}>{isHOD ? 'Department HOD Sanction Desk' : 'Admin Sanction Desk'}:</Text> Review and approve student, faculty and staff absence requests for {faculty.dept}. Approved requests are synchronized in real-time across institutional web and mobile systems.
+                      </Text>
+                    </View>
+
+                    {/* Filter Pills */}
+                    <View style={styles.serviceFilterScrollRow}>
+                      {(['All', 'Pending', 'Approved', 'Rejected'] as const).map((st) => (
+                        <TouchableOpacity
+                          key={st}
+                          style={[styles.serviceFilterPill, leaveStatusFilter === st && styles.serviceFilterPillActive]}
+                          onPress={() => setLeaveStatusFilter(st)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.serviceFilterPillText, leaveStatusFilter === st && styles.serviceFilterPillTextActive]}>
+                            {st}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {filteredDeptLeaves.length === 0 ? (
+                      <View style={styles.emptyStateContainer}>
+                        <Text style={styles.emptyStateEmoji}>📋</Text>
+                        <Text style={styles.emptyStateTitle}>No Requests in Approval Queue</Text>
+                        <Text style={styles.emptyStateSubtitle}>
+                          {leaveStatusFilter === 'All'
+                            ? 'No student or department staff leave requests logged at this time.'
+                            : `No requests matching status '${leaveStatusFilter}'.`}
+                        </Text>
+                      </View>
+                    ) : (
+                      filteredDeptLeaves.map((l) => {
+                        const isApproved = l.status === 'Approved';
+                        const isHodApproved = l.status === 'HOD Approved – Pending Admin Approval';
+                        const isRejected = l.status === 'Rejected';
+                        const isPending = !isApproved && !isRejected && l.status !== 'Cancelled';
+                        const isActioning = actioningLeaveId === l.id;
+
+                        let badgeBg = '#FEF3C7';
+                        let badgeColor = '#B45309';
+                        let badgeText = '⏳ Pending Review';
+
+                        if (isApproved) {
+                          badgeBg = '#DCFCE7';
+                          badgeColor = '#15803D';
+                          badgeText = '✓ Approved';
+                        } else if (isHodApproved) {
+                          badgeBg = '#EFF6FF';
+                          badgeColor = '#1D4ED8';
+                          badgeText = '⏳ Forwarded to Admin';
+                        } else if (l.status === 'Pending Admin Approval') {
+                          badgeBg = '#EFF6FF';
+                          badgeColor = '#2563EB';
+                          badgeText = '⏳ Awaiting Admin';
+                        } else if (isRejected) {
+                          badgeBg = '#FEE2E2';
+                          badgeColor = '#DC2626';
+                          badgeText = '✕ Rejected';
+                        }
+
+                        return (
+                          <View key={l.id} style={[styles.serviceCardBox, { padding: 14, backgroundColor: '#FFFFFF' }]}>
+                            <View style={styles.serviceCardTopRow}>
+                              <View style={{ flex: 1, marginRight: 8 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                  <Text style={styles.serviceCardTitle}>{l.applicantName}</Text>
+                                  <Text style={{
+                                    fontSize: 10,
+                                    fontWeight: '800',
+                                    paddingHorizontal: 7,
+                                    paddingVertical: 2,
+                                    borderRadius: 10,
+                                    backgroundColor: l.role === 'Student' ? '#E0F2FE' : (l.role === 'Parent' ? '#FCE7F3' : '#EDE9FE'),
+                                    color: l.role === 'Student' ? '#0369A1' : (l.role === 'Parent' ? '#BE185D' : '#6D28D9'),
+                                  }}>
+                                    {l.role}
+                                  </Text>
+                                </View>
+                                <Text style={styles.serviceCardMeta}>
+                                  {l.department} • {l.studentId || l.staffId ? `ID: ${l.studentId || l.staffId}` : 'ID: Registered'} • {l.type}
+                                </Text>
+                              </View>
+                              <View style={[styles.statusBadge, { backgroundColor: badgeBg }]}>
+                                <Text style={[styles.statusBadgeText, { color: badgeColor }]}>
+                                  {badgeText}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <Text style={[styles.leaveHistoryDates, { marginTop: 4 }]}>
+                              📅 Period: {l.from} - {l.to} ({l.days} Day{l.days > 1 ? 's' : ''})
+                            </Text>
+                            <Text style={[styles.leaveHistoryReason, { marginTop: 2 }]}>
+                              Reason: "{l.reason}"
+                            </Text>
+
+                            {/* Action Buttons if Pending Review */}
+                            {isPending && (
+                              <View style={{ flexDirection: 'row', gap: 10, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                                <TouchableOpacity
+                                  style={{
+                                    flex: 1,
+                                    backgroundColor: '#16A34A',
+                                    paddingVertical: 10,
+                                    borderRadius: 8,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    opacity: isActioning ? 0.7 : 1,
+                                  }}
+                                  onPress={() => handleReviewLeaveAction(l.id, 'approve')}
+                                  disabled={isActioning}
+                                  activeOpacity={0.8}
+                                >
+                                  {isActioning ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                  ) : (
+                                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>
+                                      {isHOD ? '✓ Sanction & Forward' : '✓ Approve Leave'}
+                                    </Text>
+                                  )}
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  style={{
+                                    flex: 1,
+                                    backgroundColor: '#FEF2F2',
+                                    borderWidth: 1,
+                                    borderColor: '#FECACA',
+                                    paddingVertical: 10,
+                                    borderRadius: 8,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    opacity: isActioning ? 0.7 : 1,
+                                  }}
+                                  onPress={() => handleReviewLeaveAction(l.id, 'reject')}
+                                  disabled={isActioning}
+                                  activeOpacity={0.8}
+                                >
+                                  {isActioning ? (
+                                    <ActivityIndicator size="small" color="#DC2626" />
+                                  ) : (
+                                    <Text style={{ color: '#DC2626', fontWeight: '800', fontSize: 12 }}>
+                                      ✕ Reject Leave
+                                    </Text>
+                                  )}
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
                 )}
               </View>
             )}
@@ -6759,7 +7066,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F9FAFB',
   },
   topHeaderBar: {
     backgroundColor: '#FFFFFF',
@@ -6770,7 +7077,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#E5E7EB',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -6782,7 +7089,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#1E3A8A',
+    backgroundColor: '#111827',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
@@ -6801,13 +7108,15 @@ const styles = StyleSheet.create({
   roleTag: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#6B7280',
   },
   empIdTag: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#2563EB',
-    backgroundColor: '#EFF6FF',
+    color: '#111827',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 4,
@@ -6815,14 +7124,16 @@ const styles = StyleSheet.create({
   headerNameText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#111827',
   },
   headerSubText: {
     fontSize: 11,
-    color: '#64748B',
+    color: '#6B7280',
   },
   headerSignOutBtn: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -6843,31 +7154,31 @@ const styles = StyleSheet.create({
 
   // HERO CARD
   heroGreetingCard: {
-    backgroundColor: '#1E3A8A',
-    borderRadius: 16,
-    padding: 18,
-    shadowColor: '#0F172A',
+    backgroundColor: '#111827',
+    borderRadius: 14,
+    padding: 16,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 3,
   },
   greetingTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 2,
   },
   greetingSub: {
     fontSize: 12,
-    color: '#BFDBFE',
-    marginBottom: 16,
+    color: '#9CA3AF',
+    marginBottom: 14,
   },
   heroKpiRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 10,
     padding: 12,
   },
   heroKpiItem: {
@@ -6876,11 +7187,11 @@ const styles = StyleSheet.create({
   },
   heroKpiDivider: {
     width: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   heroKpiLabel: {
     fontSize: 11,
-    color: '#BFDBFE',
+    color: '#9CA3AF',
     marginBottom: 2,
   },
   heroKpiValue: {
@@ -6890,20 +7201,20 @@ const styles = StyleSheet.create({
   },
   heroKpiSub: {
     fontSize: 10,
-    color: '#E2E8F0',
+    color: '#E5E7EB',
   },
 
   // CARDS & HEADINGS
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
     elevation: 1,
   },
   cardHeaderRow: {
@@ -6913,15 +7224,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardHeaderTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#111827',
     marginBottom: 2,
   },
   cardHeaderLink: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#2563EB',
+    color: '#111827',
   },
   sectionSubtitle: {
     fontSize: 12,
