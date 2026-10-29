@@ -1802,7 +1802,7 @@ const CampusMembersRegisterPage = ({ defaultTab }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {loadingMovements || loadingStaff || loadingStudents ? (
+                  {loadingMovements || loadingDirectory ? (
                     <tr>
                       <td colSpan={9} style={{ textAlign: 'center', padding: '40px 20px' }}>
                         <RefreshCw size={26} className="wmn-spin" style={{ color: '#2563eb', margin: '0 auto 10px auto' }} />
@@ -2049,17 +2049,19 @@ const CampusMembersRegisterPage = ({ defaultTab }) => {
                             <button
                               type="button"
                               onClick={() => {
-                                setModalRole(item.role.toLowerCase());
-                                setLogFormData({
-                                  personId: item.id,
-                                  name: item.name,
-                                  role: item.role,
-                                  personType: item.role,
-                                  department: item.department || '',
-                                  direction: item.isInside ? 'Out' : 'In',
-                                  reason: item.isInside ? 'Campus Departure' : 'Regular Campus Entry',
-                                  gate: currentGate || 'Gate 1 (Main Entrance)',
-                                  vehicleType: 'None',
+                                const roleLower = item.role.toLowerCase();
+                                setModalRole(roleLower);
+                                setIdInput(item.id || '');
+                                setFormData({
+                                  personId: item.id || '',
+                                  name: item.name || '',
+                                  role: item.role || 'Staff',
+                                  department: item.department || 'General',
+                                  designation: item.designation || (roleLower === 'student' ? 'Student' : 'Staff'),
+                                  movementType: item.isInside ? 'Out' : 'In',
+                                  gate: 'Gate 1 (Main Entrance)',
+                                  reason: item.isInside ? 'Campus Departure' : (roleLower === 'student' ? 'Regular Daily Class / Lab' : 'Official College Duty'),
+                                  passNumber: '',
                                   vehicleNumber: '',
                                   remarks: ''
                                 });
