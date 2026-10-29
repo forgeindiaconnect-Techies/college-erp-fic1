@@ -730,3 +730,48 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+@keyframes laserScan {
+  0% { top: 8%; opacity: 0.8; }
+  50% { top: 88%; opacity: 1; }
+  100% { top: 8%; opacity: 0.8; }
+}
+
+/* Print Styles for Gate Reports */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 10px !important;
+    font-size: 10pt !important;
+  }
+
+  .wmn-sidebar,
+  .wmn-topbar,
+  .wmn-page-header,
+  .wmn-tab-btn,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  .report-print-header {
+    display: block !important;
+  }
+
+  .wmn-card {
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    margin-bottom: 12px !important;
+    page-break-inside: avoid;
+  }
+
+  .wmn-table th,
+  .wmn-table td {
+    padding: 6px 8px !important;
+    font-size: 8.5pt !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+}
+

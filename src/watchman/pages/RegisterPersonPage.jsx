@@ -7,6 +7,7 @@ import {
   Sparkles, ExternalLink, Shield, Check
 } from 'lucide-react';
 import { registerCampusPerson, recordCampusIn } from '../../api';
+import { getGatePassUrl, getQrCodeImageUrl } from '../../utils/qrPassHelper';
 import '../watchman.css';
 
 const DEPARTMENTS = [
@@ -124,10 +125,12 @@ const RegisterPersonPage = () => {
       };
 
       const res = await registerCampusPerson(payload);
-      if (res.data?.success) {
-        setRegisteredPerson(res.data.data);
+        const personData = res.data.data;
+        const verifyUrl = getGatePassUrl(personData.personId, personData.personType || personType);
+        personData.qrCodeUrl = getQrCodeImageUrl(verifyUrl, 300);
+        personData.verifyUrl = verifyUrl;
+        setRegisteredPerson(personData);
         setSuccess(res.data.message || `${personType} registered successfully.`);
-      }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to register person. Please try again.');
     } finally {

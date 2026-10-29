@@ -7,7 +7,8 @@ import {
   Sparkles, Camera, CameraOff, AlertCircle, UserPlus,
   LogIn, LogOut, GraduationCap, UserCheck, ShieldCheck,
   ChevronRight, Calendar, Upload, Image as ImageIcon,
-  Car, Eye, Filter, Printer, Download, ExternalLink
+  Car, Eye, Filter, Printer, Download, ExternalLink,
+  Scan, X
 } from 'lucide-react';
 import {
   lookupCampusPerson,
@@ -32,6 +33,8 @@ import {
   loadQrScannerEngine
 } from '../../utils/qrDecoder';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
+import DigitalSecurityPassCard from '../components/DigitalSecurityPassCard';
+import { getGatePassUrl, getQrCodeImageUrl } from '../../utils/qrPassHelper';
 import '../watchman.css';
 
 const GATES = [
@@ -50,6 +53,9 @@ const QrVerificationPage = () => {
   const initialParams = new URLSearchParams(location.search);
   const initialType = initialParams.get('type');
   const initialCode = initialParams.get('code') || initialParams.get('id');
+
+  const isDirectPassRoute = location.pathname === '/verify-gate-pass' || Boolean(initialCode);
+  const [showFullDashboard, setShowFullDashboard] = useState(!isDirectPassRoute);
 
   const [activeMode, setActiveMode] = useState(
     initialType === 'visitor' || initialCode?.startsWith('PASS-') || initialCode?.startsWith('V-')
@@ -96,6 +102,7 @@ const QrVerificationPage = () => {
   const [visitorStatusFilter, setVisitorStatusFilter] = useState('All'); // 'All' | 'Inside' | 'Pre-Registered' | 'Checked Out'
 
   // Camera Live Scanner State
+  const [showScanModal, setShowScanModal] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraFacing, setCameraFacing] = useState('environment'); // 'environment' | 'user'
   const [cameraError, setCameraError] = useState('');
@@ -107,6 +114,7 @@ const QrVerificationPage = () => {
   const fileInputRef = useRef(null);
   const lastScannedCodeRef = useRef('');
   const lastScannedTimeRef = useRef(0);
+  const [modalInputCode, setModalInputCode] = useState('');
 
   // Live Stats
   const [stats, setStats] = useState({
@@ -232,6 +240,7 @@ const QrVerificationPage = () => {
       setCrossScanAlert(null);
       setIdentifiedPerson(null);
       if (code) {
+        setShowFullDashboard(false);
         setPassQuery(code);
         setVisitorResult(null);
         handleLookupVisitorDirect(code);
@@ -242,6 +251,7 @@ const QrVerificationPage = () => {
       setSearchInput(code);
       setIdentifiedPerson(null);
       setVisitorResult(null);
+      setShowFullDashboard(false);
       handleLookupMember(code);
     } else if (type === 'members') {
       setActiveMode('members_scanner');
@@ -257,6 +267,12 @@ const QrVerificationPage = () => {
       setCameraError('');
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraError('Camera API is not supported on this browser or context is insecure (HTTPS or localhost required).');
+        setCameraActive(false);
+        return;
       }
       const constraints = {
         video: { facingMode: cameraFacing, width: { ideal: 640 }, height: { ideal: 480 } }
@@ -265,15 +281,26 @@ const QrVerificationPage = () => {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraActive(true);
-        startDetectionLoop();
+        try {
+          await videoRef.current.play();
+        } catch (_) {}
+      } else {
+        setTimeout(async () => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            try {
+              await videoRef.current.play();
+            } catch (_) {}
+          }
+        }, 150);
       }
+      setCameraActive(true);
+      startDetectionLoop();
     } catch (err) {
       console.warn('Camera stream notice:', err);
-      setCameraError(err.name === 'NotAllowedError'
-        ? 'Camera permission denied. Please allow camera permissions in your browser or use the manual search field below.'
-        : `Camera unavailable (${err.message || 'no webcam detected'}). You can use a barcode scanner gun or enter ID manually below.`);
+      setCameraError(err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
+        ? 'Camera permission denied. Please allow camera permissions in your browser address bar to scan QR codes directly.'
+        : `Camera unavailable (${err.message || 'no webcam detected'}). You can upload a QR code image or enter ID manually below.`);
       setCameraActive(false);
     }
   };
@@ -290,12 +317,24 @@ const QrVerificationPage = () => {
     setCameraActive(false);
   };
 
+  const openScannerModal = () => {
+    setShowScanModal(true);
+    setTimeout(() => {
+      startCamera();
+    }, 100);
+  };
+
+  const closeScannerModal = () => {
+    setShowScanModal(false);
+    stopCamera();
+  };
+
   const toggleCameraFacing = () => {
     const nextFacing = cameraFacing === 'environment' ? 'user' : 'environment';
     setCameraFacing(nextFacing);
     if (cameraActive) {
       stopCamera();
-      setTimeout(() => startCamera(), 200);
+      setTimeout(() => startCamera(), 150);
     }
   };
 
@@ -345,6 +384,9 @@ const QrVerificationPage = () => {
           setScanPulse(true);
           setTimeout(() => setScanPulse(false), 1400);
 
+          // Close modal automatically on successful scan
+          closeScannerModal();
+
           if (activeMode === 'members_scanner') {
             setSearchInput(cleanCode);
             handleLookupMember(cleanCode);
@@ -369,6 +411,7 @@ const QrVerificationPage = () => {
         playScanBeep();
         setScanPulse(true);
         setTimeout(() => setScanPulse(false), 1400);
+        closeScannerModal();
         const code = decoded.trim();
         if (activeMode === 'members_scanner') {
           setSearchInput(code);
@@ -387,6 +430,7 @@ const QrVerificationPage = () => {
     }
   };
 
+  // Cleanup camera stream on unmount
   useEffect(() => {
     return () => {
       stopCamera();
@@ -451,13 +495,11 @@ const QrVerificationPage = () => {
       }
     } catch (err) {
       if (err.response?.data?.isVisitorPass) {
-        setCrossScanAlert({
-          type: 'visitor_on_members',
-          code: code,
-          name: err.response.data.name,
-          message: err.response.data.message || `Visitor Pass detected. This scanner is strictly for Students, Staff, and HODs.`
-        });
-        if (!isSilent) setIdentifiedPerson(null);
+        setActiveMode('visitor_scanner');
+        setPassQuery(code);
+        setIdentifiedPerson(null);
+        handleLookupVisitorDirect(code);
+        return;
       } else if (!isSilent) {
         setIdentifiedPerson(null);
         setErrorMsg(err.response?.data?.message || `No registered student, staff, or HOD found matching "${code}".`);
@@ -581,14 +623,11 @@ const QrVerificationPage = () => {
       }
     } catch (err) {
       if (err.response?.data?.isMemberPass) {
-        setCrossScanAlert({
-          type: 'member_on_visitors',
-          code: cleanCode,
-          name: err.response.data.name,
-          personType: err.response.data.personType,
-          message: err.response.data.message || `College member pass detected. This area is strictly for Visitors.`
-        });
+        setActiveMode('members_scanner');
+        setSearchInput(cleanCode);
         setVisitorResult(null);
+        handleLookupMember(cleanCode);
+        return;
       } else if (!keepCurrent) {
         setVisitorResult(null);
         setErrorMsg(err.response?.data?.message || 'Verification failed. Pass record not found.');
@@ -721,8 +760,8 @@ const QrVerificationPage = () => {
     const v = visitorResult?.data || visitorResult?.visitor || visitorResult;
     if (!v) return;
     const passCode = v.passNumber || v.visitorId || v._id;
-    const verifyUrl = `${window.location.origin}/watchman/qr-verification?type=visitor&code=${encodeURIComponent(passCode)}`;
-    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=10&data=${encodeURIComponent(verifyUrl)}`;
+    const verifyUrl = getGatePassUrl(passCode, 'visitor');
+    const qrImageUrl = getQrCodeImageUrl(verifyUrl, 400);
 
     fetch(qrImageUrl)
       .then(res => res.blob())
@@ -812,6 +851,54 @@ const QrVerificationPage = () => {
   const visitorExitedCount = visitorsList.filter(v => v.status === 'Exited' || v.status === 'Checked Out').length;
   const visitorPreRegCount = visitorsList.filter(v => v.status === 'Pre-Registered').length;
 
+  // When in Focused Digital Pass View (Mobile scans, Google Lens, or direct pass URL)
+  if (!showFullDashboard && (isDirectPassRoute || identifiedPerson || visitorResult || lookingUp || visitorLoading)) {
+    return (
+      <div className="wmn-page-container" style={{ padding: '0 0 40px 0', background: '#f8fafc', minHeight: '100vh' }}>
+        <DigitalSecurityPassCard
+          person={activeMode === 'members_scanner' ? (identifiedPerson || (visitorResult?.personType ? visitorResult : null)) : null}
+          visitor={activeMode === 'visitor_scanner' ? visitorResult : null}
+          loading={lookingUp || visitorLoading}
+          error={errorMsg}
+          success={successMsg}
+          gate={gate}
+          onGateChange={setGate}
+          remarks={remarks}
+          onRemarksChange={setRemarks}
+          onRecordIn={() => {
+            if (identifiedPerson) handleRecordInForPerson();
+            else if (visitorResult) handleRecordVisitorIn();
+          }}
+          onRecordOut={() => {
+            if (identifiedPerson) handleRecordOutForPerson();
+            else if (visitorResult) handleRecordVisitorOut();
+          }}
+          actionLoading={actionLoading || visitorLoading}
+          movements={personMovements}
+          onManualSearch={(q) => {
+            if (q.startsWith('PASS-') || q.startsWith('V-')) {
+              setActiveMode('visitor_scanner');
+              handleLookupVisitorDirect(q);
+            } else {
+              setActiveMode('members_scanner');
+              handleLookupMember(q);
+            }
+          }}
+          onSwitchToDashboard={() => setShowFullDashboard(true)}
+          onClear={() => {
+            setIdentifiedPerson(null);
+            setVisitorResult(null);
+            setSearchInput('');
+            setPassQuery('');
+            setErrorMsg('');
+            setSuccessMsg('');
+          }}
+          searchedCode={searchInput || passQuery || initialCode || ''}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="wmn-page-container">
       {/* Page Header */}
@@ -847,6 +934,48 @@ const QrVerificationPage = () => {
               ))}
             </select>
           </div>
+
+          <button
+            type="button"
+            className="wmn-btn-primary"
+            style={{ fontSize: '0.82rem', padding: '6px 14px', background: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onClick={openScannerModal}
+            title="Open camera to scan QR code"
+          >
+            <Camera size={15} />
+            <span>Scan QR Code</span>
+          </button>
+
+          <button
+            type="button"
+            className="wmn-btn-sec"
+            style={{ fontSize: '0.82rem', padding: '6px 14px', background: '#ecfdf5', color: '#065f46', borderColor: '#a7f3d0', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+            onClick={() => {
+              if (activeMode === 'members_scanner') {
+                if (identifiedPerson) {
+                  setShowFullDashboard(false);
+                } else if (membersList && membersList.length > 0) {
+                  handleSelectMemberCard(membersList[0]);
+                  setShowFullDashboard(false);
+                } else {
+                  setErrorMsg('Please select a member from the directory or enter their ID to view pass.');
+                }
+              } else {
+                if (visitorResult) {
+                  setShowFullDashboard(false);
+                } else if (visitorsList && visitorsList.length > 0) {
+                  handleSelectVisitorCard(visitorsList[0]);
+                  setShowFullDashboard(false);
+                } else {
+                  setErrorMsg('Please select a visitor or enter their Pass # to view pass.');
+                }
+              }
+            }}
+            title="Switch to dedicated Pass View"
+          >
+            <ShieldCheck size={15} style={{ color: '#059669' }} />
+            <span>View Pass Card</span>
+          </button>
 
           <button
             type="button"
@@ -1159,6 +1288,134 @@ const QrVerificationPage = () => {
           </button>
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* QUICK VERIFICATION & HARDWARE BARCODE SCANNER TOOLBAR                */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      <div className="wmn-card" style={{
+        marginBottom: '20px',
+        padding: '16px 20px',
+        background: '#ffffff',
+        borderRadius: '12px',
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)'
+      }}>
+        {/* Hidden File Input for QR Image Upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleFileUpload}
+        />
+
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          flexWrap: 'wrap'
+        }}>
+          {/* Left: Input for Hardware Barcode Gun / Manual Roll # Entry */}
+          <div style={{ flex: 1, minWidth: '320px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <Scan size={16} style={{ color: '#2563eb' }} />
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {activeMode === 'visitor_scanner' ? 'Visitor Pass Scanner / Pass ID Verification' : 'Member Scanner Gun / Roll # & ID Verification'}
+              </span>
+              <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                (Supports USB barcode guns, Bluetooth scanners, and direct manual entry)
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                className="wmn-form-input"
+                style={{
+                  fontSize: '0.88rem',
+                  padding: '9px 14px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #cbd5e1',
+                  flex: 1
+                }}
+                placeholder={activeMode === 'visitor_scanner' ? 'Scan visitor pass barcode or type pass number (e.g. PASS-1001)...' : 'Scan card barcode or type Student / Staff ID (e.g. STU001, STF001)...'}
+                value={activeMode === 'visitor_scanner' ? passQuery : searchInput}
+                onChange={(e) => activeMode === 'visitor_scanner' ? setPassQuery(e.target.value) : setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (activeMode === 'visitor_scanner') {
+                      handleLookupVisitorDirect(passQuery);
+                    } else {
+                      handleLookupMember(searchInput);
+                    }
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="wmn-btn-primary"
+                style={{ fontSize: '0.85rem', padding: '9px 20px', background: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}
+                onClick={() => {
+                  if (activeMode === 'visitor_scanner') {
+                    handleLookupVisitorDirect(passQuery);
+                  } else {
+                    handleLookupMember(searchInput);
+                  }
+                }}
+                disabled={lookingUp || visitorLoading}
+              >
+                <Search size={15} />
+                <span>Verify</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Right: Camera Scanner & Upload Triggers */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              className="wmn-btn-primary"
+              style={{
+                fontSize: '0.86rem',
+                padding: '9px 18px',
+                background: '#059669',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 12px rgba(5, 150, 105, 0.25)',
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+                borderRadius: '8px'
+              }}
+              onClick={openScannerModal}
+              title="Open live camera to scan QR code"
+            >
+              <Camera size={16} />
+              <span>Open Camera Scanner</span>
+            </button>
+
+            <button
+              type="button"
+              className="wmn-btn-sec"
+              style={{
+                fontSize: '0.84rem',
+                padding: '9px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              title="Upload QR photo or screenshot"
+            >
+              <Upload size={15} />
+              <span>Upload QR</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {/* MODE 1: MEMBER QR SCANNER (STUDENTS, STAFF & HOD)                    */}
@@ -1503,6 +1760,27 @@ const QrVerificationPage = () => {
                       </span>
                       <button
                         type="button"
+                        onClick={() => setShowFullDashboard(false)}
+                        style={{
+                          background: '#eff6ff',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '6px',
+                          padding: '4px 10px',
+                          fontSize: '0.74rem',
+                          color: '#1e40af',
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        title="View dedicated Digital Pass Card"
+                      >
+                        <QrCode size={13} />
+                        <span>Pass Card</span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => {
                           setIdentifiedPerson(null);
                           setSearchInput('');
@@ -1679,12 +1957,44 @@ const QrVerificationPage = () => {
                 </div>
               );
             })() : (
-              <div className="wmn-card" style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
-                <Shield size={48} style={{ color: '#cbd5e1', margin: '0 auto 12px auto' }} />
-                <h4 style={{ margin: '0 0 6px 0', color: '#1e293b' }}>No Member Identity Loaded</h4>
-                <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                  Scan a QR card using the camera, scan with a barcode gun, or select from the Registered Members list on the left.
+              <div className="wmn-card" style={{ textAlign: 'center', padding: '48px 24px', color: '#64748b' }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  background: '#eff6ff',
+                  color: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 14px auto'
+                }}>
+                  <Scan size={28} />
+                </div>
+                <h4 style={{ margin: '0 0 6px 0', color: '#1e293b', fontSize: '1.05rem', fontWeight: 800 }}>Ready to Verify Campus Member</h4>
+                <p style={{ margin: '0 auto 18px auto', fontSize: '0.84rem', color: '#64748b', maxWidth: '320px', lineHeight: 1.5 }}>
+                  Scan a Student Roll Card, Staff ID, or HOD QR code with the camera, hardware scanner gun, or select from the directory on the left.
                 </p>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="wmn-btn-primary"
+                    style={{ fontSize: '0.84rem', padding: '9px 16px', background: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    onClick={openScannerModal}
+                  >
+                    <Camera size={15} />
+                    <span>Open Camera Scanner</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="wmn-btn-sec"
+                    style={{ fontSize: '0.84rem', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload size={14} />
+                    <span>Upload QR</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -2068,6 +2378,27 @@ const QrVerificationPage = () => {
                           </span>
                           <button
                             type="button"
+                            onClick={() => setShowFullDashboard(false)}
+                            style={{
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '6px',
+                              padding: '5px 10px',
+                              fontSize: '0.74rem',
+                              color: '#1e40af',
+                              cursor: 'pointer',
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title="View dedicated Digital Pass Card"
+                          >
+                            <QrCode size={13} />
+                            <span>Pass Card</span>
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => {
                               setVisitorResult(null);
                               setPassQuery('');
@@ -2226,14 +2557,309 @@ const QrVerificationPage = () => {
                 </div>
               );
             })() : (
-              <div className="wmn-card" style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
-                <Shield size={48} style={{ color: '#cbd5e1', margin: '0 auto 12px auto' }} />
-                <h4 style={{ margin: '0 0 6px 0', color: '#1e293b' }}>No Visitor Pass Loaded</h4>
-                <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                  Scan a visitor's QR badge, enter a pass number, or select from the Registered Visitors list on the left.
+              <div className="wmn-card" style={{ textAlign: 'center', padding: '48px 24px', color: '#64748b' }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  background: '#eff6ff',
+                  color: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 14px auto'
+                }}>
+                  <ShieldCheck size={28} />
+                </div>
+                <h4 style={{ margin: '0 0 6px 0', color: '#1e293b', fontSize: '1.05rem', fontWeight: 800 }}>Ready to Verify Visitor Pass</h4>
+                <p style={{ margin: '0 auto 18px auto', fontSize: '0.84rem', color: '#64748b', maxWidth: '320px', lineHeight: 1.5 }}>
+                  Scan the Visitor QR pass using the camera scanner, hardware barcode reader, or click any visitor from the registered directory.
                 </p>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="wmn-btn-primary"
+                    style={{ fontSize: '0.84rem', padding: '9px 16px', background: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    onClick={openScannerModal}
+                  >
+                    <Camera size={15} />
+                    <span>Open Camera Scanner</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="wmn-btn-sec"
+                    style={{ fontSize: '0.84rem', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload size={14} />
+                    <span>Upload QR</span>
+                  </button>
+                </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* ON-DEMAND CAMERA SCANNER MODAL DIALOG                                 */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {showScanModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(5px)',
+          WebkitBackdropFilter: 'blur(5px)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '520px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '16px 20px',
+              borderBottom: '1px solid #e2e8f0',
+              background: '#f8fafc'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '8px',
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Camera size={18} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                    {activeMode === 'visitor_scanner' ? 'Scan Visitor QR Pass' : 'Scan Member QR Code'}
+                  </h3>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                    Align QR code within the target frame to auto-verify
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeScannerModal}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b'
+                }}
+                title="Close Scanner"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body / Camera Viewport */}
+            <div style={{ padding: '20px', background: '#0f172a' }}>
+              <div style={{
+                position: 'relative',
+                width: '100%',
+                aspectRatio: '4/3',
+                background: '#020617',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                border: scanPulse ? '2.5px solid #22c55e' : '2px solid #334155',
+                boxShadow: scanPulse ? '0 0 25px rgba(34, 197, 94, 0.4)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: cameraActive ? 'block' : 'none'
+                  }}
+                />
+
+                {!cameraActive && (
+                  <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>
+                    {cameraError ? (
+                      <div style={{ color: '#f87171', fontSize: '0.85rem' }}>
+                        <AlertCircle size={32} style={{ margin: '0 auto 8px', color: '#ef4444' }} />
+                        <div style={{ fontWeight: 700, marginBottom: '6px' }}>Camera Access Notice</div>
+                        <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginBottom: '12px', maxWidth: '320px', lineHeight: 1.4 }}>{cameraError}</div>
+                        <button
+                          type="button"
+                          className="wmn-btn-primary"
+                          style={{ fontSize: '0.78rem', padding: '6px 14px' }}
+                          onClick={startCamera}
+                        >
+                          Retry Camera
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <CameraOff size={36} style={{ margin: '0 auto 8px', color: '#64748b' }} />
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>Starting camera...</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Viewfinder Target Reticle */}
+                {cameraActive && (
+                  <div style={{
+                    position: 'absolute',
+                    inset: '12%',
+                    border: scanPulse ? '2.5px solid #22c55e' : '2px dashed rgba(255, 255, 255, 0.7)',
+                    borderRadius: '12px',
+                    boxShadow: scanPulse ? '0 0 20px rgba(34, 197, 94, 0.6)' : '0 0 0 9999px rgba(0, 0, 0, 0.4)',
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      height: '2px',
+                      background: 'linear-gradient(90deg, transparent, #ef4444, #3b82f6, transparent)',
+                      boxShadow: '0 0 8px #3b82f6',
+                      animation: 'laserScan 2s ease-in-out infinite'
+                    }} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Manual Code / Barcode Scanner Input */}
+            <div style={{
+              padding: '12px 20px',
+              background: '#1e293b',
+              borderTop: '1px solid #334155',
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center'
+            }}>
+              <input
+                type="text"
+                placeholder={activeMode === 'visitor_scanner' ? 'Or enter Pass # or Phone (e.g. PASS-2026-001)...' : 'Or enter Roll No, Staff ID, or HOD ID...'}
+                value={modalInputCode}
+                onChange={(e) => setModalInputCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && modalInputCode.trim()) {
+                    const code = modalInputCode.trim();
+                    setModalInputCode('');
+                    closeScannerModal();
+                    if (activeMode === 'members_scanner') {
+                      setSearchInput(code);
+                      handleLookupMember(code);
+                    } else {
+                      setPassQuery(code);
+                      handleLookupVisitorDirect(code);
+                    }
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #475569',
+                  background: '#0f172a',
+                  color: '#ffffff',
+                  fontSize: '0.84rem'
+                }}
+              />
+              <button
+                type="button"
+                className="wmn-btn-primary"
+                style={{ fontSize: '0.82rem', padding: '8px 16px', background: '#2563eb' }}
+                onClick={() => {
+                  if (!modalInputCode.trim()) return;
+                  const code = modalInputCode.trim();
+                  setModalInputCode('');
+                  closeScannerModal();
+                  if (activeMode === 'members_scanner') {
+                    setSearchInput(code);
+                    handleLookupMember(code);
+                  } else {
+                    setPassQuery(code);
+                    handleLookupVisitorDirect(code);
+                  }
+                }}
+              >
+                Verify Code
+              </button>
+            </div>
+
+            {/* Modal Footer Controls */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '14px 20px',
+              borderTop: '1px solid #e2e8f0',
+              background: '#ffffff'
+            }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="wmn-btn-sec"
+                  style={{ fontSize: '0.8rem', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  onClick={toggleCameraFacing}
+                  title="Flip camera (Front / Rear)"
+                >
+                  <RefreshCw size={13} />
+                  <span>Flip</span>
+                </button>
+                <button
+                  type="button"
+                  className="wmn-btn-sec"
+                  style={{ fontSize: '0.8rem', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Upload QR Image"
+                >
+                  <Upload size={13} />
+                  <span>Upload QR</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="wmn-btn-sec"
+                style={{ fontSize: '0.82rem', padding: '8px 16px' }}
+                onClick={closeScannerModal}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { type MobileUser } from '../../services/api';
 import { Colors, Shadows, Spacing, Radius, Typography } from '../../constants/designSystem';
+import { LogoutIcon } from '../navigation/ScreenHeader';
 
 export type UserProfileProps = {
   user: MobileUser;
@@ -67,7 +68,7 @@ export default function UserProfileScreen({
             activeOpacity={0.7}
             accessibilityLabel="Log out"
           >
-            <Text style={styles.headerLogoutIcon}>🚪</Text>
+            <LogoutIcon size={16} color="#DC2626" />
           </TouchableOpacity>
         </View>
       )}
@@ -172,7 +173,7 @@ export default function UserProfileScreen({
             accessibilityLabel="Sign Out of College ERP"
             accessibilityRole="button"
           >
-            <Text style={styles.logoutButtonIcon}>🚪</Text>
+            <LogoutIcon size={16} color="#FFFFFF" />
             <Text style={styles.logoutButtonText}>Sign Out of College ERP</Text>
           </TouchableOpacity>
         </View>

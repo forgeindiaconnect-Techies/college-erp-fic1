@@ -2,6 +2,9 @@ import express from 'express';
 import StaffSupportRecord from '../models/StaffSupportRecord.js';
 import User from '../models/User.js';
 import Notification from '../models/Notification.js';
+import EmployeeAttendance from '../models/EmployeeAttendance.js';
+import WatchmanAttendance from '../models/WatchmanAttendance.js';
+import TransportDriverAttendance from '../models/TransportDriverAttendance.js';
 import { protect, collegeScope } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -88,6 +91,210 @@ const broadcastUpdate = (req, formattedData, action = 'updated') => {
   }
 };
 
+// 0. GET REAL-TIME ATTENDANCE AND ABSENCE SUMMARY (Calculated from actual DB records)
+router.get('/attendance-summary', async (req, res) => {
+  try {
+    const tenantId = req.collegeId || req.user?.collegeId || req.user?.tenantId || 'COL001';
+    const selectedDate = req.query.date || new Date().toISOString().split('T')[0];
+    const roleFilter = (req.query.role || 'All').trim();
+
+    // 1. Determine role filter for Users
+    let targetRoles = [];
+    if (roleFilter === 'Watchman') {
+      targetRoles = ['Watchman'];
+    } else if (roleFilter === 'Driver') {
+      targetRoles = ['Driver'];
+    } else if (roleFilter === 'Staff' || roleFilter === 'Faculty') {
+      targetRoles = ['Staff', 'Faculty', 'Teacher'];
+    } else if (roleFilter === 'HOD') {
+      targetRoles = ['HOD'];
+    } else {
+      // 'All' or empty: all employees (Watchman, Driver, Staff, Faculty, HOD)
+      targetRoles = ['Staff', 'Faculty', 'HOD', 'Watchman', 'Driver'];
+    }
+
+    // Tenant query for users
+    const userTenantQuery = {
+      role: { $in: targetRoles },
+      $or: [
+        { collegeId: tenantId },
+        { collegeId: 'COL001' },
+        { tenantId: tenantId },
+        { tenantId: 'COL001' },
+        { collegeId: 'unassigned_college' },
+        { collegeId: { $exists: false } }
+      ]
+    };
+
+    const employees = await User.find(userTenantQuery).lean();
+    const totalEmployees = employees.length;
+
+    // 2. Fetch approved leaves for the selected date
+    // An approved leave has startDate <= selectedDate and endDate >= selectedDate, status: 'Approved'
+    const leaveQuery = {
+      requestType: 'Leave',
+      status: 'Approved',
+      startDate: { $lte: selectedDate },
+      endDate: { $gte: selectedDate },
+      role: { $in: targetRoles },
+      $or: [
+        { collegeId: tenantId },
+        { collegeId: 'COL001' },
+        { collegeId: 'unassigned_college' },
+        { collegeId: { $exists: false } }
+      ]
+    };
+
+    const approvedLeaves = await StaffSupportRecord.find(leaveQuery).lean();
+
+    // Map approved leave employees
+    const onLeaveEmpMap = new Map();
+    for (const l of approvedLeaves) {
+      if (l.staffId) onLeaveEmpMap.set(String(l.staffId).toLowerCase().trim(), l);
+      if (l.staffName) onLeaveEmpMap.set(String(l.staffName).toLowerCase().trim(), l);
+      if (l.email) onLeaveEmpMap.set(String(l.email).toLowerCase().trim(), l);
+    }
+
+    // 3. Fetch attendance records for selectedDate
+    // For Staff / Faculty / HOD -> EmployeeAttendance
+    // For Watchman -> WatchmanAttendance
+    // For Driver -> TransportDriverAttendance
+    const presentEmpMap = new Map();
+
+    const startOfDay = new Date(selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // a) EmployeeAttendance
+    try {
+      const empAtt = await EmployeeAttendance.find({
+        date: { $gte: startOfDay, $lte: endOfDay },
+        status: { $in: ['Present', 'Checked In', 'On Duty', 'Half Day'] }
+      }).lean();
+      for (const a of empAtt) {
+        if (a.employeeId) presentEmpMap.set(String(a.employeeId).toLowerCase(), a);
+      }
+    } catch (e) {
+      console.warn('Error reading EmployeeAttendance:', e.message);
+    }
+
+    // b) WatchmanAttendance
+    try {
+      const wAtt = await WatchmanAttendance.find({
+        date: selectedDate,
+        status: { $in: ['On Duty', 'Completed', 'Present', 'Late', 'Half Day'] }
+      }).lean();
+      for (const a of wAtt) {
+        if (a.watchmanId) presentEmpMap.set(String(a.watchmanId).toLowerCase(), a);
+        if (a.employeeId) presentEmpMap.set(String(a.employeeId).toLowerCase(), a);
+        if (a.watchmanName) presentEmpMap.set(String(a.watchmanName).toLowerCase(), a);
+      }
+    } catch (e) {
+      console.warn('Error reading WatchmanAttendance:', e.message);
+    }
+
+    // c) TransportDriverAttendance
+    try {
+      const dAtt = await TransportDriverAttendance.find({
+        date: selectedDate,
+        status: 'Present'
+      }).lean();
+      for (const a of dAtt) {
+        if (a.driverId) presentEmpMap.set(String(a.driverId).toLowerCase(), a);
+        if (a.driverName) presentEmpMap.set(String(a.driverName).toLowerCase(), a);
+      }
+    } catch (e) {
+      console.warn('Error reading TransportDriverAttendance:', e.message);
+    }
+
+    // 4. Evaluate each employee's status without double counting
+    let presentCount = 0;
+    let approvedLeaveCount = 0;
+    let absentCount = 0;
+
+    const roster = employees.map(emp => {
+      const empId = String(emp._id || '').toLowerCase();
+      const refId = String(emp.referenceId || '').toLowerCase();
+      const empName = String(emp.name || '').toLowerCase();
+      const empEmail = String(emp.email || '').toLowerCase();
+
+      // Check if on approved leave
+      const isApprovedLeave = onLeaveEmpMap.has(empId) ||
+        (refId && onLeaveEmpMap.has(refId)) ||
+        (empName && onLeaveEmpMap.has(empName)) ||
+        (empEmail && onLeaveEmpMap.has(empEmail));
+
+      // Check if marked present
+      const isPresent = !isApprovedLeave && (
+        presentEmpMap.has(empId) ||
+        (refId && presentEmpMap.has(refId)) ||
+        (empName && presentEmpMap.has(empName)) ||
+        (empEmail && presentEmpMap.has(empEmail))
+      );
+
+      let status = 'Absent';
+      if (isApprovedLeave) {
+        status = 'On Approved Leave';
+        approvedLeaveCount++;
+      } else if (isPresent) {
+        status = 'Present';
+        presentCount++;
+      } else {
+        status = 'Absent';
+        absentCount++;
+      }
+
+      return {
+        id: emp._id,
+        name: emp.name,
+        role: emp.role,
+        department: emp.department || (emp.role === 'Watchman' ? 'Security & Gate' : emp.role === 'Driver' ? 'Transport' : 'General'),
+        employeeId: emp.referenceId || emp.userId || String(emp._id).slice(-6),
+        status,
+        date: selectedDate
+      };
+    });
+
+    // 5. Query Pending & Rejected counts for Leave Requests
+    const leaveStatsQuery = {
+      requestType: 'Leave',
+      $or: [
+        { collegeId: tenantId },
+        { collegeId: 'COL001' },
+        { collegeId: 'unassigned_college' },
+        { collegeId: { $exists: false } }
+      ]
+    };
+    if (roleFilter !== 'All') {
+      leaveStatsQuery.role = { $in: targetRoles };
+    }
+
+    const allLeaveRecords = await StaffSupportRecord.find(leaveStatsQuery).lean();
+    const pendingCount = allLeaveRecords.filter(l => {
+      const st = (l.status || '').toLowerCase();
+      return st.includes('pending') && !st.includes('approved') && !st.includes('rejected');
+    }).length;
+    const rejectedCount = allLeaveRecords.filter(l => (l.status || '').toLowerCase() === 'rejected').length;
+
+    res.json({
+      success: true,
+      selectedDate,
+      roleFilter,
+      totalEmployees,
+      presentCount,
+      absentCount,
+      approvedLeaveCount,
+      pendingCount,
+      rejectedCount,
+      roster
+    });
+  } catch (err) {
+    console.error('Error calculating attendance summary:', err);
+    res.status(500).json({ success: false, message: 'Failed to calculate attendance summary', error: err.message });
+  }
+});
+
 // 1. GET ALL LEAVES (with role-based filtering)
 router.get('/', async (req, res) => {
   try {
@@ -112,6 +319,15 @@ router.get('/', async (req, res) => {
       if (req.user?.email) staffFilter.push({ email: { $regex: new RegExp(`^${req.user.email.trim()}$`, 'i') } });
 
       query.$and = [{ $or: query.$or }, { $or: staffFilter.length > 0 ? staffFilter : [{ staffName: req.user.name }] }];
+      delete query.$or;
+    } else if (role === 'watchman' || role === 'driver') {
+      const empFilter = [];
+      if (req.user?.name) empFilter.push({ staffName: { $regex: new RegExp(`^${req.user.name.trim()}$`, 'i') } });
+      if (req.user?.referenceId) empFilter.push({ staffId: req.user.referenceId });
+      if (req.user?._id) empFilter.push({ staffId: req.user._id.toString() });
+      if (req.user?.email) empFilter.push({ email: { $regex: new RegExp(`^${req.user.email.trim()}$`, 'i') } });
+
+      query.$and = [{ $or: query.$or }, { $or: empFilter.length > 0 ? empFilter : [{ staffName: req.user.name }] }];
       delete query.$or;
     } else if (role === 'student') {
       const studentFilter = [{ staffName: req.user.name }];
@@ -239,9 +455,29 @@ router.post('/', async (req, res) => {
       } catch {}
     }
 
+    // Prevent duplicate pending leave requests for the same applicant on overlapping dates
+    const duplicateQuery = {
+      requestType: 'Leave',
+      startDate: sDate,
+      endDate: eDate,
+      status: { $in: ['Pending', 'Pending HOD Approval', 'Pending Admin Approval', 'HOD Approved – Pending Admin Approval'] },
+      $or: [
+        { staffName: applicantName },
+        ...(req.user?.referenceId ? [{ staffId: req.user.referenceId }] : []),
+        ...(req.user?._id ? [{ staffId: req.user._id.toString() }] : [])
+      ]
+    };
+    const duplicate = await StaffSupportRecord.findOne(duplicateQuery);
+    if (duplicate) {
+      return res.status(409).json({
+        success: false,
+        message: `A pending leave request already exists for ${applicantName} for the period ${sDate} to ${eDate}.`
+      });
+    }
+
     // Role-based Initial Status & Audit Trail
     // Staff & Student -> 'Pending HOD Approval'
-    // HOD & Parent -> 'Pending Admin Approval'
+    // HOD, Parent, Watchman & Driver -> 'Pending Admin Approval'
     const normRole = normalizeRole(applicantRole);
     let initialStatus = 'Pending HOD Approval';
     let initialNote = `Leave application submitted (${leaveCategory}). Awaiting HOD review.`;
@@ -252,6 +488,9 @@ router.post('/', async (req, res) => {
     } else if (normRole === 'hod') {
       initialStatus = 'Pending Admin Approval';
       initialNote = `HOD leave application submitted (${leaveCategory}). Forwarded directly to Admin for approval.`;
+    } else if (normRole === 'watchman' || normRole === 'driver') {
+      initialStatus = 'Pending Admin Approval';
+      initialNote = `${applicantRole} leave application submitted (${leaveCategory}). Awaiting Central Admin approval.`;
     } else if (normRole === 'student') {
       initialStatus = 'Pending HOD Approval';
       initialNote = `Student leave application submitted (${leaveCategory}). Awaiting Department HOD review.`;
@@ -477,7 +716,7 @@ const handleStatusUpdate = async (req, res) => {
             title: 'Leave Application Approved! ✓',
             message: `Leave application for ${leave.staffName} (${leave.startDate} to ${leave.endDate}) has received final approval from Central Admin.`,
             type: 'Success',
-            link: isParentRequest ? '/parent/leaves' : (applicantRole === 'student' ? '/student/leaves' : '/staff/leaves'),
+            link: applicantRole === 'watchman' ? '/watchman/leaves' : (applicantRole === 'driver' ? '/driver/leaves' : (isParentRequest ? '/parent/leaves' : (applicantRole === 'student' ? '/student/leaves' : '/staff/leaves'))),
             collegeId: leave.collegeId,
             tenantId: leave.collegeId
           }).save();
@@ -513,7 +752,7 @@ const handleStatusUpdate = async (req, res) => {
             title: 'Leave Request Rejected by Admin',
             message: `Leave application for ${leave.staffName} (${leave.startDate}) was declined by Central Admin. Reason: ${leave.rejectionReason}`,
             type: 'Warning',
-            link: isParentRequest ? '/parent/leaves' : (applicantRole === 'student' ? '/student/leaves' : '/staff/leaves'),
+            link: applicantRole === 'watchman' ? '/watchman/leaves' : (applicantRole === 'driver' ? '/driver/leaves' : (isParentRequest ? '/parent/leaves' : (applicantRole === 'student' ? '/student/leaves' : '/staff/leaves'))),
             collegeId: leave.collegeId,
             tenantId: leave.collegeId
           }).save();

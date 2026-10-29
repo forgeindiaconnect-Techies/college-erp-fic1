@@ -3,8 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -14,8 +12,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Linking,
 } from 'react-native';
-import { apiGet, apiPost, type MobileUser } from '../../services/api';
+import { apiGet, apiPost, getCurrentBaseUrl, type MobileUser } from '../../services/api';
 
 type Props = {
   user: MobileUser;
@@ -23,83 +22,138 @@ type Props = {
   onNavigateHome?: () => void;
 };
 
-type VisitorSubTab = 'active' | 'new_entry' | 'preregistered' | 'qr_verify' | 'history';
+// 3 Distinct Tabs as requested: Visitors, Pre-Visitors, and dedicated Visitor Scanner
+export type VisitorSection = 'visitors' | 'pre_visitors' | 'scanner';
+type DirectoryFilter = 'all' | 'inside' | 'exited' | 'awaiting';
 
-export default function WatchmanVisitorModule({ user, assignedGate = 'Gate 1 (Main Entrance)' }: Props) {
-  const [activeSubTab, setActiveSubTab] = useState<VisitorSubTab>('active');
+const GATES = [
+  'Gate 1 (Main Entrance)',
+  'Gate 2 (North Gate)',
+  'Gate 3 (Hostel Gate)',
+  'Gate 4 (Sports Complex Gate)',
+  'Gate 5 (Back Gate / Delivery Bay)',
+];
+
+const PURPOSES = [
+  'Admissions Enquiry',
+  'Parent Meeting / Ward Visit',
+  'Official Campus Meeting / Vendor',
+  'Guest Lecture / Speaker',
+  'Placement Interview / Recruiter',
+  'Maintenance / Facility Service',
+  'Document Submission / Attestation',
+  'Hostel Resident Visit',
+  'Other',
+];
+
+const ID_TYPES = [
+  'Aadhaar Card',
+  'Driving License',
+  'Voter ID',
+  'PAN Card',
+  'College ID',
+  'Passport',
+  'Other Govt ID',
+];
+
+export default function WatchmanVisitorModule({
+  user,
+  assignedGate = 'Gate 1 (Main Entrance)',
+}: Props) {
+  // Sub-tabs: 'visitors', 'pre_visitors', 'scanner'
+  const [activeSection, setActiveSection] = useState<VisitorSection>('visitors');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [performingId, setPerformingId] = useState<string | null>(null);
 
-  // Real-time Visitors Directory (All Registered, Inside & Exited)
+  // Visitors data from backend
   const [allVisitors, setAllVisitors] = useState<any[]>([]);
-  const [visitorFilter, setVisitorFilter] = useState<'all' | 'registered' | 'inside' | 'exited'>('all');
 
-  // Active Visitors
-  const [activeVisitors, setActiveVisitors] = useState<any[]>([]);
-  const [activeSearch, setActiveSearch] = useState('');
+  // Filters & Search per tab
+  const [visitorSearch, setVisitorSearch] = useState('');
+  const [visitorFilter, setVisitorFilter] = useState<DirectoryFilter>('all');
 
-  // Pre-Registered Visitors
-  const [preRegisteredVisitors, setPreRegisteredVisitors] = useState<any[]>([]);
-  const [preRegSearch, setPreRegSearch] = useState('');
+  const [preSearch, setPreSearch] = useState('');
+  const [preFilter, setPreFilter] = useState<DirectoryFilter>('all');
 
-  // History Logs
-  const [visitorHistory, setVisitorHistory] = useState<any[]>([]);
-  const [historySearch, setHistorySearch] = useState('');
+  // Register New Visitor Form Modal / Expand state
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [formName, setFormName] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+  const [formPurpose, setFormPurpose] = useState('Admissions Enquiry');
+  const [formPersonToMeet, setFormPersonToMeet] = useState('');
+  const [formDepartment, setFormDepartment] = useState('General');
+  const [formVehicle, setFormVehicle] = useState('');
+  const [formIdType, setFormIdType] = useState('Aadhaar Card');
+  const [formIdNumber, setFormIdNumber] = useState('');
+  const [formImmediateIn, setFormImmediateIn] = useState(true);
+  const [formSubmitting, setFormSubmitting] = useState(false);
 
-  // New Visitor Form State
-  const [visName, setVisName] = useState('');
-  const [visPhone, setVisPhone] = useState('');
-  const [visEmail, setVisEmail] = useState('');
-  const [visPurpose, setVisPurpose] = useState('');
-  const [visHost, setVisHost] = useState('');
-  const [visDept, setVisDept] = useState('');
-  const [visIdType, setVisIdType] = useState('Aadhaar');
-  const [visIdNumber, setVisIdNumber] = useState('');
-  const [visVehicle, setVisVehicle] = useState('');
-  const [visDuration, setVisDuration] = useState('1 Hour');
-  const [submittingNewVisitor, setSubmittingNewVisitor] = useState(false);
+  // Pre-Register Guest Form Modal state
+  const [showPreRegisterForm, setShowPreRegisterForm] = useState(false);
+  const [preName, setPreName] = useState('');
+  const [prePhone, setPrePhone] = useState('');
+  const [prePurpose, setPrePurpose] = useState('Official Campus Meeting / Vendor');
+  const [preHost, setPreHost] = useState('');
+  const [preDept, setPreDept] = useState('General');
+  const [preDate, setPreDate] = useState(new Date().toISOString().slice(0, 10));
+  const [preTime, setPreTime] = useState('10:00 AM');
+  const [preSubmitting, setPreSubmitting] = useState(false);
 
-  // Visitor QR Verification State
-  const [qrCodeInput, setQrCodeInput] = useState('');
-  const [verifiedPass, setVerifiedPass] = useState<any | null>(null);
-  const [verifyingPass, setVerifyingPass] = useState(false);
-  const [passActionLoading, setPassActionLoading] = useState(false);
+  // Generated Digital QR Pass Modal
+  const [generatedPass, setGeneratedPass] = useState<any | null>(null);
 
-  // Digital Pass View Modal
-  const [selectedPassModal, setSelectedPassModal] = useState<any | null>(null);
+  // Dedicated Visitor Scanner state
+  const [scanPassCode, setScanPassCode] = useState('');
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scannedVisitor, setScannedVisitor] = useState<any | null>(null);
+  const [scanActionLoading, setScanActionLoading] = useState(false);
 
   // ----------------------------------------------------------------------
-  // LOAD REAL DATA FROM BACKEND (Synced with Web Flow)
+  // LOAD REAL VISITORS FROM BACKEND
   // ----------------------------------------------------------------------
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
-      const [allVisRes, activeRes, preRegRes, historyRes] = await Promise.allSettled([
+      if (!isSilent) setLoading(true);
+
+      const [visitorsRes, preRes] = await Promise.allSettled([
         apiGet<any>('watchman/visitors'),
-        apiGet<any>('watchman/visitors/active'),
         apiGet<any>('watchman/visitors/pre-registered'),
-        apiGet<any>('watchman/visitors/history'),
       ]);
 
-      if (allVisRes.status === 'fulfilled') {
-        const raw = Array.isArray(allVisRes.value?.data) ? allVisRes.value.data : Array.isArray(allVisRes.value) ? allVisRes.value : [];
-        setAllVisitors(raw);
+      const map = new Map<string, any>();
+
+      // 1. Regular Visitors
+      if (visitorsRes.status === 'fulfilled' && visitorsRes.value) {
+        const list = Array.isArray(visitorsRes.value.data)
+          ? visitorsRes.value.data
+          : Array.isArray(visitorsRes.value)
+          ? visitorsRes.value
+          : [];
+        list.forEach((v: any) => {
+          const key = (v.passNumber || v.visitorId || v._id || '').toUpperCase();
+          if (key) map.set(key, v);
+        });
       }
-      if (activeRes.status === 'fulfilled') {
-        const raw = Array.isArray(activeRes.value?.data) ? activeRes.value.data : Array.isArray(activeRes.value) ? activeRes.value : [];
-        setActiveVisitors(raw);
+
+      // 2. Pre-Registered Visitors
+      if (preRes.status === 'fulfilled' && preRes.value) {
+        const preList = Array.isArray(preRes.value.data)
+          ? preRes.value.data
+          : Array.isArray(preRes.value)
+          ? preRes.value
+          : [];
+        preList.forEach((pv: any) => {
+          const key = (pv.passNumber || pv.visitorId || pv._id || '').toUpperCase();
+          if (key) {
+            map.set(key, { ...pv, isPreRegistered: true });
+          }
+        });
       }
-      if (preRegRes.status === 'fulfilled') {
-        const raw = Array.isArray(preRegRes.value?.data) ? preRegRes.value.data : Array.isArray(preRegRes.value) ? preRegRes.value : [];
-        setPreRegisteredVisitors(raw);
-      }
-      if (historyRes.status === 'fulfilled') {
-        const raw = Array.isArray(historyRes.value?.data) ? historyRes.value.data : Array.isArray(historyRes.value) ? historyRes.value : [];
-        setVisitorHistory(raw);
-      }
+
+      setAllVisitors(Array.from(map.values()));
     } catch (err) {
-      console.warn('WatchmanVisitorModule data error:', err);
+      console.warn('WatchmanVisitorModule load error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -108,377 +162,363 @@ export default function WatchmanVisitorModule({ user, assignedGate = 'Gate 1 (Ma
 
   useEffect(() => {
     loadData();
+    const timer = setInterval(() => {
+      loadData(true);
+    }, 5000);
+    return () => clearInterval(timer);
   }, [loadData]);
 
   // ----------------------------------------------------------------------
-  // ACTION: RECORD VISITOR CAMPUS IN (LOGIN)
+  // SPLIT WALK-IN VISITORS VS PRE-REGISTERED VISITORS
   // ----------------------------------------------------------------------
-  const handleRecordVisitorIn = async (visitor: any) => {
-    const vId = visitor._id || visitor.id || visitor.passNumber;
-    const vName = visitor.name || 'Visitor';
-    try {
-      setActionLoadingId(vId);
-      await apiPost(`watchman/visitors/${vId}/in`, { gate: assignedGate });
-      Alert.alert('✓ Campus In Recorded', `Visitor ${vName} entry authorized. Status updated to Inside Campus.`);
-      await loadData();
-    } catch (err: any) {
-      Alert.alert('Campus In Notice', err?.message || 'Visitor marked as inside campus.');
-      await loadData();
-    } finally {
-      setActionLoadingId(null);
+  const regularVisitorsList = useMemo(() => {
+    return allVisitors.filter((v) => !v.isPreRegistered);
+  }, [allVisitors]);
+
+  const preRegisteredVisitorsList = useMemo(() => {
+    return allVisitors.filter((v) => !!v.isPreRegistered);
+  }, [allVisitors]);
+
+  // Filtered Regular Visitors
+  const displayedVisitors = useMemo(() => {
+    let pool = regularVisitorsList;
+    if (visitorFilter === 'inside') {
+      pool = pool.filter((v) => (v.status || '').toLowerCase().includes('inside'));
+    } else if (visitorFilter === 'exited') {
+      pool = pool.filter((v) => (v.status || '').toLowerCase().includes('exited') || (v.status || '').toLowerCase().includes('departed'));
     }
-  };
+    if (!visitorSearch.trim()) return pool;
+    const q = visitorSearch.toLowerCase().trim();
+    return pool.filter((v) => {
+      const name = (v.name || '').toLowerCase();
+      const pass = (v.passNumber || v.visitorId || '').toLowerCase();
+      const host = (v.personToMeet || '').toLowerCase();
+      const phone = (v.phone || '').toLowerCase();
+      const dept = (v.department || '').toLowerCase();
+      return name.includes(q) || pass.includes(q) || host.includes(q) || phone.includes(q) || dept.includes(q);
+    });
+  }, [regularVisitorsList, visitorFilter, visitorSearch]);
 
-  // ----------------------------------------------------------------------
-  // ACTION: RECORD VISITOR EXIT
-  // ----------------------------------------------------------------------
-  const handleRecordExit = async (visitor: any) => {
-    const vId = visitor._id || visitor.id;
-    const vName = visitor.name || 'Visitor';
-    Alert.alert(
-      'Confirm Visitor Exit',
-      `Mark visitor ${vName} as departed from campus through ${assignedGate}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm Exit',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setActionLoadingId(vId);
-              await apiPost(`watchman/visitors/${vId}/exit`, { gate: assignedGate });
-              Alert.alert('✓ Visitor Departed', `Departure recorded for ${vName}. Gate pass archived.`);
-              await loadData();
-            } catch (err: any) {
-              Alert.alert('Exit Recorded', err?.message || 'Visitor marked as exited.');
-              await loadData();
-            } finally {
-              setActionLoadingId(null);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  // ----------------------------------------------------------------------
-  // ACTION: ADMIT PRE-REGISTERED VISITOR
-  // ----------------------------------------------------------------------
-  const handleAdmitPreRegistered = async (item: any) => {
-    const vId = item._id || item.id;
-    const vName = item.name || 'Guest';
-    try {
-      setActionLoadingId(vId);
-      const res = await apiPost<any>(`watchman/visitors/${vId}/admit`, {
-        gate: assignedGate,
-      });
-      Alert.alert('✓ Visitor Admitted', `${vName} has been admitted. Security Gate Pass issued.`);
-      setActiveSubTab('active');
-      await loadData();
-    } catch (err: any) {
-      Alert.alert('Admit Notice', err?.message || 'Visitor admitted.');
-      await loadData();
-    } finally {
-      setActionLoadingId(null);
+  // Filtered Pre-Registered Visitors
+  const displayedPreVisitors = useMemo(() => {
+    let pool = preRegisteredVisitorsList;
+    if (preFilter === 'awaiting') {
+      pool = pool.filter((v) => !(v.status || '').toLowerCase().includes('inside') && !(v.status || '').toLowerCase().includes('exited'));
+    } else if (preFilter === 'inside') {
+      pool = pool.filter((v) => (v.status || '').toLowerCase().includes('inside'));
+    } else if (preFilter === 'exited') {
+      pool = pool.filter((v) => (v.status || '').toLowerCase().includes('exited') || (v.status || '').toLowerCase().includes('departed'));
     }
-  };
+    if (!preSearch.trim()) return pool;
+    const q = preSearch.toLowerCase().trim();
+    return pool.filter((v) => {
+      const name = (v.name || '').toLowerCase();
+      const pass = (v.passNumber || v.visitorId || '').toLowerCase();
+      const host = (v.personToMeet || '').toLowerCase();
+      const phone = (v.phone || '').toLowerCase();
+      return name.includes(q) || pass.includes(q) || host.includes(q) || phone.includes(q);
+    });
+  }, [preRegisteredVisitorsList, preFilter, preSearch]);
+
+  // Metric counts
+  const regularInsideCount = regularVisitorsList.filter((v) => (v.status || '').toLowerCase().includes('inside')).length;
+  const regularExitedCount = regularVisitorsList.filter((v) => (v.status || '').toLowerCase().includes('exited')).length;
+
+  const preAwaitingCount = preRegisteredVisitorsList.filter((v) => !(v.status || '').toLowerCase().includes('inside') && !(v.status || '').toLowerCase().includes('exited')).length;
+  const preInsideCount = preRegisteredVisitorsList.filter((v) => (v.status || '').toLowerCase().includes('inside')).length;
 
   // ----------------------------------------------------------------------
-  // ACTION: SUBMIT NEW VISITOR ENTRY
+  // VISITOR ACTIONS: CAMPUS IN & CAMPUS OUT
   // ----------------------------------------------------------------------
-  const handleSubmitNewVisitor = async () => {
-    if (!visName.trim() || !visPhone.trim() || !visPurpose.trim()) {
-      Alert.alert('Missing Fields', 'Please fill Visitor Name, Phone Number, and Purpose of Visit.');
+  const handleVisitorIn = async (visitor: any) => {
+    const vId = visitor.visitorId || visitor.passNumber || visitor._id;
+    const isInside = (visitor.status || '').toLowerCase().includes('inside');
+
+    if (isInside) {
+      Alert.alert(
+        '⚠️ Already Inside Campus',
+        `${visitor.name} (${visitor.passNumber}) is already marked as INSIDE campus.`
+      );
       return;
     }
+
     try {
-      setSubmittingNewVisitor(true);
-      const res = await apiPost<any>('watchman/visitors/entry', {
-        name: visName.trim(),
-        phone: visPhone.trim(),
-        email: visEmail.trim() || undefined,
-        purpose: visPurpose.trim(),
-        personToMeet: visHost.trim() || 'Administration',
-        department: visDept.trim() || undefined,
-        idProofType: visIdType,
-        idProofNumber: visIdNumber.trim() || undefined,
-        vehicleNo: visVehicle.trim().toUpperCase() || undefined,
-        expectedDuration: visDuration,
+      setPerformingId(vId);
+      setScanActionLoading(true);
+
+      const targetId = visitor._id || visitor.visitorId || visitor.passNumber;
+      const res = await apiPost<any>(`watchman/visitors/${encodeURIComponent(targetId)}/in`, {
         gate: assignedGate,
       });
 
-      const passData = res?.data || res;
-      Alert.alert('✓ Gate Pass Issued', `Visitor pass generated for ${visName.trim()}. Pass #${passData?.passNumber || 'Generated'}`);
-      
-      // Reset form
-      setVisName('');
-      setVisPhone('');
-      setVisEmail('');
-      setVisPurpose('');
-      setVisHost('');
-      setVisDept('');
-      setVisIdNumber('');
-      setVisVehicle('');
-      
-      if (passData) {
-        setSelectedPassModal(passData);
-      }
-      setActiveSubTab('active');
-      await loadData();
-    } catch (err: any) {
-      Alert.alert('Notice', err?.message || 'Visitor pass issued.');
-      setActiveSubTab('active');
-      await loadData();
-    } finally {
-      setSubmittingNewVisitor(false);
-    }
-  };
-
-  // ----------------------------------------------------------------------
-  // ACTION: VERIFY VISITOR PASS QR CODE (Visitors ONLY)
-  // ----------------------------------------------------------------------
-  const handleVerifyPassQr = async (codeToVerify?: string) => {
-    const code = (codeToVerify || qrCodeInput).trim();
-    if (!code) {
-      Alert.alert('Input Required', 'Please enter a Visitor Pass number, booking ID, or scan visitor QR.');
-      return;
-    }
-    try {
-      setVerifyingPass(true);
-      setVerifiedPass(null);
-
-      // 0. Pre-check for known Student / Staff / HOD code formats
-      if (/^(STU-|STF-|HOD-|FAC-|21CS|21EC|21ME)/i.test(code)) {
+      if (res?.success !== false) {
         Alert.alert(
-          '⚠️ College Member Pass Detected',
-          `This pass (${code}) belongs to a registered Student, Staff, or HOD.\n\nVisitor QR Scanner is strictly for visitors. Please use the Gate Operations QR Scanner under Gate Ops.`,
-          [{ text: 'OK' }]
+          '✓ Visitor Admitted',
+          `${visitor.name} (${visitor.passNumber}) has been admitted INSIDE campus through ${assignedGate}.`
         );
+        if (scannedVisitor && (scannedVisitor.passNumber === visitor.passNumber || scannedVisitor._id === visitor._id)) {
+          setScannedVisitor((prev: any) => ({ ...prev, status: 'Inside Campus' }));
+        }
+      } else {
+        Alert.alert('Notice', res.message || 'Could not admit visitor.');
+      }
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Action Notice', err?.message || `Updated entry for ${visitor.name}.`);
+      await loadData();
+    } finally {
+      setPerformingId(null);
+      setScanActionLoading(false);
+    }
+  };
+
+  const handleVisitorOut = async (visitor: any) => {
+    const vId = visitor.visitorId || visitor.passNumber || visitor._id;
+    const isInside = (visitor.status || '').toLowerCase().includes('inside');
+
+    if (!isInside) {
+      Alert.alert(
+        '⚠️ Visitor Not Inside',
+        `${visitor.name} (${visitor.passNumber}) is not currently marked as inside campus.`
+      );
+      return;
+    }
+
+    try {
+      setPerformingId(vId);
+      setScanActionLoading(true);
+
+      const targetId = visitor._id || visitor.visitorId || visitor.passNumber;
+      const res = await apiPost<any>(`watchman/visitors/${encodeURIComponent(targetId)}/out`, {
+        gate: assignedGate,
+      });
+
+      if (res?.success !== false) {
+        Alert.alert(
+          '✓ Visitor Departure Logged',
+          `${visitor.name} (${visitor.passNumber}) departure recorded successfully through ${assignedGate}.`
+        );
+        if (scannedVisitor && (scannedVisitor.passNumber === visitor.passNumber || scannedVisitor._id === visitor._id)) {
+          setScannedVisitor((prev: any) => ({ ...prev, status: 'Exited' }));
+        }
+      } else {
+        Alert.alert('Notice', res.message || 'Could not record exit.');
+      }
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Action Notice', err?.message || `Updated departure for ${visitor.name}.`);
+      await loadData();
+    } finally {
+      setPerformingId(null);
+      setScanActionLoading(false);
+    }
+  };
+
+  // ----------------------------------------------------------------------
+  // SUBMIT VISITOR REGISTRATION
+  // ----------------------------------------------------------------------
+  const handleRegisterVisitorSubmit = async () => {
+    if (!formName.trim()) {
+      Alert.alert('Validation Error', 'Please enter visitor full name.');
+      return;
+    }
+    const cleanPhone = formPhone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    if (!formPersonToMeet.trim()) {
+      Alert.alert('Validation Error', 'Please specify host / person to meet.');
+      return;
+    }
+
+    try {
+      setFormSubmitting(true);
+      const payload = {
+        name: formName.trim(),
+        phone: cleanPhone,
+        purpose: formPurpose,
+        personToMeet: formPersonToMeet.trim(),
+        department: formDepartment,
+        vehicleNumber: formVehicle.trim().toUpperCase(),
+        idProofType: formIdType,
+        idProofNumber: formIdNumber.trim(),
+        gate: assignedGate,
+        immediateIn: formImmediateIn,
+      };
+
+      const res = await apiPost<any>('watchman/visitors/entry', payload);
+
+      if (res?.success !== false && res?.data) {
+        const created = res.data;
+        const passNum = created.passNumber || `PASS-${Date.now().toString().slice(-4)}`;
+        const webBase = getCurrentBaseUrl().replace('/api', '').replace(':5000', ':5173');
+        const verifyPassUrl = created.verifyUrl || `${webBase}/verify-gate-pass?type=visitor&code=${encodeURIComponent(passNum)}`;
+        const qrCodeUrl = created.qrUrl || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(verifyPassUrl)}`;
+
+        const passData = {
+          ...created,
+          passNumber: passNum,
+          verifyUrl: verifyPassUrl,
+          qrUrl: qrCodeUrl,
+        };
+
+        setGeneratedPass(passData);
+        setShowRegisterForm(false);
+
+        // Reset form
+        setFormName('');
+        setFormPhone('');
+        setFormPersonToMeet('');
+        setFormVehicle('');
+        setFormIdNumber('');
+
+        await loadData();
+      } else {
+        Alert.alert('Registration Failed', res?.message || 'Could not register visitor.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to submit visitor registration.');
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
+
+  // ----------------------------------------------------------------------
+  // SUBMIT PRE-REGISTRATION APPOINTMENT
+  // ----------------------------------------------------------------------
+  const handlePreRegisterSubmit = async () => {
+    if (!preName.trim()) {
+      Alert.alert('Validation Error', 'Please enter guest full name.');
+      return;
+    }
+    const cleanPhone = prePhone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    if (!preHost.trim()) {
+      Alert.alert('Validation Error', 'Please specify host faculty or department.');
+      return;
+    }
+
+    try {
+      setPreSubmitting(true);
+      const payload = {
+        name: preName.trim(),
+        phone: cleanPhone,
+        purpose: prePurpose,
+        personToMeet: preHost.trim(),
+        department: preDept,
+        expectedDate: preDate,
+        expectedTime: preTime,
+        gate: assignedGate,
+      };
+
+      const res = await apiPost<any>('watchman/visitors/pre-register', payload);
+
+      if (res?.success !== false && res?.data) {
+        Alert.alert('✓ Guest Scheduled', `Pre-registration pass ${res.data.passNumber} generated.`);
+        setShowPreRegisterForm(false);
+        setPreName('');
+        setPrePhone('');
+        setPreHost('');
+        await loadData();
+      } else {
+        Alert.alert('Failed', res?.message || 'Could not schedule guest.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to schedule pre-registered guest.');
+    } finally {
+      setPreSubmitting(false);
+    }
+  };
+
+  // ----------------------------------------------------------------------
+  // DEDICATED VISITOR QR SCANNER LOOKUP
+  // ----------------------------------------------------------------------
+  const handleLookupVisitorPass = async (codeOverride?: string) => {
+    const raw = (codeOverride || scanPassCode).trim();
+    if (!raw) {
+      Alert.alert('Input Required', 'Please enter or scan a Visitor Pass (e.g. PASS-8411, VIS-...).');
+      return;
+    }
+
+    // Cross-guard: Block Student, Staff, HOD IDs from visitor scanner
+    const upper = raw.toUpperCase();
+    if (upper.startsWith('STU-') || upper.startsWith('STF-') || upper.startsWith('HOD-')) {
+      Alert.alert(
+        '⚠️ Member Pass Detected',
+        'This is a Student, Staff, or HOD member code.\n\nThe Visitor Scanner is strictly for Visitor & Pre-Visitor passes.\n\nPlease scan this code under the "Gate Ops" tab.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    try {
+      setScanLoading(true);
+      setScannedVisitor(null);
+
+      // Verify pass with backend
+      const res = await apiGet<any>(`watchman/visitors/verify?code=${encodeURIComponent(raw)}`);
+
+      if (res?.success && (res?.visitor || res?.data)) {
+        const vData = res.visitor || res.data;
+        setScannedVisitor(vData);
         return;
       }
 
-      // 1. Check backend campus-people lookup with module=visitor_management
-      try {
-        const campusRes = await apiGet<any>(`watchman/campus-people/lookup/${encodeURIComponent(code)}?module=visitor_management`);
-        if (campusRes?.isMemberPass || (campusRes?.person && ['Student', 'Staff', 'Faculty', 'HOD'].includes(campusRes.person.personType))) {
-          const pType = campusRes.personType || campusRes?.person?.personType || 'College Member';
-          const pName = campusRes.name || campusRes?.person?.name || code;
-          Alert.alert(
-            '⚠️ College Member Pass Detected',
-            `This pass belongs to a registered ${pType} (${pName}).\n\nPlease use the Gate Operations QR Scanner under Gate Ops.`,
-            [{ text: 'OK' }]
-          );
-          return;
-        }
+      // Memory fallback lookup
+      const found = allVisitors.find((v) => {
+        const p = (v.passNumber || v.visitorId || v._id || '').toUpperCase();
+        return p === upper || p.includes(upper);
+      });
 
-        if (campusRes?.success && campusRes?.person && campusRes.person.personType === 'Visitor') {
-          const cp = campusRes.person;
-          setVerifiedPass({
-            _id: cp.personId || cp._id,
-            name: cp.name,
-            phone: cp.phone,
-            email: cp.email,
-            passNumber: cp.personId,
-            badgeNumber: cp.personId,
-            purpose: cp.designation || 'Campus Visit',
-            personToMeet: cp.department || 'Administration',
-            status: cp.currentStatus === 'Inside Campus' ? 'Inside' : 'Pre-Registered',
-            inTime: cp.lastEntryTime ? new Date(cp.lastEntryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today',
-            createdAt: cp.createdAt || new Date().toISOString(),
-          });
-          return;
-        }
-      } catch (cErr: any) {
-        if (cErr?.isMemberPass || cErr?.message?.includes('College member pass detected')) {
-          Alert.alert(
-            '⚠️ College Member Pass Detected',
-            cErr.message || 'This pass belongs to a registered Student/Staff/HOD. Please use the Gate Operations QR Scanner under Gate Ops.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-      }
-
-      // 2. Call visitor verification endpoint
-      try {
-        const res = await apiGet<any>(`watchman/visitors/verify?code=${encodeURIComponent(code)}`);
-        if (res?.isMemberPass) {
-          Alert.alert(
-            '⚠️ College Member Pass Detected',
-            res.message || 'This pass belongs to a registered Student/Staff/HOD. Please use the Gate Operations QR Scanner under Gate Ops.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-
-        const passData = res?.data || res?.visitor;
-        if (res?.success && passData) {
-          setVerifiedPass(passData);
-          return;
-        }
-      } catch (vErr: any) {
-        if (vErr?.isMemberPass || vErr?.message?.includes('College member pass detected') || vErr?.message?.includes('Student/Staff/HOD')) {
-          Alert.alert(
-            '⚠️ College Member Pass Detected',
-            vErr.message || 'This pass belongs to a registered Student/Staff/HOD. Please use the Gate Operations QR Scanner under Gate Ops.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-      }
-
-      // 3. Fallback search strictly within local visitor datasets
-      const match =
-        activeVisitors.find((v) => (v.passNumber || v.badgeNumber || v._id || '').toLowerCase() === code.toLowerCase()) ||
-        preRegisteredVisitors.find((v) => (v.passNumber || v.appointmentCode || v._id || '').toLowerCase() === code.toLowerCase());
-      if (match) {
-        setVerifiedPass(match);
+      if (found) {
+        setScannedVisitor(found);
       } else {
-        Alert.alert('Invalid Visitor Pass', `No visitor pass found matching code "${code}".\n\nPlease ensure this is an active or pre-booked visitor pass.`);
-      }
-    } catch (err: any) {
-      if (err?.isMemberPass || err?.message?.includes('College member pass detected') || err?.message?.includes('Student/Staff/HOD')) {
         Alert.alert(
-          '⚠️ College Member Pass Detected',
-          err.message || 'This pass belongs to a registered Student/Staff/HOD. Please use the Gate Operations QR Scanner under Gate Ops.',
-          [{ text: 'OK' }]
+          'Visitor Pass Not Found',
+          `No visitor record matches pass code "${raw}".\n\nWould you like to register this person as a new visitor?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Register Visitor',
+              onPress: () => {
+                setActiveSection('visitors');
+                setShowRegisterForm(true);
+              },
+            },
+          ]
         );
-      } else {
-        Alert.alert('Verification Notice', err?.message || 'Could not verify visitor pass.');
       }
-    } finally {
-      setVerifyingPass(false);
-    }
-  };
-
-  const handleVerifiedPassCampusIn = async () => {
-    if (!verifiedPass) return;
-    const vId = verifiedPass._id || verifiedPass.id || verifiedPass.passNumber;
-    try {
-      setPassActionLoading(true);
-      const res = await apiPost<any>(`watchman/visitors/${vId}/in`, { gate: assignedGate });
-      Alert.alert('✓ Campus In Recorded', 'Visitor entry authorized. Status updated to Inside Campus.');
-      if (res?.data) {
-        setVerifiedPass(res.data);
-      } else {
-        setVerifiedPass(null);
-        setQrCodeInput('');
-      }
-      await loadData();
     } catch (err: any) {
-      Alert.alert('Campus In Notice', err?.message || 'Campus In recorded.');
-      await loadData();
+      Alert.alert('Verification Notice', err?.message || 'Could not verify visitor pass.');
     } finally {
-      setPassActionLoading(false);
+      setScanLoading(false);
     }
   };
-
-  const handleVerifiedPassCampusOut = async () => {
-    if (!verifiedPass) return;
-    const vId = verifiedPass._id || verifiedPass.id || verifiedPass.passNumber;
-    try {
-      setPassActionLoading(true);
-      const res = await apiPost<any>(`watchman/visitors/${vId}/out`, { gate: assignedGate });
-      Alert.alert('✓ Campus Out Recorded', 'Visitor departure successfully recorded. Status updated to Exited.');
-      if (res?.data) {
-        setVerifiedPass(res.data);
-      } else {
-        setVerifiedPass(null);
-        setQrCodeInput('');
-      }
-      await loadData();
-    } catch (err: any) {
-      Alert.alert('Campus Out Notice', err?.message || 'Campus Out recorded.');
-      await loadData();
-    } finally {
-      setPassActionLoading(false);
-    }
-  };
-
-  // ----------------------------------------------------------------------
-  // FILTERED LISTS
-  // ----------------------------------------------------------------------
-  // ----------------------------------------------------------------------
-  // FILTERED LISTS (Live Real-Time Synced with Web Flow)
-  // ----------------------------------------------------------------------
-  const registeredCount = useMemo(() => {
-    return allVisitors.filter((v) => (v.status || '').toLowerCase() === 'registered').length;
-  }, [allVisitors]);
-
-  const insideCount = useMemo(() => {
-    return allVisitors.filter((v) => (v.status || '').toLowerCase().includes('inside')).length || activeVisitors.length;
-  }, [allVisitors, activeVisitors]);
-
-  const exitedCount = useMemo(() => {
-    return allVisitors.filter((v) => (v.status || '').toLowerCase().includes('exit') || (v.status || '').toLowerCase().includes('checked out')).length;
-  }, [allVisitors]);
-
-  const displayedActive = useMemo(() => {
-    let pool = allVisitors.length > 0 ? allVisitors : activeVisitors;
-
-    if (visitorFilter === 'registered') {
-      pool = pool.filter((v) => (v.status || '').toLowerCase() === 'registered');
-    } else if (visitorFilter === 'inside') {
-      pool = pool.filter((v) => (v.status || '').toLowerCase().includes('inside'));
-    } else if (visitorFilter === 'exited') {
-      pool = pool.filter((v) => (v.status || '').toLowerCase().includes('exit') || (v.status || '').toLowerCase().includes('checked out'));
-    }
-
-    if (!activeSearch.trim()) return pool;
-    const q = activeSearch.toLowerCase().trim();
-    return pool.filter(
-      (v) =>
-        (v.name || '').toLowerCase().includes(q) ||
-        (v.phone || '').includes(q) ||
-        (v.passNumber || v.badgeNumber || '').toLowerCase().includes(q) ||
-        (v.personToMeet || '').toLowerCase().includes(q) ||
-        (v.purpose || '').toLowerCase().includes(q)
-    );
-  }, [allVisitors, activeVisitors, visitorFilter, activeSearch]);
-
-  const displayedPreReg = useMemo(() => {
-    if (!preRegSearch.trim()) return preRegisteredVisitors;
-    const q = preRegSearch.toLowerCase().trim();
-    return preRegisteredVisitors.filter(
-      (v) =>
-        (v.name || '').toLowerCase().includes(q) ||
-        (v.phone || '').includes(q) ||
-        (v.personToMeet || '').toLowerCase().includes(q)
-    );
-  }, [preRegisteredVisitors, preRegSearch]);
-
-  const displayedHistory = useMemo(() => {
-    if (!historySearch.trim()) return visitorHistory;
-    const q = historySearch.toLowerCase().trim();
-    return visitorHistory.filter(
-      (v) =>
-        (v.name || '').toLowerCase().includes(q) ||
-        (v.phone || '').includes(q) ||
-        (v.passNumber || '').toLowerCase().includes(q) ||
-        (v.purpose || '').toLowerCase().includes(q)
-    );
-  }, [visitorHistory, historySearch]);
 
   return (
     <View style={styles.container}>
-      {/* 5-DESTINATION HORIZONTAL SUB-NAV TABS */}
+      {/* ============================================================== */}
+      {/* 3 DISTINCT SUB-NAV TABS: VISITORS, PRE-VISITORS, VISITOR SCAN  */}
+      {/* ============================================================== */}
       <View style={styles.navBarWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navBar}>
           {[
-            { id: 'new_entry', label: 'New Entry', icon: '📝' },
-            { id: 'preregistered', label: `Pre-Book (${preRegisteredVisitors.length})`, icon: '📅' },
-            { id: 'qr_verify', label: 'Visitor Scanner', icon: '📷' },
-            { id: 'active', label: `Visitors (${allVisitors.length || activeVisitors.length})`, icon: '👥' },
-            { id: 'history', label: 'History', icon: '📋' },
+            { id: 'visitors', label: `👥 Visitors (${regularVisitorsList.length})` },
+            { id: 'pre_visitors', label: `📅 Pre-Visitors (${preRegisteredVisitorsList.length})` },
+            { id: 'scanner', label: '📷 Visitor Scanner' },
           ].map((tab) => (
             <TouchableOpacity
               key={tab.id}
-              style={[styles.navPill, activeSubTab === tab.id && styles.navPillActive]}
-              onPress={() => setActiveSubTab(tab.id as VisitorSubTab)}
+              style={[styles.navBtn, activeSection === tab.id && styles.navBtnActive]}
+              onPress={() => setActiveSection(tab.id as VisitorSection)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.navPillText, activeSubTab === tab.id && styles.navPillTextActive]}>
-                {tab.icon} {tab.label}
+              <Text style={[styles.navBtnText, activeSection === tab.id && styles.navBtnTextActive]}>
+                {tab.label}
               </Text>
             </TouchableOpacity>
           ))}
@@ -490,391 +530,128 @@ export default function WatchmanVisitorModule({ user, assignedGate = 'Gate 1 (Ma
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
       >
         {/* ============================================================== */}
-        {/* SUB-TAB 1: VISITORS DIRECTORY (REAL-TIME SYNCED WITH WEB)      */}
+        {/* TAB 1: REGULAR WALK-IN VISITORS                                */}
         {/* ============================================================== */}
-        {activeSubTab === 'active' && (
+        {activeSection === 'visitors' && (
           <View>
+            {/* Header + Register Visitor Button */}
             <View style={styles.sectionHeaderRow}>
-              <View>
-                <Text style={styles.sectionTitle}>👥 Visitors Directory</Text>
-                <Text style={styles.sectionSub}>All registered, active inside & departing campus guests</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionTitle}>👥 Campus Visitors ({regularVisitorsList.length})</Text>
+                <Text style={styles.sectionSub}>Tap any visitor to view pass & log entry/exit</Text>
               </View>
               <TouchableOpacity
                 style={styles.actionBtnPrimary}
-                onPress={() => setActiveSubTab('new_entry')}
+                onPress={() => setShowRegisterForm(true)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.actionBtnPrimaryText}>+ New Entry</Text>
+                <Text style={styles.actionBtnPrimaryText}>+ Register Visitor</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Status Filter Pills */}
-            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-              {[
-                { id: 'all', label: `All (${allVisitors.length || activeVisitors.length})` },
-                { id: 'registered', label: `Registered (${registeredCount})` },
-                { id: 'inside', label: `Inside (${insideCount})` },
-                { id: 'exited', label: `Exited (${exitedCount})` },
-              ].map((f) => (
-                <TouchableOpacity
-                  key={f.id}
-                  style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 16,
-                    backgroundColor: visitorFilter === f.id ? '#2563EB' : '#F1F5F9',
-                    borderWidth: 1,
-                    borderColor: visitorFilter === f.id ? '#1D4ED8' : '#CBD5E1',
-                  }}
-                  onPress={() => setVisitorFilter(f.id as any)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '700',
-                      color: visitorFilter === f.id ? '#FFFFFF' : '#475569',
-                    }}
-                  >
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
+            {/* Search Input */}
             <TextInput
               style={styles.searchInput}
-              placeholder="🔍 Search by name, phone, pass number, host..."
-              value={activeSearch}
-              onChangeText={setActiveSearch}
+              placeholder="🔍 Search visitors by name, pass #, phone, host..."
+              placeholderTextColor="#94A3B8"
+              value={visitorSearch}
+              onChangeText={setVisitorSearch}
               clearButtonMode="while-editing"
             />
 
-            {loading ? (
-              <ActivityIndicator size="large" color="#2563EB" style={{ marginVertical: 24 }} />
-            ) : displayedActive.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyEmoji}>🏛️</Text>
-                <Text style={styles.emptyTitle}>No Visitors Found</Text>
-                <Text style={styles.emptySub}>No visitors matching current filter.</Text>
-              </View>
-            ) : (
-              displayedActive.map((v, idx) => {
-                const vId = v._id || v.id || `VIS-${idx + 1}`;
-                const isActionLoading = actionLoadingId === vId;
-                const badge = v.passNumber || v.badgeNumber || `PASS-${100 + idx}`;
-                const isRegistered = (v.status || '').toLowerCase() === 'registered';
-                const isInside = (v.status || '').toLowerCase().includes('inside');
-                const isExited = (v.status || '').toLowerCase().includes('exit') || (v.status || '').toLowerCase().includes('checked out');
-
-                return (
-                  <View key={vId} style={styles.visitorCard}>
-                    <View style={styles.cardTopRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.visitorName}>{v.name}</Text>
-                        <TouchableOpacity
-                          onPress={() => v.phone && Linking.openURL(`tel:${v.phone}`).catch(() => null)}
-                        >
-                          <Text style={styles.visitorPhone}>📞 {v.phone || 'No phone'}</Text>
-                        </TouchableOpacity>
-                      </View>
-                      <View style={[
-                        styles.badgePill,
-                        isInside && { backgroundColor: '#DCFCE7', borderColor: '#86EFAC' },
-                        isRegistered && { backgroundColor: '#FEF9C3', borderColor: '#FDE047' },
-                        isExited && { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' }
-                      ]}>
-                        <Text style={[
-                          styles.badgePillText,
-                          isInside && { color: '#166534' },
-                          isRegistered && { color: '#854D0E' },
-                          isExited && { color: '#64748B' }
-                        ]}>
-                          {isInside ? '● INSIDE' : isRegistered ? '🟡 REGISTERED' : isExited ? '○ EXITED' : badge}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.detailsGrid}>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Pass #:</Text>
-                        <Text style={styles.detailValBold}>{badge}</Text>
-                      </View>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Purpose:</Text>
-                        <Text style={styles.detailValBold}>{v.purpose || 'Official Visit'}</Text>
-                      </View>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Host / Dept:</Text>
-                        <Text style={styles.detailVal}>{v.personToMeet || v.department || 'Administration'}</Text>
-                      </View>
-                      {v.vehicleNo ? (
-                        <View style={styles.detailRow}>
-                          <Text style={styles.detailLabel}>Vehicle No:</Text>
-                          <Text style={styles.detailVal}>{v.vehicleNo}</Text>
-                        </View>
-                      ) : null}
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Registered / In:</Text>
-                        <Text style={styles.detailVal}>
-                          {v.inTime || (v.entryTime ? new Date(v.entryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : v.createdAt ? new Date(v.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today')}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Dual Action Buttons */}
-                    <View style={styles.cardActionsRow}>
-                      <TouchableOpacity
-                        style={styles.viewPassBtn}
-                        onPress={() => setSelectedPassModal(v)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.viewPassBtnText}>🎫 View Pass</Text>
-                      </TouchableOpacity>
-
-                      {isRegistered ? (
-                        <TouchableOpacity
-                          style={[styles.inBtn, isActionLoading && { opacity: 0.6 }]}
-                          onPress={() => handleRecordVisitorIn(v)}
-                          disabled={isActionLoading}
-                          activeOpacity={0.8}
-                        >
-                          {isActionLoading ? (
-                            <ActivityIndicator color="#FFFFFF" size="small" />
-                          ) : (
-                            <Text style={styles.inBtnText}>Campus In 🟢</Text>
-                          )}
-                        </TouchableOpacity>
-                      ) : isInside ? (
-                        <TouchableOpacity
-                          style={[styles.exitBtn, isActionLoading && { opacity: 0.6 }]}
-                          onPress={() => handleRecordExit(v)}
-                          disabled={isActionLoading}
-                          activeOpacity={0.8}
-                        >
-                          {isActionLoading ? (
-                            <ActivityIndicator color="#FFFFFF" size="small" />
-                          ) : (
-                            <Text style={styles.exitBtnText}>Record Exit 🚪</Text>
-                          )}
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
-                  </View>
-                );
-              })
-            )}
-          </View>
-        )}
-
-        {/* ============================================================== */}
-        {/* SUB-TAB 2: NEW VISITOR ENTRY FORM                              */}
-        {/* ============================================================== */}
-        {activeSubTab === 'new_entry' && (
-          <View>
-            <View style={styles.sectionHeaderRow}>
-              <View>
-                <Text style={styles.sectionTitle}>📝 Issue New Visitor Pass</Text>
-                <Text style={styles.sectionSub}>Register arriving guest and grant campus gate entry</Text>
-              </View>
-            </View>
-
-            <View style={styles.formCard}>
-              <Text style={styles.formInputLabel}>Visitor Full Name *</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="e.g. Anand Murthy"
-                value={visName}
-                onChangeText={setVisName}
-              />
-
-              <View style={styles.formRowDual}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formInputLabel}>Mobile Phone *</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="e.g. 98402 12345"
-                    keyboardType="phone-pad"
-                    value={visPhone}
-                    onChangeText={setVisPhone}
-                  />
-                </View>
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={styles.formInputLabel}>Email (Optional)</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="e.g. guest@email.com"
-                    keyboardType="email-address"
-                    value={visEmail}
-                    onChangeText={setVisEmail}
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              <Text style={styles.formInputLabel}>Purpose of Visit *</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="e.g. Student Admission, Vendor Meeting, Parent Query"
-                value={visPurpose}
-                onChangeText={setVisPurpose}
-              />
-
-              <View style={styles.formRowDual}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formInputLabel}>Person to Meet *</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="e.g. Principal / HOD CSE"
-                    value={visHost}
-                    onChangeText={setVisHost}
-                  />
-                </View>
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={styles.formInputLabel}>Department</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="e.g. Admissions"
-                    value={visDept}
-                    onChangeText={setVisDept}
-                  />
-                </View>
-              </View>
-
-              <Text style={styles.formInputLabel}>ID Proof Document Type</Text>
-              <View style={styles.proofPillRow}>
-                {['Aadhaar', 'PAN Card', 'Driving License', 'Voter ID', 'Passport'].map((t) => (
+            {/* Filter Pills */}
+            <View style={styles.filterGroupRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {[
+                  { id: 'all', label: `All Visitors (${regularVisitorsList.length})` },
+                  { id: 'inside', label: `● Inside Campus (${regularInsideCount})` },
+                  { id: 'exited', label: `○ Exited (${regularExitedCount})` },
+                ].map((f) => (
                   <TouchableOpacity
-                    key={t}
-                    style={[styles.proofPill, visIdType === t && styles.proofPillActive]}
-                    onPress={() => setVisIdType(t)}
+                    key={f.id}
+                    style={[styles.filterPill, visitorFilter === f.id && styles.filterPillActive]}
+                    onPress={() => setVisitorFilter(f.id as DirectoryFilter)}
+                    activeOpacity={0.7}
                   >
-                    <Text style={[styles.proofPillText, visIdType === t && styles.proofPillTextActive]}>
-                      {t}
+                    <Text style={[styles.filterPillText, visitorFilter === f.id && styles.filterPillTextActive]}>
+                      {f.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </View>
-
-              <Text style={styles.formInputLabel}>ID Proof Number</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="e.g. 1234 5678 9012"
-                value={visIdNumber}
-                onChangeText={setVisIdNumber}
-              />
-
-              <View style={styles.formRowDual}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formInputLabel}>Vehicle Number (If any)</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="e.g. TN-07-CB-1234"
-                    value={visVehicle}
-                    onChangeText={setVisVehicle}
-                    autoCapitalize="characters"
-                  />
-                </View>
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={styles.formInputLabel}>Expected Duration</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="e.g. 1 Hour"
-                    value={visDuration}
-                    onChangeText={setVisDuration}
-                  />
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={styles.formSubmitBtn}
-                onPress={handleSubmitNewVisitor}
-                disabled={submittingNewVisitor}
-                activeOpacity={0.8}
-              >
-                {submittingNewVisitor ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.formSubmitBtnText}>✓ Authorize & Issue Gate Pass</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* ============================================================== */}
-        {/* SUB-TAB 3: PRE-REGISTERED APPOINTMENTS                         */}
-        {/* ============================================================== */}
-        {activeSubTab === 'preregistered' && (
-          <View>
-            <View style={styles.sectionHeaderRow}>
-              <View>
-                <Text style={styles.sectionTitle}>📅 Pre-Registered Appointments</Text>
-                <Text style={styles.sectionSub}>Visitors scheduled and pre-approved by faculty/admin</Text>
-              </View>
+              </ScrollView>
             </View>
 
-            <TextInput
-              style={styles.searchInput}
-              placeholder="🔍 Search scheduled guest name, host, phone..."
-              value={preRegSearch}
-              onChangeText={setPreRegSearch}
-              clearButtonMode="while-editing"
-            />
-
-            {displayedPreReg.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyEmoji}>📅</Text>
-                <Text style={styles.emptyTitle}>No Scheduled Appointments</Text>
-                <Text style={styles.emptySub}>No pre-registered guests found for today.</Text>
+            {/* Visitors List */}
+            {displayedVisitors.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateIcon}>👥</Text>
+                <Text style={styles.emptyStateTitle}>No Visitors Found</Text>
+                <Text style={styles.emptyStateSub}>No visitors match the current search or status filter.</Text>
               </View>
             ) : (
-              displayedPreReg.map((item, idx) => {
-                const itemId = item._id || item.id || `PR-${idx}`;
-                const isAdmitLoading = actionLoadingId === itemId;
-                const status = item.status || 'Approved';
+              displayedVisitors.map((v) => {
+                const isInside = (v.status || '').toLowerCase().includes('inside');
+                const isBusy = performingId === (v.visitorId || v.passNumber || v._id);
 
                 return (
-                  <View key={itemId} style={styles.preRegCard}>
-                    <View style={styles.cardTopRow}>
+                  <View key={v.visitorId || v.passNumber || v._id} style={styles.visitorCard}>
+                    <View style={styles.visitorCardHeader}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.visitorName}>{item.name}</Text>
-                        <Text style={styles.visitorPhone}>📞 {item.phone}</Text>
-                      </View>
-                      <View style={[styles.statusBadge, status === 'Approved' ? styles.statusBadgeGreen : styles.statusBadgeYellow]}>
-                        <Text style={[styles.statusBadgeText, status === 'Approved' ? styles.statusTextGreen : styles.statusTextYellow]}>
-                          {status}
+                        <Text style={styles.visitorName}>{v.name}</Text>
+                        <Text style={styles.visitorHost}>
+                          Host: <Text style={{ fontWeight: '700', color: '#0F172A' }}>{v.personToMeet || 'College Staff'}</Text>
+                          {v.department ? ` (${v.department})` : ''}
                         </Text>
                       </View>
-                    </View>
-
-                    <View style={styles.detailsGrid}>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Scheduled Host:</Text>
-                        <Text style={styles.detailValBold}>{item.personToMeet || item.host || 'Department'}</Text>
-                      </View>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Purpose:</Text>
-                        <Text style={styles.detailVal}>{item.purpose || 'Official Meeting'}</Text>
-                      </View>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Appointment Date/Time:</Text>
-                        <Text style={styles.detailVal}>{item.appointmentDate || item.expectedTime || 'Today'}</Text>
+                      <View style={styles.passNumberBadge}>
+                        <Text style={styles.passNumberBadgeText}>{v.passNumber || v.visitorId}</Text>
                       </View>
                     </View>
 
-                    <TouchableOpacity
-                      style={[styles.admitBtn, isAdmitLoading && { opacity: 0.6 }]}
-                      onPress={() => handleAdmitPreRegistered(item)}
-                      disabled={isAdmitLoading}
-                      activeOpacity={0.8}
-                    >
-                      {isAdmitLoading ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                      ) : (
-                        <Text style={styles.admitBtnText}>✓ Admit Visitor & Issue Badge</Text>
-                      )}
-                    </TouchableOpacity>
+                    <Text style={styles.visitorDetailText}>Purpose: {v.purpose || 'Official'}</Text>
+                    {v.phone ? <Text style={styles.visitorDetailText}>Phone: 📞 {v.phone}</Text> : null}
+
+                    <View style={styles.visitorCardFooter}>
+                      <View style={[styles.statusPill, isInside ? styles.statusPillInside : styles.statusPillOutside]}>
+                        <Text style={[styles.statusPillText, isInside ? styles.statusPillTextInside : styles.statusPillTextOutside]}>
+                          {isInside ? '● INSIDE CAMPUS' : (v.status || '○ REGISTERED')}
+                        </Text>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <TouchableOpacity
+                          style={styles.viewPassBtn}
+                          onPress={() => {
+                            const pCode = v.passNumber || v.visitorId;
+                            const webBase = getCurrentBaseUrl().replace('/api', '').replace(':5000', ':5173');
+                            const verifyPassUrl = v.verifyUrl || `${webBase}/verify-gate-pass?type=visitor&code=${encodeURIComponent(pCode)}`;
+                            const qr = v.qrUrl || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(verifyPassUrl)}`;
+                            setGeneratedPass({ ...v, verifyUrl: verifyPassUrl, qrUrl: qr });
+                          }}
+                        >
+                          <Text style={styles.viewPassBtnText}>🔍 Pass</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.gateActionBtn,
+                            isInside ? styles.gateActionBtnLogout : styles.gateActionBtnLogin,
+                            isBusy && { opacity: 0.6 },
+                          ]}
+                          onPress={() => (isInside ? handleVisitorOut(v) : handleVisitorIn(v))}
+                          disabled={isBusy}
+                          activeOpacity={0.8}
+                        >
+                          {isBusy ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Text style={styles.gateActionBtnText}>
+                              {isInside ? '➔ Campus Out' : '➔ Campus In'}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
                   </View>
                 );
               })
@@ -883,374 +660,531 @@ export default function WatchmanVisitorModule({ user, assignedGate = 'Gate 1 (Ma
         )}
 
         {/* ============================================================== */}
-        {/* SUB-TAB 4: VISITOR PASS QR SCANNER                             */}
+        {/* TAB 2: PRE-REGISTERED VISITORS                                 */}
         {/* ============================================================== */}
-        {activeSubTab === 'qr_verify' && (
+        {activeSection === 'pre_visitors' && (
           <View>
+
+            {/* Header + Pre-Register Button */}
             <View style={styles.sectionHeaderRow}>
-              <View>
-                <Text style={styles.sectionTitle}>📷 Visitor Pass QR Scanner</Text>
-                <Text style={styles.sectionSub}>Verify digital visitor passes and record authorized entries or departures</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionTitle}>📅 Pre-Registered Guests ({preRegisteredVisitorsList.length})</Text>
+                <Text style={styles.sectionSub}>Scheduled visitors, guest lectures & vendor appointments</Text>
               </View>
+              <TouchableOpacity
+                style={styles.actionBtnPrimary}
+                onPress={() => setShowPreRegisterForm(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.actionBtnPrimaryText}>+ Schedule Guest</Text>
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.formCard}>
-              <Text style={styles.formInputLabel}>Scan or Type Visitor Pass / Code</Text>
-              <View style={styles.scanRow}>
-                <TextInput
-                  style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
-                  placeholder="e.g. PASS-1001, VIS-101..."
-                  value={qrCodeInput}
-                  onChangeText={setQrCodeInput}
-                  autoCapitalize="characters"
-                />
-                <TouchableOpacity
-                  style={styles.verifyBtn}
-                  onPress={() => handleVerifyPassQr()}
-                  disabled={verifyingPass}
-                  activeOpacity={0.8}
-                >
-                  {verifyingPass ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
-                  ) : (
-                    <Text style={styles.verifyBtnText}>Verify Pass</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+            {/* Search Input */}
+            <TextInput
+              style={styles.searchInput}
+              placeholder="🔍 Search scheduled guests by name, pass #, host..."
+              placeholderTextColor="#94A3B8"
+              value={preSearch}
+              onChangeText={setPreSearch}
+              clearButtonMode="while-editing"
+            />
 
-              {/* Quick Visitor Pass Presets */}
-              <View style={styles.presetRow}>
-                <Text style={styles.presetLabel}>Quick Presets:</Text>
-                {activeVisitors.slice(0, 2).map((v, i) => {
-                  const pNum = v.passNumber || v.badgeNumber || `PASS-${101 + i}`;
-                  return (
-                    <TouchableOpacity
-                      key={pNum}
-                      style={styles.presetPill}
-                      onPress={() => {
-                        setQrCodeInput(pNum);
-                        handleVerifyPassQr(pNum);
-                      }}
-                    >
-                      <Text style={styles.presetPillText}>Active: {pNum}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                {preRegisteredVisitors.slice(0, 2).map((pv, i) => {
-                  const pNum = pv.passNumber || pv.appointmentCode || `PR-${101 + i}`;
-                  return (
-                    <TouchableOpacity
-                      key={pNum}
-                      style={[styles.presetPill, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}
-                      onPress={() => {
-                        setQrCodeInput(pNum);
-                        handleVerifyPassQr(pNum);
-                      }}
-                    >
-                      <Text style={[styles.presetPillText, { color: '#B45309' }]}>Pre-Book: {pNum}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                {activeVisitors.length === 0 && preRegisteredVisitors.length === 0 && (
+            {/* Filter Pills */}
+            <View style={styles.filterGroupRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {[
+                  { id: 'all', label: `All Scheduled (${preRegisteredVisitorsList.length})` },
+                  { id: 'awaiting', label: `⏳ Awaiting Arrival (${preAwaitingCount})` },
+                  { id: 'inside', label: `● Admitted (${preInsideCount})` },
+                ].map((f) => (
                   <TouchableOpacity
-                    style={styles.presetPill}
-                    onPress={() => {
-                      setQrCodeInput('PASS-1001');
-                      handleVerifyPassQr('PASS-1001');
-                    }}
+                    key={f.id}
+                    style={[styles.filterPill, preFilter === f.id && styles.filterPillActive]}
+                    onPress={() => setPreFilter(f.id as DirectoryFilter)}
+                    activeOpacity={0.7}
                   >
-                    <Text style={styles.presetPillText}>PASS-1001</Text>
+                    <Text style={[styles.filterPillText, preFilter === f.id && styles.filterPillTextActive]}>
+                      {f.label}
+                    </Text>
                   </TouchableOpacity>
-                )}
-              </View>
+                ))}
+              </ScrollView>
             </View>
 
-            {/* Verified Visitor Pass Card */}
-            {verifiedPass && (() => {
-              const passCode = verifiedPass.passNumber || verifiedPass.badgeNumber || verifiedPass.appointmentCode || verifiedPass.visitorId || verifiedPass._id || 'VIS-PASS';
-              const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(passCode)}`;
-              const statusStr = (verifiedPass.status || 'Registered').toLowerCase();
-              const isInside = statusStr.includes('inside');
-              const isExited = statusStr.includes('exited') || statusStr.includes('checked out');
-              const canLogin = !isInside && !isExited;
-              const canLogout = isInside;
+            {/* Pre-Registered Visitors List */}
+            {displayedPreVisitors.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateIcon}>📅</Text>
+                <Text style={styles.emptyStateTitle}>No Pre-Registered Guests Found</Text>
+                <Text style={styles.emptyStateSub}>No scheduled visitor records match the filter.</Text>
+              </View>
+            ) : (
+              displayedPreVisitors.map((pv) => {
+                const isInside = (pv.status || '').toLowerCase().includes('inside');
+                const isBusy = performingId === (pv.visitorId || pv.passNumber || pv._id);
 
-              return (
-                <View style={styles.verifiedPassCard}>
-                  <View style={{ alignItems: 'center', marginBottom: 12 }}>
-                    <Text style={styles.passHeaderTitle}>CAMPUS VISITOR PASS</Text>
-                    <Text style={styles.passName}>{verifiedPass.name || verifiedPass.visitorName || 'Guest Visitor'}</Text>
-                    <View style={styles.passBadgePill}>
-                      <Text style={styles.passBadgeText}>
-                        PASS ID: {passCode}
-                      </Text>
-                    </View>
-
-                    {/* Individual Pass QR Code */}
-                    <View style={{ alignItems: 'center', marginTop: 10, padding: 8, backgroundColor: '#FFFFFF', borderRadius: 10, borderWidth: 1, borderColor: '#CBD5E1' }}>
-                      <Image source={{ uri: qrUrl }} style={{ width: 130, height: 130 }} resizeMode="contain" />
-                      <Text style={{ fontSize: 10, color: '#64748B', marginTop: 4, fontWeight: '700' }}>Unique Pass QR Code</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.detailsGrid}>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Contact Phone:</Text>
-                      <Text style={styles.detailValBold}>{verifiedPass.phone || 'Not provided'}</Text>
-                    </View>
-                    {verifiedPass.email ? (
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Email:</Text>
-                        <Text style={styles.detailVal}>{verifiedPass.email}</Text>
-                      </View>
-                    ) : null}
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Host / Dept:</Text>
-                      <Text style={styles.detailVal}>{verifiedPass.personToMeet || verifiedPass.host || verifiedPass.department || 'Administration'}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Purpose:</Text>
-                      <Text style={styles.detailVal}>{verifiedPass.purpose || 'Campus Visit'}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Registration Time:</Text>
-                      <Text style={styles.detailVal}>
-                        {verifiedPass.createdAt ? new Date(verifiedPass.createdAt).toLocaleString('en-IN') : 'Today'}
-                      </Text>
-                    </View>
-                    {verifiedPass.entryTime ? (
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Actual Entry Time:</Text>
-                        <Text style={[styles.detailValBold, { color: '#059669' }]}>
-                          {new Date(verifiedPass.entryTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                return (
+                  <View key={pv.visitorId || pv.passNumber || pv._id} style={styles.visitorCard}>
+                    <View style={styles.visitorCardHeader}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.visitorName}>{pv.name}</Text>
+                        <Text style={styles.visitorHost}>
+                          Host: <Text style={{ fontWeight: '700', color: '#0F172A' }}>{pv.personToMeet || 'Department'}</Text>
+                          {pv.department ? ` (${pv.department})` : ''}
                         </Text>
                       </View>
+                      <View style={[styles.passNumberBadge, { backgroundColor: '#4338CA' }]}>
+                        <Text style={styles.passNumberBadgeText}>{pv.passNumber || pv.visitorId}</Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.visitorDetailText}>Purpose: {pv.purpose || 'Campus Visit'}</Text>
+                    {pv.expectedDate ? (
+                      <Text style={styles.visitorDetailText}>
+                        Scheduled: 🕒 {pv.expectedDate} {pv.expectedTime || ''}
+                      </Text>
                     ) : null}
-                    {verifiedPass.exitTime ? (
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Actual Exit Time:</Text>
-                        <Text style={[styles.detailValBold, { color: '#DC2626' }]}>
-                          {new Date(verifiedPass.exitTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    {pv.phone ? <Text style={styles.visitorDetailText}>Phone: 📞 {pv.phone}</Text> : null}
+
+                    <View style={styles.visitorCardFooter}>
+                      <View style={[styles.statusPill, isInside ? styles.statusPillInside : { backgroundColor: '#FEF3C7' }]}>
+                        <Text style={[styles.statusPillText, isInside ? styles.statusPillTextInside : { color: '#B45309' }]}>
+                          {isInside ? '● INSIDE CAMPUS' : '⏳ AWAITING ARRIVAL'}
                         </Text>
                       </View>
-                    ) : null}
-                    {verifiedPass.vehicleNo || verifiedPass.vehicleNumber ? (
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Vehicle No:</Text>
-                        <Text style={styles.detailVal}>{verifiedPass.vehicleNo || verifiedPass.vehicleNumber}</Text>
+
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <TouchableOpacity
+                          style={styles.viewPassBtn}
+                          onPress={() => {
+                            const pCode = pv.passNumber || pv.visitorId;
+                            const webBase = getCurrentBaseUrl().replace('/api', '').replace(':5000', ':5173');
+                            const verifyPassUrl = pv.verifyUrl || `${webBase}/verify-gate-pass?type=visitor&code=${encodeURIComponent(pCode)}`;
+                            const qr = pv.qrUrl || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(verifyPassUrl)}`;
+                            setGeneratedPass({ ...pv, verifyUrl: verifyPassUrl, qrUrl: qr });
+                          }}
+                        >
+                          <Text style={styles.viewPassBtnText}>🔍 Pass</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.gateActionBtn,
+                            isInside ? styles.gateActionBtnLogout : styles.gateActionBtnLogin,
+                            isBusy && { opacity: 0.6 },
+                          ]}
+                          onPress={() => (isInside ? handleVisitorOut(pv) : handleVisitorIn(pv))}
+                          disabled={isBusy}
+                          activeOpacity={0.8}
+                        >
+                          {isBusy ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Text style={styles.gateActionBtnText}>
+                              {isInside ? '➔ Campus Out' : '➔ Admit (In)'}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
                       </View>
-                    ) : null}
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Entry/Exit Status:</Text>
-                      <Text style={[styles.detailValBold, { color: isInside ? '#15803D' : isExited ? '#475569' : '#2563EB' }]}>
-                        {isInside ? '🟢 Inside Campus (Logged In)' : isExited ? '⚪ Exited Campus (Logged Out)' : '🟡 Registered / Ready for Entry'}
-                      </Text>
                     </View>
                   </View>
-
-                  {/* Two Distinct Actions: Login / Campus In & Logout / Campus Out */}
-                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                    <TouchableOpacity
-                      style={[
-                        styles.exitPassBtn,
-                        { flex: 1, backgroundColor: canLogin ? '#059669' : '#CBD5E1' },
-                        (passActionLoading || !canLogin) && { opacity: 0.7 }
-                      ]}
-                      onPress={handleVerifiedPassCampusIn}
-                      disabled={passActionLoading || !canLogin}
-                      activeOpacity={0.8}
-                    >
-                      {passActionLoading ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                      ) : (
-                        <Text style={styles.exitPassBtnText}>🟢 Campus In</Text>
-                      )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.exitPassBtn,
-                        { flex: 1, backgroundColor: canLogout ? '#DC2626' : '#CBD5E1' },
-                        (passActionLoading || !canLogout) && { opacity: 0.7 }
-                      ]}
-                      onPress={handleVerifiedPassCampusOut}
-                      disabled={passActionLoading || !canLogout}
-                      activeOpacity={0.8}
-                    >
-                      {passActionLoading ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                      ) : (
-                        <Text style={styles.exitPassBtnText}>🔴 Campus Out</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })()}
+                );
+              })
+            )}
           </View>
         )}
 
         {/* ============================================================== */}
-        {/* SUB-TAB 5: VISITOR HISTORY LOGS                                */}
+        {/* TAB 3: DEDICATED VISITOR QR SCANNER                            */}
         {/* ============================================================== */}
-        {activeSubTab === 'history' && (
-          <View>
-            <View style={styles.sectionHeaderRow}>
-              <View>
-                <Text style={styles.sectionTitle}>📋 Visitor History Logs</Text>
-                <Text style={styles.sectionSub}>Historical record of all past campus visitors</Text>
+        {activeSection === 'scanner' && (
+          <View style={styles.card}>
+            <View style={styles.sectionHeadingBlock}>
+              <Text style={styles.sectionTitle}>📷 Dedicated Visitor QR Scanner</Text>
+              <Text style={styles.sectionSubtitle}>
+                Scan & verify Visitor passes (PASS-xxxx, VIS-xxxx). Rejects Student/Staff/HOD passes.
+              </Text>
+            </View>
+
+            {/* Viewfinder Frame */}
+            <View style={styles.scannerViewport}>
+              <View style={styles.viewfinderBox}>
+                <View style={[styles.corner, styles.cornerTL]} />
+                <View style={[styles.corner, styles.cornerTR]} />
+                <View style={[styles.corner, styles.cornerBL]} />
+                <View style={[styles.corner, styles.cornerBR]} />
+                <Text style={styles.scanTargetIcon}>📷</Text>
+                <Text style={styles.scanTargetText}>Position Visitor QR Pass</Text>
+                <Text style={{ fontSize: 11, color: '#FCD34D', marginTop: 4, fontWeight: '600' }}>
+                  Visitors & Pre-Visitors Only
+                </Text>
               </View>
             </View>
 
-            <TextInput
-              style={styles.searchInput}
-              placeholder="🔍 Search history by name, phone, pass number..."
-              value={historySearch}
-              onChangeText={setHistorySearch}
-              clearButtonMode="while-editing"
-            />
+            {/* Manual Pass Code Input */}
+            <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Or Enter Visitor Pass Number:</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput
+                style={[styles.textInput, { flex: 1 }]}
+                placeholder="e.g. PASS-8411, PASS-9264, VIS-..."
+                placeholderTextColor="#94A3B8"
+                value={scanPassCode}
+                onChangeText={setScanPassCode}
+                autoCapitalize="characters"
+                clearButtonMode="while-editing"
+              />
+              <TouchableOpacity
+                style={styles.verifyBtnPrimary}
+                onPress={() => handleLookupVisitorPass()}
+                activeOpacity={0.8}
+                disabled={scanLoading}
+              >
+                {scanLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.verifyBtnPrimaryText}>🔍 Verify Pass</Text>
+                )}
+              </TouchableOpacity>
+            </View>
 
-            {displayedHistory.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyEmoji}>📋</Text>
-                <Text style={styles.emptyTitle}>No Historical Logs Found</Text>
-                <Text style={styles.emptySub}>No archived visitor visits found.</Text>
+            {/* Quick Demo Visitor Pass Shortcuts */}
+            <View style={{ marginTop: 14 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 6 }}>
+                Active Visitor Pass Shortcuts:
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {allVisitors.slice(0, 6).map((v) => {
+                  const pass = v.passNumber || v.visitorId;
+                  const isInside = (v.status || '').toLowerCase().includes('inside');
+                  return (
+                    <TouchableOpacity
+                      key={pass}
+                      style={[
+                        styles.shortcutPill,
+                        isInside ? { backgroundColor: '#DCFCE7', borderColor: '#BBF7D0' } : { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' },
+                      ]}
+                      onPress={() => {
+                        setScanPassCode(pass);
+                        handleLookupVisitorPass(pass);
+                      }}
+                    >
+                      <Text style={[styles.shortcutPillText, isInside ? { color: '#166534' } : { color: '#92400E' }]}>
+                        {isInside ? '● In: ' : '○ Reg: '}{pass} ({v.name})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-            ) : (
-              displayedHistory.map((item, idx) => {
-                const hId = item._id || item.id || `HIST-${idx}`;
-                return (
-                  <View key={hId} style={styles.historyCard}>
-                    <View style={styles.cardTopRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.visitorName}>{item.name}</Text>
-                        <Text style={styles.visitorPhone}>📞 {item.phone}</Text>
-                      </View>
-                      <View style={styles.historyBadge}>
-                        <Text style={styles.historyBadgeText}>{item.passNumber || `LOG-${idx + 1}`}</Text>
-                      </View>
-                    </View>
+            </View>
 
-                    <Text style={styles.historyDetail}>Purpose: <Text style={{ fontWeight: '700' }}>{item.purpose}</Text></Text>
-                    <Text style={styles.historyDetail}>Host: {item.personToMeet || item.department || 'Administration'}</Text>
-                    <Text style={styles.historyDetail}>
-                      In: {item.inTime || 'Morning'} • Out: {item.outTime || 'Departed'}
-                    </Text>
-                  </View>
-                );
-              })
+            {/* Scanned Visitor Dossier Card */}
+            {scannedVisitor && (
+              <View style={styles.scannedResultCard}>
+                <Text style={styles.scannedCardTitle}>✓ Visitor Pass Verified</Text>
+                <Text style={styles.scannedName}>{scannedVisitor.name}</Text>
+                <Text style={styles.scannedDetails}>
+                  Pass: <Text style={{ fontWeight: '700' }}>{scannedVisitor.passNumber || scannedVisitor.visitorId}</Text>
+                  {scannedVisitor.isPreRegistered ? ' • Pre-Registered Guest' : ' • Walk-In Visitor'}
+                </Text>
+                <Text style={styles.scannedDetails}>
+                  Host: <Text style={{ fontWeight: '700' }}>{scannedVisitor.personToMeet || 'General'}</Text>
+                  {scannedVisitor.department ? ` (${scannedVisitor.department})` : ''}
+                </Text>
+                <Text style={styles.scannedDetails}>Purpose: {scannedVisitor.purpose || 'Official'}</Text>
+                <Text style={styles.scannedDetails}>
+                  Status:{' '}
+                  <Text style={{ fontWeight: '800', color: (scannedVisitor.status || '').includes('Inside') ? '#10B981' : '#B45309' }}>
+                    {scannedVisitor.status || 'Registered'}
+                  </Text>
+                </Text>
+
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.gateActionBtn,
+                      styles.gateActionBtnLogin,
+                      { flex: 1, paddingVertical: 12 },
+                      ((scannedVisitor.status || '').toLowerCase().includes('inside') || scanActionLoading) && { opacity: 0.5 },
+                    ]}
+                    onPress={() => handleVisitorIn(scannedVisitor)}
+                    disabled={(scannedVisitor.status || '').toLowerCase().includes('inside') || scanActionLoading}
+                  >
+                    <Text style={[styles.gateActionBtnText, { fontSize: 13 }]}>➔ Authorize In</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.gateActionBtn,
+                      styles.gateActionBtnLogout,
+                      { flex: 1, paddingVertical: 12 },
+                      (!(scannedVisitor.status || '').toLowerCase().includes('inside') || scanActionLoading) && { opacity: 0.5 },
+                    ]}
+                    onPress={() => handleVisitorOut(scannedVisitor)}
+                    disabled={!(scannedVisitor.status || '').toLowerCase().includes('inside') || scanActionLoading}
+                  >
+                    <Text style={[styles.gateActionBtnText, { fontSize: 13 }]}>➔ Authorize Out</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             )}
           </View>
         )}
       </ScrollView>
 
       {/* ============================================================== */}
-      {/* DIGITAL GATE PASS MODAL                                        */}
+      {/* MODAL 1: REGISTER NEW VISITOR FORM                             */}
       {/* ============================================================== */}
-      <Modal
-        visible={selectedPassModal !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedPassModal(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            {(() => {
-              const modalPassCode = selectedPassModal?.passNumber || selectedPassModal?.badgeNumber || selectedPassModal?.visitorId || selectedPassModal?._id || 'PASS-001';
-              const modalQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(modalPassCode)}`;
-              const isModalInside = (selectedPassModal?.status || '').toLowerCase().includes('inside');
-              const isModalRegistered = (selectedPassModal?.status || '').toLowerCase().includes('registered');
-
-              return (
-                <>
-                  <View style={{ alignItems: 'center', marginBottom: 14 }}>
-                    <Text style={styles.passHeaderTitle}>CAMPUS SECURITY VISITOR PASS</Text>
-                    <Text style={styles.passName}>{selectedPassModal?.name}</Text>
-                    <View style={styles.passBadgePill}>
-                      <Text style={styles.passBadgeText}>
-                        PASS ID: {modalPassCode}
-                      </Text>
-                    </View>
-
-                    {/* QR Code in Modal */}
-                    <View style={{ alignItems: 'center', marginTop: 10, padding: 8, backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1' }}>
-                      <Image source={{ uri: modalQrUrl }} style={{ width: 120, height: 120 }} resizeMode="contain" />
-                      <Text style={{ fontSize: 10, color: '#64748B', marginTop: 4, fontWeight: '700' }}>Individual Pass QR Code</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.detailsGrid}>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Contact Phone:</Text>
-                      <Text style={styles.detailValBold}>{selectedPassModal?.phone}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Purpose:</Text>
-                      <Text style={styles.detailValBold}>{selectedPassModal?.purpose}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Person to Meet:</Text>
-                      <Text style={styles.detailVal}>{selectedPassModal?.personToMeet || 'Administration'}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Authorized Gate:</Text>
-                      <Text style={styles.detailVal}>{selectedPassModal?.gate || assignedGate}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Current Status:</Text>
-                      <Text style={[styles.detailValBold, { color: isModalInside ? '#15803D' : '#2563EB' }]}>
-                        {isModalInside ? '🟢 Inside Campus' : (selectedPassModal?.status || '🟡 Registered')}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.modalActions}>
-                    <TouchableOpacity
-                      style={styles.modalCancel}
-                      onPress={() => setSelectedPassModal(null)}
-                    >
-                      <Text style={styles.modalCancelText}>Close</Text>
-                    </TouchableOpacity>
-
-                    {isModalInside ? (
-                      <TouchableOpacity
-                        style={[styles.modalSubmit, { backgroundColor: '#DC2626' }]}
-                        onPress={() => {
-                          const p = selectedPassModal;
-                          setSelectedPassModal(null);
-                          if (p) handleRecordExit(p);
-                        }}
-                      >
-                        <Text style={styles.modalSubmitText}>🔴 Campus Out</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity
-                        style={[styles.modalSubmit, { backgroundColor: '#059669' }]}
-                        onPress={async () => {
-                          const p = selectedPassModal;
-                          setSelectedPassModal(null);
-                          if (p) {
-                            try {
-                              const vId = p._id || p.id || p.passNumber;
-                              await apiPost(`watchman/visitors/${vId}/in`, { gate: assignedGate });
-                              Alert.alert('✓ Campus In Recorded', 'Visitor entry authorized. Status updated to Inside Campus.');
-                              await loadData();
-                            } catch (err: any) {
-                              Alert.alert('Notice', err?.message || 'Campus In recorded.');
-                            }
-                          }
-                        }}
-                      >
-                        <Text style={styles.modalSubmitText}>🟢 Campus In</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </>
-              );
-            })()}
+      <Modal visible={showRegisterForm} animationType="slide" transparent={false} onRequestClose={() => setShowRegisterForm(false)}>
+        <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalHeaderTitle}>📝 Register New Visitor</Text>
+            <TouchableOpacity onPress={() => setShowRegisterForm(false)} style={styles.closeBtn}>
+              <Text style={styles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
           </View>
+
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+            <Text style={styles.fieldLabel}>Visitor Full Name *</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. R. Ananth Kumar"
+              placeholderTextColor="#94A3B8"
+              value={formName}
+              onChangeText={setFormName}
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>10-Digit Mobile Phone *</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. 98402 12345"
+              placeholderTextColor="#94A3B8"
+              value={formPhone}
+              onChangeText={setFormPhone}
+              keyboardType="phone-pad"
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Purpose of Visit *</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              {PURPOSES.slice(0, 5).map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.choicePill, formPurpose === p && styles.choicePillActive]}
+                  onPress={() => setFormPurpose(p)}
+                >
+                  <Text style={[styles.choicePillText, formPurpose === p && styles.choicePillTextActive]}>{p}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Person to Meet / Host *</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. Dr. Ramesh / Admissions"
+              placeholderTextColor="#94A3B8"
+              value={formPersonToMeet}
+              onChangeText={setFormPersonToMeet}
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Department</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. Computer Science, Admissions, Accounts"
+              placeholderTextColor="#94A3B8"
+              value={formDepartment}
+              onChangeText={setFormDepartment}
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Vehicle Number (Optional)</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. TN-09-AB-1234"
+              placeholderTextColor="#94A3B8"
+              value={formVehicle}
+              onChangeText={setFormVehicle}
+              autoCapitalize="characters"
+            />
+
+            <TouchableOpacity
+              style={[styles.actionBtnPrimary, { marginTop: 24, paddingVertical: 14 }]}
+              onPress={handleRegisterVisitorSubmit}
+              disabled={formSubmitting}
+            >
+              {formSubmitting ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={[styles.actionBtnPrimaryText, { fontSize: 14, textAlign: 'center' }]}>
+                  ✓ Register & Generate QR Pass
+                </Text>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </Modal>
+
+      {/* ============================================================== */}
+      {/* MODAL 2: PRE-REGISTER GUEST FORM                               */}
+      {/* ============================================================== */}
+      <Modal visible={showPreRegisterForm} animationType="slide" transparent={false} onRequestClose={() => setShowPreRegisterForm(false)}>
+        <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalHeaderTitle}>📅 Schedule Pre-Registered Guest</Text>
+            <TouchableOpacity onPress={() => setShowPreRegisterForm(false)} style={styles.closeBtn}>
+              <Text style={styles.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+            <Text style={styles.fieldLabel}>Guest Full Name *</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. Dr. V. Swaminathan"
+              placeholderTextColor="#94A3B8"
+              value={preName}
+              onChangeText={setPreName}
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>10-Digit Mobile Phone *</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. 98402 12345"
+              placeholderTextColor="#94A3B8"
+              value={prePhone}
+              onChangeText={setPrePhone}
+              keyboardType="phone-pad"
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Host Faculty / Inviter *</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. Prof. Anandha Kumar (CSE)"
+              placeholderTextColor="#94A3B8"
+              value={preHost}
+              onChangeText={setPreHost}
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Expected Date</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#94A3B8"
+              value={preDate}
+              onChangeText={setPreDate}
+            />
+
+            <TouchableOpacity
+              style={[styles.actionBtnPrimary, { marginTop: 24, paddingVertical: 14, backgroundColor: '#4338CA' }]}
+              onPress={handlePreRegisterSubmit}
+              disabled={preSubmitting}
+            >
+              {preSubmitting ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={[styles.actionBtnPrimaryText, { fontSize: 14, textAlign: 'center' }]}>
+                  ✓ Schedule Guest Appointment
+                </Text>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* MODAL 3: DIGITAL QR PASS VIEW                                  */}
+      {/* ============================================================== */}
+      {generatedPass && (
+        <Modal visible={!!generatedPass} animationType="fade" transparent={true} onRequestClose={() => setGeneratedPass(null)}>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.passModalCard}>
+              <View style={styles.passModalHeader}>
+                <Text style={styles.passModalTitle}>CAMPUS VISITOR PASS</Text>
+                <TouchableOpacity onPress={() => setGeneratedPass(null)}>
+                  <Text style={styles.closeBtnText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+                <Image
+                  source={{ uri: generatedPass.qrUrl }}
+                  style={{ width: 180, height: 180, borderRadius: 8 }}
+                  resizeMode="contain"
+                />
+                <Text style={styles.passCardNumber}>{generatedPass.passNumber || generatedPass.visitorId}</Text>
+                <Text style={styles.passCardName}>{generatedPass.name}</Text>
+                <Text style={styles.passCardDetail}>Host: {generatedPass.personToMeet} ({generatedPass.department || 'General'})</Text>
+                <Text style={styles.passCardDetail}>Purpose: {generatedPass.purpose}</Text>
+                <Text style={[styles.passCardDetail, { fontWeight: '800', marginTop: 4, color: (generatedPass.status || '').includes('Inside') ? '#16A34A' : '#D97706' }]}>
+                  Status: {(generatedPass.status || '').includes('Inside') ? '● INSIDE CAMPUS' : (generatedPass.status || '○ REGISTERED')}
+                </Text>
+
+                {generatedPass.verifyUrl && (
+                  <TouchableOpacity
+                    style={{
+                      marginTop: 8,
+                      paddingVertical: 6,
+                      paddingHorizontal: 12,
+                      backgroundColor: '#EFF6FF',
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#BFDBFE',
+                    }}
+                    onPress={() => {
+                      Linking.openURL(generatedPass.verifyUrl).catch(() =>
+                        Alert.alert('Pass URL', generatedPass.verifyUrl)
+                      );
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, color: '#1D4ED8', fontWeight: '700' }}>
+                      🔗 Open Pass Clearance Page
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>
+                <TouchableOpacity
+                  style={[
+                    styles.gateActionBtn,
+                    styles.gateActionBtnLogin,
+                    { flex: 1, paddingVertical: 10 },
+                    (generatedPass.status || '').includes('Inside') && { opacity: 0.5 },
+                  ]}
+                  onPress={async () => {
+                    await handleVisitorIn(generatedPass);
+                    setGeneratedPass((prev: any) => ({ ...prev, status: 'Inside Campus' }));
+                  }}
+                  disabled={(generatedPass.status || '').includes('Inside')}
+                >
+                  <Text style={styles.gateActionBtnText}>➔ Campus In</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.gateActionBtn,
+                    styles.gateActionBtnLogout,
+                    { flex: 1, paddingVertical: 10 },
+                    !(generatedPass.status || '').includes('Inside') && { opacity: 0.5 },
+                  ]}
+                  onPress={async () => {
+                    await handleVisitorOut(generatedPass);
+                    setGeneratedPass((prev: any) => ({ ...prev, status: 'Exited' }));
+                  }}
+                  disabled={!(generatedPass.status || '').includes('Inside')}
+                >
+                  <Text style={styles.gateActionBtnText}>➔ Campus Out</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.actionBtnPrimary, { marginTop: 6, paddingVertical: 10, backgroundColor: '#64748B' }]}
+                onPress={() => setGeneratedPass(null)}
+              >
+                <Text style={[styles.actionBtnPrimaryText, { textAlign: 'center' }]}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -1264,48 +1198,83 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+    paddingVertical: 8,
   },
   navBar: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 6,
-  },
-  navPill: {
     paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
+    gap: 8,
+  },
+  navBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     backgroundColor: '#F1F5F9',
   },
-  navPillActive: {
-    backgroundColor: '#2563EB',
+  navBtnActive: {
+    backgroundColor: '#1E3A8A',
   },
-  navPillText: {
-    fontSize: 12,
+  navBtnText: {
+    fontSize: 13,
     fontWeight: '700',
     color: '#475569',
   },
-  navPillTextActive: {
+  navBtnTextActive: {
     color: '#FFFFFF',
   },
   scrollContent: {
     padding: 14,
-    paddingBottom: 28,
+    paddingBottom: 40,
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 14,
+  },
+  metricCard: {
+    width: '48%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  metricLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  metricValue: {
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  metricSub: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    marginTop: 4,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: '#0F172A',
   },
   sectionSub: {
     fontSize: 11,
     color: '#64748B',
-    marginTop: 1,
+    marginTop: 2,
   },
   actionBtnPrimary: {
     backgroundColor: '#2563EB',
@@ -1314,410 +1283,373 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   actionBtnPrimaryText: {
-    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+    color: '#FFFFFF',
   },
   searchInput: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     fontSize: 13,
     color: '#0F172A',
+    marginBottom: 10,
+  },
+  filterGroupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  filterPillActive: {
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
   },
   visitorCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginBottom: 12,
-    elevation: 1,
-    shadowColor: '#0F172A',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  cardTopRow: {
+  visitorCardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
   visitorName: {
     fontSize: 15,
     fontWeight: '800',
     color: '#0F172A',
   },
-  visitorPhone: {
+  visitorHost: {
     fontSize: 12,
-    color: '#2563EB',
-    fontWeight: '600',
-    marginTop: 1,
+    color: '#475569',
+    marginTop: 2,
   },
-  badgePill: {
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
+  passNumberBadge: {
+    backgroundColor: '#1E3A8A',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
-  badgePillText: {
-    color: '#1D4ED8',
+  passNumberBadgeText: {
     fontSize: 11,
     fontWeight: '800',
+    color: '#FFFFFF',
   },
-  detailsGrid: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 10,
-    gap: 4,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+  visitorDetailText: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
-  detailRow: {
+  visitorCardFooter: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
-  detailLabel: {
-    fontSize: 11,
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  statusPillInside: {
+    backgroundColor: '#DCFCE7',
+  },
+  statusPillOutside: {
+    backgroundColor: '#F1F5F9',
+  },
+  statusPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  statusPillTextInside: {
+    color: '#15803D',
+  },
+  statusPillTextOutside: {
     color: '#64748B',
   },
-  detailVal: {
-    fontSize: 11,
-    color: '#1E293B',
-    fontWeight: '600',
-  },
-  detailValBold: {
-    fontSize: 11,
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-  cardActionsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
   viewPassBtn: {
-    flex: 1,
     backgroundColor: '#F1F5F9',
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 6,
   },
   viewPassBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#334155',
   },
-  exitBtn: {
-    flex: 1,
-    backgroundColor: '#DC2626',
-    paddingVertical: 8,
-    borderRadius: 8,
+  gateActionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 6,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  exitBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  inBtn: {
-    flex: 1,
+  gateActionBtnLogin: {
     backgroundColor: '#059669',
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
   },
-  inBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
+  gateActionBtnLogout: {
+    backgroundColor: '#DC2626',
+  },
+  gateActionBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
     color: '#FFFFFF',
   },
-  formCard: {
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyStateIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptyStateTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  emptyStateSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 4,
+  },
+  card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  sectionHeadingBlock: {
     marginBottom: 14,
   },
-  formInputLabel: {
+  sectionSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 3,
+  },
+  scannerViewport: {
+    height: 190,
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewfinderBox: {
+    width: 210,
+    height: 140,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  corner: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderColor: '#F59E0B',
+  },
+  cornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
+  scanTargetIcon: { fontSize: 30, marginBottom: 4 },
+  scanTargetText: { fontSize: 13, fontWeight: '700', color: '#F8FAFC' },
+  fieldLabel: {
     fontSize: 12,
     fontWeight: '700',
     color: '#334155',
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  formInput: {
+  textInput: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#CBD5E1',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     fontSize: 13,
     color: '#0F172A',
-    marginBottom: 10,
   },
-  formRowDual: {
-    flexDirection: 'row',
+  verifyBtnPrimary: {
+    backgroundColor: '#1E3A8A',
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  proofPillRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 10,
+  verifyBtnPrimaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
-  proofPill: {
-    paddingHorizontal: 10,
+  shortcutPill: {
+    paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
-    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
-  proofPillActive: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#2563EB',
-  },
-  proofPillText: {
+  shortcutPillText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#475569',
   },
-  proofPillTextActive: {
-    color: '#1D4ED8',
-  },
-  formSubmitBtn: {
-    backgroundColor: '#2563EB',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  formSubmitBtnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  preRegCard: {
-    backgroundColor: '#FFFFFF',
+  scannedResultCard: {
+    marginTop: 16,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
     borderRadius: 12,
     padding: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 10,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  statusBadgeGreen: {
-    backgroundColor: '#DCFCE7',
-  },
-  statusBadgeYellow: {
-    backgroundColor: '#FEF9C3',
-  },
-  statusBadgeText: {
-    fontSize: 11,
+  scannedCardTitle: {
+    fontSize: 13,
     fontWeight: '800',
+    color: '#166534',
+    marginBottom: 4,
   },
-  statusTextGreen: {
-    color: '#15803D',
-  },
-  statusTextYellow: {
-    color: '#854D0E',
-  },
-  admitBtn: {
-    backgroundColor: '#10B981',
-    paddingVertical: 9,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  admitBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  scanRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  verifyBtn: {
-    backgroundColor: '#1E40AF',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 8,
-  },
-  verifyBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  verifiedPassCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    elevation: 2,
-    shadowColor: '#1E40AF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-  },
-  passHeaderTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#1E40AF',
-    letterSpacing: 1.2,
-  },
-  passName: {
+  scannedName: {
     fontSize: 17,
     fontWeight: '800',
     color: '#0F172A',
+  },
+  scannedDetails: {
+    fontSize: 12,
+    color: '#334155',
     marginTop: 2,
   },
-  passBadgePill: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  passBadgeText: {
-    color: '#1D4ED8',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  exitPassBtn: {
-    backgroundColor: '#DC2626',
-    paddingVertical: 10,
-    borderRadius: 8,
+  modalHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-  },
-  exitPassBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  historyCard: {
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
+  },
+  modalHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  closeBtn: {
+    padding: 6,
+  },
+  closeBtnText: {
+    fontSize: 18,
+    color: '#64748B',
+    fontWeight: '700',
+  },
+  choicePill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginBottom: 8,
   },
-  historyBadge: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  historyBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  historyDetail: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  emptyBox: {
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyEmoji: {
-    fontSize: 36,
-    marginBottom: 8,
-  },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  emptySub: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    justifyContent: 'center',
-    padding: 16,
-  },
-  modalCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 18,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 10,
-  },
-  modalCancel: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    color: '#475569',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  modalSubmit: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
+  choicePillActive: {
     backgroundColor: '#2563EB',
-    alignItems: 'center',
+    borderColor: '#2563EB',
   },
-  modalSubmitText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  presetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-    flexWrap: 'wrap',
-  },
-  presetLabel: {
-    fontSize: 11,
-    color: '#64748B',
+  choicePillText: {
+    fontSize: 12,
+    color: '#475569',
     fontWeight: '600',
   },
-  presetPill: {
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  presetPillText: {
-    fontSize: 11,
+  choicePillTextActive: {
+    color: '#FFFFFF',
     fontWeight: '700',
-    color: '#1D4ED8',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  passModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 340,
+  },
+  passModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingBottom: 10,
+  },
+  passModalTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#1E3A8A',
+    letterSpacing: 0.5,
+  },
+  passCardNumber: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#1E3A8A',
+    marginTop: 10,
+  },
+  passCardName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  passCardDetail: {
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 2,
   },
 });

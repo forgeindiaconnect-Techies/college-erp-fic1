@@ -6,7 +6,7 @@ import {
   Calendar, CalendarCheck, FileSpreadsheet, BookOpenCheck, Inbox, FileBarChart, 
   ClipboardList, Megaphone, ShieldCheck, Shield, Settings, ChevronRight, ChevronDown, 
   Wallet, Activity, PieChart, LogOut, Library, Bus, Building, Briefcase, Bot, Layers, Clock, Award, Network,
-  CreditCard, ScanLine, Package
+  CreditCard, ScanLine, Package, UserCheck
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -107,7 +107,8 @@ const Sidebar = ({ isOpen, onClose }) => {
         { name: 'Hostel', path: '/admin/hostel', icon: <Building size={20} />, flag: 'hostelEnabled' },
         { name: 'Placement', path: '/admin/placement', icon: <Briefcase size={20} />, flag: 'placementEnabled' },
         { name: 'Delivery & Parcels', path: '/admin/parcels', icon: <Package size={20} /> },
-        { name: 'Watchman Monitoring', path: '/admin/watchman-monitoring', icon: <ShieldCheck size={20} /> }
+        { name: 'Watchman Monitoring', path: '/admin/watchman-monitoring', icon: <ShieldCheck size={20} /> },
+        { name: 'Visitor Approvals', path: '/admin/visitor-approvals', icon: <UserCheck size={20} /> }
       ].filter(item => !item.flag || !collegeSettings || collegeSettings[item.flag] !== false)
     },
     {

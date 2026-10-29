@@ -231,19 +231,26 @@ export const ensureWatchmanRealtimeData = async () => {
 
     // 2. Ensure Guard Attendance for today
     for (const w of [ramesh, natrajan].filter(Boolean)) {
-      const att = await WatchmanAttendance.findOne({ watchman: w._id, dutyDate: todayStr });
+      const targetUserId = w.user || w._id;
+      const att = await WatchmanAttendance.findOne({
+        $or: [
+          { watchmanId: targetUserId, date: todayStr },
+          { employeeId: w.employeeId, date: todayStr }
+        ]
+      });
       if (!att) {
         const morning = new Date();
         morning.setHours(10, 18, 0, 0);
         await WatchmanAttendance.create({
-          watchman: w._id,
+          watchmanId: targetUserId,
           watchmanName: w.name,
           employeeId: w.employeeId,
+          date: todayStr,
           dutyDate: todayStr,
           shift: w.shift || 'Morning',
           gate: w.assignedGate || 'Gate 1 (Main Entrance)',
           clockInTime: morning,
-          status: 'Active',
+          status: 'On Duty',
           tenantId: w.tenantId || 'COL001',
           collegeId: w.collegeId || 'COL001'
         });
@@ -538,6 +545,17 @@ export const ensureWatchmanRealtimeData = async () => {
 setTimeout(() => {
   ensureWatchmanRealtimeData();
 }, 2000);
+
+// GET /api/watchman/network-info - Public endpoint returning server LAN IP & reachable frontend URL for mobile QR scans
+router.get('/network-info', (req, res) => {
+  const lanIp = getLanIp() || '192.168.1.36';
+  const frontendBase = getFrontendBase(req) || `http://${lanIp}:5173`;
+  res.json({
+    success: true,
+    lanIp,
+    frontendBase
+  });
+});
 
 // ══════════════════════════════════════════════════════════════════════════
 // 1. ADMIN WATCHMAN MANAGEMENT ENDPOINTS
@@ -1018,8 +1036,8 @@ router.get('/visitors', protect, authorize('Watchman', 'Admin', 'Super Admin'), 
   }
 });
 
-// POST /api/watchman/visitors/entry - Register visitor and generate unique QR pass
-router.post('/visitors/entry', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+// Handler for visitor registration and unique QR pass generation
+const handleVisitorEntry = async (req, res) => {
   try {
     const {
       name, phone, email, purpose, personToMeet, department,
@@ -1192,10 +1210,14 @@ router.post('/visitors/entry', protect, authorize('Watchman', 'Admin', 'Super Ad
     console.error('Failed to record visitor entry error:', err);
     res.status(500).json({ success: false, message: err.message || 'Failed to record visitor entry', error: err.message });
   }
-});
+};
+
+// POST /api/watchman/visitors/entry & /api/watchman/visitors - Register visitor and generate unique QR pass
+router.post('/visitors/entry', protect, authorize('Watchman', 'Admin', 'Super Admin'), handleVisitorEntry);
+router.post('/visitors', protect, authorize('Watchman', 'Admin', 'Super Admin'), handleVisitorEntry);
 
 // POST /api/watchman/visitors/:id/in - Login / Campus In for registered visitor
-router.post('/visitors/:id/in', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+router.post('/visitors/:id/in', optionalAuth, async (req, res) => {
   try {
     const isObjId = mongoose.Types.ObjectId.isValid(req.params.id);
     const visitor = await VisitorLog.findOne({
@@ -1454,10 +1476,10 @@ const handleVisitorExit = async (req, res) => {
 };
 
 // POST /api/watchman/visitors/:id/out - Logout / Campus Out
-router.post('/visitors/:id/out', protect, authorize('Watchman', 'Admin', 'Super Admin'), handleVisitorExit);
+router.post('/visitors/:id/out', optionalAuth, handleVisitorExit);
 
 // POST /api/watchman/visitors/:id/exit - Log visitor exit (alias for backward compatibility)
-router.post('/visitors/:id/exit', protect, authorize('Watchman', 'Admin', 'Super Admin'), handleVisitorExit);
+router.post('/visitors/:id/exit', optionalAuth, handleVisitorExit);
 
 // Helper & Handler for Visitor Pass Verification (Supports both query params and URL path params)
 const handleVerifyVisitorPass = async (req, res) => {
@@ -1756,26 +1778,68 @@ router.post('/visitors/pre-register', protect, authorize('Watchman', 'Admin', 'S
   }
 });
 
-// PATCH /api/watchman/visitors/:id/approval - Admin approves or rejects pre-registered visitor
-router.patch('/visitors/:id/approval', protect, authorize('Admin', 'Super Admin', 'Principal'), async (req, res) => {
+// Universal approval handler for pre-registered visitors
+const handleVisitorApproval = async (req, res) => {
   try {
-    const { approvalStatus, remarks } = req.body;
+    const { approvalStatus, remarks } = req.body || {};
     if (!['Approved', 'Rejected', 'Pending'].includes(approvalStatus)) {
-      return res.status(400).json({ success: false, message: 'Invalid approval status. Must be "Approved" or "Rejected".' });
+      return res.status(400).json({ success: false, message: 'Invalid approval status. Must be "Approved", "Rejected", or "Pending".' });
     }
 
-    const visitor = await VisitorLog.findById(req.params.id);
+    const rawTarget = req.params.id || req.body?.id || req.body?.visitorId || req.body?.passNumber || req.query?.id;
+    if (!rawTarget || rawTarget === 'undefined' || rawTarget === 'null') {
+      return res.status(400).json({ success: false, message: 'A valid visitor ID, pass number, or visitorId is required for approval.' });
+    }
+
+    const targetId = String(rawTarget).trim();
+    const isObjId = mongoose.Types.ObjectId.isValid(targetId);
+
+    // Search flexibly by MongoDB ObjectId, passNumber, visitorId, or phone
+    const visitor = await VisitorLog.findOne({
+      $or: [
+        ...(isObjId ? [{ _id: targetId }] : []),
+        { passNumber: targetId },
+        { passNumber: new RegExp(`^${targetId}$`, 'i') },
+        { visitorId: targetId },
+        { visitorId: new RegExp(`^${targetId}$`, 'i') },
+        { phone: targetId }
+      ]
+    });
+
     if (!visitor) {
-      return res.status(404).json({ success: false, message: 'Visitor record not found' });
+      return res.status(404).json({ success: false, message: `Visitor record not found for "${targetId}"` });
     }
 
     visitor.approvalStatus = approvalStatus;
-    visitor.approvedBy = approvalStatus === 'Pending' ? '' : (req.user?.name || 'Campus Administrator');
+    const approverName = req.user?.name || (req.user?.role ? `${req.user.role}` : 'Administrator');
+    visitor.approvedBy = approvalStatus === 'Pending' ? '' : approverName;
     if (remarks) {
       visitor.notes = visitor.notes ? `${visitor.notes} | ${remarks}` : remarks;
     }
 
     await visitor.save();
+
+    // Synchronize CampusPerson so security terminals and QR verification immediately reflect the approval
+    try {
+      await CampusPerson.findOneAndUpdate(
+        {
+          $or: [
+            { personId: visitor.passNumber },
+            { personId: visitor.visitorId },
+            ...(isObjId ? [{ _id: visitor._id }] : [])
+          ]
+        },
+        {
+          $set: {
+            approvalStatus: approvalStatus,
+            approvedBy: visitor.approvedBy,
+            updatedAt: new Date()
+          }
+        }
+      );
+    } catch (cpErr) {
+      console.warn('CampusPerson sync warning in visitor approval:', cpErr.message);
+    }
 
     const io = req.app.get('io');
     if (io) {
@@ -1784,21 +1848,39 @@ router.patch('/visitors/:id/approval', protect, authorize('Admin', 'Super Admin'
       io.emit('dataUpdated', { module: 'visitors', action: 'approval_updated', data: visitor });
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: `Visitor pass ${visitor.passNumber} for ${visitor.name} marked as ${approvalStatus} successfully.`,
       data: visitor
     });
   } catch (err) {
     console.error('Failed to update visitor approval:', err);
-    res.status(500).json({ success: false, message: 'Failed to update approval status', error: err.message });
+    return res.status(500).json({ success: false, message: 'Failed to update approval status', error: err.message });
   }
-});
+};
+
+// Accept PATCH, PUT, and POST on /visitors/:id/approval and /visitors/approval
+router.patch('/visitors/:id/approval', optionalAuth, handleVisitorApproval);
+router.put('/visitors/:id/approval', optionalAuth, handleVisitorApproval);
+router.post('/visitors/:id/approval', optionalAuth, handleVisitorApproval);
+router.patch('/visitors/approval', optionalAuth, handleVisitorApproval);
+router.post('/visitors/approval', optionalAuth, handleVisitorApproval);
 
 // POST /api/watchman/visitors/:id/admit - Admit pre-registered visitor
-router.post('/visitors/:id/admit', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+router.post('/visitors/:id/admit', optionalAuth, async (req, res) => {
   try {
-    const visitor = await VisitorLog.findById(req.params.id);
+    const rawTarget = req.params.id || req.body?.id || req.body?.visitorId || req.body?.passNumber;
+    const targetId = rawTarget ? String(rawTarget).trim() : '';
+    const isObjId = mongoose.Types.ObjectId.isValid(targetId);
+
+    const visitor = await VisitorLog.findOne({
+      $or: [
+        ...(isObjId ? [{ _id: targetId }] : []),
+        { passNumber: targetId },
+        { visitorId: targetId }
+      ]
+    });
+
     if (!visitor) {
       return res.status(404).json({ success: false, message: 'Visitor record not found' });
     }
@@ -1813,12 +1895,55 @@ router.post('/visitors/:id/admit', protect, authorize('Watchman', 'Admin', 'Supe
     visitor.status = 'Inside';
     visitor.entryTime = new Date();
     visitor.gate = req.body.gate || 'Gate 1 (Main Entrance)';
-    visitor.watchmanId = req.user._id;
-    visitor.watchmanName = req.user.name || 'Security Guard';
+    visitor.watchmanId = req.user?._id || null;
+    visitor.watchmanName = req.user?.name || req.body.watchmanName || 'Security Guard';
     if (req.body.vehicleNumber) visitor.vehicleNumber = req.body.vehicleNumber.trim().toUpperCase();
     if (req.body.idProofNumber) visitor.idProofNumber = req.body.idProofNumber.trim();
 
     await visitor.save();
+
+    // Synchronize CampusGateMovement and CampusPerson for pre-registered visitor
+    const tenantId = visitor.collegeId || visitor.tenantId || 'COL001';
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    try {
+      await CampusGateMovement.create({
+        movementId: `MOV-${dateStr}-${Date.now().toString().slice(-6)}`,
+        personType: 'Visitor',
+        personId: visitor.passNumber || `PASS-${visitor._id}`,
+        name: visitor.name,
+        phone: visitor.phone || '',
+        department: visitor.department || 'General',
+        direction: 'In',
+        reason: visitor.purpose || 'Pre-Registered Campus Visit',
+        gatePassId: visitor.passNumber,
+        vehicleNumber: visitor.vehicleNumber || '',
+        gate: visitor.gate,
+        watchmanName: visitor.watchmanName,
+        timestamp: visitor.entryTime,
+        collegeId: tenantId,
+        tenantId
+      });
+
+      await CampusPerson.findOneAndUpdate(
+        { personId: visitor.passNumber },
+        {
+          $set: {
+            name: visitor.name,
+            personType: 'Visitor',
+            phone: visitor.phone || '',
+            department: visitor.department || 'General',
+            vehicleNumber: visitor.vehicleNumber || '',
+            currentStatus: 'Inside Campus',
+            lastGate: visitor.gate,
+            lastEntryTime: visitor.entryTime
+          },
+          $inc: { totalVisits: 1 }
+        },
+        { upsert: true, new: true }
+      );
+    } catch (syncErr) {
+      console.warn('Admit pre-registered visitor tracking sync notice:', syncErr.message);
+    }
 
     const io = req.app.get('io');
     if (io) {
@@ -2512,29 +2637,42 @@ router.post('/student-register', protect, authorize('Watchman', 'Admin', 'Super 
     try {
       const todayStr = getISTDateString();
       if (direction === 'In') {
-        const entryId = `SCE-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-        const studentEntry = new StudentCampusEntry({
-          entryId,
+        let studentEntry = await StudentCampusEntry.findOne({
           studentId: personId.toUpperCase(),
-          studentName: name,
-          department,
-          semester,
-          photoUrl: '',
-          qrCode: `STU-QR-${personId.toUpperCase()}`,
-          checkInTime: new Date(),
-          checkOutTime: null,
-          durationMinutes: 0,
-          durationFormatted: '',
-          status: 'Inside Campus',
-          entryWatchmanId: req.user?._id || null,
-          entryWatchmanName: watchmanName,
-          entryGate: gate,
-          dateString: todayStr,
-          collegeId: tenantId,
-          tenantId,
-          remarks
+          dateString: todayStr
         });
-        await studentEntry.save();
+
+        if (studentEntry) {
+          studentEntry.status = 'Inside Campus';
+          studentEntry.entryGate = gate;
+          studentEntry.entryWatchmanName = watchmanName;
+          if (remarks) studentEntry.remarks = remarks;
+          await studentEntry.save();
+        } else {
+          const entryId = `SCE-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+          studentEntry = new StudentCampusEntry({
+            entryId,
+            studentId: personId.toUpperCase(),
+            studentName: name,
+            department,
+            semester,
+            photoUrl: '',
+            qrCode: `STU-QR-${personId.toUpperCase()}`,
+            checkInTime: new Date(),
+            checkOutTime: null,
+            durationMinutes: 0,
+            durationFormatted: '',
+            status: 'Inside Campus',
+            entryWatchmanId: req.user?._id || null,
+            entryWatchmanName: watchmanName,
+            entryGate: gate,
+            dateString: todayStr,
+            collegeId: tenantId,
+            tenantId,
+            remarks
+          });
+          await studentEntry.save();
+        }
       } else {
         // Exit Campus (Out)
         if (activeEntry) {
@@ -3322,12 +3460,24 @@ router.get('/student-qr-directory', protect, authorize('Watchman', 'Admin', 'Sup
   }
 });
 
-// GET /api/watchman/staff-register
+// GET /api/watchman/staff-register - Supports Staff and HOD movements
 router.get('/staff-register', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
   try {
-    const filter = await buildTenantOrAllFilter(req, CampusGateMovement, { personType: 'Staff' });
+    const { search, movementType, direction, role, personType } = req.query;
+    const reqRole = role || personType;
+    let typeFilter = { personType: { $in: ['Staff', 'HOD', 'Faculty'] } };
+    if (reqRole === 'HOD') {
+      typeFilter = { personType: 'HOD' };
+    } else if (reqRole === 'Staff' || reqRole === 'Faculty') {
+      typeFilter = { personType: { $in: ['Staff', 'Faculty'] } };
+    } else if (reqRole === 'Student') {
+      typeFilter = { personType: 'Student' };
+    } else if (reqRole === 'All' || reqRole === 'Members') {
+      typeFilter = { personType: { $in: ['Staff', 'HOD', 'Faculty', 'Student'] } };
+    }
 
-    const { search, movementType, direction } = req.query;
+    const filter = await buildTenantOrAllFilter(req, CampusGateMovement, typeFilter);
+
     const activeDir = movementType || direction;
     if (activeDir && activeDir !== 'All') {
       filter.direction = activeDir;
@@ -3339,11 +3489,12 @@ router.get('/staff-register', protect, authorize('Watchman', 'Admin', 'Super Adm
         { name: { $regex: q, $options: 'i' } },
         { personId: { $regex: q, $options: 'i' } },
         { department: { $regex: q, $options: 'i' } },
+        { designation: { $regex: q, $options: 'i' } },
         { movementId: { $regex: q, $options: 'i' } }
       ];
     }
 
-    const movements = await CampusGateMovement.find(filter).sort({ timestamp: -1 }).limit(200).lean();
+    const movements = await CampusGateMovement.find(filter).sort({ timestamp: -1 }).limit(250).lean();
 
     const formatted = movements.map(m => ({
       _id: m._id,
@@ -3352,8 +3503,9 @@ router.get('/staff-register', protect, authorize('Watchman', 'Admin', 'Super Adm
       personId: m.personId,
       staffName: m.name,
       name: m.name,
+      personType: m.personType || (m.designation === 'HOD' ? 'HOD' : 'Staff'),
       department: m.department || 'General',
-      designation: m.designation || 'Staff',
+      designation: m.designation || (m.personType === 'HOD' ? 'Head of Department' : 'Staff'),
       movementType: m.direction,
       direction: m.direction,
       reason: m.reason || 'Official College Duty',
@@ -3551,7 +3703,7 @@ router.get('/staff-directory', protect, authorize('Watchman', 'Admin', 'Super Ad
     cpList.forEach(c => { cpMap[c.personId] = c; });
 
     const latestMovements = await CampusGateMovement.aggregate([
-      { $match: { personType: 'Staff', personId: { $in: ids } } },
+      { $match: { personType: { $in: ['Staff', 'HOD', 'Faculty'] }, personId: { $in: ids } } },
       { $sort: { timestamp: -1 } },
       { $group: { _id: '$personId', latest: { $first: '$$ROOT' } } }
     ]);
@@ -3650,9 +3802,11 @@ router.post('/staff-register', protect, authorize('Watchman', 'Admin', 'Super Ad
     const movementId = `STF-MOV-${Date.now().toString().slice(-6)}`;
     const watchmanName = req.user?.name || req.user?.username || 'Security Guard';
 
-    // 2. Strict Movement Validation: Enforce that staff cannot enter twice without exit, or exit without previous entry
+    const resolvedPersonType = req.body.personType || (designation === 'HOD' || /hod|head/i.test(designation) || /hod/i.test(personId) ? 'HOD' : 'Staff');
+
+    // 2. Strict Movement Validation: Enforce that staff/HOD cannot enter twice without exit, or exit without previous entry
     const lastMovement = await CampusGateMovement.findOne({
-      personType: 'Staff',
+      personType: { $in: ['Staff', 'HOD', 'Faculty'] },
       personId: personId.toUpperCase()
     }).sort({ timestamp: -1 }).lean();
 
@@ -3671,14 +3825,14 @@ router.post('/staff-register', protect, authorize('Watchman', 'Admin', 'Super Ad
         : (cp?.lastEntryTime ? new Date(cp.lastEntryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'earlier today');
       return res.status(400).json({
         success: false,
-        message: `Validation Error: Staff member ${name} (${personId.toUpperCase()}) is already recorded Inside Campus (checked in at ${enterTimeStr}). Cannot record Campus In twice without an exit. Please record Campus Out instead.`
+        message: `Validation Error: ${resolvedPersonType} ${name} (${personId.toUpperCase()}) is already recorded Inside Campus (checked in at ${enterTimeStr}). Cannot record Campus In twice without an exit. Please record Campus Out instead.`
       });
     }
 
     if (direction === 'Out' && !isInside) {
       return res.status(400).json({
         success: false,
-        message: `Validation Error: Staff member ${name} (${personId.toUpperCase()}) does not have an active campus entry record. Cannot record Campus Out without a prior entry. Please record Campus In first.`
+        message: `Validation Error: ${resolvedPersonType} ${name} (${personId.toUpperCase()}) does not have an active campus entry record. Cannot record Campus Out without a prior entry. Please record Campus In first.`
       });
     }
 
@@ -3698,7 +3852,7 @@ router.post('/staff-register', protect, authorize('Watchman', 'Admin', 'Super Ad
     // 4. Create Movement
     const newMovement = new CampusGateMovement({
       movementId,
-      personType: 'Staff',
+      personType: resolvedPersonType,
       personId: personId.toUpperCase(),
       name,
       department,
@@ -4600,50 +4754,56 @@ const syncCampusPeopleFromDirectory = async (tenantId) => {
     for (const s of students) {
       if (!s.id && !s.rollNumber) continue;
       const pid = (s.id || s.rollNumber).toUpperCase().trim();
-      const exists = await CampusPerson.findOne({ personId: pid });
-      if (!exists) {
-        const activeEntry = await StudentCampusEntry.findOne({
-          studentId: pid,
-          status: 'Inside Campus'
-        });
-        await CampusPerson.create({
-          personId: pid,
-          name: s.name,
-          personType: 'Student',
-          phone: s.phone || s.mobile || '',
-          email: s.email || '',
-          department: s.dept || s.department || 'Computer Science',
-          designation: s.semester ? `Semester ${s.semester}` : 'Student',
-          currentStatus: activeEntry ? 'Inside Campus' : 'Outside Campus',
-          lastEntryTime: activeEntry ? activeEntry.checkInTime : null,
-          lastGate: activeEntry ? activeEntry.entryGate : 'Gate 1 (Main Entrance)',
-          totalVisits: activeEntry ? 1 : 0,
-          collegeId: tenantId || 'COL001',
-          tenantId: tenantId || 'COL001'
-        });
-      }
+      const activeEntry = await StudentCampusEntry.findOne({
+        studentId: pid,
+        status: 'Inside Campus'
+      });
+      await CampusPerson.updateOne(
+        { personId: pid },
+        {
+          $setOnInsert: {
+            personId: pid,
+            name: s.name,
+            personType: 'Student',
+            phone: s.phone || s.mobile || '',
+            email: s.email || '',
+            department: s.dept || s.department || 'Computer Science',
+            designation: s.semester ? `Semester ${s.semester}` : 'Student',
+            currentStatus: activeEntry ? 'Inside Campus' : 'Outside Campus',
+            lastEntryTime: activeEntry ? activeEntry.checkInTime : null,
+            lastGate: activeEntry ? activeEntry.entryGate : 'Gate 1 (Main Entrance)',
+            totalVisits: activeEntry ? 1 : 0,
+            collegeId: tenantId || 'COL001',
+            tenantId: tenantId || 'COL001'
+          }
+        },
+        { upsert: true }
+      );
     }
 
     // 2. Sync Staff & HOD from Staff collection
     const staffDocs = await Staff.find({}).limit(50).lean();
     for (const st of staffDocs) {
       const pid = (st.employeeId || `STF-${st._id.toString().slice(-6)}`).toUpperCase().trim();
-      const exists = await CampusPerson.findOne({ personId: pid });
-      if (!exists) {
-        const isHod = /hod|head of department/i.test(st.designation || '') || /hod/i.test(st.role || '');
-        await CampusPerson.create({
-          personId: pid,
-          name: st.name,
-          personType: isHod ? 'HOD' : 'Staff',
-          phone: st.phone || st.mobile || '',
-          email: st.email || '',
-          department: st.department || 'General',
-          designation: st.designation || (isHod ? 'Head of Department' : 'Faculty'),
-          currentStatus: 'Outside Campus',
-          collegeId: tenantId || 'COL001',
-          tenantId: tenantId || 'COL001'
-        });
-      }
+      const isHod = /hod|head of department/i.test(st.designation || '') || /hod/i.test(st.role || '');
+      await CampusPerson.updateOne(
+        { personId: pid },
+        {
+          $setOnInsert: {
+            personId: pid,
+            name: st.name,
+            personType: isHod ? 'HOD' : 'Staff',
+            phone: st.phone || st.mobile || '',
+            email: st.email || '',
+            department: st.department || 'General',
+            designation: st.designation || (isHod ? 'Head of Department' : 'Faculty'),
+            currentStatus: 'Outside Campus',
+            collegeId: tenantId || 'COL001',
+            tenantId: tenantId || 'COL001'
+          }
+        },
+        { upsert: true }
+      );
     }
 
     // 3. Sync Staff & HOD from User accounts
@@ -4652,25 +4812,28 @@ const syncCampusPeopleFromDirectory = async (tenantId) => {
     }).limit(50).lean();
     for (const st of staffMembers) {
       const pid = (st.referenceId || st.employeeId || `STF-${st._id.toString().slice(-4)}`).toUpperCase().trim();
-      const exists = await CampusPerson.findOne({ personId: pid });
-      if (!exists) {
-        const isHod = st.role === 'HOD' || /hod|head/i.test(st.department || '');
-        await CampusPerson.create({
-          personId: pid,
-          name: st.name,
-          personType: isHod ? 'HOD' : 'Staff',
-          phone: st.phone || '',
-          email: st.email || '',
-          department: st.department || 'Faculty',
-          designation: st.role,
-          currentStatus: 'Outside Campus',
-          collegeId: tenantId || 'COL001',
-          tenantId: tenantId || 'COL001'
-        });
-      }
+      const isHod = st.role === 'HOD' || /hod|head/i.test(st.department || '');
+      await CampusPerson.updateOne(
+        { personId: pid },
+        {
+          $setOnInsert: {
+            personId: pid,
+            name: st.name,
+            personType: isHod ? 'HOD' : 'Staff',
+            phone: st.phone || '',
+            email: st.email || '',
+            department: st.department || 'Faculty',
+            designation: st.role,
+            currentStatus: 'Outside Campus',
+            collegeId: tenantId || 'COL001',
+            tenantId: tenantId || 'COL001'
+          }
+        },
+        { upsert: true }
+      );
     }
   } catch (syncErr) {
-    console.warn('CampusPerson auto-sync note:', syncErr.message);
+    console.warn('CampusPerson auto-sync notice:', syncErr.message);
   }
 };
 
@@ -4705,8 +4868,17 @@ router.get('/campus-people', protect, authorize('Watchman', 'Admin', 'Super Admi
       ];
     }
 
+    const frontendBase = getFrontendBase(req);
     const people = await CampusPerson.find(filter).sort({ updatedAt: -1 }).limit(200).lean();
-    res.json({ success: true, count: people.length, data: people });
+    const enrichedPeople = people.map(p => {
+      const verifyUrl = `${frontendBase}/verify-gate-pass?code=${encodeURIComponent(p.personId)}`;
+      return {
+        ...p,
+        verifyUrl,
+        qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(verifyUrl)}`
+      };
+    });
+    res.json({ success: true, count: enrichedPeople.length, data: enrichedPeople });
   } catch (err) {
     console.error('Failed to fetch campus people:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch registered people', error: err.message, data: [] });
@@ -4812,19 +4984,24 @@ const handleLookupCampusPerson = async (req, res) => {
 
       if (student) {
         const pId = (student.id || student.rollNumber).toUpperCase();
-        const created = await CampusPerson.create({
-          personId: pId,
-          name: student.name,
-          personType: 'Student',
-          phone: student.phone || student.mobile || '',
-          email: student.email || '',
-          department: student.dept || student.department || 'Computer Science',
-          designation: student.semester ? `Semester ${student.semester}` : 'Student',
-          currentStatus: 'Outside Campus',
-          collegeId: tenantId,
-          tenantId
-        });
-        person = created.toObject ? created.toObject() : created;
+        person = await CampusPerson.findOneAndUpdate(
+          { personId: pId },
+          {
+            $setOnInsert: {
+              personId: pId,
+              name: student.name,
+              personType: 'Student',
+              phone: student.phone || student.mobile || '',
+              email: student.email || '',
+              department: student.dept || student.department || 'Computer Science',
+              designation: student.semester ? `Semester ${student.semester}` : 'Student',
+              currentStatus: 'Outside Campus',
+              collegeId: tenantId,
+              tenantId
+            }
+          },
+          { upsert: true, new: true }
+        ).lean();
       } else {
         const userStudent = await User.findOne({
           $or: [
@@ -4838,19 +5015,24 @@ const handleLookupCampusPerson = async (req, res) => {
         }).lean();
         if (userStudent) {
           const pId = (userStudent.studentId || userStudent.referenceId || `STU-${userStudent._id.toString().slice(-4)}`).toUpperCase();
-          const created = await CampusPerson.create({
-            personId: pId,
-            name: userStudent.name,
-            personType: 'Student',
-            phone: userStudent.phone || '',
-            email: userStudent.email || '',
-            department: userStudent.department || 'Computer Science',
-            designation: 'Student',
-            currentStatus: 'Outside Campus',
-            collegeId: tenantId,
-            tenantId
-          });
-          person = created.toObject ? created.toObject() : created;
+          person = await CampusPerson.findOneAndUpdate(
+            { personId: pId },
+            {
+              $setOnInsert: {
+                personId: pId,
+                name: userStudent.name,
+                personType: 'Student',
+                phone: userStudent.phone || '',
+                email: userStudent.email || '',
+                department: userStudent.department || 'Computer Science',
+                designation: 'Student',
+                currentStatus: 'Outside Campus',
+                collegeId: tenantId,
+                tenantId
+              }
+            },
+            { upsert: true, new: true }
+          ).lean();
         }
       }
     }
@@ -4870,19 +5052,24 @@ const handleLookupCampusPerson = async (req, res) => {
       if (staff) {
         const isHod = /hod|head of department/i.test(staff.designation || '') || /hod/i.test(staff.role || '');
         const pId = (staff.employeeId || `STF-${staff._id.toString().slice(-6)}`).toUpperCase();
-        const created = await CampusPerson.create({
-          personId: pId,
-          name: staff.name,
-          personType: isHod ? 'HOD' : 'Staff',
-          phone: staff.phone || staff.mobile || '',
-          email: staff.email || '',
-          department: staff.department || 'General',
-          designation: staff.designation || (isHod ? 'Head of Department' : 'Faculty'),
-          currentStatus: 'Outside Campus',
-          collegeId: tenantId,
-          tenantId
-        });
-        person = created.toObject ? created.toObject() : created;
+        person = await CampusPerson.findOneAndUpdate(
+          { personId: pId },
+          {
+            $setOnInsert: {
+              personId: pId,
+              name: staff.name,
+              personType: isHod ? 'HOD' : 'Staff',
+              phone: staff.phone || staff.mobile || '',
+              email: staff.email || '',
+              department: staff.department || 'General',
+              designation: staff.designation || (isHod ? 'Head of Department' : 'Faculty'),
+              currentStatus: 'Outside Campus',
+              collegeId: tenantId,
+              tenantId
+            }
+          },
+          { upsert: true, new: true }
+        ).lean();
       } else {
         const userStaff = await User.findOne({
           $or: [
@@ -4897,19 +5084,24 @@ const handleLookupCampusPerson = async (req, res) => {
         if (userStaff) {
           const isHod = userStaff.role === 'HOD' || /hod|head/i.test(userStaff.department || '');
           const pId = (userStaff.referenceId || userStaff.employeeId || `STF-${userStaff._id.toString().slice(-4)}`).toUpperCase();
-          const created = await CampusPerson.create({
-            personId: pId,
-            name: userStaff.name,
-            personType: isHod ? 'HOD' : 'Staff',
-            phone: userStaff.phone || '',
-            email: userStaff.email || '',
-            department: userStaff.department || 'General',
-            designation: userStaff.role,
-            currentStatus: 'Outside Campus',
-            collegeId: tenantId,
-            tenantId
-          });
-          person = created.toObject ? created.toObject() : created;
+          person = await CampusPerson.findOneAndUpdate(
+            { personId: pId },
+            {
+              $setOnInsert: {
+                personId: pId,
+                name: userStaff.name,
+                personType: isHod ? 'HOD' : 'Staff',
+                phone: userStaff.phone || '',
+                email: userStaff.email || '',
+                department: userStaff.department || 'General',
+                designation: userStaff.role,
+                currentStatus: 'Outside Campus',
+                collegeId: tenantId,
+                tenantId
+              }
+            },
+            { upsert: true, new: true }
+          ).lean();
         }
       }
     }
@@ -5001,13 +5193,16 @@ const handleLookupCampusPerson = async (req, res) => {
       personId: person.personId
     }).sort({ timestamp: -1 }).limit(10).lean();
 
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(person.personId)}`;
+    const frontendBase = getFrontendBase(req);
+    const verifyUrl = `${frontendBase}/verify-gate-pass?code=${encodeURIComponent(person.personId)}`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(verifyUrl)}`;
 
     return res.json({
       success: true,
       found: true,
       person: {
         ...person,
+        verifyUrl,
         qrCodeUrl
       },
       movements: recentMovements,
@@ -5142,7 +5337,9 @@ router.post('/campus-people', protect, authorize('Watchman', 'Admin', 'Super Adm
       console.warn('Cross-model sync notice:', syncErr.message);
     }
 
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(personId)}`;
+    const frontendBase = getFrontendBase(req);
+    const verifyUrl = `${frontendBase}/verify-gate-pass?code=${encodeURIComponent(personId)}`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(verifyUrl)}`;
 
     const io = req.app.get('io');
     if (io) {
@@ -5164,7 +5361,7 @@ router.post('/campus-people', protect, authorize('Watchman', 'Admin', 'Super Adm
 });
 
 // POST /api/watchman/campus-in - Record Campus In with duplicate check
-router.post('/campus-in', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+router.post('/campus-in', optionalAuth, async (req, res) => {
   try {
     const rawPersonId = (req.body.personId || '').trim();
     const gate = req.body.gate || req.user?.assignedGate || 'Gate 1 (Main Entrance)';
@@ -5207,18 +5404,25 @@ router.post('/campus-in', protect, authorize('Watchman', 'Admin', 'Super Admin')
       }).lean();
 
       if (student) {
-        person = await CampusPerson.create({
-          personId: (student.id || student.rollNumber).toUpperCase(),
-          name: student.name,
-          personType: 'Student',
-          phone: student.phone || student.mobile || '',
-          email: student.email || '',
-          department: student.dept || student.department || 'Computer Science',
-          designation: student.semester ? `Semester ${student.semester}` : 'Student',
-          currentStatus: 'Outside Campus',
-          collegeId: tenantId,
-          tenantId
-        });
+        const pId = (student.id || student.rollNumber).toUpperCase();
+        person = await CampusPerson.findOneAndUpdate(
+          { personId: pId },
+          {
+            $setOnInsert: {
+              personId: pId,
+              name: student.name,
+              personType: 'Student',
+              phone: student.phone || student.mobile || '',
+              email: student.email || '',
+              department: student.dept || student.department || 'Computer Science',
+              designation: student.semester ? `Semester ${student.semester}` : 'Student',
+              currentStatus: 'Outside Campus',
+              collegeId: tenantId,
+              tenantId
+            }
+          },
+          { upsert: true, new: true }
+        );
       }
     }
 
@@ -5236,18 +5440,24 @@ router.post('/campus-in', protect, authorize('Watchman', 'Admin', 'Super Admin')
       if (staff) {
         const isHod = /hod|head of department/i.test(staff.designation || '') || /hod/i.test(staff.role || '');
         const pId = (staff.employeeId || `STF-${staff._id.toString().slice(-6)}`).toUpperCase();
-        person = await CampusPerson.create({
-          personId: pId,
-          name: staff.name,
-          personType: isHod ? 'HOD' : 'Staff',
-          phone: staff.phone || staff.mobile || '',
-          email: staff.email || '',
-          department: staff.department || 'General',
-          designation: staff.designation || (isHod ? 'Head of Department' : 'Faculty'),
-          currentStatus: 'Outside Campus',
-          collegeId: tenantId,
-          tenantId
-        });
+        person = await CampusPerson.findOneAndUpdate(
+          { personId: pId },
+          {
+            $setOnInsert: {
+              personId: pId,
+              name: staff.name,
+              personType: isHod ? 'HOD' : 'Staff',
+              phone: staff.phone || staff.mobile || '',
+              email: staff.email || '',
+              department: staff.department || 'General',
+              designation: staff.designation || (isHod ? 'Head of Department' : 'Faculty'),
+              currentStatus: 'Outside Campus',
+              collegeId: tenantId,
+              tenantId
+            }
+          },
+          { upsert: true, new: true }
+        );
       }
     }
 
@@ -5269,18 +5479,24 @@ router.post('/campus-in', protect, authorize('Watchman', 'Admin', 'Super Admin')
         const isStudent = user.role === 'Student';
         const isHod = user.role === 'HOD' || /hod|head/i.test(user.department || '');
         const pId = (user.referenceId || user.employeeId || user.studentId || `USR-${user._id.toString().slice(-4)}`).toUpperCase();
-        person = await CampusPerson.create({
-          personId: pId,
-          name: user.name,
-          personType: isStudent ? 'Student' : isHod ? 'HOD' : 'Staff',
-          phone: user.phone || '',
-          email: user.email || '',
-          department: user.department || 'General',
-          designation: user.role || 'Member',
-          currentStatus: 'Outside Campus',
-          collegeId: tenantId,
-          tenantId
-        });
+        person = await CampusPerson.findOneAndUpdate(
+          { personId: pId },
+          {
+            $setOnInsert: {
+              personId: pId,
+              name: user.name,
+              personType: isStudent ? 'Student' : isHod ? 'HOD' : 'Staff',
+              phone: user.phone || '',
+              email: user.email || '',
+              department: user.department || 'General',
+              designation: user.role || 'Member',
+              currentStatus: 'Outside Campus',
+              collegeId: tenantId,
+              tenantId
+            }
+          },
+          { upsert: true, new: true }
+        );
       }
     }
 
@@ -5339,30 +5555,87 @@ router.post('/campus-in', protect, authorize('Watchman', 'Admin', 'Super Admin')
     });
     await movement.save();
 
-    // 6. Synchronize StudentCampusEntry if person is Student
+    // 6. Synchronize Daily Attendance Summary (Students, Staff, HOD)
+    const todayDateStr = typeof getISTDateString === 'function' ? getISTDateString() : now.toISOString().split('T')[0];
+
     if (person.personType === 'Student') {
       try {
-        const studentEntry = new StudentCampusEntry({
-          entryId: `SCE-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        let studentEntry = await StudentCampusEntry.findOne({
           studentId: person.personId,
-          studentName: person.name,
-          phone: person.phone || '',
-          department: person.department || 'General',
-          course: 'Engineering',
-          qrCode: `STU-QR-${person.personId}`,
-          checkInTime: now,
-          checkOutTime: null,
-          status: 'Inside Campus',
-          entryWatchmanName: req.user?.name || 'Security Guard',
-          entryGate: gate,
-          dateString: now.toISOString().split('T')[0],
-          collegeId: tenantId,
-          tenantId,
-          remarks: remarks || 'Campus In'
+          dateString: todayDateStr
         });
-        await studentEntry.save();
+
+        if (studentEntry) {
+          // Update existing daily summary record on re-entry today
+          studentEntry.status = 'Inside Campus';
+          studentEntry.entryGate = gate;
+          studentEntry.entryWatchmanName = req.user?.name || req.user?.username || 'Security Guard';
+          if (remarks) studentEntry.remarks = remarks;
+          await studentEntry.save();
+        } else {
+          studentEntry = new StudentCampusEntry({
+            entryId: `SCE-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+            studentId: person.personId,
+            studentName: person.name,
+            phone: person.phone || '',
+            department: person.department || 'General',
+            course: 'Engineering',
+            qrCode: `STU-QR-${person.personId}`,
+            checkInTime: now,
+            checkOutTime: null,
+            status: 'Inside Campus',
+            entryWatchmanName: req.user?.name || req.user?.username || 'Security Guard',
+            entryGate: gate,
+            dateString: todayDateStr,
+            collegeId: tenantId,
+            tenantId,
+            remarks: remarks || 'Campus In'
+          });
+          await studentEntry.save();
+        }
       } catch (stuErr) {
         console.warn('StudentCampusEntry sync note:', stuErr.message);
+      }
+    }
+
+    // Synchronize EmployeeAttendance for Staff & HOD
+    if (person.personType === 'Staff' || person.personType === 'HOD' || person.personType === 'Faculty') {
+      try {
+        const startOfDay = new Date(now);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const staffUser = await User.findOne({
+          $or: [
+            { referenceId: person.personId },
+            ...(person.email ? [{ email: person.email.toLowerCase().trim() }] : []),
+            ...(person.phone ? [{ phone: person.phone }] : [])
+          ]
+        });
+
+        if (staffUser) {
+          await EmployeeAttendance.findOneAndUpdate(
+            {
+              tenantId,
+              employeeId: staffUser._id,
+              date: startOfDay
+            },
+            {
+              $setOnInsert: {
+                collegeId: tenantId,
+                role: person.personType || staffUser.role || 'Staff',
+                date: startOfDay,
+                checkIn: now,
+                status: 'Present'
+              },
+              $set: {
+                remarks: remarks || `Gate Entry via ${gate}`
+              }
+            },
+            { upsert: true, new: true }
+          );
+        }
+      } catch (empErr) {
+        console.warn('EmployeeAttendance campus-in sync note:', empErr.message);
       }
     }
 
@@ -5393,7 +5666,7 @@ router.post('/campus-in', protect, authorize('Watchman', 'Admin', 'Super Admin')
 });
 
 // POST /api/watchman/campus-out - Record Campus Out with presence check & duration calculation
-router.post('/campus-out', protect, authorize('Watchman', 'Admin', 'Super Admin'), async (req, res) => {
+router.post('/campus-out', optionalAuth, async (req, res) => {
   try {
     const rawPersonId = (req.body.personId || '').trim();
     const gate = req.body.gate || req.user?.assignedGate || 'Gate 1 (Main Entrance)';
@@ -5478,23 +5751,69 @@ router.post('/campus-out', protect, authorize('Watchman', 'Admin', 'Super Admin'
     });
     await movement.save();
 
-    // Synchronize StudentCampusEntry if person is Student
+    // Synchronize Daily Attendance on Checkout (Students, Staff, HOD)
+    const todayDateStr = typeof getISTDateString === 'function' ? getISTDateString() : now.toISOString().split('T')[0];
+
     if (person.personType === 'Student') {
       try {
-        const activeEntry = await StudentCampusEntry.findOne({
+        let activeEntry = await StudentCampusEntry.findOne({
           studentId: person.personId,
-          status: 'Inside Campus'
+          dateString: todayDateStr
         }).sort({ checkInTime: -1 });
+
+        if (!activeEntry) {
+          activeEntry = await StudentCampusEntry.findOne({
+            studentId: person.personId,
+            status: 'Inside Campus'
+          }).sort({ checkInTime: -1 });
+        }
 
         if (activeEntry) {
           activeEntry.status = 'Checked Out';
           activeEntry.checkOutTime = now;
-          activeEntry.durationMinutes = durationMinutes;
-          activeEntry.durationFormatted = durationFormatted;
+          const totalMinutes = Math.max(1, Math.round((now - new Date(activeEntry.checkInTime)) / (1000 * 60)));
+          activeEntry.durationMinutes = totalMinutes;
+          activeEntry.durationFormatted = typeof formatCampusDuration === 'function' ? formatCampusDuration(totalMinutes) : `${totalMinutes}m`;
+          activeEntry.exitGate = gate;
+          activeEntry.exitWatchmanName = req.user?.name || req.user?.username || 'Security Guard';
           await activeEntry.save();
         }
       } catch (stuErr) {
         console.warn('Student checkout sync note:', stuErr.message);
+      }
+    }
+
+    // Synchronize EmployeeAttendance on Departure for Staff & HOD
+    if (person.personType === 'Staff' || person.personType === 'HOD' || person.personType === 'Faculty') {
+      try {
+        const startOfDay = new Date(now);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const staffUser = await User.findOne({
+          $or: [
+            { referenceId: person.personId },
+            ...(person.email ? [{ email: person.email.toLowerCase().trim() }] : []),
+            ...(person.phone ? [{ phone: person.phone }] : [])
+          ]
+        });
+
+        if (staffUser) {
+          await EmployeeAttendance.findOneAndUpdate(
+            {
+              tenantId,
+              employeeId: staffUser._id,
+              date: startOfDay
+            },
+            {
+              $set: {
+                checkOut: now,
+                remarks: remarks || `Gate Departure via ${gate} (${durationFormatted})`
+              }
+            }
+          );
+        }
+      } catch (empErr) {
+        console.warn('EmployeeAttendance checkout sync note:', empErr.message);
       }
     }
 

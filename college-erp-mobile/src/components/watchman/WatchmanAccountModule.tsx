@@ -18,6 +18,8 @@ type Props = {
   onGateChange: (gate: string) => void;
   onLogout: () => void;
   onOpenReferrals?: () => void;
+  onNavigateLeaves?: () => void;
+  onNavigatePayroll?: () => void;
 };
 
 const GATES = [
@@ -34,6 +36,8 @@ export default function WatchmanAccountModule({
   onGateChange,
   onLogout,
   onOpenReferrals,
+  onNavigateLeaves,
+  onNavigatePayroll,
 }: Props) {
   const [gateModalVisible, setGateModalVisible] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
@@ -131,6 +135,25 @@ export default function WatchmanAccountModule({
           </TouchableOpacity>
         </View>
 
+        {/* Staff Welfare & HR */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Staff Welfare & HR</Text>
+          <TouchableOpacity
+            style={[styles.switchGateBtn, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', marginBottom: 8 }]}
+            onPress={onNavigateLeaves}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.switchGateBtnText, { color: '#1D4ED8' }]}>📅 Apply & View Leave Requests</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.switchGateBtn, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}
+            onPress={onNavigatePayroll}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.switchGateBtnText, { color: '#047857' }]}>💳 My Monthly Payroll & Payslips</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Emergency Contacts */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Campus Emergency Helplines</Text>
@@ -182,7 +205,7 @@ export default function WatchmanAccountModule({
             style={[styles.actionRow, { borderBottomWidth: 0 }]}
             onPress={confirmLogout}
           >
-            <Text style={[styles.actionRowText, { color: '#DC2626' }]}>🚪 Sign Out of Security Terminal</Text>
+            <Text style={[styles.actionRowText, { color: '#DC2626' }]}>Sign Out of Security Terminal</Text>
             <Text style={[styles.actionRowChevron, { color: '#DC2626' }]}>→</Text>
           </TouchableOpacity>
         </View>

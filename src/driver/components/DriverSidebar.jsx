@@ -62,6 +62,7 @@ const DriverSidebar = ({ isOpen, onClose }) => {
       icon: <CheckSquare size={20} />,
       items: [
         { name: 'My Tasks', path: '/driver/tasks', icon: <CheckSquare size={20} /> },
+        { name: 'Leave Requests', path: '/driver/leaves', icon: <Calendar size={20} /> },
         { name: 'Payroll', path: '/driver/payroll', icon: <IndianRupee size={20} /> },
         { name: 'Notifications', path: '/driver/notifications', icon: <Bell size={20} /> }
       ]

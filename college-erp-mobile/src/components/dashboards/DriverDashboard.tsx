@@ -24,6 +24,7 @@ import QuickAccessGrid from './QuickAccessGrid';
 import HighlightCard from './HighlightCard';
 import DailyDutyAttendanceCard from '../common/DailyDutyAttendanceCard';
 import MobileNotificationCenter from '../notifications/MobileNotificationCenter';
+import DriverLeaveScreen from '../driver/DriverLeaveScreen';
 
 type Props = {
   user: MobileUser;
@@ -31,7 +32,7 @@ type Props = {
 };
 
 type TransportSubTab = 'operations' | 'route' | 'students' | 'vehicle';
-type MoreSection = 'menu' | 'checklist' | 'tasks' | 'payroll' | 'safety' | 'notices' | 'profile';
+type MoreSection = 'menu' | 'checklist' | 'tasks' | 'payroll' | 'leaves' | 'safety' | 'notices' | 'profile';
 
 type ComplaintTask = {
   _id: string;
@@ -1151,6 +1152,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
     }
     if (activeNavTab === 'profile') {
       if (moreSection === 'checklist') return 'Pre-Trip Inspection';
+      if (moreSection === 'leaves') return 'Driver Leave Portal';
       if (moreSection === 'payroll') return 'Driver Payroll & Slips';
       if (moreSection === 'notices') return 'Transit Notices';
       if (moreSection === 'safety') return 'Driver Safety Guidelines';
@@ -1294,6 +1296,8 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                 },
               ]}
             />
+
+
 
 
 
@@ -2645,7 +2649,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
             )}
 
             {/* VIEW 2: FLEET SERVICES & TOOLS */}
-            {moreSection !== 'profile' && (
+            {moreSection !== 'profile' && moreSection !== 'leaves' && (
               <ScrollView
                 style={styles.scrollArea}
                 contentContainerStyle={styles.scrollContent}
@@ -2676,6 +2680,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
 
                 {[
                   { id: 'profile', title: 'Driver Identity & Profile', sub: 'Verified employee details and route license', icon: '👤' },
+                  { id: 'leaves', title: 'Leave Requests & Approvals', sub: 'Submit leave applications and track status', icon: '📅' },
                   { id: 'tasks', title: 'My Operational Tasks', sub: 'Assigned vehicle defects and maintenance work', icon: '📋' },
                   { id: 'checklist', title: 'Daily Pre-Trip Inspection', sub: 'Brakes, tires, first-aid & emergency exit check', icon: '🛡️' },
                   { id: 'payroll', title: 'Salary Slips & Payroll', sub: 'View monthly earnings, allowances and net pay', icon: '💵' },
@@ -2919,6 +2924,11 @@ export default function DriverDashboard({ user, onLogout }: Props) {
             )}
 
               </ScrollView>
+            )}
+
+            {/* VIEW 3: DRIVER LEAVE PORTAL */}
+            {moreSection === 'leaves' && (
+              <DriverLeaveScreen user={user} onBack={() => setMoreSection('menu')} />
             )}
           </View>
         )}

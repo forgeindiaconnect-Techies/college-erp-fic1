@@ -43,10 +43,13 @@ const IMG_RATIO =
     ? loginAsset.height / loginAsset.width
     : 844 / 390;
 const SCALED_IMG_HEIGHT = SCREEN_WIDTH * IMG_RATIO;
-const TOP_BANNER_HEIGHT = Math.round(SCALED_IMG_HEIGHT * 0.25);
-const TOP_OFFSET = Math.round(SCALED_IMG_HEIGHT * 0.045);
-const BOTTOM_NAV_OFFSET = Math.round(SCALED_IMG_HEIGHT * 0.024);
-const BOTTOM_SECTION_HEIGHT = Math.round(SCALED_IMG_HEIGHT * 0.21);
+const TOP_BANNER_HEIGHT = Math.round(SCALED_IMG_HEIGHT * 0.282);
+const TOP_OFFSET = Math.round(SCALED_IMG_HEIGHT * 0.042);
+const BOTTOM_IMG_OFFSET =
+  Platform.OS === 'android'
+    ? Math.round(SCALED_IMG_HEIGHT * 0.018)
+    : Math.round(SCALED_IMG_HEIGHT * 0.012);
+const BOTTOM_SECTION_HEIGHT = Math.round(SCALED_IMG_HEIGHT * 0.245);
 
 // ── Sleek Minimal Vector Outline Icons (Exact Match to Reference Mockup) ──
 function OutlineMailIcon({ focused }: { focused?: boolean }) {
@@ -619,7 +622,7 @@ export default function MobileApp() {
                 width: SCREEN_WIDTH,
                 height: SCALED_IMG_HEIGHT,
                 position: 'absolute',
-                bottom: -BOTTOM_NAV_OFFSET,
+                bottom: BOTTOM_IMG_OFFSET,
                 left: 0,
               }}
               resizeMode="cover"
@@ -785,7 +788,7 @@ const styles = StyleSheet.create({
     maxWidth: 390,
     alignSelf: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingVertical: 8,
     backgroundColor: '#FFFFFF',
   },
   formHeading: {
@@ -798,7 +801,7 @@ const styles = StyleSheet.create({
   formSubtitle: {
     fontSize: 13.5,
     color: '#64748B',
-    marginBottom: 24,
+    marginBottom: 20,
     fontWeight: '400',
   },
 
@@ -889,8 +892,8 @@ const styles = StyleSheet.create({
   // ── Forgot Password ──
   forgotPasswordRow: {
     alignItems: 'flex-end',
-    marginTop: 10,
-    marginBottom: 20,
+    marginTop: 8,
+    marginBottom: 16,
   },
   forgotPasswordLinkText: {
     fontSize: 13.5,

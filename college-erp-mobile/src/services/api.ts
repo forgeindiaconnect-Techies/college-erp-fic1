@@ -130,11 +130,6 @@ export async function getApiBaseUrl(): Promise<string> {
     return currentBaseUrl;
   }
 
-  // If local host has previously timed out / failed, stay on cloud fallback
-  if (hasLocalFailed) {
-    currentBaseUrl = CLOUD_API_URL;
-    return currentBaseUrl;
-  }
 
   // 2. In development, detect developer machine LAN IP from Expo's Metro hostUri
   const hostUri =
@@ -246,9 +241,7 @@ async function fetchWithFailover(
 
     if (primaryUrl !== CLOUD_API_URL && process.env.EXPO_PUBLIC_API_URL) {
       try {
-        hasLocalFailed = true;
-        currentBaseUrl = CLOUD_API_URL;
-        console.warn(`[API] Host ${primaryUrl} unreachable. Falling back to: ${CLOUD_API_URL}`);
+        console.warn(`[API] Host ${primaryUrl} unreachable for this call. Trying cloud fallback: ${CLOUD_API_URL}`);
         const cloudRes = await fetch(`${CLOUD_API_URL}/${cleanPath}`, init);
         return cloudRes;
       } catch (cloudErr) {

@@ -5,6 +5,7 @@ import {
   Plus, UserPlus, Mail, Building, Car, Shield, FileText, QrCode
 } from 'lucide-react';
 import { getPreRegisteredVisitors, admitPreRegisteredVisitor, preRegisterVisitor } from '../../api/index';
+import { getGatePassUrl, getQrCodeImageUrl } from '../../utils/qrPassHelper';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import '../watchman.css';
 
@@ -687,93 +688,74 @@ const PreRegisteredVisitorsPage = () => {
             </div>
 
             <div style={{ padding: '24px 20px' }}>
-              {/* QR Mode Switcher */}
-              <div style={{
-                display: 'flex',
-                background: '#f1f5f9',
-                padding: '3px',
-                borderRadius: '8px',
-                maxWidth: '320px',
-                margin: '0 auto 12px auto',
-                border: '1px solid #e2e8f0'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setPassQrMode('raw')}
-                  style={{
-                    flex: 1,
-                    padding: '5px 8px',
-                    fontSize: '0.74rem',
-                    fontWeight: passQrMode === 'raw' ? 800 : 600,
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: passQrMode === 'raw' ? '#ffffff' : 'transparent',
-                    color: passQrMode === 'raw' ? '#0f172a' : '#64748b',
-                    boxShadow: passQrMode === 'raw' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Direct Code
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPassQrMode('url')}
-                  style={{
-                    flex: 1,
-                    padding: '5px 8px',
-                    fontSize: '0.74rem',
-                    fontWeight: passQrMode === 'url' ? 800 : 600,
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: passQrMode === 'url' ? '#ffffff' : 'transparent',
-                    color: passQrMode === 'url' ? '#0f172a' : '#64748b',
-                    boxShadow: passQrMode === 'url' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Mobile Web Pass (Wi-Fi)
-                </button>
-              </div>
-
               {(() => {
-                const rawQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(createdPassModal.passNumber)}`;
-                const activeQr = passQrMode === 'raw' ? rawQrUrl : (createdPassModal.qrUrl || rawQrUrl);
+                const passUrl = getGatePassUrl(createdPassModal.passNumber, 'visitor');
+                const activeQr = getQrCodeImageUrl(passUrl, 260);
 
                 return (
-                  <div style={{ display: 'inline-block', padding: '10px', background: '#f8fafc', border: '2px dashed #cbd5e1', borderRadius: '12px', marginBottom: '14px' }}>
-                    <img src={activeQr} alt="Pass QR" style={{ width: 170, height: 170, display: 'block', margin: '0 auto' }} />
-                    <strong style={{ display: 'block', marginTop: '6px', fontFamily: 'monospace', color: '#7c3aed', fontSize: '0.95rem' }}>
-                      {createdPassModal.passNumber}
-                    </strong>
-                    <div style={{
-                      marginTop: '6px',
-                      fontSize: '0.72rem',
-                      color: passQrMode === 'raw' ? '#166534' : '#1e40af',
-                      background: passQrMode === 'raw' ? '#f0fdf4' : '#eff6ff',
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      border: '1px solid',
-                      borderColor: passQrMode === 'raw' ? '#bbf7d0' : '#bfdbfe',
-                      maxWidth: '280px',
-                      margin: '6px auto 0 auto'
-                    }}>
-                      {passQrMode === 'raw' ? (
-                        <span>✅ Universal: Scans as text with any phone camera or gate scanner.</span>
-                      ) : (
-                        <span>📶 Web: Connect phone to same Wi-Fi / Hotspot to open live pass.</span>
-                      )}
+                  <div>
+                    <div style={{ display: 'inline-block', padding: '14px', background: '#ffffff', border: '2px dashed #10b981', borderRadius: '14px', marginBottom: '14px', boxShadow: '0 4px 14px rgba(0,0,0,0.08)' }}>
+                      <img src={activeQr} alt="Pass QR" style={{ width: 190, height: 190, display: 'block', margin: '0 auto' }} />
+                      <strong style={{ display: 'block', marginTop: '8px', fontFamily: 'monospace', color: '#059669', fontSize: '1.05rem', fontWeight: 800 }}>
+                        {createdPassModal.passNumber}
+                      </strong>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '2px' }}>
+                        Scan via Phone Camera / Google Lens
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '16px' }}>
+                      <a
+                        href={passUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: '0.78rem',
+                          padding: '6px 12px',
+                          background: '#ecfdf5',
+                          color: '#065f46',
+                          border: '1px solid #a7f3d0',
+                          borderRadius: '6px',
+                          textDecoration: 'none',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <span>🔗 Open Digital Pass Preview</span>
+                      </a>
+                      <button
+                        type="button"
+                        style={{
+                          fontSize: '0.78rem',
+                          padding: '6px 12px',
+                          background: '#f1f5f9',
+                          color: '#334155',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: 700
+                        }}
+                        onClick={() => {
+                          navigator.clipboard?.writeText(passUrl);
+                          alert('Digital Pass Link copied to clipboard!\n' + passUrl);
+                        }}
+                      >
+                        📋 Copy Link
+                      </button>
                     </div>
                   </div>
                 );
               })()}
 
-              <h4 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#0f172a' }}>{createdPassModal.name}</h4>
-              <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: '#64748b' }}>
-                📞 {createdPassModal.phone} • Meeting {createdPassModal.personToMeet} ({createdPassModal.department})
+              <h4 style={{ margin: '0 0 4px', fontSize: '1.15rem', color: '#0f172a', fontWeight: 800 }}>{createdPassModal.name}</h4>
+              <p style={{ margin: '0 0 10px', fontSize: '0.84rem', color: '#64748b' }}>
+                📞 {createdPassModal.phone} • Meeting <strong>{createdPassModal.personToMeet}</strong> ({createdPassModal.department})
               </p>
 
-              <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600 }}>
-                Scheduled for {new Date(createdPassModal.expectedDate).toLocaleDateString()} at {createdPassModal.expectedTime}
+              <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', padding: '8px 12px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700 }}>
+                📅 Scheduled for {new Date(createdPassModal.expectedDate).toLocaleDateString()} at {createdPassModal.expectedTime}
               </div>
             </div>
 
@@ -781,7 +763,7 @@ const PreRegisteredVisitorsPage = () => {
               <button
                 type="button"
                 className="wmn-btn-primary"
-                style={{ background: '#059669', width: '100%', padding: '10px 0' }}
+                style={{ background: '#059669', width: '100%', padding: '10px 0', fontSize: '0.9rem', fontWeight: 800 }}
                 onClick={() => setCreatedPassModal(null)}
               >
                 Done

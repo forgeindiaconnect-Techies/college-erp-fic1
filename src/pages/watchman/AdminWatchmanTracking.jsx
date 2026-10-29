@@ -8,7 +8,7 @@ import {
   Activity, Radio, Car, Package, LogOut as ExitIcon,
   ShieldAlert, UserCheck, CalendarCheck, ArrowLeftRight, LogIn, LogOut,
   GraduationCap, Truck, Bus, AlertTriangle, ChevronRight, Phone,
-  ShieldCheck, Sparkles, UserPlus
+  ShieldCheck, Sparkles, UserPlus, Mail
 } from 'lucide-react';
 import {
   getStudentTracking,
@@ -78,13 +78,33 @@ const formatRelativeTime = (timestamp) => {
   return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 };
 
-const AdminWatchmanTracking = () => {
+const AdminWatchmanTracking = ({ defaultTab }) => {
   const navigate = useNavigate();
 
+  // Read URL query parameter ?tab= if present
+  const urlTab = useMemo(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('tab');
+    } catch {
+      return null;
+    }
+  }, []);
+
   // Navigation Tabs:
-  // 'dashboard' | 'student_tracking' | 'staff_movements' | 'campus_movements' | 'visitors_logistics' | 'incidents' | 'security_personnel' | 'attendance' | 'daily_report' | 'student_qr_directory'
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // 'dashboard' | 'visitor_approvals' | 'student_tracking' | 'staff_movements' | 'campus_movements' | 'visitors_logistics' | 'incidents' | 'security_personnel' | 'attendance' | 'daily_report' | 'student_qr_directory'
+  const [activeTab, setActiveTab] = useState(defaultTab || urlTab || 'dashboard');
   const [logisticsSubtab, setLogisticsSubtab] = useState('visitors'); // 'visitors' | 'vehicles' | 'parcels' | 'pre_registered'
+
+  useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
+
+  // Visitor Approvals Tab State
+  const [visitorApprovalFilter, setVisitorApprovalFilter] = useState('All'); // 'All' | 'Pending' | 'Approved' | 'Rejected'
+  const [visitorApprovalSearch, setVisitorApprovalSearch] = useState('');
+  const [actionSuccessMsg, setActionSuccessMsg] = useState('');
 
   // General Filters
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -328,16 +348,37 @@ const AdminWatchmanTracking = () => {
   }, []);
 
   // Admin Visitor Approval / Rejection Handler
-  const handleApprovalAction = async (visitorId, approvalStatus) => {
+  const handleApprovalAction = async (targetId, approvalStatus, remarks = '') => {
+    if (!targetId) return;
     try {
-      setApprovalLoadingId(visitorId);
-      const res = await updateVisitorApproval(visitorId, { approvalStatus });
+      setApprovalLoadingId(targetId);
+      const res = await updateVisitorApproval(targetId, { approvalStatus, remarks, id: targetId });
       if (res.data?.success) {
-        setPreRegList(prev => prev.map(p => p._id === visitorId ? { ...p, approvalStatus, approvedBy: 'Administrator' } : p));
+        const updated = res.data?.data;
+        setPreRegList(prev => prev.map(p => {
+          const match = (p._id && (p._id === targetId || p._id === updated?._id)) ||
+                        (p.id && (p.id === targetId || p.id === updated?.id)) ||
+                        (p.passNumber && (p.passNumber === targetId || p.passNumber === updated?.passNumber)) ||
+                        (p.visitorId && (p.visitorId === targetId || p.visitorId === updated?.visitorId));
+          return match ? {
+            ...p,
+            ...(updated || {}),
+            approvalStatus,
+            approvedBy: approvalStatus === 'Pending' ? '' : (updated?.approvedBy || 'Administrator'),
+            notes: remarks ? (p.notes ? `${p.notes} | ${remarks}` : remarks) : p.notes
+          } : p;
+        }));
+        setActionSuccessMsg(`Visitor pass marked as "${approvalStatus}" successfully!`);
+        setTimeout(() => setActionSuccessMsg(''), 4500);
         fetchLogistics();
+        fetchWatchmanStats();
+      } else {
+        alert(res.data?.message || 'Failed to update visitor approval');
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update visitor approval');
+      console.error('Failed to update visitor approval:', err);
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to update visitor approval';
+      alert(errorMsg);
     } finally {
       setApprovalLoadingId(null);
     }
@@ -476,6 +517,34 @@ const AdminWatchmanTracking = () => {
       if (showLoader) setLoadingPersonnel(false);
     }
   }, []);
+
+  // Memoized Filtered Pre-Registered Visitors for Approval Management
+  const filteredVisitorApprovals = useMemo(() => {
+    return preRegList.filter(p => {
+      // 1. Status Filter
+      if (visitorApprovalFilter !== 'All') {
+        const status = p.approvalStatus || 'Pending';
+        if (status !== visitorApprovalFilter) return false;
+      }
+      // 2. Search Filter
+      if (visitorApprovalSearch.trim()) {
+        const q = visitorApprovalSearch.trim().toLowerCase();
+        const nameMatch = (p.name || '').toLowerCase().includes(q);
+        const phoneMatch = (p.phone || '').toLowerCase().includes(q);
+        const emailMatch = (p.email || '').toLowerCase().includes(q);
+        const passMatch = (p.passNumber || '').toLowerCase().includes(q);
+        const hostMatch = (p.personToMeet || '').toLowerCase().includes(q);
+        const deptMatch = (p.department || '').toLowerCase().includes(q);
+        const purposeMatch = (p.purpose || '').toLowerCase().includes(q);
+        const vehicleMatch = (p.vehicleNumber || '').toLowerCase().includes(q);
+        const collegeMatch = (p.collegeName || '').toLowerCase().includes(q);
+        if (!nameMatch && !phoneMatch && !emailMatch && !passMatch && !hostMatch && !deptMatch && !purposeMatch && !vehicleMatch && !collegeMatch) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [preRegList, visitorApprovalFilter, visitorApprovalSearch]);
 
   // Admin Incident Resolution Handlers
   const handleOpenResolutionModal = (incident) => {
@@ -713,6 +782,7 @@ const AdminWatchmanTracking = () => {
     else if (activeTab === 'staff_movements') fetchStaffMovements(true);
     else if (activeTab === 'attendance') fetchAttendance();
     else if (activeTab === 'visitors_logistics') fetchLogistics();
+    else if (activeTab === 'visitor_approvals') fetchLogistics();
     else if (activeTab === 'daily_report') fetchReport();
     else if (activeTab === 'student_qr_directory') fetchDirectory();
     else if (activeTab === 'campus_movements') fetchCampusMovementsData(true);
@@ -736,6 +806,7 @@ const AdminWatchmanTracking = () => {
         else if (activeTab === 'staff_movements') fetchStaffMovements(false);
         else if (activeTab === 'attendance') fetchAttendance();
         else if (activeTab === 'visitors_logistics') fetchLogistics();
+        else if (activeTab === 'visitor_approvals') fetchLogistics();
         else if (activeTab === 'daily_report') fetchReport();
         else if (activeTab === 'student_qr_directory') fetchDirectory();
         else if (activeTab === 'campus_movements') fetchCampusMovementsData(false);
@@ -953,6 +1024,22 @@ const AdminWatchmanTracking = () => {
 
         <button
           type="button"
+          className={`awt-tab ${activeTab === 'visitor_approvals' ? 'active' : ''}`}
+          onClick={() => setActiveTab('visitor_approvals')}
+        >
+          <UserCheck size={16} />
+          <span>Visitor Approvals</span>
+          {preRegList.filter(p => p.approvalStatus === 'Pending').length > 0 ? (
+            <span className="awt-tab-badge" style={{ background: '#fee2e2', color: '#dc2626', fontWeight: 800 }}>
+              {preRegList.filter(p => p.approvalStatus === 'Pending').length} Pending
+            </span>
+          ) : (
+            <span className="awt-tab-badge">{preRegList.length}</span>
+          )}
+        </button>
+
+        <button
+          type="button"
           className={`awt-tab ${activeTab === 'visitors_logistics' ? 'active' : ''}`}
           onClick={() => setActiveTab('visitors_logistics')}
         >
@@ -1051,14 +1138,45 @@ const AdminWatchmanTracking = () => {
               <div className="awt-kpi-info">
                 <h5>Visitors Inside</h5>
                 <div className="val" style={{ color: '#7c3aed' }}>{watchmanStats.visitorsInside || visitorsList.filter(v => v.status === 'Inside').length || 0}</div>
-                <div className="sub">{watchmanStats.expectedVisitors || preRegList.length || 0} pre-registered</div>
+                <div className="sub">{watchmanStats.todayTotalVisitors || visitorsList.length || 0} today entries</div>
               </div>
               <div className="awt-kpi-icon" style={{ background: '#f5f3ff', color: '#7c3aed' }}>
                 <Users size={24} />
               </div>
             </div>
 
-            {/* 4. Vehicles Parked */}
+            {/* 4. Visitor Approvals (Dedicated Quick Review) */}
+            <div
+              className="awt-kpi-card"
+              style={{
+                '--accent-bar': preRegList.filter(p => p.approvalStatus === 'Pending').length > 0 ? '#dc2626' : '#16a34a',
+                cursor: 'pointer'
+              }}
+              onClick={() => setActiveTab('visitor_approvals')}
+            >
+              <div className="awt-kpi-info">
+                <h5>Visitor Approvals</h5>
+                <div className="val" style={{ color: preRegList.filter(p => p.approvalStatus === 'Pending').length > 0 ? '#dc2626' : '#16a34a' }}>
+                  {preRegList.filter(p => p.approvalStatus === 'Pending').length}
+                </div>
+                <div className="sub">
+                  {preRegList.filter(p => p.approvalStatus === 'Pending').length > 0
+                    ? `${preRegList.filter(p => p.approvalStatus === 'Pending').length} pending review`
+                    : 'All requests reviewed'} • {preRegList.length} total
+                </div>
+              </div>
+              <div
+                className="awt-kpi-icon"
+                style={{
+                  background: preRegList.filter(p => p.approvalStatus === 'Pending').length > 0 ? '#fef2f2' : '#f0fdf4',
+                  color: preRegList.filter(p => p.approvalStatus === 'Pending').length > 0 ? '#dc2626' : '#16a34a'
+                }}
+              >
+                <UserCheck size={24} />
+              </div>
+            </div>
+
+            {/* 5. Vehicles Parked */}
             <div className="awt-kpi-card" style={{ '--accent-bar': '#0891b2' }} onClick={() => { setActiveTab('visitors_logistics'); setLogisticsSubtab('vehicles'); }}>
               <div className="awt-kpi-info">
                 <h5>Vehicles Parked</h5>
@@ -1070,7 +1188,7 @@ const AdminWatchmanTracking = () => {
               </div>
             </div>
 
-            {/* 5. Parcels at Gate */}
+            {/* 6. Parcels at Gate */}
             <div className="awt-kpi-card" style={{ '--accent-bar': '#d97706' }} onClick={() => { setActiveTab('visitors_logistics'); setLogisticsSubtab('parcels'); }}>
               <div className="awt-kpi-info">
                 <h5>Parcels at Gate</h5>
@@ -1082,7 +1200,7 @@ const AdminWatchmanTracking = () => {
               </div>
             </div>
 
-            {/* 6. Active Security Alerts */}
+            {/* 7. Active Security Alerts */}
             <div className="awt-kpi-card" style={{ '--accent-bar': '#dc2626' }} onClick={() => setActiveTab('incidents')}>
               <div className="awt-kpi-info">
                 <h5>Security Alerts</h5>
@@ -1093,18 +1211,6 @@ const AdminWatchmanTracking = () => {
               </div>
               <div className="awt-kpi-icon" style={{ background: watchmanStats.openIncidents > 0 ? '#fef2f2' : '#f0fdf4', color: watchmanStats.openIncidents > 0 ? '#dc2626' : '#16a34a' }}>
                 <ShieldAlert size={24} />
-              </div>
-            </div>
-
-            {/* 7. Buses on Campus */}
-            <div className="awt-kpi-card" style={{ '--accent-bar': '#0284c7' }} onClick={() => navigate('/admin/bus-gate-tracking')}>
-              <div className="awt-kpi-info">
-                <h5>Buses on Campus</h5>
-                <div className="val" style={{ color: '#0284c7' }}>{busStats.insideCampus || 0}</div>
-                <div className="sub">{busStats.totalRegistered || 0} total fleet registered</div>
-              </div>
-              <div className="awt-kpi-icon" style={{ background: '#f0f9ff', color: '#0284c7' }}>
-                <Bus size={24} />
               </div>
             </div>
 
@@ -1121,121 +1227,6 @@ const AdminWatchmanTracking = () => {
                 <ShieldCheck size={24} />
               </div>
             </div>
-          </div>
-
-          {/* Quick Action Banners Grid (matching Watchman Command Center) */}
-          <div className="awt-action-grid">
-            {/* Action 1: Campus In & Out Gate */}
-            <button
-              type="button"
-              className="awt-action-card"
-              onClick={() => setActiveTab('campus_movements')}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="icon-box"><ArrowLeftRight size={22} /></div>
-                <div>
-                  <div className="title">Campus In & Out Gate</div>
-                  <div className="desc">1-Click entry & exit for registered people</div>
-                </div>
-              </div>
-              <ChevronRight size={18} className="action-chevron" />
-            </button>
-
-            {/* Action 2: Register New Person */}
-            <button
-              type="button"
-              className="awt-action-card"
-              onClick={() => navigate('/watchman/register-person')}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="icon-box"><UserPlus size={22} /></div>
-                <div>
-                  <div className="title">Register New Person</div>
-                  <div className="desc">Students, Staff, HODs & Guests + QR Pass</div>
-                </div>
-              </div>
-              <ChevronRight size={18} className="action-chevron" />
-            </button>
-
-            {/* Action 3: Gate QR Scanner */}
-            <button
-              type="button"
-              className="awt-action-card"
-              onClick={() => { setScanModalOpen(true); setScanResult(null); setScanError(''); setScanSuccessMsg(''); }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="icon-box"><QrCode size={22} /></div>
-                <div>
-                  <div className="title">Gate QR Scanner</div>
-                  <div className="desc">Webcam scan • Campus In & Out</div>
-                </div>
-              </div>
-              <ChevronRight size={18} className="action-chevron" />
-            </button>
-
-            {/* Action 4: Log Student Movement */}
-            <button
-              type="button"
-              className="awt-action-card"
-              onClick={() => setActiveTab('student_tracking')}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="icon-box"><GraduationCap size={22} /></div>
-                <div>
-                  <div className="title">Log Student Movement</div>
-                  <div className="desc">Identify by Roll No & track In/Out</div>
-                </div>
-              </div>
-              <ChevronRight size={18} className="action-chevron" />
-            </button>
-
-            {/* Action 5: Staff Gate Register */}
-            <button
-              type="button"
-              className="awt-action-card"
-              onClick={() => setActiveTab('staff_movements')}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="icon-box"><UserCheck size={22} /></div>
-                <div>
-                  <div className="title">Staff Gate Register</div>
-                  <div className="desc">Log faculty & staff movements</div>
-                </div>
-              </div>
-              <ChevronRight size={18} className="action-chevron" />
-            </button>
-
-            {/* Action 6: New Visitor Entry */}
-            <button
-              type="button"
-              className="awt-action-card"
-              onClick={() => navigate('/watchman/visitor-entry')}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="icon-box"><Users size={22} /></div>
-                <div>
-                  <div className="title">New Visitor Entry</div>
-                  <div className="desc">Issue QR badge & verify pass</div>
-                </div>
-              </div>
-              <ChevronRight size={18} className="action-chevron" />
-            </button>
-
-            {/* Action 7: Bus Entry Tracking */}
-            <button
-              type="button"
-              className="awt-action-card"
-              onClick={() => navigate('/admin/bus-gate-tracking')}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="icon-box"><Bus size={22} /></div>
-                <div>
-                  <div className="title">Bus Entry Tracking</div>
-                  <div className="desc">{busStats.insideCampus > 0 ? `${busStats.insideCampus} Buses Inside Campus` : 'Log Arrival & Departure'}</div>
-                </div>
-              </div>
-              <ChevronRight size={18} className="action-chevron" />
-            </button>
           </div>
 
           {/* Interactive Live Gate Personnel Switcher (Students, Staff, Visitors, Campus Movements) */}
@@ -1697,6 +1688,440 @@ const AdminWatchmanTracking = () => {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ──────────────── TAB: VISITOR APPROVALS (GATE PASS & PRE-REGISTRATION REVIEW) ──────────────── */}
+      {activeTab === 'visitor_approvals' && (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {/* Action Feedback Banner */}
+          {actionSuccessMsg && (
+            <div style={{
+              background: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              color: '#065f46',
+              padding: '12px 18px',
+              borderRadius: '10px',
+              marginBottom: '1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              fontWeight: 600,
+              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.1)'
+            }}>
+              <CheckCircle2 size={18} style={{ color: '#059669' }} />
+              <span>{actionSuccessMsg}</span>
+            </div>
+          )}
+
+          {/* Visitor Approvals Summary Metric Cards */}
+          <div className="awt-stats-grid" style={{ marginBottom: '1.25rem' }}>
+            {/* Total Requests */}
+            <div
+              className={`awt-stat-card ${visitorApprovalFilter === 'All' ? 'active-filter' : ''}`}
+              style={{ cursor: 'pointer', border: visitorApprovalFilter === 'All' ? '2px solid #7c3aed' : undefined }}
+              onClick={() => setVisitorApprovalFilter('All')}
+              title="Filter All Requests"
+            >
+              <div className="awt-stat-icon purple">
+                <Users size={24} />
+              </div>
+              <div className="awt-stat-content">
+                <h3>Total Requests</h3>
+                <div className="val">{preRegList.length}</div>
+                <div className="sub">All pre-registered appointments</div>
+              </div>
+            </div>
+
+            {/* Pending Approvals */}
+            <div
+              className={`awt-stat-card ${visitorApprovalFilter === 'Pending' ? 'active-filter' : ''}`}
+              style={{
+                cursor: 'pointer',
+                border: visitorApprovalFilter === 'Pending' ? '2px solid #dc2626' : undefined,
+                background: preRegList.filter(p => p.approvalStatus === 'Pending').length > 0 ? '#fffaf0' : undefined
+              }}
+              onClick={() => setVisitorApprovalFilter('Pending')}
+              title="Filter Pending Approvals"
+            >
+              <div className="awt-stat-icon amber">
+                <Clock size={24} />
+              </div>
+              <div className="awt-stat-content">
+                <h3>Pending Review</h3>
+                <div className="val" style={{ color: preRegList.filter(p => p.approvalStatus === 'Pending').length > 0 ? '#dc2626' : '#d97706' }}>
+                  {preRegList.filter(p => p.approvalStatus === 'Pending').length}
+                </div>
+                <div className="sub">Awaiting Admin decision</div>
+              </div>
+            </div>
+
+            {/* Approved Passes */}
+            <div
+              className={`awt-stat-card ${visitorApprovalFilter === 'Approved' ? 'active-filter' : ''}`}
+              style={{ cursor: 'pointer', border: visitorApprovalFilter === 'Approved' ? '2px solid #059669' : undefined }}
+              onClick={() => setVisitorApprovalFilter('Approved')}
+              title="Filter Approved Passes"
+            >
+              <div className="awt-stat-icon green">
+                <CheckCircle2 size={24} />
+              </div>
+              <div className="awt-stat-content">
+                <h3>Approved Passes</h3>
+                <div className="val" style={{ color: '#059669' }}>
+                  {preRegList.filter(p => p.approvalStatus === 'Approved').length}
+                </div>
+                <div className="sub">Authorized for campus entry</div>
+              </div>
+            </div>
+
+            {/* Rejected / Denied */}
+            <div
+              className={`awt-stat-card ${visitorApprovalFilter === 'Rejected' ? 'active-filter' : ''}`}
+              style={{ cursor: 'pointer', border: visitorApprovalFilter === 'Rejected' ? '2px solid #dc2626' : undefined }}
+              onClick={() => setVisitorApprovalFilter('Rejected')}
+              title="Filter Rejected Requests"
+            >
+              <div className="awt-stat-icon blue">
+                <XCircle size={24} />
+              </div>
+              <div className="awt-stat-content">
+                <h3>Rejected Requests</h3>
+                <div className="val" style={{ color: '#dc2626' }}>
+                  {preRegList.filter(p => p.approvalStatus === 'Rejected').length}
+                </div>
+                <div className="sub">Gate admission blocked</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search, Filter Tabs & Actions Bar */}
+          <div className="awt-filter-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '1.25rem' }}>
+            {/* Search Input */}
+            <div className="awt-search-wrap" style={{ flex: 1, minWidth: '260px' }}>
+              <Search size={16} />
+              <input
+                type="text"
+                className="awt-search-input"
+                placeholder="Search by visitor name, phone, email, pass #, host, department, purpose..."
+                value={visitorApprovalSearch}
+                onChange={(e) => setVisitorApprovalSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Segmented Filter Pills */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
+              <button
+                type="button"
+                className={`awt-tab ${visitorApprovalFilter === 'All' ? 'active' : ''}`}
+                style={{ padding: '6px 14px', fontSize: '0.8rem', borderRadius: '6px' }}
+                onClick={() => setVisitorApprovalFilter('All')}
+              >
+                All ({preRegList.length})
+              </button>
+              <button
+                type="button"
+                className={`awt-tab ${visitorApprovalFilter === 'Pending' ? 'active' : ''}`}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '0.8rem',
+                  borderRadius: '6px',
+                  color: visitorApprovalFilter === 'Pending' ? '#dc2626' : undefined,
+                  fontWeight: visitorApprovalFilter === 'Pending' ? 700 : undefined
+                }}
+                onClick={() => setVisitorApprovalFilter('Pending')}
+              >
+                Pending ({preRegList.filter(p => p.approvalStatus === 'Pending').length})
+              </button>
+              <button
+                type="button"
+                className={`awt-tab ${visitorApprovalFilter === 'Approved' ? 'active' : ''}`}
+                style={{ padding: '6px 14px', fontSize: '0.8rem', borderRadius: '6px' }}
+                onClick={() => setVisitorApprovalFilter('Approved')}
+              >
+                Approved ({preRegList.filter(p => p.approvalStatus === 'Approved').length})
+              </button>
+              <button
+                type="button"
+                className={`awt-tab ${visitorApprovalFilter === 'Rejected' ? 'active' : ''}`}
+                style={{ padding: '6px 14px', fontSize: '0.8rem', borderRadius: '6px' }}
+                onClick={() => setVisitorApprovalFilter('Rejected')}
+              >
+                Rejected ({preRegList.filter(p => p.approvalStatus === 'Rejected').length})
+              </button>
+            </div>
+
+            {/* Refresh Button */}
+            <button
+              type="button"
+              className="awt-btn awt-btn-secondary"
+              onClick={fetchLogistics}
+              disabled={loadingLogistics}
+            >
+              <RefreshCw size={14} className={loadingLogistics ? 'animate-spin' : ''} />
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          {/* Table Card */}
+          <div className="awt-table-card">
+            <div className="awt-table-header">
+              <h2>
+                <UserCheck size={18} style={{ color: '#2563eb' }} />
+                <span>Pre-Registered Visitor Gate Pass Requests ({filteredVisitorApprovals.length})</span>
+              </h2>
+              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                Admin approvals synchronize immediately with gate watchman mobile & web terminals
+              </span>
+            </div>
+
+            <div className="awt-table-responsive">
+              <table className="awt-table">
+                <thead>
+                  <tr>
+                    <th>Pass Number</th>
+                    <th>Visitor Details</th>
+                    <th>Host / Department</th>
+                    <th>Purpose & Vehicle</th>
+                    <th>Visit Schedule</th>
+                    <th>College & Registered</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Admin Decision</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredVisitorApprovals.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '3.5rem 1rem', color: '#64748b' }}>
+                        <div style={{ maxWidth: '420px', margin: '0 auto' }}>
+                          <UserCheck size={44} style={{ color: '#cbd5e1', margin: '0 auto 12px auto' }} />
+                          <h4 style={{ margin: '0 0 6px', color: '#0f172a', fontSize: '1.05rem', fontWeight: 700 }}>
+                            No Visitor Approval Requests Found
+                          </h4>
+                          <p style={{ margin: '0 0 16px', fontSize: '0.84rem', color: '#64748b' }}>
+                            {visitorApprovalSearch
+                              ? `No visitor requests matched "${visitorApprovalSearch}".`
+                              : visitorApprovalFilter !== 'All'
+                              ? `There are currently no visitor requests with status "${visitorApprovalFilter}".`
+                              : 'No pre-registered visitor appointments have been logged by gate watchmen or hosts yet.'}
+                          </p>
+                          {(visitorApprovalSearch || visitorApprovalFilter !== 'All') && (
+                            <button
+                              type="button"
+                              className="awt-btn awt-btn-secondary"
+                              onClick={() => { setVisitorApprovalSearch(''); setVisitorApprovalFilter('All'); }}
+                            >
+                              Reset Filters
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredVisitorApprovals.map(p => {
+                      const itemKey = p._id || p.id || p.passNumber || p.visitorId;
+                      const isPending = p.approvalStatus === 'Pending';
+                      const isApproved = p.approvalStatus === 'Approved';
+                      const isRejected = p.approvalStatus === 'Rejected';
+                      const isLoadingThis = approvalLoadingId === itemKey || approvalLoadingId === p._id || (p.passNumber && approvalLoadingId === p.passNumber);
+
+                      return (
+                        <tr key={itemKey}>
+                          <td>
+                            <strong style={{
+                              fontFamily: 'monospace',
+                              color: '#7c3aed',
+                              background: '#f5f3ff',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid #ddd6fe',
+                              display: 'inline-block'
+                            }}>
+                              {p.passNumber || 'PASS-TBD'}
+                            </strong>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.92rem' }}>{p.name}</div>
+                            {p.phone && (
+                              <div style={{ fontSize: '0.78rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                <Phone size={12} style={{ color: '#64748b' }} />
+                                <span>{p.phone}</span>
+                              </div>
+                            )}
+                            {p.email && (
+                              <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
+                                <Mail size={12} style={{ color: '#94a3b8' }} />
+                                <span>{p.email}</span>
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{p.personToMeet || 'Campus General'}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                              <Building2 size={12} style={{ display: 'inline', marginRight: '3px' }} />
+                              {p.department || 'General'}
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 500, color: '#1e293b' }}>{p.purpose || 'General Visit'}</div>
+                            {p.vehicleNumber && (
+                              <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                <Car size={12} />
+                                <span>{p.vehicleNumber}</span>
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a' }}>
+                              {p.expectedDate ? new Date(p.expectedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Today'}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
+                              <Clock size={12} style={{ color: '#64748b' }} />
+                              <span>{p.expectedTime || 'General Gate Hours'}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 500, fontSize: '0.82rem', color: '#334155' }}>
+                              {p.collegeName || 'Main Campus'}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '2px' }}>
+                              Reg: {p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}
+                            </div>
+                            {p.watchmanName && (
+                              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                Guard: {p.watchmanName}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              fontSize: '0.76rem',
+                              fontWeight: 700,
+                              background: isApproved ? '#dcfce7' : (isRejected ? '#fee2e2' : '#fef3c7'),
+                              color: isApproved ? '#166534' : (isRejected ? '#991b1b' : '#92400e'),
+                              border: `1px solid ${isApproved ? '#bbf7d0' : (isRejected ? '#fca5a5' : '#fde68a')}`
+                            }}>
+                              {isApproved ? <CheckCircle2 size={13} /> : (isRejected ? <XCircle size={13} /> : <Clock size={13} />)}
+                              <span>{p.approvalStatus || 'Pending'}</span>
+                            </span>
+                            {p.approvedBy && (
+                              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '3px' }}>
+                                {isApproved ? 'Approved by' : 'Rejected by'}: <strong>{p.approvedBy}</strong>
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                              {isPending ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="awt-btn"
+                                    style={{
+                                      background: '#059669',
+                                      color: '#ffffff',
+                                      padding: '6px 12px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 700,
+                                      borderRadius: '6px',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                    disabled={isLoadingThis}
+                                    onClick={() => handleApprovalAction(itemKey, 'Approved')}
+                                  >
+                                    <Check size={14} />
+                                    <span>{isLoadingThis ? 'Processing...' : 'Approve'}</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="awt-btn"
+                                    style={{
+                                      background: '#fee2e2',
+                                      color: '#dc2626',
+                                      padding: '6px 12px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 700,
+                                      borderRadius: '6px',
+                                      border: '1px solid #fca5a5',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                    disabled={isLoadingThis}
+                                    onClick={() => handleApprovalAction(itemKey, 'Rejected')}
+                                  >
+                                    <XCircle size={14} />
+                                    <span>{isLoadingThis ? 'Processing...' : 'Reject'}</span>
+                                  </button>
+                                </>
+                              ) : isApproved ? (
+                                <button
+                                  type="button"
+                                  className="awt-btn"
+                                  style={{
+                                    background: '#f8fafc',
+                                    color: '#dc2626',
+                                    padding: '5px 12px',
+                                    fontSize: '0.76rem',
+                                    fontWeight: 600,
+                                    borderRadius: '6px',
+                                    border: '1px solid #cbd5e1',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  disabled={isLoadingThis}
+                                  onClick={() => handleApprovalAction(itemKey, 'Rejected')}
+                                >
+                                  <XCircle size={13} />
+                                  <span>{isLoadingThis ? 'Processing...' : 'Revoke'}</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="awt-btn"
+                                  style={{
+                                    background: '#059669',
+                                    color: '#ffffff',
+                                    padding: '5px 12px',
+                                    fontSize: '0.76rem',
+                                    fontWeight: 600,
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  disabled={isLoadingThis}
+                                  onClick={() => handleApprovalAction(itemKey, 'Approved')}
+                                >
+                                  <Check size={13} />
+                                  <span>{isLoadingThis ? 'Processing...' : 'Re-Approve'}</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

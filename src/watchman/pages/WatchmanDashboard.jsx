@@ -5,7 +5,7 @@ import {
   AlertTriangle, Clock, ShieldCheck, MapPin, CheckCircle2,
   Package, Search, RefreshCw, ChevronRight, Phone, Car,
   Shield, GraduationCap, ScanLine, ArrowRight, ArrowLeft,
-  UserCheck, Briefcase, Eye, X, Check, Camera, Sparkles,
+  UserCheck, Briefcase, Building2, Eye, X, Check, Camera, Sparkles,
   Filter, ExternalLink, Printer, ArrowLeftRight, LogIn
 } from 'lucide-react';
 import {
@@ -28,6 +28,7 @@ import {
 } from '../../api/index';
 import EmployeeAttendanceCard from '../../components/common/EmployeeAttendanceCard';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
+import { getGatePassUrl, getQrCodeImageUrl } from '../../utils/qrPassHelper';
 import { SettingsContext } from '../../App';
 import '../watchman.css';
 
@@ -81,7 +82,7 @@ const WatchmanDashboard = () => {
   const [scanResult, setScanResult] = useState(null);
   const [scanError, setScanError] = useState('');
   const [scanSuccessMsg, setScanSuccessMsg] = useState('');
-  const [scanSearchMode, setScanSearchMode] = useState('mobile'); // 'mobile' | 'qr'
+  const [scanSearchMode, setScanSearchMode] = useState('qr'); // 'qr' | 'mobile'
   const [busStats, setBusStats] = useState({ totalRegistered: 0, insideCampus: 0, departedToday: 0, notArrivedToday: 0 });
 
   const getWatchmanSession = () => {
@@ -343,8 +344,26 @@ const WatchmanDashboard = () => {
            sQr.toLowerCase().includes(q);
   });
 
-  // 2. Filtered Staff
-  const filteredStaff = staffList.filter(st =>
+  // Filter HODs vs General Staff Members
+  const isHodMember = (st) => {
+    const des = (st.designation || '').toLowerCase();
+    const role = (st.role || '').toLowerCase();
+    const pType = (st.personType || '').toLowerCase();
+    return des.includes('hod') || des.includes('head of department') || role === 'hod' || pType === 'hod';
+  };
+
+  const hodList = staffList.filter(isHodMember);
+  const generalStaffList = staffList.filter(st => !isHodMember(st));
+
+  // 2. Filtered Staff (Non-HOD)
+  const filteredStaff = generalStaffList.filter(st =>
+    (st.staffName || st.name)?.toLowerCase().includes(search.toLowerCase()) ||
+    (st.staffId || st.personId)?.toLowerCase().includes(search.toLowerCase()) ||
+    st.department?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // 2b. Filtered HODs
+  const filteredHod = hodList.filter(st =>
     (st.staffName || st.name)?.toLowerCase().includes(search.toLowerCase()) ||
     (st.staffId || st.personId)?.toLowerCase().includes(search.toLowerCase()) ||
     st.department?.toLowerCase().includes(search.toLowerCase())
@@ -579,37 +598,19 @@ const WatchmanDashboard = () => {
           <ChevronRight size={18} className="action-chevron" />
         </button>
 
-        {/* Action: Log Student Movement */}
+        {/* Unified Member Register: Staff, Student & HOD */}
         <button
           type="button"
-          onClick={() => navigate('/watchman/student-register')}
+          onClick={() => navigate('/watchman/members-register')}
           className="wmn-action-card"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div className="icon-box">
-              <GraduationCap size={22} />
+            <div className="icon-box" style={{ background: '#ecfdf5', color: '#059669' }}>
+              <Users size={22} />
             </div>
             <div>
-              <div className="title">Log Student Movement</div>
-              <div className="desc">Identify by Roll No & track In/Out</div>
-            </div>
-          </div>
-          <ChevronRight size={18} className="action-chevron" />
-        </button>
-
-        {/* Action 2: Staff Gate Register */}
-        <button
-          type="button"
-          onClick={() => navigate('/watchman/staff-register')}
-          className="wmn-action-card"
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div className="icon-box">
-              <UserCheck size={22} />
-            </div>
-            <div>
-              <div className="title">Staff Gate Register</div>
-              <div className="desc">Log faculty & staff movements</div>
+              <div className="title">Staff, Student & HOD Register</div>
+              <div className="desc">Track & log In/Out for all campus members</div>
             </div>
           </div>
           <ChevronRight size={18} className="action-chevron" />
@@ -798,7 +799,30 @@ const WatchmanDashboard = () => {
                 }}
               >
                 <UserCheck size={16} />
-                <span>Staff ({staffList.length})</span>
+                <span>Staff ({generalStaffList.length})</span>
+              </button>
+
+              {/* Tab 3: HOD */}
+              <button
+                type="button"
+                onClick={() => { setActiveViewTab('hod'); setSearch(''); }}
+                style={{
+                  border: 'none',
+                  background: activeViewTab === 'hod' ? '#ffffff' : 'transparent',
+                  color: activeViewTab === 'hod' ? '#b45309' : '#64748b',
+                  fontWeight: activeViewTab === 'hod' ? 700 : 500,
+                  fontSize: '0.84rem',
+                  padding: '6px 14px',
+                  borderRadius: '7px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: activeViewTab === 'hod' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                }}
+              >
+                <Building2 size={16} />
+                <span>HOD ({hodList.length})</span>
               </button>
 
               {/* Tab 3: Visitors */}
@@ -858,6 +882,8 @@ const WatchmanDashboard = () => {
                       ? "Search student name, ID, roll #..."
                       : activeViewTab === 'staff'
                       ? "Search staff name, ID..."
+                      : activeViewTab === 'hod'
+                      ? "Search HOD name, dept, ID..."
                       : "Search visitor name, pass #..."
                   }
                   value={search}
@@ -1353,6 +1379,119 @@ const WatchmanDashboard = () => {
             </div>
           )}
 
+          {/* ═════════ TAB: HOD ON CAMPUS ═════════ */}
+          {activeViewTab === 'hod' && (
+            <div style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
+              <table className="wmn-table">
+                <thead>
+                  <tr>
+                    <th>Head of Department (HOD)</th>
+                    <th>Staff / HOD ID</th>
+                    <th>Department</th>
+                    <th>Gate Entered</th>
+                    <th>Entry Time</th>
+                    <th style={{ textAlign: 'right' }}>Campus Exit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredHod.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '36px 16px', color: '#64748b' }}>
+                        <Building2 size={36} style={{ color: '#d97706', margin: '0 auto 8px auto' }} />
+                        <p style={{ margin: 0, fontWeight: 700, fontSize: '0.95rem' }}>No HOD movements recorded yet today</p>
+                        <span style={{ fontSize: '0.8rem' }}>Head of Department gate entries will appear here.</span>
+                        <div style={{ marginTop: '12px' }}>
+                          <button
+                            type="button"
+                            className="wmn-btn-primary"
+                            style={{ padding: '6px 14px', fontSize: '0.82rem', margin: '0 auto', display: 'inline-flex', background: '#d97706', borderColor: '#d97706' }}
+                            onClick={() => navigate('/watchman/members-register?tab=hod')}
+                          >
+                            <Building2 size={15} />
+                            <span>Log HOD Entry</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredHod.map(hd => (
+                      <tr key={hd._id}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              background: '#fef3c7',
+                              color: '#b45309',
+                              fontWeight: 800,
+                              fontSize: '0.8rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: '1px solid #fde68a'
+                            }}>
+                              {(hd.staffName || hd.name)?.slice(0, 2).toUpperCase() || 'HD'}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#0f172a' }}>{hd.staffName || hd.name}</div>
+                              <div style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 600 }}>{hd.designation || 'Head of Department'}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span style={{
+                            fontFamily: 'monospace',
+                            fontWeight: 700,
+                            color: '#b45309',
+                            background: '#fef3c7',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            border: '1px solid #fde68a',
+                            fontSize: '0.82rem'
+                          }}>
+                            {hd.staffId || hd.personId}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ fontSize: '0.82rem', color: '#334155', fontWeight: 600 }}>
+                            {hd.department || 'Academic Department'}
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ fontSize: '0.8rem', color: '#475569' }}>{hd.gate || 'Gate 1'}</div>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', color: '#334155' }}>
+                            <Clock size={13} style={{ color: '#64748b' }} />
+                            <span>{new Date(hd.timestamp || hd.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            className="wmn-btn-sec"
+                            style={{
+                              padding: '5px 12px',
+                              fontSize: '0.78rem',
+                              color: '#dc2626',
+                              borderColor: '#fca5a5'
+                            }}
+                            disabled={actionLoadingId === hd._id}
+                            onClick={() => handleQuickStaffExit(hd)}
+                          >
+                            <ExitIcon size={13} />
+                            <span>{actionLoadingId === hd._id ? 'Logging...' : 'Log Exit'}</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {/* ═════════ TAB 3: VISITORS ON CAMPUS OR REGISTERED TODAY ═════════ */}
           {activeViewTab === 'visitors' && (
             <div style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
@@ -1704,66 +1843,18 @@ const WatchmanDashboard = () => {
 
             {/* Modal Content */}
             <div style={{ padding: '24px 20px', textAlign: 'center' }}>
-              {/* QR Mode Switcher Tabs */}
-              <div style={{
-                display: 'flex',
-                background: '#f1f5f9',
-                padding: '3px',
-                borderRadius: '8px',
-                maxWidth: '380px',
-                margin: '0 auto 16px auto',
-                border: '1px solid #e2e8f0'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setQrDisplayMode('raw')}
-                  style={{
-                    flex: 1,
-                    padding: '7px 10px',
-                    fontSize: '0.78rem',
-                    fontWeight: qrDisplayMode === 'raw' ? 800 : 600,
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: qrDisplayMode === 'raw' ? '#ffffff' : 'transparent',
-                    color: qrDisplayMode === 'raw' ? '#0f172a' : '#64748b',
-                    boxShadow: qrDisplayMode === 'raw' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Direct Code (Any Scanner)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQrDisplayMode('url')}
-                  style={{
-                    flex: 1,
-                    padding: '7px 10px',
-                    fontSize: '0.78rem',
-                    fontWeight: qrDisplayMode === 'url' ? 800 : 600,
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: qrDisplayMode === 'url' ? '#ffffff' : 'transparent',
-                    color: qrDisplayMode === 'url' ? '#0f172a' : '#64748b',
-                    boxShadow: qrDisplayMode === 'url' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Mobile Web Pass (Wi-Fi)
-                </button>
-              </div>
-
               {/* QR Image Box */}
               {(() => {
                 const rawCode = qrPassModal.data.qrCode || qrPassModal.data.passNumber || qrPassModal.data.id;
-                const rawQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(rawCode)}`;
-                const activeQrUrl = qrDisplayMode === 'raw' ? rawQrUrl : (qrPassModal.data.qrUrl || rawQrUrl);
+                const verifyUrl = getGatePassUrl(rawCode, qrPassModal.type || 'members');
+                const activeQrUrl = getQrCodeImageUrl(verifyUrl, 250);
 
                 return (
                   <div style={{
                     background: '#ffffff',
                     border: '2px dashed #cbd5e1',
                     borderRadius: '14px',
-                    padding: '14px',
+                    padding: '16px',
                     display: 'inline-block',
                     margin: '0 auto 16px auto',
                     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
@@ -1775,33 +1866,14 @@ const WatchmanDashboard = () => {
                     />
                     <span style={{
                       display: 'block',
-                      marginTop: '8px',
+                      marginTop: '10px',
                       fontFamily: 'monospace',
                       fontWeight: 800,
-                      fontSize: '0.92rem',
+                      fontSize: '0.98rem',
                       color: qrPassModal.type === 'student' ? '#1d4ed8' : '#7c3aed'
                     }}>
                       {rawCode}
                     </span>
-                    <div style={{
-                      marginTop: '8px',
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      background: qrDisplayMode === 'raw' ? '#f0fdf4' : '#eff6ff',
-                      border: '1px solid',
-                      borderColor: qrDisplayMode === 'raw' ? '#bbf7d0' : '#bfdbfe',
-                      fontSize: '0.74rem',
-                      color: qrDisplayMode === 'raw' ? '#166534' : '#1e40af',
-                      maxWidth: '340px',
-                      margin: '8px auto 0 auto',
-                      textAlign: 'center'
-                    }}>
-                      {qrDisplayMode === 'raw' ? (
-                        <span>✅ <strong>Universal Scanner Mode:</strong> Scans instantly as text in Google Lens, phone camera, or gate hardware barcode reader.</span>
-                      ) : (
-                        <span>📶 <strong>Mobile Browser Mode:</strong> Connect phone to the same Wi-Fi / Hotspot as this computer to load the pass directly.</span>
-                      )}
-                    </div>
                   </div>
                 );
               })()}
@@ -1987,29 +2059,6 @@ const WatchmanDashboard = () => {
               <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => { setScanSearchMode('mobile'); setScanQuery(''); setScanError(''); setScanResult(null); }}
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: scanSearchMode === 'mobile' ? '#ffffff' : 'transparent',
-                    color: scanSearchMode === 'mobile' ? '#312e81' : '#64748b',
-                    fontWeight: scanSearchMode === 'mobile' ? 800 : 600,
-                    fontSize: '0.82rem',
-                    cursor: 'pointer',
-                    boxShadow: scanSearchMode === 'mobile' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <Phone size={15} />
-                  <span>Search by Mobile #</span>
-                </button>
-                <button
-                  type="button"
                   onClick={() => { setScanSearchMode('qr'); setScanQuery(''); setScanError(''); setScanResult(null); }}
                   style={{
                     flex: 1,
@@ -2030,6 +2079,29 @@ const WatchmanDashboard = () => {
                 >
                   <QrCode size={15} />
                   <span>Scan QR Code / ID</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setScanSearchMode('mobile'); setScanQuery(''); setScanError(''); setScanResult(null); }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: scanSearchMode === 'mobile' ? '#ffffff' : 'transparent',
+                    color: scanSearchMode === 'mobile' ? '#312e81' : '#64748b',
+                    fontWeight: scanSearchMode === 'mobile' ? 800 : 600,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    boxShadow: scanSearchMode === 'mobile' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Phone size={15} />
+                  <span>Search by Mobile #</span>
                 </button>
               </div>
             </div>

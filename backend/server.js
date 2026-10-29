@@ -1108,6 +1108,8 @@ const autoSeedIfEmpty = async () => {
       { staffId: 'STF007', staffName: 'Prof. Karthik S.', designation: 'Assistant Prof.', department: 'Computer Science', billingMonth: 'May 2026', basicPay: 65000, allowances: 10000, deductions: 3000, netSalary: 72000, status: 'Pending', paymentMode: 'Bank Transfer' },
       { staffId: 'STF008', staffName: 'Dr. Ananya Rao', designation: 'Professor', department: 'Computer Science', billingMonth: 'May 2026', basicPay: 90000, allowances: 20000, deductions: 8000, netSalary: 102000, status: 'Disbursed', paymentDate: new Date('2026-05-25'), paymentMode: 'Bank Transfer' },
       { staffId: 'STF009', staffName: 'Dr. Meena Pillai', designation: 'Associate Prof.', department: 'Electronics & Comm.', billingMonth: 'May 2026', basicPay: 75000, allowances: 12000, deductions: 4000, netSalary: 83000, status: 'Pending', paymentMode: 'Bank Transfer' },
+      { staffId: 'WMN-001', staffName: 'Ramesh Kumar (Chief Watchman)', designation: 'Chief Security Watchman', department: 'Campus Security & Safety', billingMonth: 'May 2026', basicPay: 22000, allowances: 7000, deductions: 800, netSalary: 28200, status: 'Disbursed', paymentDate: new Date('2026-05-25'), paymentMode: 'Bank Transfer' },
+      { staffId: 'DRV-001', staffName: 'Rajesh Driver (Senior Driver)', designation: 'Senior Transit Driver', department: 'Transport Division', billingMonth: 'May 2026', basicPay: 24000, allowances: 7700, deductions: 900, netSalary: 30800, status: 'Disbursed', paymentDate: new Date('2026-05-25'), paymentMode: 'Bank Transfer' },
     ]);
 
     // 17. Welfare Records Seed

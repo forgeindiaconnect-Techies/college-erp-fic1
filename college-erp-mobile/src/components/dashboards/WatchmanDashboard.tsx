@@ -9,6 +9,8 @@ import WatchmanGateOperations from '../watchman/WatchmanGateOperations';
 import WatchmanVisitorModule from '../watchman/WatchmanVisitorModule';
 import WatchmanLogisticsModule from '../watchman/WatchmanLogisticsModule';
 import WatchmanAccountModule from '../watchman/WatchmanAccountModule';
+import WatchmanLeaveScreen from '../watchman/WatchmanLeaveScreen';
+import WatchmanPayrollScreen from '../watchman/WatchmanPayrollScreen';
 import MobileNotificationCenter from '../notifications/MobileNotificationCenter';
 
 type Props = {
@@ -19,6 +21,7 @@ type Props = {
 export default function WatchmanDashboard({ user, onLogout }: Props) {
   // 5 Main Navigation Destinations (Home, Gate Ops, Visitors, Logistics, Account)
   const [activeTab, setActiveTab] = useState<MainNavTab>('home');
+  const [activeSubScreen, setActiveSubScreen] = useState<'leaves' | 'payroll' | null>(null);
   const [assignedGate, setAssignedGate] = useState('Gate 1 (Main Entrance)');
   const [showReferralsHub, setShowReferralsHub] = useState(false);
   const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
@@ -30,6 +33,10 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
   // Android hardware back button handler
   useEffect(() => {
     const onBackPress = () => {
+      if (activeSubScreen) {
+        setActiveSubScreen(null);
+        return true;
+      }
       if (showReferralsHub) {
         setShowReferralsHub(false);
         return true;
@@ -42,31 +49,37 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
     };
     const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => sub.remove();
-  }, [activeTab, showReferralsHub]);
+  }, [activeTab, showReferralsHub, activeSubScreen]);
 
-  const isInnerScreen = activeTab !== 'home' || showReferralsHub;
+  const isInnerScreen = activeTab !== 'home' || showReferralsHub || !!activeSubScreen;
 
   const getScreenTitle = () => {
+    if (activeSubScreen === 'leaves') return 'Security Leave Requests';
+    if (activeSubScreen === 'payroll') return 'Security Payroll & Payslips';
     if (showReferralsHub) return 'Business Referrals & Rewards';
-    if (activeTab === 'academics') return 'Gate Operations';
-    if (activeTab === 'referrals') return 'Visitor Management';
+    if (activeTab === 'academics') return 'Gate Operations (Members)';
+    if (activeTab === 'referrals') return 'Visitors & Pre-Visitors';
     if (activeTab === 'notifications') return 'Logistics & Shift Duty';
     if (activeTab === 'profile') return 'Security Officer Account';
     return 'Security Command Center';
   };
 
   const getScreenSubtitle = () => {
+    if (activeSubScreen === 'leaves') return 'Submit & Track Absence Approvals';
+    if (activeSubScreen === 'payroll') return 'Official Monthly Compensation Slips';
     if (showReferralsHub) return 'Referral Hub';
     if (activeTab === 'home') return `${assignedGate} • Live Duty Active`;
-    if (activeTab === 'academics') return 'Student & Staff Movements';
-    if (activeTab === 'referrals') return 'Guest Passes & Authorizations';
+    if (activeTab === 'academics') return 'Students, Staff & HODs Movement Register';
+    if (activeTab === 'referrals') return 'Visitors, Pre-Visitors & Dedicated Scanner';
     if (activeTab === 'notifications') return 'Buses, Deliveries & Fleet';
     if (activeTab === 'profile') return 'Badge & Station Settings';
     return undefined;
   };
 
   const handleBackNavigation = () => {
-    if (showReferralsHub) {
+    if (activeSubScreen) {
+      setActiveSubScreen(null);
+    } else if (showReferralsHub) {
       setShowReferralsHub(false);
     } else {
       setActiveTab('home');
@@ -88,6 +101,7 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
         notificationsCount={unreadNotifsCount}
         onNotificationsPress={() => setShowNotifModal(true)}
         onProfilePress={() => {
+          setActiveSubScreen(null);
           setShowReferralsHub(false);
           setActiveTab('profile');
         }}
@@ -96,7 +110,11 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
 
       {/* 2. BODY CONTENT ROUTED ACCORDING TO USER'S SELECTED DESTINATION */}
       <View style={styles.bodyWrapper}>
-        {showReferralsHub ? (
+        {activeSubScreen === 'leaves' ? (
+          <WatchmanLeaveScreen user={user} onBack={() => setActiveSubScreen(null)} />
+        ) : activeSubScreen === 'payroll' ? (
+          <WatchmanPayrollScreen user={user} onBack={() => setActiveSubScreen(null)} />
+        ) : showReferralsHub ? (
           <ReferralHub user={user} onBack={() => setShowReferralsHub(false)} />
         ) : activeTab === 'home' ? (
           /* MODULE 1: COMMAND CENTER */
@@ -106,6 +124,8 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
             onNavigateGate={() => setActiveTab('academics')}
             onNavigateVisitors={() => setActiveTab('referrals')}
             onNavigateLogistics={() => setActiveTab('notifications')}
+            onNavigateLeaves={() => setActiveSubScreen('leaves')}
+            onNavigatePayroll={() => setActiveSubScreen('payroll')}
           />
         ) : activeTab === 'academics' ? (
           /* MODULE 2 & 3: STUDENT & STAFF GATE OPERATIONS */
@@ -136,6 +156,8 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
             onGateChange={setAssignedGate}
             onLogout={onLogout}
             onOpenReferrals={() => setShowReferralsHub(true)}
+            onNavigateLeaves={() => setActiveSubScreen('leaves')}
+            onNavigatePayroll={() => setActiveSubScreen('payroll')}
           />
         )}
       </View>
@@ -144,6 +166,7 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
       <BottomTabBar
         activeTab={activeTab}
         onTabChange={(tab) => {
+          setActiveSubScreen(null);
           setShowReferralsHub(false);
           setActiveTab(tab);
         }}
@@ -156,7 +179,7 @@ export default function WatchmanDashboard({ user, onLogout }: Props) {
         }}
         tabIcons={{
           home: '🛡️',
-          academics: '🚪',
+          academics: '📋',
           referrals: '👥',
           notifications: '🚚',
           profile: '👤',

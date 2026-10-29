@@ -5,7 +5,8 @@ import {
   LayoutDashboard, UserPlus, LogOut as ExitIcon, QrCode,
   CalendarCheck, Package, Truck, Bus, Users, UserCheck,
   Clock, AlertTriangle, History, Bell, User, Key,
-  LogOut, Shield, ChevronRight, X, ArrowLeftRight, ShieldCheck
+  LogOut, Shield, ChevronRight, X, ArrowLeftRight, ShieldCheck,
+  CreditCard
 } from 'lucide-react';
 import '../../components/layout/Sidebar.css';
 
@@ -40,24 +41,12 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
 
   const menuSections = [
     {
-      title: 'Command Center',
+      title: 'Gate Operations',
       items: [
         { name: 'Gate Dashboard', path: '/watchman/dashboard', icon: <LayoutDashboard size={19} /> },
+        { name: 'Staff, Student & HOD Register', path: '/watchman/members-register', icon: <Users size={19} /> },
         { name: 'Campus In / Out Control', path: '/watchman/campus-in-out', icon: <ArrowLeftRight size={19} /> },
-        { name: 'Register Student / Staff', path: '/watchman/register-person', icon: <UserCheck size={19} /> },
         { name: 'Member QR Scanner', path: '/watchman/qr-verification?type=members', icon: <QrCode size={19} /> }
-      ]
-    },
-    {
-      title: 'Student Gate Operations',
-      items: [
-        { name: 'Student Movement Register', path: '/watchman/student-register', icon: <Users size={19} /> }
-      ]
-    },
-    {
-      title: 'Staff Gate Operations',
-      items: [
-        { name: 'Staff Entry Register', path: '/watchman/staff-register', icon: <UserCheck size={19} /> }
       ]
     },
     {
@@ -81,8 +70,16 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
       ]
     },
     {
-      title: 'Account',
+      title: 'Staff Welfare & HR',
       items: [
+        { name: 'Leave Requests', path: '/watchman/leaves', icon: <CalendarCheck size={19} /> },
+        { name: 'My Payroll', path: '/watchman/payroll', icon: <CreditCard size={19} /> }
+      ]
+    },
+    {
+      title: 'Registration & Account',
+      items: [
+        { name: 'Register Student / Staff', path: '/watchman/register-person', icon: <UserCheck size={19} /> },
         { name: 'My Profile', path: '/watchman/profile', icon: <User size={19} /> }
       ]
     }
@@ -146,6 +143,11 @@ const WatchmanSidebar = ({ isOpen, onClose }) => {
                         active = location.pathname === '/watchman/qr-verification' && (isMember || (!isVisitor && location.search === ''));
                       } else if (item.path === '/watchman/qr-verification') {
                         active = location.pathname === '/watchman/qr-verification' && !isVisitor;
+                      } else if (item.path === '/watchman/members-register') {
+                        active = location.pathname === '/watchman/members-register' ||
+                                 location.pathname === '/watchman/student-register' ||
+                                 location.pathname === '/watchman/staff-register' ||
+                                 location.pathname === '/watchman/hod-register';
                       } else {
                         active = location.pathname === item.path;
                       }

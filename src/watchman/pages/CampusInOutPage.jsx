@@ -39,6 +39,7 @@ import {
   getCampusMovementStats
 } from '../../api';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
+import { getGatePassUrl, getQrCodeImageUrl } from '../../utils/qrPassHelper';
 import '../watchman.css';
 
 const formatDateTime = (timestamp) => {
@@ -1464,11 +1465,16 @@ const CampusInOutPage = () => {
                 display: 'inline-block',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
               }}>
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(qrPassModal.personId)}`}
-                  alt={`QR Pass for ${qrPassModal.name}`}
-                  style={{ width: 220, height: 220, display: 'block' }}
-                />
+                {(() => {
+                  const verifyUrl = getGatePassUrl(qrPassModal.personId, qrPassModal.personType);
+                  return (
+                    <img
+                      src={getQrCodeImageUrl(verifyUrl, 260)}
+                      alt={`QR Pass for ${qrPassModal.name}`}
+                      style={{ width: 220, height: 220, display: 'block' }}
+                    />
+                  );
+                })()}
               </div>
 
               <div style={{
@@ -1476,7 +1482,7 @@ const CampusInOutPage = () => {
                 fontSize: '0.76rem',
                 color: '#64748b'
               }}>
-                Scan using the Watchman QR Scanner camera or barcode gun to record Gate In / Out.
+                Scan using any mobile camera, Google Lens, or Watchman QR Scanner to record Gate In / Out.
               </div>
 
               <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 18 }}>
@@ -1484,7 +1490,8 @@ const CampusInOutPage = () => {
                   type="button"
                   className="wm-btn wm-btn-secondary"
                   onClick={() => {
-                    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrPassModal.personId)}`;
+                    const verifyUrl = getGatePassUrl(qrPassModal.personId, qrPassModal.personType);
+                    const qrUrl = getQrCodeImageUrl(verifyUrl, 300);
                     const a = document.createElement('a');
                     a.href = qrUrl;
                     a.download = `QR-PASS-${qrPassModal.personId}.png`;

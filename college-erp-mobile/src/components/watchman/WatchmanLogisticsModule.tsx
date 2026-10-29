@@ -616,7 +616,7 @@ export default function WatchmanLogisticsModule({ user, assignedGate = 'Gate 1 (
                         {isActionLoading ? (
                           <ActivityIndicator color="#FFFFFF" size="small" />
                         ) : (
-                          <Text style={styles.exitBtnFullText}>Confirm Vehicle Exit 🚪</Text>
+                          <Text style={styles.exitBtnFullText}>Confirm Vehicle Exit</Text>
                         )}
                       </TouchableOpacity>
                     )}

@@ -238,6 +238,7 @@ import DriverTasks from './driver/pages/DriverTasks';
 import DriverPayroll from './driver/pages/DriverPayroll';
 import DriverNotifications from './driver/pages/DriverNotifications';
 import DriverAttendance from './driver/pages/DriverAttendance';
+import DriverLeaves from './driver/pages/DriverLeaves';
 
 // Librarian Layout & Pages
 import LibrarianLayout from './librarian/components/LibrarianLayout';
@@ -257,6 +258,7 @@ import VehicleRegisterPage from './watchman/pages/VehicleRegisterPage';
 import BusEntryTrackingPage from './watchman/pages/BusEntryTrackingPage';
 import StudentRegisterPage from './watchman/pages/StudentRegisterPage';
 import StaffRegisterPage from './watchman/pages/StaffRegisterPage';
+import CampusMembersRegisterPage from './watchman/pages/CampusMembersRegisterPage';
 import AttendanceShiftPage from './watchman/pages/AttendanceShiftPage';
 import IncidentReportsPage from './watchman/pages/IncidentReportsPage';
 import VisitorHistoryPage from './watchman/pages/VisitorHistoryPage';
@@ -265,6 +267,8 @@ import WatchmanProfilePage from './watchman/pages/WatchmanProfilePage';
 import WatchmanChangePasswordPage from './watchman/pages/WatchmanChangePasswordPage';
 import CampusInOutPage from './watchman/pages/CampusInOutPage';
 import RegisterPersonPage from './watchman/pages/RegisterPersonPage';
+import WatchmanLeaves from './watchman/pages/WatchmanLeaves';
+import WatchmanPayroll from './watchman/pages/WatchmanPayroll';
 
 import Unauthorized from './pages/Unauthorized';
 
@@ -558,6 +562,8 @@ function App() {
               <Route path="watchman-management" element={<AdminWatchmanManagement />} />
               <Route path="watchman-monitoring" element={<AdminWatchmanTracking />} />
               <Route path="watchman-tracking" element={<AdminWatchmanTracking />} />
+              <Route path="visitor-approvals" element={<AdminWatchmanTracking defaultTab="visitor_approvals" />} />
+              <Route path="visitor-approval" element={<AdminWatchmanTracking defaultTab="visitor_approvals" />} />
               <Route path="student-entry-management" element={<AdminWatchmanTracking />} />
               <Route path="parcels" element={<AdminDeliveryParcelManagement />} />
               <Route path="parcel" element={<AdminDeliveryParcelManagement />} />
@@ -777,6 +783,8 @@ function App() {
               <Route path="tasks/:id" element={<ResolveComplaintPage />} />
               <Route path="complaint/:id" element={<ResolveComplaintPage />} />
               <Route path="payroll" element={<DriverPayroll />} />
+              <Route path="leaves" element={<DriverLeaves />} />
+              <Route path="leave-request" element={<DriverLeaves />} />
               <Route path="notifications" element={<DriverNotifications />} />
               <Route path="attendance" element={<DriverAttendance />} />
               <Route path="referrals"  element={<PersonalReferrals />} />
@@ -882,10 +890,16 @@ function App() {
               <Route path="vehicles" element={<VehicleRegisterPage />} />
               <Route path="bus-tracking" element={<BusEntryTrackingPage />} />
               <Route path="buses" element={<BusEntryTrackingPage />} />
-              <Route path="student-register" element={<StudentRegisterPage />} />
-              <Route path="staff-register" element={<StaffRegisterPage />} />
+              <Route path="members-register" element={<CampusMembersRegisterPage />} />
+              <Route path="members" element={<CampusMembersRegisterPage />} />
+              <Route path="student-register" element={<CampusMembersRegisterPage defaultTab="student" />} />
+              <Route path="staff-register" element={<CampusMembersRegisterPage defaultTab="staff" />} />
+              <Route path="hod-register" element={<CampusMembersRegisterPage defaultTab="hod" />} />
               <Route path="attendance-shift" element={<AttendanceShiftPage />} />
               <Route path="attendance" element={<AttendanceShiftPage />} />
+              <Route path="leaves" element={<WatchmanLeaves />} />
+              <Route path="leave-request" element={<WatchmanLeaves />} />
+              <Route path="payroll" element={<WatchmanPayroll />} />
               <Route path="incidents" element={<IncidentReportsPage />} />
               <Route path="visitor-history" element={<VisitorHistoryPage />} />
               <Route path="verify" element={<QrVerificationPage />} />

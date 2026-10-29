@@ -364,6 +364,8 @@ export const deleteFee = (id) => api.delete(`/fees/${id}`);
 
 // Salary / Payroll Endpoints
 export const getSalaries = () => api.get('/salaries');
+export const getAllSalaries = () => api.get('/salaries');
+export const getMySalaries = () => api.get('/salaries/my');
 export const getSalariesByStaff = (staffId) => api.get(`/salaries/staff/${staffId}`);
 export const createSalary = (data) => api.post('/salaries', data);
 export const updateSalary = (id, data) => api.put(`/salaries/${id}`, data);
@@ -918,8 +920,14 @@ export const getWatchmanStats = () => api.get('/watchman/stats');
 export const getActiveVisitors = () => api.get('/watchman/visitors/active');
 export const getAllVisitors = (params = {}) => api.get('/watchman/visitors', { params });
 export const recordVisitorEntry = (data) => api.post('/watchman/visitors/entry', data);
-export const recordVisitorCampusIn = (id, data = {}) => api.post(`/watchman/visitors/${id}/in`, data);
-export const recordVisitorCampusOut = (id, data = {}) => api.post(`/watchman/visitors/${id}/out`, data);
+export const recordVisitorCampusIn = (id, data = {}) => {
+  const target = encodeURIComponent(String(id || data.id || data.passNumber || '').trim());
+  return api.post(`/watchman/visitors/${target}/in`, data);
+};
+export const recordVisitorCampusOut = (id, data = {}) => {
+  const target = encodeURIComponent(String(id || data.id || data.passNumber || '').trim());
+  return api.post(`/watchman/visitors/${target}/out`, data);
+};
 export const recordVisitorExit = (id, data = {}) => api.post(`/watchman/visitors/${id}/out`, data);
 export const verifyVisitorPass = (query) => {
   let cleanQuery = (query || '').toString().trim();
@@ -933,7 +941,10 @@ export const verifyVisitorPass = (query) => {
 };
 export const getPreRegisteredVisitors = () => api.get('/watchman/visitors/pre-registered');
 export const preRegisterVisitor = (data) => api.post('/watchman/visitors/pre-register', data);
-export const updateVisitorApproval = (id, data) => api.patch(`/watchman/visitors/${id}/approval`, data);
+export const updateVisitorApproval = (id, data = {}) => {
+  const visitorId = id || data.id || data.visitorId || data.passNumber;
+  return api.patch(`/watchman/visitors/${encodeURIComponent(visitorId)}/approval`, { ...data, id: visitorId });
+};
 export const admitPreRegisteredVisitor = (id, data = {}) => api.post(`/watchman/visitors/${id}/in`, data);
 export const getVisitorHistory = (params = {}) => api.get('/watchman/visitors/history', { params });
 
@@ -1013,9 +1024,7 @@ export const lookupCampusPerson = (query, extraParams = {}) => {
 export const getLeaves = (params = {}) => api.get('/leaves', { params });
 export const getStudentLeaves = (studentId) => api.get(`/leaves/student/${studentId}`);
 export const createLeave = (data) => api.post('/leaves', data);
+export const applyLeave = (data) => api.post('/leaves', data);
 export const updateLeaveStatus = (id, data) => api.patch(`/leaves/${id}`, data);
 export const deleteLeave = (id) => api.delete(`/leaves/${id}`);
-
-
-
-
+export const getLeaveAttendanceSummary = (params = {}) => api.get('/leaves/attendance-summary', { params });

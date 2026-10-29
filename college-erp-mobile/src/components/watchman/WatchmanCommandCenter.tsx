@@ -48,6 +48,8 @@ interface Props {
   onNavigateGate?: () => void;
   onNavigateVisitors?: () => void;
   onNavigateLogistics?: () => void;
+  onNavigateLeaves?: () => void;
+  onNavigatePayroll?: () => void;
   onRefresh?: () => void;
 }
 
@@ -71,6 +73,8 @@ export default function WatchmanCommandCenter({
   onNavigateGate,
   onNavigateVisitors,
   onNavigateLogistics,
+  onNavigateLeaves,
+  onNavigatePayroll,
   onRefresh: propsOnRefresh,
 }: Props) {
   // Self-managed state if not supplied via props
@@ -252,7 +256,7 @@ export default function WatchmanCommandCenter({
     >
       {/* 1. Command Center Gate Header Card */}
       <View style={styles.headerBanner}>
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, { marginBottom: 0 }]}>
           <View style={styles.gateShield}>
             <Text style={{ fontSize: 24 }}>🛡️</Text>
           </View>
@@ -263,49 +267,6 @@ export default function WatchmanCommandCenter({
           <View style={styles.statusPill}>
             <Text style={styles.statusPillText}>● {officer.shiftStatus}</Text>
           </View>
-        </View>
-
-        {/* Quick KPI Row */}
-        <View style={styles.kpiGrid}>
-          <TouchableOpacity
-            style={[styles.kpiCard, { borderLeftColor: '#2563EB' }]}
-            activeOpacity={0.8}
-            onPress={() => handleNavigate('academics')}
-          >
-            <Text style={styles.kpiNum}>{stats.studentsInside || 0}</Text>
-            <Text style={styles.kpiLabel}>Students In</Text>
-            <Text style={styles.kpiSub}>Total Today: {stats.todayTotalStudents || 0}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.kpiCard, { borderLeftColor: '#7C3AED' }]}
-            activeOpacity={0.8}
-            onPress={() => handleNavigate('academics')}
-          >
-            <Text style={[styles.kpiNum, { color: '#7C3AED' }]}>{stats.staffInside || 0}</Text>
-            <Text style={styles.kpiLabel}>Staff Inside</Text>
-            <Text style={styles.kpiSub}>Active Campus</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.kpiCard, { borderLeftColor: '#059669' }]}
-            activeOpacity={0.8}
-            onPress={() => handleNavigate('referrals')}
-          >
-            <Text style={[styles.kpiNum, { color: '#059669' }]}>{stats.visitorsInside || 0}</Text>
-            <Text style={styles.kpiLabel}>Active Guests</Text>
-            <Text style={styles.kpiSub}>Total: {stats.todayTotalVisitors || 0}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.kpiCard, { borderLeftColor: '#D97706' }]}
-            activeOpacity={0.8}
-            onPress={() => handleNavigate('notifications')}
-          >
-            <Text style={[styles.kpiNum, { color: '#D97706' }]}>{stats.vehiclesInside || 0}</Text>
-            <Text style={styles.kpiLabel}>Vehicles In</Text>
-            <Text style={styles.kpiSub}>Buses: {stats.busStats?.insideCampus || 0}</Text>
-          </TouchableOpacity>
         </View>
       </View>
 

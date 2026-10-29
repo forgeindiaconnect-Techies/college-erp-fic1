@@ -609,7 +609,7 @@ export default function WatchmanRegisterPersonModal({
                     onPress={() => setShowGatePicker(!showGatePicker)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.pickerSelectorText}>🚪 {gate}</Text>
+                    <Text style={styles.pickerSelectorText}>📍 {gate}</Text>
                     <Text style={styles.pickerArrow}>{showGatePicker ? '▲' : '▼'}</Text>
                   </TouchableOpacity>
 

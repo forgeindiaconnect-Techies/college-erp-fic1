@@ -31,6 +31,52 @@ export type ScreenHeaderProps = {
   rightAction?: React.ReactNode;
 };
 
+// Clean, professional vector Logout icon (replacing door emoji across all 5 mobile dashboards)
+export function LogoutIcon({ size = 16, color = '#DC2626' }: { size?: number; color?: string }) {
+  return (
+    <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+      {/* Outer bracket / door-frame without panels */}
+      <View
+        style={{
+          position: 'absolute',
+          left: 1,
+          top: 1,
+          bottom: 1,
+          width: Math.round(size * 0.52),
+          borderWidth: 1.8,
+          borderRightWidth: 0,
+          borderColor: color,
+          borderTopLeftRadius: 3,
+          borderBottomLeftRadius: 3,
+        }}
+      />
+      {/* Horizontal exit arrow line */}
+      <View
+        style={{
+          position: 'absolute',
+          left: Math.round(size * 0.25),
+          right: 2,
+          height: 1.8,
+          backgroundColor: color,
+        }}
+      />
+      {/* Arrow tip chevron */}
+      <View
+        style={{
+          position: 'absolute',
+          right: 2,
+          width: Math.round(size * 0.34),
+          height: Math.round(size * 0.34),
+          borderTopWidth: 1.8,
+          borderRightWidth: 1.8,
+          borderColor: color,
+          transform: [{ rotate: '45deg' }],
+        }}
+      />
+    </View>
+  );
+}
+
 export default function ScreenHeader({
   showBack = false,
   onBack,
@@ -117,7 +163,7 @@ export default function ScreenHeader({
                 activeOpacity={0.7}
                 accessibilityLabel="Sign out"
               >
-                <Text style={styles.headerLogoutEmoji}>🚪</Text>
+                <LogoutIcon size={16} color="#DC2626" />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -181,7 +227,7 @@ export default function ScreenHeader({
               activeOpacity={0.7}
               accessibilityLabel="Sign Out"
             >
-              <Text style={styles.homeIconEmoji}>🚪</Text>
+              <LogoutIcon size={16} color="#DC2626" />
             </TouchableOpacity>
           ) : null}
         </View>

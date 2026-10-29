@@ -844,3 +844,9 @@
   gap: 8px;
   color: var(--text-primary, #0f172a);
 }
+
+/* Visitor Approvals Card and Filter Enhancements */
+.awt-stat-card.active-filter {
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);
+  transform: translateY(-2px);
+}

@@ -19,6 +19,22 @@ import {
 import { getVisitorHistory } from '../../api';
 import '../watchman.css';
 
+const computeDuration = (entryTime, exitTime, status) => {
+  if (!entryTime) return '—';
+  const start = new Date(entryTime).getTime();
+  if (isNaN(start)) return '—';
+  const end = exitTime ? new Date(exitTime).getTime() : Date.now();
+  const diffMs = Math.max(0, end - start);
+  const diffMins = Math.round(diffMs / (1000 * 60));
+  const hrs = Math.floor(diffMins / 60);
+  const mins = diffMins % 60;
+  const formatted = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+  if (!exitTime && (status === 'Inside' || status === 'Inside Campus')) {
+    return `${formatted} (Active)`;
+  }
+  return formatted;
+};
+
 const VisitorHistoryPage = () => {
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +86,7 @@ const VisitorHistoryPage = () => {
 
   const handleExportCSV = () => {
     if (!filteredVisitors.length) return;
-    const headers = ['Pass ID', 'Name', 'Phone', 'Purpose', 'Person to Meet', 'Department', 'Entry Time', 'Exit Time', 'Status'];
+    const headers = ['Pass ID', 'Name', 'Phone', 'Purpose', 'Person to Meet', 'Department', 'Entry Time', 'Exit Time', 'Campus Duration', 'Gate', 'Status'];
     const rows = filteredVisitors.map((v) => [
       `"${v.passNumber || v.visitorId || ''}"`,
       `"${v.name || v.visitorName || ''}"`,
@@ -80,6 +96,8 @@ const VisitorHistoryPage = () => {
       `"${v.department || ''}"`,
       `"${v.entryTime ? new Date(v.entryTime).toLocaleString() : ''}"`,
       `"${v.exitTime ? new Date(v.exitTime).toLocaleString() : ''}"`,
+      `"${computeDuration(v.entryTime, v.exitTime, v.status)}"`,
+      `"${v.gate || 'Gate 1'}"`,
       `"${v.status || ''}"`
     ]);
 
@@ -212,8 +230,9 @@ const VisitorHistoryPage = () => {
                 <th>Visitor</th>
                 <th>Host & Dept</th>
                 <th>Purpose</th>
-                <th>Entry Time</th>
-                <th>Exit Time</th>
+                <th>Entry Time & Gate</th>
+                <th>Exit Time & Gate</th>
+                <th>Duration</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -221,14 +240,14 @@ const VisitorHistoryPage = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
                     <RefreshCw className="wm-spin" size={24} style={{ margin: '0 auto 8px' }} />
                     <p>Loading historical records...</p>
                   </td>
                 </tr>
               ) : filteredVisitors.length === 0 ? (
                 <tr>
-                  <td colSpan="8">
+                  <td colSpan="9">
                     <div className="wm-empty">
                       <History size={40} style={{ color: '#cbd5e1', marginBottom: 12 }} />
                       <div className="wm-empty-title">No visitor records found</div>
@@ -269,6 +288,9 @@ const VisitorHistoryPage = () => {
                             <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                               {new Date(item.entryTime).toLocaleDateString()}
                             </div>
+                            <div style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600, marginTop: '2px' }}>
+                              {item.gate || 'Gate 1'} • {item.watchmanName || item.entryWatchmanName || 'Security'}
+                            </div>
                           </>
                         ) : (
                           <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>—</span>
@@ -283,15 +305,32 @@ const VisitorHistoryPage = () => {
                             <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                               {new Date(item.exitTime).toLocaleDateString()}
                             </div>
+                            <div style={{ fontSize: '0.7rem', color: '#dc2626', fontWeight: 600, marginTop: '2px' }}>
+                              {item.exitGate || item.gate || 'Gate 1'} • {item.exitWatchmanName || 'Security'}
+                            </div>
                           </>
                         ) : (
                           <span style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 700 }}>Inside Campus</span>
                         )}
                       </td>
                       <td>
-                        {item.status === 'Inside' ? (
+                        <span style={{
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          fontFamily: 'monospace',
+                          background: item.exitTime ? '#f1f5f9' : '#ecfdf5',
+                          color: item.exitTime ? '#334155' : '#059669',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          display: 'inline-block'
+                        }}>
+                          {computeDuration(item.entryTime, item.exitTime, item.status)}
+                        </span>
+                      </td>
+                      <td>
+                        {item.status === 'Inside' || item.status === 'Inside Campus' ? (
                           <span className="wm-badge wm-badge-success">● Inside</span>
-                        ) : item.status === 'Checked Out' ? (
+                        ) : item.status === 'Checked Out' || item.status === 'Exited' ? (
                           <span className="wm-badge wm-badge-secondary">Checked Out</span>
                         ) : (
                           <span className="wm-badge wm-badge-warning">{item.status || 'Pre-Registered'}</span>
@@ -403,20 +442,46 @@ const VisitorHistoryPage = () => {
               {/* Grid 2: Timeline Breakdown */}
               <div>
                 <h5 style={{ margin: '0 0 10px', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', fontWeight: 800 }}>
-                  Gate Movement Timeline
+                  Gate Movement & Duration Breakdown
                 </h5>
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '10px', borderBottom: '1px dashed #e2e8f0' }}>
-                    <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Entry Clearance Timestamp:</span>
-                    <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>
-                      {selectedVisitor.entryTime ? new Date(selectedVisitor.entryTime).toLocaleString() : '—'}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px dashed #e2e8f0' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Total Time on Campus:</span>
+                    <strong style={{
+                      fontSize: '0.92rem',
+                      fontFamily: 'monospace',
+                      fontWeight: 800,
+                      color: selectedVisitor.exitTime ? '#1e293b' : '#059669',
+                      background: selectedVisitor.exitTime ? '#f1f5f9' : '#ecfdf5',
+                      padding: '2px 8px',
+                      borderRadius: '4px'
+                    }}>
+                      {computeDuration(selectedVisitor.entryTime, selectedVisitor.exitTime, selectedVisitor.status)}
                     </strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px' }}>
-                    <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Exit Clearance Timestamp:</span>
-                    <strong style={{ fontSize: '0.85rem', color: selectedVisitor.exitTime ? '#0f172a' : '#059669' }}>
-                      {selectedVisitor.exitTime ? new Date(selectedVisitor.exitTime).toLocaleString() : 'Currently Inside Campus'}
-                    </strong>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px dashed #e2e8f0' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Entry Timestamp & Officer:</span>
+                    <div style={{ textAlign: 'right' }}>
+                      <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block' }}>
+                        {selectedVisitor.entryTime ? new Date(selectedVisitor.entryTime).toLocaleString() : '—'}
+                      </strong>
+                      <span style={{ fontSize: '0.72rem', color: '#2563eb' }}>
+                        Gate: {selectedVisitor.gate || 'Gate 1'} • by {selectedVisitor.watchmanName || selectedVisitor.entryWatchmanName || 'Security'}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '2px' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Exit Timestamp & Officer:</span>
+                    <div style={{ textAlign: 'right' }}>
+                      <strong style={{ fontSize: '0.85rem', color: selectedVisitor.exitTime ? '#0f172a' : '#059669', display: 'block' }}>
+                        {selectedVisitor.exitTime ? new Date(selectedVisitor.exitTime).toLocaleString() : 'Currently Inside Campus'}
+                      </strong>
+                      {selectedVisitor.exitTime && (
+                        <span style={{ fontSize: '0.72rem', color: '#dc2626' }}>
+                          Gate: {selectedVisitor.exitGate || selectedVisitor.gate || 'Gate 1'} • by {selectedVisitor.exitWatchmanName || 'Security'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

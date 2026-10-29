@@ -1,0 +1,3 @@
+# 
+
+{"user":{"_id":"6ab1003be01edde3cba8cb00","name":"RENUKA","email":"renuka@gmail.com","role":"Staff","department":"TAMIL","referenceId":"STF002","tenantId":"COL004-3190860","collegeId":"COL004-3190860"},"staffDoc":{"_id":"6a61b148c21f8f00096248d8","id":"STF002","name":"POOJA","email":"pooja@gmail.com","phone":"2345609876","dept":"Computer Science Engineering","deptCode":"","designation":"Assistant Prof.","subjects":["Data Structures","DBMS"],"workload":9,"attendance":95,"experience":"","passRate":0,"publications":0,"faculty":0,"students":0,"rating":0,"status":"Active","collegeId":"COL002-8379189","joinDate":"2026-07-23T06:14:32.582Z","createdAt":"2026-07-23T06:14:32.584Z","updatedAt":"2026-09-07T07:20:07.379Z","__v":0}}

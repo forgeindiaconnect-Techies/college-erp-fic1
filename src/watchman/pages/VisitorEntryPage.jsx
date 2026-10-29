@@ -6,6 +6,7 @@ import {
   LogOut as ExitIcon, ExternalLink, ArrowRight, Download, LogIn
 } from 'lucide-react';
 import { recordVisitorEntry, recordVisitorCampusIn } from '../../api/index';
+import { getGatePassUrl, getQrCodeImageUrl } from '../../utils/qrPassHelper';
 import '../watchman.css';
 
 const PURPOSES = [
@@ -396,9 +397,7 @@ const VisitorEntryPage = () => {
               {/* Real Scannable Individual QR Pass Box */}
               <div className="wmn-pass-qr-box" style={{ textAlign: 'center', padding: '18px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '16px' }}>
                 <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=8&data=${encodeURIComponent(
-                    `${window.location.origin}/watchman/qr-verification?type=visitor&code=${encodeURIComponent(createdPass.passNumber || createdPass.visitorId)}`
-                  )}`}
+                  src={getQrCodeImageUrl(getGatePassUrl(createdPass.passNumber || createdPass.visitorId, 'visitor'), 250)}
                   alt={`Unique QR Code for ${createdPass.passNumber}`}
                   style={{
                     width: '150px',

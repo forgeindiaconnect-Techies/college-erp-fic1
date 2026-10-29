@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -13,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { apiGet, apiPost, type MobileUser } from '../../services/api';
+import { apiGet, apiPost, getCurrentBaseUrl, type MobileUser } from '../../services/api';
 import WatchmanRegisterPersonModal, { PersonType } from './WatchmanRegisterPersonModal';
 
 type Props = {
@@ -22,111 +24,108 @@ type Props = {
   onNavigateHome?: () => void;
 };
 
-type GateSubTab = 'student' | 'staff' | 'hod' | 'qr_scanner';
-type FilterStatus = 'inside' | 'all' | 'history';
+// 3 Distinct Tabs for Gate Operations: Student, Staff, and HOD
+export type GateSubTab = 'student' | 'staff' | 'hod';
+type StatusFilter = 'All' | 'Inside' | 'Outside';
 
-const GATES = [
-  'Gate 1 (Main Entrance)',
-  'Gate 2 (North Gate)',
-  'Gate 3 (Hostel Gate)',
-  'Gate 4 (Sports Complex Gate)',
-  'Gate 5 (Back Gate / Delivery Bay)',
-];
-
-export default function WatchmanGateOperations({ user, assignedGate = 'Gate 1 (Main Entrance)' }: Props) {
+export default function WatchmanGateOperations({
+  user,
+  assignedGate = 'Gate 1 (Main Entrance)',
+}: Props) {
+  // Sub-tabs: 'student', 'staff', 'hod'
   const [activeSubTab, setActiveSubTab] = useState<GateSubTab>('student');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [performingActionId, setPerformingActionId] = useState<string | null>(null);
 
-  // Register Person & Generate Gate Pass Modal State
+  // Unified Campus Members (Students, Staff, HOD) from Backend
+  const [membersList, setMembersList] = useState<any[]>([]);
+
+  // Per-Tab Search and Status Filter States
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentStatusFilter, setStudentStatusFilter] = useState<StatusFilter>('All');
+
+  const [staffSearch, setStaffSearch] = useState('');
+  const [staffStatusFilter, setStaffStatusFilter] = useState<StatusFilter>('All');
+
+  const [hodSearch, setHodSearch] = useState('');
+  const [hodStatusFilter, setHodStatusFilter] = useState<StatusFilter>('All');
+
+  // SELECTED MEMBER FOR FULL PASS & CLEARANCE MODAL (Matching Web Right-Side Panel)
+  const [selectedMember, setSelectedMember] = useState<any | null>(null);
+  const [movementRemarks, setMovementRemarks] = useState('');
+  const [memberMovements, setMemberMovements] = useState<any[]>([]);
+  const [loadingMovements, setLoadingMovements] = useState(false);
+
+  // Register Person Modal
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
   const [registerInitialType, setRegisterInitialType] = useState<PersonType>('Student');
 
-  // Student Register State
-  const [studentFilter, setStudentFilter] = useState<FilterStatus>('inside');
-  const [studentSearch, setStudentSearch] = useState('');
-  const [studentDirectory, setStudentDirectory] = useState<any[]>([]);
-  const [studentScans, setStudentScans] = useState<any[]>([]);
-  const [studentMovements, setStudentMovements] = useState<any[]>([]);
-
-  // Student QR Scanner State
-  const [studentScanCode, setStudentScanCode] = useState('');
-  const [scannedStudent, setScannedStudent] = useState<any | null>(null);
-  const [scanningLoading, setScanningLoading] = useState(false);
-  const [qrActionLoading, setQrActionLoading] = useState(false);
-
-  // Student Movement Modal
-  const [studentMovementModal, setStudentMovementModal] = useState(false);
-  const [modalStudentId, setModalStudentId] = useState('');
-  const [modalStudentName, setModalStudentName] = useState('');
-  const [modalMovementType, setModalMovementType] = useState('Outpass');
-  const [modalReason, setModalReason] = useState('');
-  const [modalParentContact, setModalParentContact] = useState('');
-  const [submittingStudentMove, setSubmittingStudentMove] = useState(false);
-
-  // Staff Register State
-  const [staffFilter, setStaffFilter] = useState<FilterStatus>('inside');
-  const [staffSearch, setStaffSearch] = useState('');
-  const [staffDirectory, setStaffDirectory] = useState<any[]>([]);
-  const [staffMovements, setStaffMovements] = useState<any[]>([]);
-
-  // HOD Register State
-  const [hodFilter, setHodFilter] = useState<'inside' | 'all'>('inside');
-  const [hodSearch, setHodSearch] = useState('');
-  const [campusPeople, setCampusPeople] = useState<any[]>([]);
-
-  // Staff Movement Modal
-  const [staffMovementModal, setStaffMovementModal] = useState(false);
-  const [modalStaffId, setModalStaffId] = useState('');
-  const [modalStaffName, setModalStaffName] = useState('');
-  const [modalStaffDept, setModalStaffDept] = useState('');
-  const [modalStaffDirection, setModalStaffDirection] = useState<'In' | 'Out'>('In');
-  const [modalStaffReason, setModalStaffReason] = useState('Duty Shift');
-  const [modalStaffVehicle, setModalStaffVehicle] = useState('');
-  const [submittingStaffMove, setSubmittingStaffMove] = useState(false);
-
   // ----------------------------------------------------------------------
-  // LOAD REAL DATA FROM BACKEND
+  // LOAD REAL DATA (Campus People, Movements, Scans)
   // ----------------------------------------------------------------------
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
-      const [stuDirRes, stuScansRes, stuMovesRes, staffDirRes, staffMovesRes, campusPeopleRes] = await Promise.allSettled([
-        apiGet<any>('watchman/student-qr-directory'),
-        apiGet<any>('watchman/student-today-scans'),
-        apiGet<any>('watchman/student-register'),
-        apiGet<any>('watchman/staff-directory'),
-        apiGet<any>('watchman/staff-register'),
+      if (!isSilent) setLoading(true);
+
+      const [peopleRes, staffDirRes, stuScansRes] = await Promise.allSettled([
         apiGet<any>('watchman/campus-people'),
+        apiGet<any>('watchman/staff-directory'),
+        apiGet<any>('watchman/student-today-scans'),
       ]);
 
-      if (stuDirRes.status === 'fulfilled') {
-        const raw = Array.isArray(stuDirRes.value?.data) ? stuDirRes.value.data : Array.isArray(stuDirRes.value) ? stuDirRes.value : [];
-        setStudentDirectory(raw);
+      let list: any[] = [];
+      if (peopleRes.status === 'fulfilled' && peopleRes.value) {
+        const raw = Array.isArray(peopleRes.value.data)
+          ? peopleRes.value.data
+          : Array.isArray(peopleRes.value)
+          ? peopleRes.value
+          : [];
+        list = raw;
       }
-      if (stuScansRes.status === 'fulfilled') {
-        const raw = Array.isArray(stuScansRes.value?.data) ? stuScansRes.value.data : Array.isArray(stuScansRes.value) ? stuScansRes.value : [];
-        setStudentScans(raw);
+
+      const map = new Map<string, any>();
+      list.forEach((p) => {
+        const key = (p.personId || p._id || p.id || '').toUpperCase();
+        if (key) map.set(key, p);
+      });
+
+      if (staffDirRes.status === 'fulfilled' && Array.isArray(staffDirRes.value)) {
+        staffDirRes.value.forEach((s: any) => {
+          const key = (s.staffId || s.id || s.employeeId || '').toUpperCase();
+          if (key && !map.has(key)) {
+            const isHod = /hod|head/i.test(s.designation || '') || /hod/i.test(s.role || '');
+            map.set(key, {
+              ...s,
+              personId: key,
+              name: s.name || s.staffName,
+              personType: isHod ? 'HOD' : 'Staff',
+              department: s.department || s.dept || 'General',
+              currentStatus: s.currentStatus || 'Outside Campus',
+            });
+          }
+        });
       }
-      if (stuMovesRes.status === 'fulfilled') {
-        const raw = Array.isArray(stuMovesRes.value?.data) ? stuMovesRes.value.data : Array.isArray(stuMovesRes.value) ? stuMovesRes.value : [];
-        setStudentMovements(raw);
+
+      if (stuScansRes.status === 'fulfilled' && Array.isArray(stuScansRes.value)) {
+        stuScansRes.value.forEach((st: any) => {
+          const key = (st.studentId || st.rollNo || st.id || '').toUpperCase();
+          if (key && !map.has(key)) {
+            map.set(key, {
+              ...st,
+              personId: key,
+              name: st.studentName || st.name,
+              personType: 'Student',
+              department: st.department || 'General',
+              currentStatus: st.currentStatus || 'Outside Campus',
+            });
+          }
+        });
       }
-      if (staffDirRes.status === 'fulfilled') {
-        const raw = Array.isArray(staffDirRes.value?.data) ? staffDirRes.value.data : Array.isArray(staffDirRes.value) ? staffDirRes.value : [];
-        setStaffDirectory(raw);
-      }
-      if (staffMovesRes.status === 'fulfilled') {
-        const raw = Array.isArray(staffMovesRes.value?.data) ? staffMovesRes.value.data : Array.isArray(staffMovesRes.value) ? staffMovesRes.value : [];
-        setStaffMovements(raw);
-      }
-      if (campusPeopleRes.status === 'fulfilled') {
-        const raw = Array.isArray(campusPeopleRes.value?.data) ? campusPeopleRes.value.data : Array.isArray(campusPeopleRes.value) ? campusPeopleRes.value : [];
-        setCampusPeople(raw);
-      }
+
+      setMembersList(Array.from(map.values()));
     } catch (err) {
-      console.warn('WatchmanGateOperations fetch error:', err);
+      console.warn('WatchmanGateOperations load error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -135,623 +134,309 @@ export default function WatchmanGateOperations({ user, assignedGate = 'Gate 1 (M
 
   useEffect(() => {
     loadData();
+    const timer = setInterval(() => {
+      loadData(true);
+    }, 5000);
+    return () => clearInterval(timer);
   }, [loadData]);
 
   // ----------------------------------------------------------------------
-  // UNIVERSAL GATE ACTION (Student, Staff, HOD, Visitor)
+  // FILTERED LISTS PER TAB
   // ----------------------------------------------------------------------
-  const handleUniversalCheckinOut = async (person: any, direction: 'In' | 'Out') => {
-    const pId = person.personId || person.id || person.staffId || person.studentId || person.passNumber;
-    const pName = person.name || person.staffName || person.visitorName || pId;
-    try {
-      setPerformingActionId(pId);
-      const endpoint = direction === 'In' ? 'watchman/campus-in' : 'watchman/campus-out';
-      const res = await apiPost<any>(endpoint, {
-        personId: pId,
-        gate: assignedGate,
-        remarks: `Gate Operations ${direction} verification`,
-      });
-      if (res?.success === false) {
-        Alert.alert('Notice', res.message || `Could not complete ${direction}.`);
-      } else {
-        Alert.alert(`✓ ${direction} Recorded`, `${pName} (${pId}) recorded as ${direction === 'In' ? 'INSIDE' : 'OUTSIDE'} campus.`);
-      }
-      await loadData();
-    } catch (err: any) {
-      Alert.alert('Action Failed', err?.message || `Could not record ${direction}.`);
-    } finally {
-      setPerformingActionId(null);
-    }
-  };
+  const allStudents = useMemo(() => {
+    return membersList.filter((m) => (m.personType || '').toUpperCase() === 'STUDENT');
+  }, [membersList]);
 
-  // ----------------------------------------------------------------------
-  // STUDENT GATE ATTENDANCE (Quick Check-in / Check-out)
-  // ----------------------------------------------------------------------
-  const handleStudentCheckin = async (student: any) => {
-    const sId = student.personId || student.studentId || student.id || student.rollNo;
-    const sName = student.studentName || student.name || 'Student';
-    try {
-      setPerformingActionId(sId);
-      try {
-        await apiPost<any>('watchman/campus-in', {
-          personId: sId,
-          gate: assignedGate,
-          remarks: 'Mobile Gate Attendance Check-in',
-        });
-      } catch (err) {
-        await apiPost<any>('watchman/student-checkin', {
-          studentId: sId,
-          gate: assignedGate,
-          remarks: 'Mobile Gate Attendance Check-in',
-        });
-      }
-      Alert.alert('✓ Student Checked In', `${sName} (${sId}) recorded as INSIDE campus.`);
-      await loadData();
-    } catch (err: any) {
-      Alert.alert('Check-in Failed', err?.message || 'Could not verify student.');
-    } finally {
-      setPerformingActionId(null);
-    }
-  };
+  const allStaff = useMemo(() => {
+    return membersList.filter((m) => (m.personType || '').toUpperCase() === 'STAFF');
+  }, [membersList]);
 
-  const handleStudentCheckout = async (student: any) => {
-    const sId = student.personId || student.studentId || student.id || student.rollNo;
-    const sName = student.studentName || student.name || 'Student';
-    try {
-      setPerformingActionId(sId);
-      try {
-        await apiPost<any>('watchman/campus-out', {
-          personId: sId,
-          gate: assignedGate,
-          remarks: 'Mobile Gate Attendance Check-out',
-        });
-      } catch (err) {
-        await apiPost<any>('watchman/student-checkout', {
-          studentId: sId,
-          gate: assignedGate,
-          remarks: 'Mobile Gate Attendance Check-out',
-        });
-      }
-      Alert.alert('✓ Student Checked Out', `${sName} (${sId}) recorded as OUTSIDE campus.`);
-      await loadData();
-    } catch (err: any) {
-      Alert.alert('Check-out Failed', err?.message || 'Could not record departure.');
-    } finally {
-      setPerformingActionId(null);
-    }
-  };
+  const allHODs = useMemo(() => {
+    return membersList.filter((m) => (m.personType || '').toUpperCase() === 'HOD');
+  }, [membersList]);
 
-  // ----------------------------------------------------------------------
-  // GATE OPERATIONS QR SCANNER LOOKUP (Students, Staff, HODs ONLY)
-  // ----------------------------------------------------------------------
-  const handleLookupStudentQr = async (codeToVerify?: string) => {
-    const code = (codeToVerify || studentScanCode).trim();
-    if (!code) {
-      Alert.alert('Input Required', 'Please enter a Student ID, Roll Number, or Staff/HOD Gate Pass code to scan.');
-      return;
-    }
-    try {
-      setScanningLoading(true);
-      setScannedStudent(null);
-
-      // 0. Pre-check: Reject visitor codes starting with PASS-
-      if (code.toUpperCase().startsWith('PASS-')) {
-        Alert.alert(
-          '⚠️ Visitor Pass Detected',
-          'This is a Visitor QR pass. Gate Operations QR Scanner only accepts Students, Staff, and HODs.\n\nPlease scan this code under Visitor Management.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      // 1. Query backend Campus Person lookup with module=gate_operations
-      try {
-        const campusRes = await apiGet<any>(`watchman/campus-people/lookup/${encodeURIComponent(code)}?module=gate_operations`);
-        if (campusRes?.isVisitorPass || campusRes?.person?.personType === 'Visitor') {
-          Alert.alert(
-            '⚠️ Visitor Pass Detected',
-            `Visitor pass detected (${campusRes?.person?.name || campusRes?.name || code}).\n\nGate Operations is exclusively for Students, Staff, and HODs. Please use the Visitor QR Scanner in Visitor Management.`,
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-
-        if (campusRes?.success && campusRes?.person) {
-          const cp = campusRes.person;
-          if (cp.personType === 'Visitor') {
-            Alert.alert(
-              '⚠️ Visitor Pass Detected',
-              `Visitor pass detected (${cp.name || code}).\n\nGate Operations is exclusively for Students, Staff, and HODs. Please use the Visitor QR Scanner in Visitor Management.`,
-              [{ text: 'OK' }]
-            );
-            return;
-          }
-
-          setScannedStudent({
-            ...cp,
-            studentId: cp.personId,
-            rollNo: cp.personId,
-            name: cp.name,
-            department: cp.department || 'General',
-            year: cp.semester ? `Semester ${cp.semester}` : cp.designation || cp.personType,
-            personType: cp.personType || 'Staff', // 'Student' | 'Staff' | 'HOD'
-            assignedGate: cp.assignedGate || assignedGate,
-            currentStatus: cp.currentStatus || 'Outside Campus',
-            qrCodeUrl: cp.qrCodeUrl,
-            phone: cp.phone,
-            vehicleNumber: cp.vehicleNumber,
-            isCampusPerson: true,
-          });
-          return;
-        }
-      } catch (cpErr: any) {
-        if (cpErr?.isVisitorPass || cpErr?.message?.includes('Visitor pass detected') || cpErr?.message?.includes('Visitor Pass')) {
-          Alert.alert(
-            '⚠️ Visitor Pass Detected',
-            cpErr.message || 'This is a Visitor QR pass. Please scan it under Visitor Management.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-        // Fallback to student-qr route below
-      }
-
-      // 2. Query Student QR route
-      try {
-        const res = await apiGet<any>(`watchman/student-qr/${encodeURIComponent(code)}`);
-        if (res?.isVisitorPass) {
-          Alert.alert(
-            '⚠️ Visitor Pass Detected',
-            res.message || 'This is a Visitor pass. Please use Visitor Management.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-        if (res?.success && res?.student) {
-          setScannedStudent({
-            ...res.student,
-            personType: 'Student',
-            assignedGate: assignedGate,
-            currentStatus: res.currentStatus || 'Outside Campus',
-            activeEntry: res.activeEntry,
-          });
-          return;
-        }
-      } catch (stuErr: any) {
-        if (stuErr?.isVisitorPass || stuErr?.message?.includes('Visitor pass')) {
-          Alert.alert(
-            '⚠️ Visitor Pass Detected',
-            stuErr.message || 'This is a Visitor pass. Please use Visitor Management.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-      }
-
-      // 3. Fallback Staff / HOD directory search
-      const staffMatch = staffDirectory.find(
-        (s) =>
-          (s.employeeId || s.staffId || s.id || '').toLowerCase() === code.toLowerCase() ||
-          (s.name || s.staffName || '').toLowerCase().includes(code.toLowerCase())
-      );
-      if (staffMatch) {
-        const isHod = /hod|head/i.test(staffMatch.designation || '') || /hod/i.test(staffMatch.role || '');
-        setScannedStudent({
-          ...staffMatch,
-          personId: staffMatch.employeeId || staffMatch.staffId || staffMatch.id,
-          name: staffMatch.name || staffMatch.staffName,
-          personType: isHod ? 'HOD' : 'Staff',
-          department: staffMatch.department || staffMatch.dept || 'General',
-          designation: staffMatch.designation || (isHod ? 'Head of Department' : 'Faculty'),
-          assignedGate: assignedGate,
-          currentStatus: staffMatch.currentStatus || 'Outside Campus',
-        });
-        return;
-      }
-
-      // 4. Fallback student directory search
-      const match = studentDirectory.find(
-        (s) =>
-          (s.rollNo || s.studentId || s.id || '').toLowerCase() === code.toLowerCase() ||
-          (s.name || '').toLowerCase().includes(code.toLowerCase())
-      );
-      if (match) {
-        setScannedStudent({
-          ...match,
-          personType: 'Student',
-          assignedGate: assignedGate,
-          currentStatus: 'Outside Campus',
-        });
-        return;
-      }
-
-      Alert.alert('Person Not Found', `No registered Student, Staff, or HOD found matching code "${code}".`);
-    } catch (err: any) {
-      Alert.alert('Lookup Notice', err?.message || 'Failed to lookup QR code.');
-    } finally {
-      setScanningLoading(false);
-    }
-  };
-
-  const handleScannedStudentAction = async (direction: 'in' | 'out') => {
-    if (!scannedStudent) return;
-    const sId = scannedStudent.personId || scannedStudent.studentId || scannedStudent.id || scannedStudent.rollNo;
-    try {
-      setQrActionLoading(true);
-      if (direction === 'in') {
-        try {
-          await apiPost('watchman/campus-in', {
-            personId: sId,
-            gate: assignedGate,
-            remarks: 'QR Scanner Verified Gate Check-in',
-            vehicleNumber: scannedStudent.vehicleNumber || '',
-          });
-        } catch (campusInErr: any) {
-          // Fallback to student-checkin if not in campus-people
-          await apiPost('watchman/student-checkin', {
-            studentId: sId,
-            gate: assignedGate,
-            remarks: 'QR Scanner Verified Gate Check-in',
-          });
-        }
-        setScannedStudent((prev: any) => ({ ...prev, currentStatus: 'Inside Campus' }));
-        Alert.alert('✓ Gate Access Granted', `${scannedStudent.name || sId} marked as INSIDE campus.`);
-      } else {
-        try {
-          await apiPost('watchman/campus-out', {
-            personId: sId,
-            gate: assignedGate,
-            remarks: 'QR Scanner Verified Gate Check-out',
-          });
-        } catch (campusOutErr: any) {
-          // Fallback to student-checkout if not in campus-people
-          await apiPost('watchman/student-checkout', {
-            studentId: sId,
-            gate: assignedGate,
-            remarks: 'QR Scanner Verified Gate Check-out',
-          });
-        }
-        setScannedStudent((prev: any) => ({ ...prev, currentStatus: 'Outside Campus' }));
-        Alert.alert('✓ Exit Verified', `${scannedStudent.name || sId} marked as OUTSIDE campus.`);
-      }
-      loadData();
-    } catch (err: any) {
-      Alert.alert('Action Error', err?.message || 'Failed to update movement.');
-    } finally {
-      setQrActionLoading(false);
-    }
-  };
-
-  // ----------------------------------------------------------------------
-  // SUBMIT FORMAL STUDENT MOVEMENT
-  // ----------------------------------------------------------------------
-  const handleSubmitStudentMovement = async () => {
-    if (!modalStudentId.trim()) {
-      Alert.alert('Required', 'Please enter Student ID or Roll Number.');
-      return;
-    }
-    try {
-      setSubmittingStudentMove(true);
-      await apiPost('watchman/student-register', {
-        studentId: modalStudentId.trim().toUpperCase(),
-        studentName: modalStudentName.trim() || undefined,
-        movementType: modalMovementType,
-        reason: modalReason.trim() || modalMovementType,
-        gate: assignedGate,
-        parentContact: modalParentContact.trim() || undefined,
-      });
-      setStudentMovementModal(false);
-      setModalStudentId('');
-      setModalStudentName('');
-      setModalReason('');
-      setModalParentContact('');
-      Alert.alert('Success', 'Student movement registered successfully.');
-      loadData();
-    } catch (err: any) {
-      Alert.alert('Notice', err?.message || 'Movement saved.');
-      setStudentMovementModal(false);
-      loadData();
-    } finally {
-      setSubmittingStudentMove(false);
-    }
-  };
-
-  // ----------------------------------------------------------------------
-  // STAFF GATE ATTENDANCE & RECORDING
-  // ----------------------------------------------------------------------
-  const handleQuickStaffMovement = async (staffMember: any, direction: 'In' | 'Out') => {
-    const stId = staffMember.staffId || staffMember.id || staffMember.personId || staffMember._id;
-    const stName = staffMember.staffName || staffMember.name || 'Faculty Member';
-    const dept = staffMember.department || staffMember.dept || 'General';
-    const desig = staffMember.designation || 'Staff';
-
-    try {
-      setPerformingActionId(stId);
-      const endpoint = direction === 'In' ? 'watchman/campus-in' : 'watchman/campus-out';
-      try {
-        await apiPost<any>(endpoint, {
-          personId: stId,
-          gate: assignedGate,
-          remarks: `Staff Gate ${direction}`,
-        });
-      } catch (e) {
-        await apiPost<any>('watchman/staff-register', {
-          staffId: stId,
-          staffName: stName,
-          movementType: direction,
-          department: dept,
-          designation: desig,
-          gate: assignedGate,
-          reason: direction === 'In' ? 'Duty Shift Reporting' : 'Campus Departure / Shift End',
-        });
-      }
-      Alert.alert(
-        direction === 'In' ? '✓ Staff Entry Recorded' : '✓ Staff Exit Recorded',
-        `Gate ${direction.toUpperCase()} logged for ${stName} (${stId}).`
-      );
-      await loadData();
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Staff movement update failed.');
-    } finally {
-      setPerformingActionId(null);
-    }
-  };
-
-  const handleSubmitStaffMovement = async () => {
-    if (!modalStaffId.trim() || !modalStaffName.trim()) {
-      Alert.alert('Required', 'Please enter Staff ID and Staff Full Name.');
-      return;
-    }
-    try {
-      setSubmittingStaffMove(true);
-      await apiPost('watchman/staff-register', {
-        staffId: modalStaffId.trim().toUpperCase(),
-        staffName: modalStaffName.trim(),
-        department: modalStaffDept.trim() || 'Academic Faculty',
-        movementType: modalStaffDirection,
-        reason: modalStaffReason,
-        vehicleNumber: modalStaffVehicle.trim().toUpperCase() || undefined,
-        gate: assignedGate,
-      });
-      setStaffMovementModal(false);
-      setModalStaffId('');
-      setModalStaffName('');
-      setModalStaffDept('');
-      setModalStaffVehicle('');
-      Alert.alert('Success', `Staff ${modalStaffDirection.toUpperCase()} movement saved.`);
-      loadData();
-    } catch (err: any) {
-      Alert.alert('Notice', err?.message || 'Staff movement recorded.');
-      setStaffMovementModal(false);
-      loadData();
-    } finally {
-      setSubmittingStaffMove(false);
-    }
-  };
-
-  // ----------------------------------------------------------------------
-  // FILTERED STUDENT & STAFF LISTS (Real-time Live Synced with Web ERP)
-  // ----------------------------------------------------------------------
+  // Filtered Students
   const displayedStudents = useMemo(() => {
-    const studentMap = new Map<string, any>();
-
-    // 1. First priority: Live registered campus people
-    campusPeople
-      .filter((p) => (p.personType || '').toUpperCase() === 'STUDENT')
-      .forEach((p) => {
-        const key = (p.personId || p._id || '').toUpperCase();
-        studentMap.set(key, {
-          ...p,
-          studentId: p.personId,
-          rollNo: p.personId,
-          studentName: p.name,
-          name: p.name,
-          department: p.department || 'General',
-          currentStatus: p.currentStatus || 'Outside Campus',
-          status: p.currentStatus || 'Outside Campus',
-        });
-      });
-
-    // 2. Merge from student directory if not already loaded
-    studentDirectory.forEach((s) => {
-      const key = (s.rollNo || s.studentId || s.id || '').toUpperCase();
-      if (key && !studentMap.has(key)) {
-        studentMap.set(key, {
-          ...s,
-          studentId: s.studentId || s.rollNo || s.id,
-          rollNo: s.rollNo || s.studentId || s.id,
-          studentName: s.studentName || s.name,
-          name: s.name || s.studentName,
-          department: s.department || s.dept || 'General',
-          currentStatus: s.currentStatus || s.status || 'Outside Campus',
-          status: s.status || s.currentStatus || 'Outside Campus',
-        });
-      }
-    });
-
-    // 3. Fallback to studentScans if empty
-    if (studentMap.size === 0) {
-      studentScans.forEach((s) => {
-        const key = (s.studentId || s.rollNo || s.id || '').toUpperCase();
-        if (key && !studentMap.has(key)) {
-          studentMap.set(key, s);
-        }
-      });
+    let pool = allStudents;
+    if (studentStatusFilter === 'Inside') {
+      pool = pool.filter((m) => (m.currentStatus || m.status || '').toLowerCase().includes('inside'));
+    } else if (studentStatusFilter === 'Outside') {
+      pool = pool.filter((m) => !(m.currentStatus || m.status || '').toLowerCase().includes('inside'));
     }
-
-    const allStudents = Array.from(studentMap.values());
-    let pool: any[] = [];
-    if (studentFilter === 'inside') {
-      pool = allStudents.filter((s) => (s.status || s.currentStatus || '').toLowerCase().includes('inside'));
-    } else if (studentFilter === 'history') {
-      pool = studentMovements.length > 0 ? studentMovements : studentScans;
-    } else {
-      pool = allStudents;
-    }
-
     if (!studentSearch.trim()) return pool;
     const q = studentSearch.toLowerCase().trim();
-    return pool.filter((s) => {
-      const name = (s.studentName || s.name || '').toLowerCase();
-      const id = (s.studentId || s.id || s.rollNo || '').toLowerCase();
-      const dept = (s.department || s.dept || '').toLowerCase();
-      return name.includes(q) || id.includes(q) || dept.includes(q);
+    return pool.filter((m) => {
+      const name = (m.name || '').toLowerCase();
+      const id = (m.personId || m.rollNo || '').toLowerCase();
+      const dept = (m.department || '').toLowerCase();
+      const phone = (m.phone || '').toLowerCase();
+      return name.includes(q) || id.includes(q) || dept.includes(q) || phone.includes(q);
     });
-  }, [campusPeople, studentDirectory, studentScans, studentMovements, studentFilter, studentSearch]);
+  }, [allStudents, studentStatusFilter, studentSearch]);
 
+  // Filtered Staff
   const displayedStaff = useMemo(() => {
-    const staffMap = new Map<string, any>();
-
-    // 1. Live registered campus people
-    campusPeople
-      .filter((p) => (p.personType || '').toUpperCase() === 'STAFF')
-      .forEach((p) => {
-        const key = (p.personId || p._id || '').toUpperCase();
-        staffMap.set(key, {
-          ...p,
-          staffId: p.personId,
-          employeeId: p.personId,
-          staffName: p.name,
-          name: p.name,
-          department: p.department || 'General',
-          currentStatus: p.currentStatus || 'Outside Campus',
-          designation: p.designation || 'Staff',
-        });
-      });
-
-    // 2. Merge from staff directory
-    staffDirectory.forEach((st) => {
-      const key = (st.staffId || st.employeeId || st.id || '').toUpperCase();
-      if (key && !staffMap.has(key)) {
-        staffMap.set(key, {
-          ...st,
-          staffId: key,
-          staffName: st.name || st.staffName,
-          currentStatus: st.currentStatus || 'Outside Campus',
-        });
-      }
-    });
-
-    const allStaff = Array.from(staffMap.values());
-    let pool: any[] = allStaff;
-    if (staffFilter === 'inside') {
-      pool = allStaff.filter((st) => (st.currentStatus || '').toLowerCase().includes('inside'));
-    } else if (staffFilter === 'history') {
-      pool = staffMovements;
+    let pool = allStaff;
+    if (staffStatusFilter === 'Inside') {
+      pool = pool.filter((m) => (m.currentStatus || m.status || '').toLowerCase().includes('inside'));
+    } else if (staffStatusFilter === 'Outside') {
+      pool = pool.filter((m) => !(m.currentStatus || m.status || '').toLowerCase().includes('inside'));
     }
-
     if (!staffSearch.trim()) return pool;
     const q = staffSearch.toLowerCase().trim();
-    return pool.filter((st) => {
-      const name = (st.name || st.staffName || '').toLowerCase();
-      const id = (st.staffId || st.id || '').toLowerCase();
-      const dept = (st.department || st.dept || '').toLowerCase();
-      return name.includes(q) || id.includes(q) || dept.includes(q);
+    return pool.filter((m) => {
+      const name = (m.name || '').toLowerCase();
+      const id = (m.personId || m.staffId || '').toLowerCase();
+      const dept = (m.department || '').toLowerCase();
+      const phone = (m.phone || '').toLowerCase();
+      return name.includes(q) || id.includes(q) || dept.includes(q) || phone.includes(q);
     });
-  }, [campusPeople, staffDirectory, staffMovements, staffFilter, staffSearch]);
+  }, [allStaff, staffStatusFilter, staffSearch]);
 
+  // Filtered HODs
   const displayedHODs = useMemo(() => {
-    const hodMap = new Map<string, any>();
-    campusPeople
-      .filter((p) => (p.personType || '').toUpperCase() === 'HOD')
-      .forEach((p) => hodMap.set(p.personId || p._id, p));
-
-    staffDirectory
-      .filter((s) => {
-        const des = (s.designation || '').toLowerCase();
-        const role = (s.role || '').toLowerCase();
-        return des.includes('hod') || des.includes('head') || role.includes('hod');
-      })
-      .forEach((s) => {
-        const key = s.staffId || s.id || s.employeeId || s._id;
-        if (!hodMap.has(key)) {
-          hodMap.set(key, {
-            ...s,
-            personId: key,
-            name: s.name || s.staffName,
-            designation: s.designation || 'Head of Department',
-            department: s.department || s.dept || 'Academic Dept',
-            currentStatus: s.currentStatus || 'Outside Campus',
-          });
-        }
-      });
-
-    let pool = Array.from(hodMap.values());
-    if (pool.length === 0) {
-      pool = staffDirectory.slice(0, 8).map((st) => ({
-        ...st,
-        personId: st.staffId || st.id || st.employeeId,
-        name: st.name || st.staffName,
-        designation: st.designation || 'Head of Department',
-        department: st.department || st.dept || 'Engineering',
-        currentStatus: st.currentStatus || 'Outside Campus',
-      }));
+    let pool = allHODs;
+    if (hodStatusFilter === 'Inside') {
+      pool = pool.filter((m) => (m.currentStatus || m.status || '').toLowerCase().includes('inside'));
+    } else if (hodStatusFilter === 'Outside') {
+      pool = pool.filter((m) => !(m.currentStatus || m.status || '').toLowerCase().includes('inside'));
     }
-
-    if (hodFilter === 'inside') {
-      const insidePool = pool.filter((h) => (h.currentStatus || '').toLowerCase().includes('inside'));
-      if (insidePool.length > 0) pool = insidePool;
-    }
-
     if (!hodSearch.trim()) return pool;
     const q = hodSearch.toLowerCase().trim();
-    return pool.filter((h) => {
-      const name = (h.name || h.staffName || '').toLowerCase();
-      const id = (h.personId || '').toLowerCase();
-      const dept = (h.department || h.dept || '').toLowerCase();
-      return name.includes(q) || id.includes(q) || dept.includes(q);
+    return pool.filter((m) => {
+      const name = (m.name || '').toLowerCase();
+      const id = (m.personId || m.staffId || m.hodId || '').toLowerCase();
+      const dept = (m.department || '').toLowerCase();
+      const phone = (m.phone || '').toLowerCase();
+      return name.includes(q) || id.includes(q) || dept.includes(q) || phone.includes(q);
     });
-  }, [campusPeople, staffDirectory, hodFilter, hodSearch]);
+  }, [allHODs, hodStatusFilter, hodSearch]);
+
+  const studentInside = allStudents.filter((m) => (m.currentStatus || m.status || '').toLowerCase().includes('inside')).length;
+  const studentOutside = allStudents.length - studentInside;
+
+  const staffInside = allStaff.filter((m) => (m.currentStatus || m.status || '').toLowerCase().includes('inside')).length;
+  const staffOutside = allStaff.length - staffInside;
+
+  const hodInside = allHODs.filter((m) => (m.currentStatus || m.status || '').toLowerCase().includes('inside')).length;
+  const hodOutside = allHODs.length - hodInside;
+
+  // ----------------------------------------------------------------------
+  // OPEN DEDICATED MEMBER PASS & CLEARANCE MODAL (When clicking any person)
+  // ----------------------------------------------------------------------
+  const handleSelectMember = async (person: any) => {
+    if (!person) return;
+    const pId = person.personId || person.id || person.rollNo || person.staffId;
+    setSelectedMember(person);
+    setMovementRemarks('');
+    setMemberMovements([]);
+
+    try {
+      setLoadingMovements(true);
+      // Fetch movements for this person
+      const res = await apiGet<any>(`watchman/campus-people/lookup/${encodeURIComponent(pId)}?module=gate_operations`);
+      if (res?.success && res?.person) {
+        setSelectedMember(res.person);
+        setMemberMovements(res.movements || []);
+      }
+    } catch (e) {
+      // Keep selectedMember from local state if network fetch fails
+    } finally {
+      setLoadingMovements(false);
+    }
+  };
+
+  // ----------------------------------------------------------------------
+  // DEDICATED MEMBER GATE IN / OUT HANDLERS
+  // ----------------------------------------------------------------------
+  const handleMemberCampusIn = async (person: any) => {
+    const pId = person.personId || person.id || person.rollNo || person.staffId;
+    const pName = person.name || 'Member';
+    const isInside = (person.currentStatus || person.status || '').toLowerCase().includes('inside');
+
+    if (isInside) {
+      Alert.alert(
+        '⚠️ Already Inside Campus',
+        `${pName} (${pId}) is already marked as INSIDE campus.`
+      );
+      return;
+    }
+
+    try {
+      setPerformingActionId(pId);
+      const res = await apiPost<any>('watchman/campus-in', {
+        personId: pId,
+        gate: assignedGate,
+        remarks: movementRemarks.trim() || 'Gate Operations Entry Verification',
+      });
+
+      if (res?.success === false) {
+        Alert.alert('Notice', res.message || 'Could not record entry.');
+      } else {
+        Alert.alert(
+          '✓ Campus In Recorded',
+          `${pName} (${pId}) has been successfully logged INSIDE campus through ${assignedGate}.`
+        );
+        const updated = { ...person, currentStatus: 'Inside Campus', lastEntryTime: new Date() };
+        if (selectedMember && (selectedMember.personId === pId || selectedMember.id === pId)) {
+          setSelectedMember(updated);
+        }
+      }
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Action Notice', err?.message || `Updated entry for ${pName}.`);
+      await loadData();
+    } finally {
+      setPerformingActionId(null);
+    }
+  };
+
+  const handleMemberCampusOut = async (person: any) => {
+    const pId = person.personId || person.id || person.rollNo || person.staffId;
+    const pName = person.name || 'Member';
+    const isInside = (person.currentStatus || person.status || '').toLowerCase().includes('inside');
+
+    if (!isInside) {
+      Alert.alert(
+        '⚠️ Already Outside Campus',
+        `${pName} (${pId}) is currently marked as OUTSIDE campus.`
+      );
+      return;
+    }
+
+    try {
+      setPerformingActionId(pId);
+      const res = await apiPost<any>('watchman/campus-out', {
+        personId: pId,
+        gate: assignedGate,
+        remarks: movementRemarks.trim() || 'Gate Operations Exit Verification',
+      });
+
+      if (res?.success === false) {
+        Alert.alert('Notice', res.message || 'Could not record departure.');
+      } else {
+        Alert.alert(
+          '✓ Campus Out Recorded',
+          `${pName} (${pId}) is now logged OUTSIDE campus through ${assignedGate}.`
+        );
+        const updated = { ...person, currentStatus: 'Outside Campus', lastExitTime: new Date() };
+        if (selectedMember && (selectedMember.personId === pId || selectedMember.id === pId)) {
+          setSelectedMember(updated);
+        }
+      }
+      await loadData();
+    } catch (err: any) {
+      Alert.alert('Action Notice', err?.message || `Updated departure for ${pName}.`);
+      await loadData();
+    } finally {
+      setPerformingActionId(null);
+    }
+  };
+
+
+
+  // ----------------------------------------------------------------------
+  // REUSABLE MEMBER ROW RENDERER (CLICK OPENS EXACT INDIVIDUAL PASS)
+  // ----------------------------------------------------------------------
+  const renderMemberRow = (m: any) => {
+    const isInside = (m.currentStatus || m.status || '').toLowerCase().includes('inside');
+    const isBusy = performingActionId === (m.personId || m.id);
+    const pRole = (m.personType || 'MEMBER').toUpperCase();
+
+    const roleBadgeColor =
+      pRole === 'HOD' ? '#F59E0B' : pRole === 'STAFF' ? '#06B6D4' : '#6366F1';
+
+    return (
+      <TouchableOpacity
+        key={m.personId || m.id || m._id}
+        style={[styles.memberCard, selectedMember?.personId === m.personId && styles.memberCardSelected]}
+        onPress={() => handleSelectMember(m)}
+        activeOpacity={0.7}
+      >
+        {/* Avatar */}
+        <View style={[styles.avatarCircle, { backgroundColor: isInside ? '#DCFCE7' : '#F1F5F9' }]}>
+          <Text style={[styles.avatarText, { color: isInside ? '#16A34A' : '#64748B' }]}>
+            {(m.name || 'M').charAt(0).toUpperCase()}
+          </Text>
+        </View>
+
+        {/* Member Details */}
+        <View style={styles.memberInfoCol}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <Text style={styles.memberName}>{m.name}</Text>
+            <View style={[styles.roleBadge, { backgroundColor: roleBadgeColor }]}>
+              <Text style={styles.roleBadgeText}>{pRole}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.memberSubDetails}>
+            {m.personId || m.rollNo || m.staffId} • {m.department || 'General'}
+            {m.phone ? ` • 📞 ${m.phone}` : ''}
+          </Text>
+
+          {/* Status Badge */}
+          <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={[styles.statusPill, isInside ? styles.statusPillInside : styles.statusPillOutside]}>
+              <Text style={[styles.statusPillText, isInside ? styles.statusPillTextInside : styles.statusPillTextOutside]}>
+                {isInside ? '● INSIDE' : '○ OUTSIDE'}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 11, color: '#3B82F6', fontWeight: '700' }}>Tap to view pass ➔</Text>
+          </View>
+        </View>
+
+        {/* 1-Tap Login / Logout Action Button */}
+        <TouchableOpacity
+          style={[
+            styles.gateActionBtn,
+            isInside ? styles.gateActionBtnLogout : styles.gateActionBtnLogin,
+            isBusy && { opacity: 0.6 },
+          ]}
+          onPress={(e) => {
+            if (isInside) {
+              handleMemberCampusOut(m);
+            } else {
+              handleMemberCampusIn(m);
+            }
+          }}
+          disabled={isBusy}
+          activeOpacity={0.8}
+        >
+          {isBusy ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.gateActionBtnText}>
+              {isInside ? '➔ Logout' : '➔ Login'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
-      {/* 4-WAY TOP NAVIGATION BAR: Student, Staff, HOD, Gate QR Scanner */}
+      {/* ============================================================== */}
+      {/* 3 SEPARATE SUB-NAV TABS: STUDENTS, STAFF, HOD                  */}
+      {/* ============================================================== */}
       <View style={styles.navBarWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.navBarScroll}
-          contentContainerStyle={styles.navBar}
-        >
-          <TouchableOpacity
-            style={[styles.navBtn, activeSubTab === 'student' && styles.navBtnActive]}
-            onPress={() => setActiveSubTab('student')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.navBtnText, activeSubTab === 'student' && styles.navBtnTextActive]}>
-              🎓 Student
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.navBtn, activeSubTab === 'staff' && styles.navBtnActive]}
-            onPress={() => setActiveSubTab('staff')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.navBtnText, activeSubTab === 'staff' && styles.navBtnTextActive]}>
-              👔 Staff
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.navBtn, activeSubTab === 'hod' && styles.navBtnActive]}
-            onPress={() => setActiveSubTab('hod')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.navBtnText, activeSubTab === 'hod' && styles.navBtnTextActive]}>
-              🏢 HOD
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.navBtn, activeSubTab === 'qr_scanner' && styles.navBtnActive]}
-            onPress={() => setActiveSubTab('qr_scanner')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.navBtnText, activeSubTab === 'qr_scanner' && styles.navBtnTextActive]}>
-              📷 Gate QR Scanner
-            </Text>
-          </TouchableOpacity>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navBar}>
+          {[
+            { id: 'student', label: `🎓 Students (${allStudents.length})` },
+            { id: 'staff', label: `👔 Staff (${allStaff.length})` },
+            { id: 'hod', label: `🏛️ HOD (${allHODs.length})` },
+          ].map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              style={[styles.navBtn, activeSubTab === tab.id && styles.navBtnActive]}
+              onPress={() => setActiveSubTab(tab.id as GateSubTab)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.navBtnText, activeSubTab === tab.id && styles.navBtnTextActive]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </ScrollView>
       </View>
 
@@ -760,717 +445,472 @@ export default function WatchmanGateOperations({ user, assignedGate = 'Gate 1 (M
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
       >
         {/* ============================================================== */}
-        {/* SUB-MODULE 1: STUDENT MOVEMENT REGISTER                        */}
-        {/* ============================================================== */}
-        {/* ============================================================== */}
-        {/* SUB-MODULE 1: STUDENT MOVEMENT REGISTER                        */}
+        {/* TAB 1: STUDENTS DIRECTORY                                      */}
         {/* ============================================================== */}
         {activeSubTab === 'student' && (
           <View>
-            {/* Header with Quick Actions */}
+            {/* Header & Register Student Button (Metrics cards removed) */}
             <View style={styles.sectionHeaderRow}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.sectionTitle}>🎓 Student Movement Register</Text>
-                <Text style={styles.sectionSub}>Manage verified student entries, outpasses & sick bay</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionTitle}>🎓 Student Movement Register ({allStudents.length})</Text>
+                <Text style={styles.sectionSub}>Tap any student to open their pass & security clearance</Text>
               </View>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                <TouchableOpacity
-                  style={[styles.actionBtnPrimary, { backgroundColor: '#10B981' }]}
-                  onPress={() => {
-                    setRegisterInitialType('Student');
-                    setRegisterModalOpen(true);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.actionBtnPrimaryText}>+ Register & Pass</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionBtnPrimary}
-                  onPress={() => setStudentMovementModal(true)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.actionBtnPrimaryText}>+ Movement</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.actionBtnPrimary}
+                onPress={() => {
+                  setRegisterInitialType('Student');
+                  setRegisterModalOpen(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.actionBtnPrimaryText}>+ Register Student</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Filter Pills */}
-            <View style={styles.filterRow}>
-              {[
-                { id: 'inside', label: 'Inside Campus' },
-                { id: 'all', label: 'All Students' },
-                { id: 'history', label: 'Movement Logs' },
-              ].map((f) => (
-                <TouchableOpacity
-                  key={f.id}
-                  style={[styles.filterPill, studentFilter === f.id && styles.filterPillActive]}
-                  onPress={() => setStudentFilter(f.id as FilterStatus)}
-                >
-                  <Text style={[styles.filterPillText, studentFilter === f.id && styles.filterPillTextActive]}>
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Search Bar */}
+            {/* Student Search */}
             <TextInput
               style={styles.searchInput}
-              placeholder="🔍 Search student name, roll number, department..."
+              placeholder="🔍 Search students by name, roll no, department..."
+              placeholderTextColor="#94A3B8"
               value={studentSearch}
               onChangeText={setStudentSearch}
               clearButtonMode="while-editing"
             />
 
-            {/* Student Cards List */}
-            {loading ? (
-              <ActivityIndicator size="large" color="#2563EB" style={{ marginVertical: 24 }} />
-            ) : displayedStudents.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyEmoji}>🎓</Text>
-                <Text style={styles.emptyTitle}>No Student Records Found</Text>
-                <Text style={styles.emptySub}>No students matching your current filter.</Text>
+            {/* Status Filter Pills */}
+            <View style={styles.filterGroupRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {[
+                  { id: 'All', label: `All Students (${allStudents.length})` },
+                  { id: 'Inside', label: `● Inside (${studentInside})` },
+                  { id: 'Outside', label: `○ Outside (${studentOutside})` },
+                ].map((s) => (
+                  <TouchableOpacity
+                    key={s.id}
+                    style={[styles.filterPill, studentStatusFilter === s.id && styles.filterPillActive]}
+                    onPress={() => setStudentStatusFilter(s.id as StatusFilter)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.filterPillText, studentStatusFilter === s.id && styles.filterPillTextActive]}>
+                      {s.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Student List */}
+            {displayedStudents.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateIcon}>🎓</Text>
+                <Text style={styles.emptyStateTitle}>No Students Found</Text>
+                <Text style={styles.emptyStateSub}>No student records match the active search or filter.</Text>
               </View>
             ) : (
-              displayedStudents.map((stu, idx) => {
-                const sId = stu.studentId || stu.rollNo || stu.id || `STU-${idx + 1}`;
-                const sName = stu.studentName || stu.name || 'Student';
-                const isActionLoading = performingActionId === sId;
-                const isInside = (stu.status || stu.currentStatus) === 'Inside Campus';
-
-                return (
-                  <View key={stu._id || sId || idx} style={styles.rosterCard}>
-                    <View style={styles.rosterAvatar}>
-                      <Text style={styles.rosterAvatarText}>{sName.substring(0, 2).toUpperCase()}</Text>
-                    </View>
-                    <View style={{ flex: 1, paddingHorizontal: 10 }}>
-                      <Text style={styles.rosterName} numberOfLines={1}>
-                        {sName}
-                      </Text>
-                      <Text style={styles.rosterDetail}>
-                        Roll: {sId} • {stu.department || 'Engineering'}
-                      </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
-                        <View style={[styles.statusTag, isInside ? styles.statusTagIn : styles.statusTagOut]}>
-                          <Text style={[styles.statusTagText, isInside ? styles.statusTagTextIn : styles.statusTagTextOut]}>
-                            {isInside ? '● Inside' : '○ Outside'}
-                          </Text>
-                        </View>
-                        {stu.movementType && (
-                          <Text style={styles.movementReasonText}>({stu.movementType})</Text>
-                        )}
-                      </View>
-                    </View>
-
-                    {/* Dual Action Gate In/Out Buttons */}
-                    <View style={styles.rosterActions}>
-                      <TouchableOpacity
-                        style={[styles.gateBtn, styles.gateBtnIn, isActionLoading && { opacity: 0.6 }]}
-                        onPress={() => handleStudentCheckin(stu)}
-                        disabled={isActionLoading}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.gateBtnTextIn}>IN 🟢</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.gateBtn, styles.gateBtnOut, isActionLoading && { opacity: 0.6 }]}
-                        onPress={() => handleStudentCheckout(stu)}
-                        disabled={isActionLoading}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.gateBtnTextOut}>OUT 🔴</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })
+              displayedStudents.map((m) => renderMemberRow(m))
             )}
           </View>
         )}
 
         {/* ============================================================== */}
-        {/* SUB-MODULE 2: STAFF GATE OPERATIONS                            */}
+        {/* TAB 2: STAFF DIRECTORY                                         */}
         {/* ============================================================== */}
         {activeSubTab === 'staff' && (
           <View>
+            {/* Header & Register Staff Button (Metrics cards removed) */}
             <View style={styles.sectionHeaderRow}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.sectionTitle}>👔 Staff Entry Register</Text>
-                <Text style={styles.sectionSub}>Log faculty movements, duty shift reporting & gate departure</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionTitle}>👔 Staff Entry Register ({allStaff.length})</Text>
+                <Text style={styles.sectionSub}>Tap any staff member to open their pass & security clearance</Text>
               </View>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                <TouchableOpacity
-                  style={[styles.actionBtnPrimary, { backgroundColor: '#10B981' }]}
-                  onPress={() => {
-                    setRegisterInitialType('Staff');
-                    setRegisterModalOpen(true);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.actionBtnPrimaryText}>+ Register & Pass</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionBtnPrimary}
-                  onPress={() => setStaffMovementModal(true)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.actionBtnPrimaryText}>+ Log Staff</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.actionBtnPrimary}
+                onPress={() => {
+                  setRegisterInitialType('Staff');
+                  setRegisterModalOpen(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.actionBtnPrimaryText}>+ Register Staff</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Filter Pills */}
-            <View style={styles.filterRow}>
-              {[
-                { id: 'inside', label: 'On Campus' },
-                { id: 'all', label: 'All Faculty' },
-                { id: 'history', label: 'Duty Logs' },
-              ].map((f) => (
-                <TouchableOpacity
-                  key={f.id}
-                  style={[styles.filterPill, staffFilter === f.id && styles.filterPillActive]}
-                  onPress={() => setStaffFilter(f.id as FilterStatus)}
-                >
-                  <Text style={[styles.filterPillText, staffFilter === f.id && styles.filterPillTextActive]}>
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Search Input */}
+            {/* Staff Search */}
             <TextInput
               style={styles.searchInput}
-              placeholder="🔍 Search faculty name, employee ID, department..."
+              placeholder="🔍 Search staff by name, staff ID, department..."
+              placeholderTextColor="#94A3B8"
               value={staffSearch}
               onChangeText={setStaffSearch}
               clearButtonMode="while-editing"
             />
 
+            {/* Status Filter Pills */}
+            <View style={styles.filterGroupRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {[
+                  { id: 'All', label: `All Staff (${allStaff.length})` },
+                  { id: 'Inside', label: `● Inside (${staffInside})` },
+                  { id: 'Outside', label: `○ Outside (${staffOutside})` },
+                ].map((s) => (
+                  <TouchableOpacity
+                    key={s.id}
+                    style={[styles.filterPill, staffStatusFilter === s.id && styles.filterPillActive]}
+                    onPress={() => setStaffStatusFilter(s.id as StatusFilter)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.filterPillText, staffStatusFilter === s.id && styles.filterPillTextActive]}>
+                      {s.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
             {/* Staff List */}
-            {loading ? (
-              <ActivityIndicator size="large" color="#2563EB" style={{ marginVertical: 24 }} />
-            ) : displayedStaff.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyEmoji}>👔</Text>
-                <Text style={styles.emptyTitle}>No Staff Members Found</Text>
-                <Text style={styles.emptySub}>No faculty records matching your filter.</Text>
+            {displayedStaff.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateIcon}>👔</Text>
+                <Text style={styles.emptyStateTitle}>No Staff Members Found</Text>
+                <Text style={styles.emptyStateSub}>No staff records match the current filter.</Text>
               </View>
             ) : (
-              displayedStaff.map((st, idx) => {
-                const stId = st.staffId || st.id || `STF-${idx + 1}`;
-                const stName = st.staffName || st.name || 'Faculty Member';
-                const isActionLoading = performingActionId === stId;
-
-                return (
-                  <View key={st._id || stId || idx} style={styles.rosterCard}>
-                    <View style={[styles.rosterAvatar, { backgroundColor: '#F0FDFA', borderColor: '#99F6E4' }]}>
-                      <Text style={[styles.rosterAvatarText, { color: '#0F766E' }]}>
-                        {stName.substring(0, 2).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1, paddingHorizontal: 10 }}>
-                      <Text style={styles.rosterName} numberOfLines={1}>
-                        {stName}
-                      </Text>
-                      <Text style={styles.rosterDetail}>
-                        ID: {stId} • {st.department || 'Academic Dept'}
-                      </Text>
-                      {st.designation && (
-                        <Text style={styles.staffDesigText}>{st.designation}</Text>
-                      )}
-                    </View>
-
-                    {/* Dual Action Buttons for Staff */}
-                    <View style={styles.rosterActions}>
-                      <TouchableOpacity
-                        style={[styles.gateBtn, styles.gateBtnIn, isActionLoading && { opacity: 0.6 }]}
-                        onPress={() => handleQuickStaffMovement(st, 'In')}
-                        disabled={isActionLoading}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.gateBtnTextIn}>IN 🟢</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.gateBtn, styles.gateBtnOut, isActionLoading && { opacity: 0.6 }]}
-                        onPress={() => handleQuickStaffMovement(st, 'Out')}
-                        disabled={isActionLoading}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.gateBtnTextOut}>OUT 🔴</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })
+              displayedStaff.map((m) => renderMemberRow(m))
             )}
           </View>
         )}
 
         {/* ============================================================== */}
-        {/* SUB-MODULE 3: HOD GATE OPERATIONS                              */}
+        {/* TAB 3: HOD DIRECTORY                                           */}
         {/* ============================================================== */}
         {activeSubTab === 'hod' && (
           <View>
+            {/* Header & Register HOD Button (Metrics cards removed) */}
             <View style={styles.sectionHeaderRow}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.sectionTitle}>🏢 HOD Gate Register</Text>
-                <Text style={styles.sectionSub}>Department heads, campus presence & VIP gate access</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionTitle}>🏛️ HOD Movement Register ({allHODs.length})</Text>
+                <Text style={styles.sectionSub}>Tap any HOD to open their pass & security clearance</Text>
               </View>
               <TouchableOpacity
-                style={[styles.actionBtnPrimary, { backgroundColor: '#10B981' }]}
+                style={styles.actionBtnPrimary}
                 onPress={() => {
                   setRegisterInitialType('HOD');
                   setRegisterModalOpen(true);
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={styles.actionBtnPrimaryText}>+ Register & Pass</Text>
+                <Text style={styles.actionBtnPrimaryText}>+ Register HOD</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Filter Pills */}
-            <View style={styles.filterRow}>
-              {[
-                { id: 'inside', label: 'On Campus' },
-                { id: 'all', label: 'All HODs' },
-              ].map((f) => (
-                <TouchableOpacity
-                  key={f.id}
-                  style={[styles.filterPill, hodFilter === f.id && styles.filterPillActive]}
-                  onPress={() => setHodFilter(f.id as any)}
-                >
-                  <Text style={[styles.filterPillText, hodFilter === f.id && styles.filterPillTextActive]}>
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Search Input */}
+            {/* HOD Search */}
             <TextInput
               style={styles.searchInput}
-              placeholder="🔍 Search HOD name, ID, department..."
+              placeholder="🔍 Search HODs by name, department..."
+              placeholderTextColor="#94A3B8"
               value={hodSearch}
               onChangeText={setHodSearch}
               clearButtonMode="while-editing"
             />
 
-            {/* HOD List */}
-            {loading ? (
-              <ActivityIndicator size="large" color="#2563EB" style={{ marginVertical: 24 }} />
-            ) : displayedHODs.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyEmoji}>🏢</Text>
-                <Text style={styles.emptyTitle}>No HOD Records Found</Text>
-                <Text style={styles.emptySub}>Tap "+ Register & Pass" to register a Department Head.</Text>
-              </View>
-            ) : (
-              displayedHODs.map((hod, idx) => {
-                const hodId = hod.personId || hod.staffId || hod.employeeId || hod.id || `HOD-${idx + 1}`;
-                const hodName = hod.name || hod.staffName || 'Department Head';
-                const isActionLoading = performingActionId === hodId;
-                const isInside = (hod.currentStatus || '').toLowerCase().includes('inside');
-
-                return (
-                  <View key={hod._id || hodId || idx} style={styles.rosterCard}>
-                    <View style={[styles.rosterAvatar, { backgroundColor: '#FDF4FF', borderColor: '#F0ABFC' }]}>
-                      <Text style={[styles.rosterAvatarText, { color: '#9333EA' }]}>
-                        {hodName.substring(0, 2).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1, paddingHorizontal: 10 }}>
-                      <Text style={styles.rosterName} numberOfLines={1}>
-                        {hodName}
-                      </Text>
-                      <Text style={styles.rosterDetail}>
-                        ID: {hodId} • {hod.department || 'Academic Department'}
-                      </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
-                        <View style={[styles.statusTag, isInside ? styles.statusTagIn : styles.statusTagOut]}>
-                          <Text style={[styles.statusTagText, isInside ? styles.statusTagTextIn : styles.statusTagTextOut]}>
-                            {isInside ? '● Inside' : '○ Outside'}
-                          </Text>
-                        </View>
-                        <Text style={[styles.staffDesigText, { color: '#9333EA' }]}>HOD</Text>
-                      </View>
-                    </View>
-
-                    {/* Dual Action Buttons for HOD */}
-                    <View style={styles.rosterActions}>
-                      <TouchableOpacity
-                        style={[styles.gateBtn, styles.gateBtnIn, isActionLoading && { opacity: 0.6 }]}
-                        onPress={() => handleUniversalCheckinOut(hod, 'In')}
-                        disabled={isActionLoading}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.gateBtnTextIn}>IN 🟢</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.gateBtn, styles.gateBtnOut, isActionLoading && { opacity: 0.6 }]}
-                        onPress={() => handleUniversalCheckinOut(hod, 'Out')}
-                        disabled={isActionLoading}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.gateBtnTextOut}>OUT 🔴</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })
-            )}
-          </View>
-        )}
-
-        {/* ============================================================== */}
-        {/* SUB-MODULE 4: GATE OPERATIONS QR SCANNER                       */}
-        {/* ============================================================== */}
-        {activeSubTab === 'qr_scanner' && (
-          <View>
-            <View style={styles.sectionHeaderRow}>
-              <View>
-                <Text style={styles.sectionTitle}>📷 Gate Operations QR Scanner</Text>
-                <Text style={styles.sectionSub}>Scan or enter Student, Staff, or HOD Gate Passes only</Text>
-              </View>
-            </View>
-
-            {/* Scan / Lookup Input Card */}
-            <View style={styles.card}>
-              <Text style={styles.inputLabel}>Scan or Type Person ID / Gate Pass Code</Text>
-              <View style={styles.scanInputRow}>
-                <TextInput
-                  style={[styles.searchInput, { flex: 1, marginBottom: 0 }]}
-                  placeholder="e.g. 21CS045, STU-..., STF-..., HOD-..."
-                  value={studentScanCode}
-                  onChangeText={setStudentScanCode}
-                  autoCapitalize="characters"
-                />
-                <TouchableOpacity
-                  style={styles.verifyBtn}
-                  onPress={() => handleLookupStudentQr()}
-                  disabled={scanningLoading}
-                  activeOpacity={0.8}
-                >
-                  {scanningLoading ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
-                  ) : (
-                    <Text style={styles.verifyBtnText}>Verify Pass</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {/* Quick Sample Presets */}
-              <View style={styles.presetRow}>
-                <Text style={styles.presetLabel}>Quick Presets:</Text>
+            {/* Status Filter Pills */}
+            <View style={styles.filterGroupRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                 {[
-                  { label: 'Student', code: '21CS045' },
-                  { label: 'Staff', code: 'STF-101' },
-                  { label: 'HOD', code: 'HOD-CS-01' }
-                ].map((p) => (
+                  { id: 'All', label: `All HODs (${allHODs.length})` },
+                  { id: 'Inside', label: `● Inside (${hodInside})` },
+                  { id: 'Outside', label: `○ Outside (${hodOutside})` },
+                ].map((s) => (
                   <TouchableOpacity
-                    key={p.code}
-                    style={styles.presetPill}
-                    onPress={() => {
-                      setStudentScanCode(p.code);
-                      handleLookupStudentQr(p.code);
-                    }}
+                    key={s.id}
+                    style={[styles.filterPill, hodStatusFilter === s.id && styles.filterPillActive]}
+                    onPress={() => setHodStatusFilter(s.id as StatusFilter)}
+                    activeOpacity={0.7}
                   >
-                    <Text style={styles.presetPillText}>{p.label}: {p.code}</Text>
+                    <Text style={[styles.filterPillText, hodStatusFilter === s.id && styles.filterPillTextActive]}>
+                      {s.label}
+                    </Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
             </View>
 
-            {/* Verified Person Gate Pass Result */}
-            {scannedStudent && (
-              <View style={styles.verifiedCard}>
-                <View style={styles.verifiedHeader}>
-                  <View style={[styles.verifiedAvatar, scannedStudent.personType === 'HOD' ? { backgroundColor: '#F3E8FF' } : scannedStudent.personType === 'Staff' ? { backgroundColor: '#F0FDFA' } : { backgroundColor: '#EFF6FF' }]}>
-                    <Text style={[styles.verifiedAvatarText, scannedStudent.personType === 'HOD' ? { color: '#7E22CE' } : scannedStudent.personType === 'Staff' ? { color: '#0F766E' } : { color: '#1D4ED8' }]}>
-                      {(scannedStudent.name || 'CP').substring(0, 2).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.verifiedName}>{scannedStudent.name || 'Verified Member'}</Text>
-                    <Text style={styles.verifiedRoll}>
-                      ID: {scannedStudent.personId || scannedStudent.rollNo || scannedStudent.studentId || scannedStudent.id}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                      <View style={[styles.typeBadge, scannedStudent.personType === 'HOD' ? styles.typeBadgePurple : scannedStudent.personType === 'Staff' ? styles.typeBadgeTeal : styles.typeBadgeBlue]}>
-                        <Text style={[styles.typeBadgeText, scannedStudent.personType === 'HOD' ? styles.typeTextPurple : scannedStudent.personType === 'Staff' ? styles.typeTextTeal : styles.typeTextBlue]}>
-                          {scannedStudent.personType === 'HOD' ? '🏢 HOD' : scannedStudent.personType === 'Staff' ? '👔 Faculty / Staff' : '🎓 Student'}
-                        </Text>
-                      </View>
-                      <Text style={styles.verifiedDept} numberOfLines={1}>
-                        • {scannedStudent.department || 'General'}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Gate Details Info Table */}
-                <View style={styles.gateDetailsTable}>
-                  <View style={styles.gateDetailRow}>
-                    <Text style={styles.gateDetailLabel}>Assigned Gate:</Text>
-                    <Text style={styles.gateDetailVal}>{scannedStudent.assignedGate || assignedGate}</Text>
-                  </View>
-                  {scannedStudent.phone ? (
-                    <View style={styles.gateDetailRow}>
-                      <Text style={styles.gateDetailLabel}>Contact:</Text>
-                      <Text style={styles.gateDetailVal}>{scannedStudent.phone}</Text>
-                    </View>
-                  ) : null}
-                  {scannedStudent.vehicleNumber ? (
-                    <View style={styles.gateDetailRow}>
-                      <Text style={styles.gateDetailLabel}>Vehicle:</Text>
-                      <Text style={styles.gateDetailVal}>{scannedStudent.vehicleNumber}</Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                <View style={styles.statusBox}>
-                  <Text style={styles.statusBoxLabel}>Campus In/Out Status:</Text>
-                  <Text
-                    style={[
-                      styles.statusBoxVal,
-                      (scannedStudent.currentStatus || '').toLowerCase().includes('inside') ? styles.statusValIn : styles.statusValOut,
-                    ]}
-                  >
-                    {(scannedStudent.currentStatus || '').toLowerCase().includes('inside') ? '● INSIDE CAMPUS' : '○ OUTSIDE CAMPUS'}
-                  </Text>
-                </View>
-
-                {/* Instant Gate Movement Actions */}
-                <View style={styles.dualActionRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.actionGateBtn,
-                      styles.btnInBg,
-                      (qrActionLoading || (scannedStudent.currentStatus || '').toLowerCase().includes('inside')) && styles.btnDisabled,
-                    ]}
-                    onPress={() => handleScannedStudentAction('in')}
-                    disabled={qrActionLoading || (scannedStudent.currentStatus || '').toLowerCase().includes('inside')}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.actionGateBtnText}>✓ Record Campus IN</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.actionGateBtn,
-                      styles.btnOutBg,
-                      (qrActionLoading || !(scannedStudent.currentStatus || '').toLowerCase().includes('inside')) && styles.btnDisabled,
-                    ]}
-                    onPress={() => handleScannedStudentAction('out')}
-                    disabled={qrActionLoading || !(scannedStudent.currentStatus || '').toLowerCase().includes('inside')}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.actionGateBtnText, { color: '#DC2626' }]}>✕ Record Campus OUT</Text>
-                  </TouchableOpacity>
-                </View>
+            {/* HOD List */}
+            {displayedHODs.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateIcon}>🏛️</Text>
+                <Text style={styles.emptyStateTitle}>No HODs Found</Text>
+                <Text style={styles.emptyStateSub}>No HOD records match the search filter.</Text>
               </View>
+            ) : (
+              displayedHODs.map((m) => renderMemberRow(m))
             )}
           </View>
         )}
+
+
       </ScrollView>
 
       {/* ============================================================== */}
-      {/* MODAL 1: FORMAL STUDENT MOVEMENT REGISTER                     */}
+      {/* MODAL: INDIVIDUAL MEMBER PASS & SECURITY CLEARANCE (WEB PANEL) */}
       {/* ============================================================== */}
-      <Modal
-        visible={studentMovementModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setStudentMovementModal(false)}
-      >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Register Student Movement</Text>
-            <Text style={styles.modalSub}>Record outpass, sick bay departure, or lunch gate pass</Text>
+      {selectedMember && (
+        <Modal
+          visible={!!selectedMember}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setSelectedMember(null)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalHeaderTitle}>Security Clearance & Pass</Text>
+                <Text style={{ fontSize: 12, color: '#64748B' }}>
+                  {selectedMember.personType} • {selectedMember.personId}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setSelectedMember(null)} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>✕ Close</Text>
+              </TouchableOpacity>
+            </View>
 
-            <Text style={styles.inputLabel}>Student ID / Roll No *</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. 21CS045"
-              value={modalStudentId}
-              onChangeText={setModalStudentId}
-              autoCapitalize="characters"
-            />
+            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+              {/* Status Banner (Matching Web Image 3) */}
+              {(() => {
+                const isInside = (selectedMember.currentStatus || '').toLowerCase().includes('inside');
+                return (
+                  <View
+                    style={[
+                      styles.clearanceStatusBanner,
+                      isInside ? styles.statusBannerInside : styles.statusBannerOutside,
+                    ]}
+                  >
+                    <Text style={styles.statusBannerIcon}>{isInside ? '✓' : '🕒'}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.statusBannerTitle,
+                          { color: isInside ? '#065F46' : '#1E40AF' },
+                        ]}
+                      >
+                        {isInside
+                          ? 'MEMBER CURRENTLY LOGGED IN (INSIDE CAMPUS)'
+                          : 'MEMBER CURRENTLY LOGGED OUT (OUTSIDE CAMPUS)'}
+                      </Text>
+                      <Text style={[styles.statusBannerSub, { color: isInside ? '#047857' : '#1E3A8A' }]}>
+                        {isInside
+                          ? 'Inside campus. Ready for departure checkout.'
+                          : 'Outside campus. Ready for security clearance & gate entry.'}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })()}
 
-            <Text style={styles.inputLabel}>Student Name (Optional)</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. Priya Sharma"
-              value={modalStudentName}
-              onChangeText={setModalStudentName}
-            />
+              {/* Digital QR Pass Code Image */}
+              <View style={styles.qrPassContainer}>
+                {(() => {
+                  const personCode = selectedMember.personId || selectedMember.id;
+                  const webBase = getCurrentBaseUrl().replace('/api', '').replace(':5000', ':5173');
+                  const rawVerify = selectedMember.verifyUrl || '';
+                  const verifyPassUrl = (rawVerify && !rawVerify.includes('localhost') && !rawVerify.includes('127.0.0.1'))
+                    ? rawVerify
+                    : `${webBase}/verify-gate-pass?code=${encodeURIComponent(personCode)}`;
+                  const qrUri = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(verifyPassUrl)}`;
 
-            <Text style={styles.inputLabel}>Movement Type *</Text>
-            <View style={styles.typeSelectorRow}>
-              {['Outpass', 'Sick Bay', 'Lunch Break', 'Day Scholar'].map((t) => (
-                <TouchableOpacity
-                  key={t}
-                  style={[styles.typePill, modalMovementType === t && styles.typePillActive]}
-                  onPress={() => setModalMovementType(t)}
-                >
-                  <Text style={[styles.typePillText, modalMovementType === t && styles.typePillTextActive]}>
-                    {t}
+                  return (
+                    <>
+                      <Image
+                        source={{ uri: qrUri }}
+                        style={styles.qrPassImage}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.qrPassCodeText}>{selectedMember.personId}</Text>
+                      <Text style={styles.qrPassHint}>Official Digital Security Pass</Text>
+
+                      <TouchableOpacity
+                        style={{
+                          marginTop: 10,
+                          paddingVertical: 7,
+                          paddingHorizontal: 14,
+                          backgroundColor: '#EFF6FF',
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: '#BFDBFE',
+                        }}
+                        onPress={() => {
+                          Linking.openURL(verifyPassUrl).catch(() =>
+                            Alert.alert('Pass Verification URL', verifyPassUrl)
+                          );
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, color: '#1D4ED8', fontWeight: '700' }}>
+                          🔗 Open Pass Clearance Page
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  );
+                })()}
+              </View>
+
+              {/* Identity Header */}
+              <View style={styles.clearanceProfileRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.clearanceName}>{selectedMember.name}</Text>
+                  <Text style={styles.clearanceSub}>
+                    {selectedMember.department || 'General'} • {selectedMember.designation || selectedMember.personType}
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                </View>
+                <View
+                  style={[
+                    styles.roleBadge,
+                    {
+                      backgroundColor:
+                        selectedMember.personType === 'HOD'
+                          ? '#F59E0B'
+                          : selectedMember.personType === 'Staff'
+                          ? '#06B6D4'
+                          : '#6366F1',
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.roleBadgeText, { fontSize: 11 }]}>{selectedMember.personType}</Text>
+                </View>
+              </View>
 
-            <Text style={styles.inputLabel}>Reason / Permission Notes</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. Warden approved medical outpass"
-              value={modalReason}
-              onChangeText={setModalReason}
-            />
+              {/* Details Info Grid */}
+              <View style={styles.detailsGrid}>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>CONTACT PHONE</Text>
+                  <Text style={styles.detailValue}>📞 {selectedMember.phone || '—'}</Text>
+                </View>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>VEHICLE #</Text>
+                  <Text style={styles.detailValue}>🚗 {selectedMember.vehicleNumber || 'Pedestrian'}</Text>
+                </View>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>LAST ENTRY TIME</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedMember.lastEntryTime
+                      ? new Date(selectedMember.lastEntryTime).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : 'None recorded'}
+                  </Text>
+                </View>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>LAST EXIT TIME</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedMember.lastExitTime
+                      ? new Date(selectedMember.lastExitTime).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : 'None recorded'}
+                  </Text>
+                </View>
+              </View>
 
-            <Text style={styles.inputLabel}>Parent / Guardian Contact</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. +91 98765 43210"
-              keyboardType="phone-pad"
-              value={modalParentContact}
-              onChangeText={setModalParentContact}
-            />
+              {/* Movement Remarks */}
+              <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Movement Remarks (Optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g. Regular classes, Lab visit, Gate clearance..."
+                placeholderTextColor="#94A3B8"
+                value={movementRemarks}
+                onChangeText={setMovementRemarks}
+              />
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setStudentMovementModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalSubmit}
-                onPress={handleSubmitStudentMovement}
-                disabled={submittingStudentMove}
-              >
-                {submittingStudentMove ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.modalSubmitText}>Save Movement</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+              {/* TWO LARGE ACTION BUTTONS (Login / Campus In & Logout / Campus Out) */}
+              {(() => {
+                const isInside = (selectedMember.currentStatus || '').toLowerCase().includes('inside');
+                const isBusy = performingActionId === selectedMember.personId;
 
-      {/* ============================================================== */}
-      {/* MODAL 2: FORMAL STAFF GATE MOVEMENT                           */}
-      {/* ============================================================== */}
-      <Modal
-        visible={staffMovementModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setStaffMovementModal(false)}
-      >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Log Staff Gate Movement</Text>
-            <Text style={styles.modalSub}>Record faculty duty shift arrival or departure</Text>
+                return (
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 18 }}>
+                    <TouchableOpacity
+                      style={[
+                        styles.gateActionBtn,
+                        styles.gateActionBtnLogin,
+                        { flex: 1, paddingVertical: 14 },
+                        (isInside || isBusy) && { opacity: 0.4 },
+                      ]}
+                      onPress={() => handleMemberCampusIn(selectedMember)}
+                      disabled={isInside || isBusy}
+                      activeOpacity={0.8}
+                    >
+                      {isBusy ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={[styles.gateActionBtnText, { fontSize: 14 }]}>➔ Login / Campus In</Text>
+                      )}
+                    </TouchableOpacity>
 
-            <Text style={styles.inputLabel}>Staff Member ID *</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. STF008"
-              value={modalStaffId}
-              onChangeText={setModalStaffId}
-              autoCapitalize="characters"
-            />
+                    <TouchableOpacity
+                      style={[
+                        styles.gateActionBtn,
+                        styles.gateActionBtnLogout,
+                        { flex: 1, paddingVertical: 14 },
+                        (!isInside || isBusy) && { opacity: 0.4 },
+                      ]}
+                      onPress={() => handleMemberCampusOut(selectedMember)}
+                      disabled={!isInside || isBusy}
+                      activeOpacity={0.8}
+                    >
+                      {isBusy ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={[styles.gateActionBtnText, { fontSize: 14 }]}>➔ Logout / Campus Out</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })()}
 
-            <Text style={styles.inputLabel}>Staff Full Name *</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. Prof. R. Swaminathan"
-              value={modalStaffName}
-              onChangeText={setModalStaffName}
-            />
-
-            <Text style={styles.inputLabel}>Department</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. Computer Science"
-              value={modalStaffDept}
-              onChangeText={setModalStaffDept}
-            />
-
-            <Text style={styles.inputLabel}>Movement Direction *</Text>
-            <View style={styles.typeSelectorRow}>
-              <TouchableOpacity
-                style={[styles.typePill, modalStaffDirection === 'In' && styles.typePillActive]}
-                onPress={() => setModalStaffDirection('In')}
-              >
-                <Text style={[styles.typePillText, modalStaffDirection === 'In' && styles.typePillTextActive]}>
-                  🟢 Campus Entry (IN)
+              {/* Recent Movement History */}
+              <View style={{ marginTop: 24 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#334155', marginBottom: 8 }}>
+                  Recent Movement History ({memberMovements.length})
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.typePill, modalStaffDirection === 'Out' && styles.typePillActive]}
-                onPress={() => setModalStaffDirection('Out')}
-              >
-                <Text style={[styles.typePillText, modalStaffDirection === 'Out' && styles.typePillTextActive]}>
-                  🔴 Campus Exit (OUT)
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.inputLabel}>Vehicle Number (If any)</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. TN-07-CB-5678"
-              value={modalStaffVehicle}
-              onChangeText={setModalStaffVehicle}
-              autoCapitalize="characters"
-            />
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => setStaffMovementModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalSubmit}
-                onPress={handleSubmitStaffMovement}
-                disabled={submittingStaffMove}
-              >
-                {submittingStaffMove ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
+                {loadingMovements ? (
+                  <ActivityIndicator size="small" color="#2563EB" />
+                ) : memberMovements.length === 0 ? (
+                  <Text style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic' }}>
+                    No recorded movements today for this individual.
+                  </Text>
                 ) : (
-                  <Text style={styles.modalSubmitText}>Save Movement</Text>
+                  memberMovements.slice(0, 5).map((mv, idx) => (
+                    <View key={mv._id || idx} style={styles.movementItemRow}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: mv.type === 'IN' ? '#16A34A' : '#DC2626' }}>
+                        {mv.type === 'IN' ? '➔ ENTRY' : '➔ EXIT'}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: '#64748B' }}>
+                        {new Date(mv.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#94A3B8' }}>{mv.gate || assignedGate}</Text>
+                    </View>
+                  ))
                 )}
-              </TouchableOpacity>
-            </View>
+              </View>
+            </ScrollView>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        </Modal>
+      )}
 
-      {/* Student, Staff, and HOD Gate Registration Modal */}
+      {/* Register Person Modal */}
       <WatchmanRegisterPersonModal
         visible={registerModalOpen}
-        user={user}
-        defaultGate={assignedGate}
-        initialPersonType={registerInitialType}
-        allowedPersonTypes={['Student', 'Staff', 'HOD']}
         onClose={() => setRegisterModalOpen(false)}
-        onRegistrationSuccess={(_person) => {
-          loadData();
-        }}
-        onNavigateScanner={(code) => {
+        user={user}
+        assignedGate={assignedGate}
+        initialPersonType={registerInitialType}
+        onRegistrationSuccess={async () => {
           setRegisterModalOpen(false);
-          setActiveSubTab('qr_scanner');
-          if (code) {
-            setStudentScanCode(code);
-            setTimeout(() => {
-              handleLookupStudentQr(code);
-            }, 300);
-          }
+          await loadData();
         }}
       />
     </View>
@@ -1482,60 +922,53 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  navBarScroll: {
+  navBarWrapper: {
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    flexGrow: 0,
+    paddingVertical: 8,
   },
   navBar: {
-    flexDirection: 'row',
     paddingHorizontal: 12,
-    paddingVertical: 10,
     gap: 8,
-    alignItems: 'center',
   },
   navBtn: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
     borderRadius: 20,
     backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   navBtnActive: {
-    backgroundColor: '#1E40AF',
-    borderColor: '#1E40AF',
+    backgroundColor: '#1E3A8A',
   },
   navBtnText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#475569',
   },
   navBtnTextActive: {
     color: '#FFFFFF',
   },
   scrollContent: {
     padding: 14,
-    paddingBottom: 28,
+    paddingBottom: 40,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    marginTop: 4,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: '#0F172A',
   },
   sectionSub: {
     fontSize: 11,
     color: '#64748B',
-    marginTop: 1,
+    marginTop: 2,
   },
   actionBtnPrimary: {
     backgroundColor: '#2563EB',
@@ -1544,462 +977,403 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   actionBtnPrimaryText: {
-    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+    color: '#FFFFFF',
   },
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
+  searchInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#0F172A',
     marginBottom: 10,
+  },
+  filterGroupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   filterPill: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   filterPillActive: {
     backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
   },
   filterPillText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#475569',
+    color: '#64748B',
   },
   filterPillTextActive: {
     color: '#FFFFFF',
   },
-  searchInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
-    color: '#0F172A',
-    marginBottom: 12,
-  },
-  rosterCard: {
+  memberCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    elevation: 1,
-    shadowColor: '#0F172A',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  rosterAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  memberCardSelected: {
+    borderColor: '#2563EB',
     backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderWidth: 2,
+  },
+  avatarCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
   },
-  rosterAvatarText: {
-    fontSize: 14,
+  avatarText: {
+    fontSize: 16,
     fontWeight: '800',
-    color: '#1E40AF',
   },
-  rosterName: {
+  memberInfoCol: {
+    flex: 1,
+  },
+  memberName: {
     fontSize: 14,
     fontWeight: '800',
     color: '#0F172A',
   },
-  rosterDetail: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  staffDesigText: {
-    fontSize: 10,
-    color: '#0D9488',
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  statusTag: {
+  roleBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  statusTagIn: {
-    backgroundColor: '#DCFCE7',
+  roleBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
-  statusTagOut: {
-    backgroundColor: '#FEE2E2',
-  },
-  statusTagText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  statusTagTextIn: {
-    color: '#15803D',
-  },
-  statusTagTextOut: {
-    color: '#B91C1C',
-  },
-  movementReasonText: {
-    fontSize: 11,
+  memberSubDetails: {
+    fontSize: 12,
     color: '#64748B',
-    fontStyle: 'italic',
+    marginTop: 2,
   },
-  rosterActions: {
-    flexDirection: 'column',
-    gap: 4,
-  },
-  gateBtn: {
+  statusPill: {
     paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 6,
-    alignItems: 'center',
+    paddingVertical: 2,
+    borderRadius: 10,
   },
-  gateBtnIn: {
+  statusPillInside: {
     backgroundColor: '#DCFCE7',
-    borderWidth: 1,
-    borderColor: '#86EFAC',
   },
-  gateBtnOut: {
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
+  statusPillOutside: {
+    backgroundColor: '#F1F5F9',
   },
-  gateBtnTextIn: {
+  statusPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  statusPillTextInside: {
     color: '#15803D',
-    fontSize: 10,
-    fontWeight: '800',
   },
-  gateBtnTextOut: {
-    color: '#DC2626',
-    fontSize: 10,
+  statusPillTextOutside: {
+    color: '#64748B',
+  },
+  gateActionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 78,
+  },
+  gateActionBtnLogin: {
+    backgroundColor: '#059669',
+  },
+  gateActionBtnLogout: {
+    backgroundColor: '#DC2626',
+  },
+  gateActionBtnText: {
+    fontSize: 12,
     fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyStateIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptyStateTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  emptyStateSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 4,
   },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 14,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  sectionHeadingBlock: {
     marginBottom: 14,
   },
-  inputLabel: {
+  sectionSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 3,
+  },
+  scannerViewport: {
+    height: 190,
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewfinderBox: {
+    width: 220,
+    height: 140,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  corner: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderColor: '#38BDF8',
+  },
+  cornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
+  scanTargetIcon: { fontSize: 30, marginBottom: 4 },
+  scanTargetText: { fontSize: 13, fontWeight: '700', color: '#F8FAFC' },
+  fieldLabel: {
     fontSize: 12,
     fontWeight: '700',
     color: '#334155',
     marginBottom: 6,
   },
-  scanInputRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  verifyBtn: {
-    backgroundColor: '#1E40AF',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 8,
-  },
-  verifyBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  presetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  presetLabel: {
-    fontSize: 11,
-    color: '#64748B',
-    fontWeight: '600',
-  },
-  presetPill: {
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  presetPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#1D4ED8',
-  },
-  navBarWrapper: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  typeBadgeBlue: {
-    backgroundColor: '#EFF6FF',
-  },
-  typeBadgeTeal: {
-    backgroundColor: '#F0FDFA',
-  },
-  typeBadgePurple: {
-    backgroundColor: '#FAF5FF',
-  },
-  typeBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  typeTextBlue: {
-    color: '#1D4ED8',
-  },
-  typeTextTeal: {
-    color: '#0F766E',
-  },
-  typeTextPurple: {
-    color: '#7E22CE',
-  },
-  gateDetailsTable: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  gateDetailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 3,
-  },
-  gateDetailLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '600',
-  },
-  gateDetailVal: {
-    fontSize: 12,
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-  verifiedCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    elevation: 2,
-    shadowColor: '#1E40AF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-  },
-  verifiedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  verifiedAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#93C5FD',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  verifiedAvatarText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1E40AF',
-  },
-  verifiedName: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  verifiedRoll: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#2563EB',
-    marginTop: 1,
-  },
-  verifiedDept: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  statusBox: {
-    backgroundColor: '#F8FAFC',
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statusBoxLabel: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '600',
-  },
-  statusBoxVal: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  statusValIn: {
-    color: '#15803D',
-  },
-  statusValOut: {
-    color: '#DC2626',
-  },
-  dualActionRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  actionGateBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnInBg: {
-    backgroundColor: '#10B981',
-  },
-  btnOutBg: {
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-  },
-  btnDisabled: {
-    opacity: 0.4,
-  },
-  actionGateBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  emptyBox: {
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyEmoji: {
-    fontSize: 36,
-    marginBottom: 8,
-  },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  emptySub: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '90%',
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  modalSub: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 12,
-  },
-  modalInput: {
+  textInput: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#CBD5E1',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     fontSize: 13,
     color: '#0F172A',
-    marginBottom: 10,
   },
-  typeSelectorRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 10,
-  },
-  typePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  verifyBtnPrimary: {
+    backgroundColor: '#1E3A8A',
+    paddingHorizontal: 14,
     borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  typePillActive: {
+  verifyBtnPrimaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  shortcutPill: {
     backgroundColor: '#EFF6FF',
-    borderColor: '#2563EB',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
   },
-  typePillText: {
+  shortcutPillText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#475569',
-  },
-  typePillTextActive: {
     color: '#1D4ED8',
   },
-  modalActions: {
+  scannedResultCard: {
+    marginTop: 16,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 12,
+    padding: 14,
+  },
+  scannedCardTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#166534',
+    marginBottom: 4,
+  },
+  scannedName: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  scannedDetails: {
+    fontSize: 12,
+    color: '#334155',
+    marginTop: 2,
+  },
+  modalHeader: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 10,
-  },
-  modalCancel: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
   },
-  modalCancelText: {
-    color: '#475569',
-    fontWeight: '700',
+  modalHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  closeBtn: {
+    padding: 6,
+  },
+  closeBtnText: {
     fontSize: 13,
+    color: '#2563EB',
+    fontWeight: '700',
   },
-  modalSubmit: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#2563EB',
+  clearanceStatusBanner: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 14,
   },
-  modalSubmitText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+  statusBannerInside: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#6EE7B7',
+  },
+  statusBannerOutside: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1.5,
+    borderColor: '#93C5FD',
+  },
+  statusBannerIcon: {
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  statusBannerTitle: {
     fontSize: 13,
+    fontWeight: '800',
+  },
+  statusBannerSub: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  qrPassContainer: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+  },
+  qrPassImage: {
+    width: 170,
+    height: 170,
+    borderRadius: 8,
+  },
+  qrPassCodeText: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#1E3A8A',
+    marginTop: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  qrPassHint: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  clearanceProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  clearanceName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  clearanceSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  detailsGrid: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  detailItem: {
+    width: '46%',
+  },
+  detailLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  detailValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  movementItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
 });
