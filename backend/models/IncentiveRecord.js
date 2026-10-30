@@ -77,11 +77,10 @@ const incentiveRecordSchema = new mongoose.Schema(
       type: String,
       required: true,
       index: true,
-      default: 'COL001',
     },
     collegeId: {
       type: String,
-      default: 'COL001',
+      index: true,
     },
     amount: {
       type: Number,

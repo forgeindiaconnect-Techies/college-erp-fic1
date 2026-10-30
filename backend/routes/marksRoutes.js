@@ -215,7 +215,11 @@ const processMarkPayload = (data) => {
 router.get('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff', 'Super Admin', 'Placement', 'Placement Officer', 'PlacementOfficer', 'Placement Cell'), departmentScope, collegeScope, async (req, res) => {
   try {
     const dept = req.dept || req.query.dept;
-    const query = { collegeId: req.collegeId };
+    const targetCid = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const query = {};
+    if (targetCid && targetCid !== 'system') {
+      query.$or = [{ collegeId: targetCid }, { tenantId: targetCid }];
+    }
     if (dept) query.department = dept;
 
     const marks = await Mark.find(query)
@@ -270,13 +274,7 @@ router.get('/student/:studentId', protect, collegeScope, async (req, res) => {
       ? {
           $or: [
             { collegeId: targetCollegeId },
-            { tenantId: targetCollegeId },
-            { collegeId: 'COL001' },
-            { tenantId: 'COL001' },
-            { collegeId: 'unassigned_college' },
-            { tenantId: 'unassigned_college' },
-            { collegeId: { $exists: false } },
-            { collegeId: null }
+            { tenantId: targetCollegeId }
           ]
         }
       : {};
@@ -318,8 +316,9 @@ router.post('/', protect, authorize('Admin', 'Principal', 'HOD', 'Staff'), colle
       );
       
       const bulkOps = processed.map(record => {
-        const collegeIdToSave = req.collegeId || 'unassigned_college';
+        const collegeIdToSave = req.collegeId || req.user?.collegeId || req.user?.tenantId;
         record.collegeId = collegeIdToSave;
+        record.tenantId = collegeIdToSave;
         return {
           updateOne: {
             filter: record.examId

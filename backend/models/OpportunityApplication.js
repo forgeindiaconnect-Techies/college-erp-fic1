@@ -78,12 +78,10 @@ const opportunityApplicationSchema = new mongoose.Schema(
       type: String,
       required: true,
       index: true,
-      default: 'COL001',
     },
     collegeId: {
       type: String,
       index: true,
-      default: 'COL001',
     },
     status: {
       type: String,

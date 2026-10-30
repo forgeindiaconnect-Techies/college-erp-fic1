@@ -1318,48 +1318,25 @@ const startServer = async () => {
     console.error('Failed to verify college names on startup:', err);
   }
 
-  // Migrate existing users without tenantId to COL001
+  // Legacy migration: ensure initial seed data has valid collegeId if only COL001 exists
   try {
-    const updateResult = await User.updateMany(
-      { role: { $ne: 'Super Admin' }, $or: [{ tenantId: null }, { tenantId: { $exists: false } }] },
-      { $set: { tenantId: 'COL001', collegeId: 'COL001' } }
-    );
-    if (updateResult.modifiedCount > 0) {
-      console.log(`✅ Multi-tenancy migration: updated ${updateResult.modifiedCount} users to default tenant COL001`);
+    const totalCollegesCount = await College.countDocuments({});
+    if (totalCollegesCount <= 1) {
+      await User.updateMany(
+        { role: { $ne: 'Super Admin' }, $or: [{ tenantId: null }, { tenantId: { $exists: false } }] },
+        { $set: { tenantId: 'COL001', collegeId: 'COL001' } }
+      );
+      await Student.updateMany(
+        { $or: [{ collegeId: null }, { collegeId: { $exists: false } }] },
+        { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
+      );
+      await Staff.updateMany(
+        { $or: [{ collegeId: null }, { collegeId: { $exists: false } }] },
+        { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
+      );
     }
-
-    // Also sync all academic & administrative records to default tenant COL001 so Mobile & Web see identical data
-    await Student.updateMany(
-      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }, { collegeId: 'unassigned_college' }] },
-      { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
-    );
-    await Staff.updateMany(
-      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }, { collegeId: 'unassigned_college' }] },
-      { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
-    );
-    await Fee.updateMany(
-      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }, { collegeId: 'unassigned_college' }] },
-      { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
-    );
-    await Mark.updateMany(
-      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }, { collegeId: 'unassigned_college' }] },
-      { $set: { collegeId: 'COL001', tenantId: 'COL001', resultStatus: 'Published' } }
-    );
-    await Attendance.updateMany(
-      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }, { tenantId: 'unassigned_college' }, { tenantId: null }, { tenantId: { $exists: false } }] },
-      { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
-    );
-    await Timetable.updateMany(
-      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }, { collegeId: 'unassigned_college' }] },
-      { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
-    );
-    await TransportRoute.updateMany(
-      { $or: [{ collegeId: null }, { collegeId: { $exists: false } }] },
-      { $set: { collegeId: 'COL001', tenantId: 'COL001' } }
-    );
-    console.log('✅ Synchronized all students, marks, fees, attendance, timetables, and routes to COL001 for Web and Mobile parity');
   } catch (err) {
-    console.error('Failed to run user multi-tenancy migration:', err);
+    console.error('Initial legacy migration notice:', err);
   }
 
   // Auto-seed the 15 Professional Departments if missing

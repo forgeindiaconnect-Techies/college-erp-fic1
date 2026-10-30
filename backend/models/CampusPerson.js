@@ -81,12 +81,10 @@ const campusPersonSchema = new mongoose.Schema({
   },
   collegeId: {
     type: String,
-    default: 'COL001',
     index: true
   },
   tenantId: {
     type: String,
-    default: 'COL001',
     index: true
   }
 }, { timestamps: true });

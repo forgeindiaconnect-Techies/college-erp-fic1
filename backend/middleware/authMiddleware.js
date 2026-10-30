@@ -51,22 +51,40 @@ export const protect = async (req, res, next) => {
       }
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key');
-      req.user = await User.findById(decoded.id).select('-password');
+      req.user = await User.findById(decoded.id).select('-password').setOptions({ skipTenant: true });
 
       if (!req.user) {
         return res.status(401).json({ message: 'Not authorized, user not found' });
       }
 
       // Scope tenant context immediately upon authentication
+      const store = context.getStore();
       if (req.user.role === 'Super Admin') {
-        req.collegeId = 'system';
-        const store = context.getStore();
-        if (store) store.set('collegeId', 'system');
+        const requestedTenant = req.headers['x-tenant-id'] || req.headers['X-Tenant-Id'] || req.query.collegeId;
+        if (requestedTenant && requestedTenant !== 'system' && requestedTenant !== 'all') {
+          req.collegeId = requestedTenant;
+          if (store) {
+            store.set('collegeId', requestedTenant);
+            const targetCol = await College.findOne({
+              $or: [
+                { tenantId: requestedTenant },
+                { _id: (typeof requestedTenant === 'string' && requestedTenant.length === 24) ? requestedTenant : null }
+              ]
+            }).lean().setOptions({ skipTenant: true });
+            if (targetCol) {
+              store.set('collegeIds', [targetCol.tenantId, targetCol._id.toString(), targetCol._id]);
+            } else {
+              store.set('collegeIds', [requestedTenant]);
+            }
+          }
+        } else {
+          req.collegeId = 'system';
+          if (store) store.set('collegeId', 'system');
+        }
       } else {
         const tenantId = req.user.tenantId || req.user.collegeId;
         if (tenantId && tenantId !== 'system') {
           req.collegeId = tenantId;
-          const store = context.getStore();
           if (store) store.set('collegeId', tenantId);
 
           const college = await College.findOne({
@@ -74,7 +92,14 @@ export const protect = async (req, res, next) => {
               { tenantId: tenantId },
               { _id: (typeof tenantId === 'string' && tenantId.length === 24) ? tenantId : null }
             ]
-          });
+          }).lean().setOptions({ skipTenant: true });
+
+          if (college && store) {
+            store.set('collegeIds', [college.tenantId, college._id.toString(), college._id]);
+          } else if (store) {
+            store.set('collegeIds', [tenantId]);
+          }
+
           if (college && (college.isActive === false || college.subscriptionStatus === 'Deactivated' || college.subscriptionStatus === 'Suspended' || college.subscriptionStatus === 'Pending Approval')) {
             const isPending = college.subscriptionStatus === 'Pending Approval';
             const isSuspended = college.subscriptionStatus === 'Suspended';
@@ -147,16 +172,50 @@ export const requirePermission = (moduleName) => {
   };
 };
 
-export const collegeScope = (req, res, next) => {
+export const collegeScope = async (req, res, next) => {
   if (req.user) {
+    const store = context.getStore();
     if (req.user.role === 'Super Admin') {
-      req.collegeId = 'system';
-      const store = context.getStore();
-      if (store) store.set('collegeId', 'system');
+      const requestedTenant = req.headers['x-tenant-id'] || req.headers['X-Tenant-Id'] || req.query.collegeId;
+      if (requestedTenant && requestedTenant !== 'system' && requestedTenant !== 'all') {
+        req.collegeId = requestedTenant;
+        if (store) {
+          store.set('collegeId', requestedTenant);
+          const targetCol = await College.findOne({
+            $or: [
+              { tenantId: requestedTenant },
+              { _id: (typeof requestedTenant === 'string' && requestedTenant.length === 24) ? requestedTenant : null }
+            ]
+          }).lean().setOptions({ skipTenant: true });
+          if (targetCol) {
+            store.set('collegeIds', [targetCol.tenantId, targetCol._id.toString(), targetCol._id]);
+          } else {
+            store.set('collegeIds', [requestedTenant]);
+          }
+        }
+      } else {
+        req.collegeId = 'system';
+        if (store) store.set('collegeId', 'system');
+      }
     } else {
-      req.collegeId = req.user.tenantId || req.user.collegeId || 'unassigned_college';
-      const store = context.getStore();
-      if (store) store.set('collegeId', req.collegeId);
+      const tenantId = req.user.tenantId || req.user.collegeId;
+      req.collegeId = tenantId;
+      if (store && tenantId) {
+        store.set('collegeId', tenantId);
+        if (!store.get('collegeIds')) {
+          const college = await College.findOne({
+            $or: [
+              { tenantId: tenantId },
+              { _id: (typeof tenantId === 'string' && tenantId.length === 24) ? tenantId : null }
+            ]
+          }).lean().setOptions({ skipTenant: true });
+          if (college) {
+            store.set('collegeIds', [college.tenantId, college._id.toString(), college._id]);
+          } else {
+            store.set('collegeIds', [tenantId]);
+          }
+        }
+      }
     }
   }
   next();

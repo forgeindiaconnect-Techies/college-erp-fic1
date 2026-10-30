@@ -426,15 +426,7 @@ router.get('/student/:studentId', protect, collegeScope, async (req, res) => {
         {
           $or: [
             { collegeId },
-            { tenantId: collegeId },
-            { collegeId: 'COL001' },
-            { tenantId: 'COL001' },
-            { collegeId: { $exists: false } },
-            { tenantId: { $exists: false } },
-            { collegeId: null },
-            { tenantId: null },
-            { collegeId: 'unassigned_college' },
-            { tenantId: 'unassigned_college' }
+            { tenantId: collegeId }
           ]
         }
       ];

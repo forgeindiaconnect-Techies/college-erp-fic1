@@ -105,6 +105,14 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    try {
+      const activeTenant = sessionStorage.getItem('tenantId') || localStorage.getItem('tenantId') || sessionStorage.getItem('collegeId') || localStorage.getItem('collegeId');
+      if (activeTenant && activeTenant !== 'undefined' && activeTenant !== 'null') {
+        config.headers['x-tenant-id'] = activeTenant;
+      }
+    } catch (_) {}
+
     return config;
   },
   (error) => {

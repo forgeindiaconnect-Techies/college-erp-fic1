@@ -83,7 +83,7 @@ const optionalAuth = async (req, res, next) => {
 };
 
 // Helper to get tenant/college id
-const getTenant = (req) => req.user?.collegeId || req.user?.tenantId || 'COL001';
+const getTenant = (req) => req.collegeId || req.user?.collegeId || req.user?.tenantId || null;
 
 // Helper to format duration in hours & minutes
 const formatCampusDuration = (minutes) => {
@@ -94,44 +94,19 @@ const formatCampusDuration = (minutes) => {
   return `${hrs} hr${hrs === 1 ? '' : 's'} ${mins} min${mins === 1 ? '' : 's'}`;
 };
 
-// Smart Multi-Tenant Filter Helper with Safe Fallback for Live Demonstration & ERP Consistency
+// Multi-Tenant Filter Helper with Strict College Isolation
 export const buildTenantOrAllFilter = async (req, Model, extraConditions = {}) => {
-  if (req?.user?.role === 'Super Admin') {
+  if (req?.user?.role === 'Super Admin' && (!req?.query?.collegeId || req.query.collegeId === 'all')) {
     return { ...extraConditions };
   }
   const tenantId = getTenant(req);
-
-  // If a Model is passed, verify if any records exist specifically for this tenant
-  if (Model) {
-    try {
-      const specificCount = await Model.countDocuments({
-        ...extraConditions,
-        $or: [{ collegeId: tenantId }, { tenantId }]
-      });
-      if (specificCount > 0) {
-        return {
-          ...extraConditions,
-          $or: [{ collegeId: tenantId }, { tenantId }]
-        };
-      }
-    } catch (_) { }
+  if (!tenantId) {
+    return { ...extraConditions };
   }
 
-  // Fallback: match current tenant, default 'COL001', or unassigned records
   return {
     ...extraConditions,
-    $or: [
-      { collegeId: tenantId },
-      { tenantId: tenantId },
-      { collegeId: 'COL001' },
-      { tenantId: 'COL001' },
-      { collegeId: null },
-      { tenantId: null },
-      { collegeId: '' },
-      { tenantId: '' },
-      { collegeId: { $exists: false } },
-      { tenantId: { $exists: false } }
-    ]
+    $or: [{ collegeId: tenantId }, { tenantId }]
   };
 };
 
@@ -571,8 +546,7 @@ router.get('/', protect, authorize('Admin', 'Super Admin'), async (req, res) => 
       : {
         $or: [
           { tenantId },
-          { collegeId: tenantId },
-          { tenantId: { $exists: false } }
+          { collegeId: tenantId }
         ]
       };
 
@@ -4961,9 +4935,13 @@ const handleLookupCampusPerson = async (req, res) => {
 
     // 0. Direct lookup by _id if valid 24-character ObjectId
     let person = null;
+    const tenantCondition = tenantId ? { $or: [{ collegeId: tenantId }, { tenantId }] } : {};
     if (rawQuery.length === 24 && mongoose.Types.ObjectId.isValid(rawQuery)) {
       try {
-        person = await CampusPerson.findById(new mongoose.Types.ObjectId(rawQuery)).lean();
+        person = await CampusPerson.findOne({
+          _id: new mongoose.Types.ObjectId(rawQuery),
+          ...tenantCondition
+        }).lean();
       } catch (_) {}
     }
 
@@ -4975,7 +4953,8 @@ const handleLookupCampusPerson = async (req, res) => {
           { personId: rawQuery },
           { id: exactRegex },
           { id: rawQuery }
-        ]
+        ],
+        ...tenantCondition
       };
       if (isGateScanner) {
         personFilter.personType = { $ne: 'Visitor' };
@@ -4987,6 +4966,7 @@ const handleLookupCampusPerson = async (req, res) => {
     if (!person) {
       person = await CampusPerson.findOne({
         phone: rawQuery,
+        ...tenantCondition,
         ...(isGateScanner ? { personType: { $ne: 'Visitor' } } : {})
       }).lean();
     }
@@ -5011,13 +4991,14 @@ const handleLookupCampusPerson = async (req, res) => {
           { idNumber: rawQuery },
           { phone: rawQuery },
           { mobile: rawQuery }
-        ]
+        ],
+        ...tenantCondition
       }).lean();
 
       if (student) {
         const pId = String(student.id || student.rollNumber || student.rollNo || student.registerNo || student.admissionNo || student.admissionNumber || `STU-${student._id.toString().slice(-4)}`).toUpperCase().trim();
         person = await CampusPerson.findOneAndUpdate(
-          { personId: pId },
+          { personId: pId, ...tenantCondition },
           {
             $set: {
               personId: pId,
@@ -5045,12 +5026,13 @@ const handleLookupCampusPerson = async (req, res) => {
             { studentId: rawQuery },
             { email: exactRegex }
           ],
-          role: 'Student'
+          role: 'Student',
+          ...tenantCondition
         }).lean();
         if (userStudent) {
           const pId = String(userStudent.studentId || userStudent.referenceId || `STU-${userStudent._id.toString().slice(-4)}`).toUpperCase().trim();
           person = await CampusPerson.findOneAndUpdate(
-            { personId: pId },
+            { personId: pId, ...tenantCondition },
             {
               $set: {
                 personId: pId,
@@ -5086,14 +5068,15 @@ const handleLookupCampusPerson = async (req, res) => {
           { phone: rawQuery },
           { mobile: rawQuery },
           { email: exactRegex }
-        ]
+        ],
+        ...tenantCondition
       }).lean();
 
       if (staff) {
         const isHod = /hod|head of department/i.test(staff.designation || '') || /hod/i.test(staff.role || '');
         const pId = String(staff.employeeId || staff.id || staff.staffId || `STF-${staff._id.toString().slice(-6)}`).toUpperCase().trim();
         person = await CampusPerson.findOneAndUpdate(
-          { personId: pId },
+          { personId: pId, ...tenantCondition },
           {
             $set: {
               personId: pId,
@@ -5123,13 +5106,14 @@ const handleLookupCampusPerson = async (req, res) => {
             { id: rawQuery },
             { email: exactRegex }
           ],
-          role: { $in: ['Staff', 'HOD', 'Principal', 'Faculty', 'Librarian'] }
+          role: { $in: ['Staff', 'HOD', 'Principal', 'Faculty', 'Librarian'] },
+          ...tenantCondition
         }).lean();
         if (userStaff) {
           const isHod = userStaff.role === 'HOD' || /hod|head/i.test(userStaff.department || '');
           const pId = String(userStaff.referenceId || userStaff.employeeId || userStaff.id || `STF-${userStaff._id.toString().slice(-4)}`).toUpperCase().trim();
           person = await CampusPerson.findOneAndUpdate(
-            { personId: pId },
+            { personId: pId, ...tenantCondition },
             {
               $set: {
                 personId: pId,
@@ -5161,13 +5145,14 @@ const handleLookupCampusPerson = async (req, res) => {
           { visitorId: exactRegex },
           { visitorId: rawQuery },
           { phone: rawQuery }
-        ]
+        ],
+        ...tenantCondition
       }).lean();
 
       if (visitor) {
         const pId = (visitor.passNumber || visitor.visitorId).toUpperCase();
         person = await CampusPerson.findOneAndUpdate(
-          { personId: pId },
+          { personId: pId, ...tenantCondition },
           {
             $set: {
               name: visitor.name,
@@ -5197,7 +5182,8 @@ const handleLookupCampusPerson = async (req, res) => {
         $or: [
           { name: exactRegex },
           { personId: { $regex: escapeRegex(rawQuery), $options: 'i' } }
-        ]
+        ],
+        ...tenantCondition
       }).lean();
     }
 

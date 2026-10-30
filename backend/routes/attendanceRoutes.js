@@ -8,15 +8,21 @@ const router = express.Router();
 
 const updateStudentAttendancePercentage = async (studentId, req) => {
   try {
-    const records = await Attendance.find({ 
-      tenantId: { $in: [req.collegeId, 'unassigned_college', 'mock_college_id'] },
-      studentId: studentId
-    });
+    const targetCid = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const query = { studentId };
+    if (targetCid && targetCid !== 'system') {
+      query.$or = [{ collegeId: targetCid }, { tenantId: targetCid }];
+    }
+    const records = await Attendance.find(query);
     if (records.length === 0) return;
     const presentDays = records.filter(r => r.status === 'Present').length;
     const percentage = Math.round((presentDays / records.length) * 100);
+    const stuFilter = { $or: [{ id: studentId }, { _id: studentId }] };
+    if (targetCid && targetCid !== 'system') {
+      stuFilter.$and = [{ $or: [{ collegeId: targetCid }, { tenantId: targetCid }] }];
+    }
     await Student.findOneAndUpdate(
-      { $or: [{ id: studentId }, { _id: studentId }] },
+      stuFilter,
       { attendance: percentage }
     );
   } catch (err) {
@@ -28,7 +34,11 @@ const updateStudentAttendancePercentage = async (studentId, req) => {
 router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff', 'Super Admin', 'Placement', 'Placement Officer', 'PlacementOfficer', 'Placement Cell'), requirePermission('view_attendance'), departmentScope, collegeScope, async (req, res) => {
   try {
     const dept = req.dept || req.query.dept;
-    const query = dept ? { department: dept } : {}; if (req.collegeId) query.tenantId = req.collegeId;
+    const targetCid = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const query = dept ? { department: dept } : {};
+    if (targetCid && targetCid !== 'system') {
+      query.$or = [{ collegeId: targetCid }, { tenantId: targetCid }];
+    }
     const records = await Attendance.find(query).sort({ attendanceDate: -1, date: -1 });
     res.json(records);
   } catch (err) {
@@ -69,17 +79,13 @@ router.get('/student/:studentId', protect, collegeScope, async (req, res) => {
     if (studentData && studentData.id) searchIds.push(studentData.id);
     if (studentData && studentData._id) searchIds.push(studentData._id.toString());
     
-    const records = await Attendance.find({ 
-      studentId: { $in: searchIds }, 
-      $or: [
-        { tenantId: { $in: [req.collegeId, req.user?.collegeId, req.user?.tenantId, 'COL001', 'unassigned_college', 'mock_college_id'].filter(Boolean) } },
-        { collegeId: { $in: [req.collegeId, req.user?.collegeId, req.user?.tenantId, 'COL001', 'unassigned_college', 'mock_college_id'].filter(Boolean) } },
-        { tenantId: { $exists: false } },
-        { collegeId: { $exists: false } },
-        { tenantId: null },
-        { collegeId: null }
-      ] 
-    }).sort({ attendanceDate: -1, date: -1 });
+    const targetCid = req.collegeId || req.user?.collegeId || req.user?.tenantId;
+    const query = { studentId: { $in: searchIds } };
+    if (targetCid && targetCid !== 'system') {
+      query.$or = [{ collegeId: targetCid }, { tenantId: targetCid }];
+    }
+    
+    const records = await Attendance.find(query).sort({ attendanceDate: -1, date: -1 });
     console.log(`=> Found ${records.length} records`);
     res.json(records);
   } catch (err) {
@@ -91,6 +97,7 @@ router.get('/student/:studentId', protect, collegeScope, async (req, res) => {
 // Record new attendance (Single or Bulk)
 router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Staff'), requirePermission('view_attendance'), collegeScope, async (req, res) => {
   try {
+    const targetCid = req.collegeId || req.user?.collegeId || req.user?.tenantId;
     console.log(`[POST /attendance] Received payload:`, JSON.stringify(req.body));
     if (Array.isArray(req.body)) {
       if (req.body.length === 0) return res.status(400).json({ message: 'Empty payload' });
@@ -100,7 +107,8 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'S
         const exactDate = new Date(record.attendanceDate || record.date);
         exactDate.setUTCHours(0, 0, 0, 0);
         record.attendanceDate = exactDate;
-        record.tenantId = req.collegeId || 'unassigned_college';
+        record.tenantId = targetCid;
+        record.collegeId = targetCid;
         if (!record.markedBy || record.markedBy === 'System') {
           record.markedBy = record.facultyName || record.staffName || facultyName;
         }
@@ -140,14 +148,14 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'S
         const msg = `You were marked ${record.status} for ${subject} on ${exactDate}.`;
         
         await sendNotification(req, {
-          recipient: record.studentId, // Targets the student via referenceId mapping if handled in frontend/backend logic. Wait, Notification handles referenceIds? Let's check sendNotification mapping. Assuming it relies on the referenceId/receiverId.
+          recipient: record.studentId,
           receiverId: record.studentId,
           receiverRole: 'Student',
           title: `Attendance Alert: ${record.status}`,
           message: msg,
           category: 'student',
           type: 'Warning',
-          tenantId: req.collegeId || 'unassigned_college'
+          tenantId: targetCid
         });
       }
 
@@ -158,7 +166,8 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'S
       const exactDate = new Date(req.body.attendanceDate || req.body.date);
       exactDate.setUTCHours(0, 0, 0, 0);
       req.body.attendanceDate = exactDate;
-      req.body.tenantId = req.collegeId || 'unassigned_college'; // Explicitly inject tenantId
+      req.body.tenantId = targetCid;
+      req.body.collegeId = targetCid;
 
       const existingCount = await Attendance.countDocuments({
         studentId: req.body.studentId,
@@ -189,7 +198,7 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'S
           message: msg,
           category: 'student',
           type: 'Warning',
-          tenantId: req.collegeId || 'unassigned_college'
+          tenantId: targetCid
         });
       }
 

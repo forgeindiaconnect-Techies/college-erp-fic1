@@ -30,33 +30,27 @@ const emitPlacementUpdate = (req, action, data = {}) => {
 };
 
 const tenantFilter = (req) => {
-  if (req.user?.role === 'Super Admin') return {};
+  if (req.user?.role === 'Super Admin') {
+    const requestedCid = req.headers['x-tenant-id'] || req.headers['X-Tenant-Id'] || req.query?.collegeId;
+    if (requestedCid && requestedCid !== 'all' && requestedCid !== 'system') {
+      return {
+        $or: [{ collegeId: requestedCid }, { tenantId: requestedCid }]
+      };
+    }
+    return {};
+  }
   const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
-  const knownTenants = [
-    collegeId,
-    'COL001',
-    'COL002-8379189',
-    'COL004-3190860',
-    'mock_college_id',
-    'unassigned_college'
-  ].filter(Boolean);
-
+  if (!collegeId || collegeId === 'system') return {};
   return {
     $or: [
-      { collegeId: { $in: knownTenants } },
-      { tenantId: { $in: knownTenants } },
-      { collegeId: { $exists: false } },
-      { collegeId: null },
-      { collegeId: '' },
-      { tenantId: { $exists: false } },
-      { tenantId: null },
-      { tenantId: '' }
+      { collegeId: collegeId },
+      { tenantId: collegeId }
     ]
   };
 };
 
 const getCollegeId = (req) => {
-  return req.collegeId || req.user?.tenantId || req.user?.collegeId || 'unassigned_college';
+  return req.collegeId || req.user?.tenantId || req.user?.collegeId;
 };
 
 // ==================== COMPANIES ====================
@@ -174,99 +168,7 @@ router.delete(
 
 router.get('/jobs', protect, collegeScope, async (req, res) => {
   try {
-    let jobs = await PlacementJob.find(tenantFilter(req)).sort({ createdAt: -1 });
-
-    // Also include any placement jobs in the database so posted drives are never hidden from staff or students
-    try {
-      const allJobsInDb = await PlacementJob.find({}).sort({ createdAt: -1 });
-      const jobMap = new Map();
-      jobs.forEach(j => jobMap.set(String(j._id || j.jobId), j));
-      allJobsInDb.forEach(j => {
-        const id = String(j._id || j.jobId);
-        if (!jobMap.has(id)) {
-          jobMap.set(id, j);
-          jobs.push(j);
-        }
-      });
-    } catch (e) {}
-
-    const canonicalJobs = [
-      {
-        jobId: 'JOB_FIC_2026',
-        company: 'FIC',
-        role: 'IT AND NON IT',
-        ctc: '3.5 Lpa',
-        eligibility: 'CGPA >= 9.2 & Max 0 Arrears',
-        minCgpa: 9.2,
-        maxArrears: 0,
-        eligibleDepartments: ['ALL', 'TAMIL', 'Computer Science Engineering'],
-        deadline: new Date('2026-10-13T23:59:59.000Z'),
-        totalRounds: 3,
-        rounds: [
-          { name: 'Round 1: Online Aptitude Test', type: 'Aptitude' },
-          { name: 'Round 2: Technical Interview', type: 'Technical' },
-          { name: 'Round 3: HR Discussion', type: 'HR' }
-        ],
-        applicants: 1,
-        collegeId: getCollegeId(req)
-      },
-      {
-        jobId: 'JOB_HONEYWELL_2026',
-        company: 'HoneyWell',
-        role: 'Software engineer',
-        ctc: '9.5 LPA',
-        eligibility: 'CGPA >= 6.0 & Max 0 Arrears',
-        minCgpa: 6.0,
-        maxArrears: 0,
-        eligibleDepartments: ['ALL', 'TAMIL', 'Computer Science Engineering'],
-        deadline: new Date('2026-11-25T23:59:59.000Z'),
-        totalRounds: 3,
-        rounds: [
-          { name: 'Round 1: Cognitive Assessment & Coding', type: 'Technical' },
-          { name: 'Round 2: Systems & Architecture Round', type: 'Technical' },
-          { name: 'Round 3: Leadership & Cultural Fit', type: 'HR' }
-        ],
-        applicants: 0,
-        collegeId: getCollegeId(req)
-      },
-      {
-        jobId: 'JOB_ACCENTURE_2026',
-        company: 'ACCENTURE',
-        role: 'IT',
-        ctc: '4.5 LPA',
-        eligibility: 'CGPA >= 6.0 & Max 0 Arrears',
-        minCgpa: 6.0,
-        maxArrears: 0,
-        eligibleDepartments: ['ALL', 'TAMIL', 'Computer Science Engineering'],
-        deadline: new Date('2026-11-12T23:59:59.000Z'),
-        totalRounds: 3,
-        rounds: [
-          { name: 'Round 1: Online Aptitude & Coding', type: 'Aptitude' },
-          { name: 'Round 2: Technical Core Skills', type: 'Technical' },
-          { name: 'Round 3: Learning Agility & HR', type: 'HR' }
-        ],
-        applicants: 1,
-        collegeId: getCollegeId(req)
-      }
-    ];
-
-    for (const cj of canonicalJobs) {
-      const match = jobs.find(j => 
-        (j.company && j.company.trim().toLowerCase() === cj.company.toLowerCase()) ||
-        (j.jobId && j.jobId === cj.jobId)
-      );
-      if (!match) {
-        try {
-          const created = await PlacementJob.findOneAndUpdate(
-            { company: new RegExp(`^${cj.company}$`, 'i'), role: new RegExp(`^${cj.role}$`, 'i') },
-            { $setOnInsert: cj },
-            { upsert: true, new: true }
-          );
-          if (created) jobs.push(created);
-        } catch (e) {}
-      }
-    }
-
+    const jobs = await PlacementJob.find(tenantFilter(req)).sort({ createdAt: -1 });
     res.json(jobs);
   } catch (error) {
     console.error(error);

@@ -282,7 +282,7 @@ export const optionalProtect = async (req, res, next) => {
       collegeScope(req, res, next);
     });
   }
-  req.collegeId = req.query.tenantId || req.query.collegeId || 'COL001';
+  req.collegeId = req.query.tenantId || req.query.collegeId || null;
   next();
 };
 
@@ -294,7 +294,7 @@ export const optionalProtect = async (req, res, next) => {
 const getTopPerformersHandler = async (req, res) => {
   try {
     const isSuperAdmin = req.user?.role === 'Super Admin';
-    let tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId)) || 'COL001';
+    let tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId));
     if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
       tenantId = req.query.collegeId;
     }
@@ -308,12 +308,11 @@ const getTopPerformersHandler = async (req, res) => {
           { collegeId: { $in: targetCollegeIds } }
         ];
       }
-    } else if (!isSuperAdmin) {
-      const allowedTenants = [tenantId, 'COL001', 'COL004-3190860', 'mock_college_id', null].filter(Boolean);
+    } else if (!isSuperAdmin && tenantId) {
+      const allowedTenants = [tenantId].filter(Boolean);
       query.$or = [
         { tenantId: { $in: allowedTenants } },
-        { collegeId: { $in: allowedTenants } },
-        { tenantId: { $exists: false } }
+        { collegeId: { $in: allowedTenants } }
       ];
     }
 
@@ -792,8 +791,10 @@ router.post('/', protect, collegeScope, async (req, res) => {
       }
     }
 
-    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
-    await ensureDefaultRules(tenantId);
+    const tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId));
+    if (tenantId) {
+      await ensureDefaultRules(tenantId);
+    }
 
     // ── Duplicate Checks & Consent Validation ──
     if (category === 'Insurance') {
@@ -1058,7 +1059,7 @@ router.post('/', protect, collegeScope, async (req, res) => {
 router.get('/my-referrals', protect, collegeScope, async (req, res) => {
   try {
     const { category, status, search } = req.query;
-    const tenantId = req.collegeId || req.user.tenantId;
+    const tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId));
 
     // Strict ownership condition: only records submitted by this specific authenticated user
     const userConditions = [{ submittedBy: req.user._id }];
@@ -1074,9 +1075,7 @@ router.get('/my-referrals', protect, collegeScope, async (req, res) => {
       andConditions.push({
         $or: [
           { tenantId },
-          { collegeId: tenantId },
-          { tenantId: { $exists: false } },
-          { tenantId: null }
+          { collegeId: tenantId }
         ]
       });
     }
@@ -1119,7 +1118,7 @@ router.get('/my-referrals', protect, collegeScope, async (req, res) => {
 // ── 3. GET CURRENT USER'S PRIVATE INCENTIVE & REFERRAL STATS ───────────────────
 router.get('/my-stats', protect, collegeScope, async (req, res) => {
   try {
-    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    const tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId));
     const userId = req.user._id;
 
     // Strict ownership condition for this authenticated user
@@ -1128,19 +1127,20 @@ router.get('/my-stats', protect, collegeScope, async (req, res) => {
       userConditions.push({ submitterEmail: req.user.email.trim().toLowerCase() });
     }
 
-    const refQuery = {
-      $and: [
-        userConditions.length > 1 ? { $or: userConditions } : userConditions[0],
-        {
-          $or: [
-            { tenantId },
-            { collegeId: tenantId },
-            { tenantId: { $exists: false } },
-            { tenantId: null }
-          ]
-        }
-      ]
-    };
+    const refQueryConditions = [
+      userConditions.length > 1 ? { $or: userConditions } : userConditions[0]
+    ];
+
+    if (tenantId) {
+      refQueryConditions.push({
+        $or: [
+          { tenantId },
+          { collegeId: tenantId }
+        ]
+      });
+    }
+
+    const refQuery = refQueryConditions.length > 1 ? { $and: refQueryConditions } : refQueryConditions[0];
 
     const allMyReferrals = await Referral.find(refQuery);
 
@@ -1217,7 +1217,7 @@ router.get('/', protect, collegeScope, async (req, res) => {
   try {
     const isSuperAdmin = req.user.role === 'Super Admin';
     const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal'].includes(req.user.role);
-    let tenantId = req.collegeId || req.user.tenantId;
+    let tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId));
 
     if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
       tenantId = req.query.collegeId;
@@ -1250,8 +1250,7 @@ router.get('/', protect, collegeScope, async (req, res) => {
       const allowedTenants = [tenantId].filter(Boolean);
       query.$or = [
         { tenantId: { $in: allowedTenants } },
-        { collegeId: { $in: allowedTenants } },
-        { tenantId: { $exists: false } }
+        { collegeId: { $in: allowedTenants } }
       ];
     }
 
@@ -1393,13 +1392,20 @@ router.get('/referrer/:userId', protect, collegeScope, authorize('Admin', 'Super
       return res.status(404).json({ success: false, message: 'Referrer not found' });
     }
 
-    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    const tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId));
     const isSuperAdmin = req.user.role === 'Super Admin';
     const refQuery = { submittedBy: user._id };
-    if (!isSuperAdmin) refQuery.tenantId = tenantId;
+    if (!isSuperAdmin && tenantId) {
+      refQuery.$or = [{ tenantId }, { collegeId: tenantId }];
+    }
+
+    const incQuery = { earnedBy: user._id };
+    if (!isSuperAdmin && tenantId) {
+      incQuery.$or = [{ tenantId }, { collegeId: tenantId }];
+    }
 
     const referrals = await Referral.find(refQuery).sort({ createdAt: -1 }).populate('incentiveRecord');
-    const incentives = await IncentiveRecord.find({ earnedBy: user._id, ...(isSuperAdmin ? {} : { tenantId }) }).sort({ createdAt: -1 });
+    const incentives = await IncentiveRecord.find(incQuery).sort({ createdAt: -1 });
 
     const totalReferrals = referrals.length;
     const eligibleCount = referrals.filter(r => r.incentiveEligible).length;
@@ -1739,10 +1745,20 @@ router.patch('/:id/status', protect, collegeScope, authorize('Admin', 'Super Adm
 // ── 7. INCENTIVE RULES CRUD ───────────────────────────────────────────────────
 router.get('/rules', optionalProtect, async (req, res) => {
   try {
-    const tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId)) || req.query.tenantId || 'COL001';
+    const isSuperAdmin = req.user && req.user.role === 'Super Admin';
+    const tenantId = (isSuperAdmin && req.query.tenantId)
+      ? req.query.tenantId
+      : (req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId)) || (isSuperAdmin ? req.query.tenantId : null));
+    
+    if (!tenantId) {
+      return res.status(400).json({ success: false, message: 'College/Tenant context is required' });
+    }
     await ensureDefaultRules(tenantId);
 
-    const filter = { tenantId, isActive: true };
+    const filter = {
+      $or: [{ tenantId }, { collegeId: tenantId }],
+      isActive: true
+    };
     if (req.query.category) {
       filter.category = new RegExp(`^${req.query.category.trim()}$`, 'i');
     }
@@ -1759,7 +1775,14 @@ router.get('/rules', optionalProtect, async (req, res) => {
 
 router.get('/rules/category/:category', optionalProtect, async (req, res) => {
   try {
-    const tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId)) || req.query.tenantId || 'COL001';
+    const isSuperAdmin = req.user && req.user.role === 'Super Admin';
+    const tenantId = (isSuperAdmin && req.query.tenantId)
+      ? req.query.tenantId
+      : (req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId)) || (isSuperAdmin ? req.query.tenantId : null));
+    
+    if (!tenantId) {
+      return res.status(400).json({ success: false, message: 'College/Tenant context is required' });
+    }
     await ensureDefaultRules(tenantId);
 
     const rawCategory = req.params.category.replace(/-/g, ' ').trim();
@@ -1918,7 +1941,7 @@ router.get('/incentives', protect, collegeScope, async (req, res) => {
   try {
     const isSuperAdmin = req.user.role === 'Super Admin';
     const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts'].includes(req.user.role);
-    let tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    let tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId));
 
     const andConditions = [];
 
@@ -1933,14 +1956,14 @@ router.get('/incentives', protect, collegeScope, async (req, res) => {
         });
       }
     } else if (!isSuperAdmin) {
-      andConditions.push({
-        $or: [
-          { tenantId },
-          { collegeId: tenantId },
-          { tenantId: { $exists: false } },
-          { tenantId: null }
-        ]
-      });
+      if (tenantId) {
+        andConditions.push({
+          $or: [
+            { tenantId },
+            { collegeId: tenantId }
+          ]
+        });
+      }
     }
 
     if (!isPrivileged) {
@@ -2410,7 +2433,7 @@ router.post('/incentives/:id/reverse', protect, collegeScope, authorize('Admin',
 router.get('/admin-overview', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal'), async (req, res) => {
   try {
     const isSuperAdmin = req.user.role === 'Super Admin';
-    let tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    let tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId));
 
     if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
       tenantId = req.query.collegeId;
@@ -2426,11 +2449,10 @@ router.get('/admin-overview', protect, collegeScope, authorize('Admin', 'Super A
         ];
       }
     } else if (!isSuperAdmin) {
-      const allowedTenants = [tenantId, 'COL001', 'mock_college_id', null].filter(Boolean);
+      const allowedTenants = [tenantId].filter(Boolean);
       query.$or = [
         { tenantId: { $in: allowedTenants } },
-        { collegeId: { $in: allowedTenants } },
-        { tenantId: { $exists: false } }
+        { collegeId: { $in: allowedTenants } }
       ];
     }
 
@@ -2676,7 +2698,7 @@ router.get('/superadmin-overview', protect, authorize('Super Admin'), async (req
 router.get('/reports/referrer-wise', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal', 'CollegeAdmin'), async (req, res) => {
   try {
     const isSuperAdmin = req.user.role === 'Super Admin';
-    let tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    let tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId));
     if (isSuperAdmin && req.query.collegeId && req.query.collegeId !== 'all') {
       tenantId = req.query.collegeId;
     }
@@ -3034,8 +3056,13 @@ router.post('/incentive-payment', protect, collegeScope, authorize('Admin'), asy
       return res.status(400).json({ success: false, message: 'Transaction Reference (UTR / Receipt No) is required.' });
     }
 
-    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
-    const referral = await Referral.findOne({ _id: referralId, tenantId }).populate('submittedBy');
+    const tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId));
+    const isSuperAdmin = req.user.role === 'Super Admin';
+    const query = { _id: referralId };
+    if (!isSuperAdmin && tenantId) {
+      query.$or = [{ tenantId }, { collegeId: tenantId }];
+    }
+    const referral = await Referral.findOne(query).populate('submittedBy');
 
     if (!referral) {
       return res.status(404).json({ success: false, message: 'Candidate referral record not found.' });
@@ -3217,7 +3244,8 @@ router.post('/incentive-payment', protect, collegeScope, authorize('Admin'), asy
 // ── 12D. EXPORT REFERRER-WISE REPORT (CSV FORMAT) ──────────────────────────────
 router.get('/reports/referrer-wise/export', protect, collegeScope, authorize('Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal', 'CollegeAdmin'), async (req, res) => {
   try {
-    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    const tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId));
+    const isSuperAdmin = req.user.role === 'Super Admin';
     const {
       search,
       startDate,
@@ -3230,7 +3258,10 @@ router.get('/reports/referrer-wise/export', protect, collegeScope, authorize('Ad
       exportType, // 'summary' or 'detailed'
     } = req.query;
 
-    const baseQuery = { tenantId };
+    const baseQuery = {};
+    if (!isSuperAdmin && tenantId) {
+      baseQuery.$or = [{ tenantId }, { collegeId: tenantId }];
+    }
     if (department && department !== 'All') baseQuery.submitterDepartment = department;
     if (referrer && referrer !== 'All') {
       if (mongoose.Types.ObjectId.isValid(referrer)) {
@@ -3474,12 +3505,16 @@ router.get('/reports/referrer-wise/export', protect, collegeScope, authorize('Ad
 // ── 13. EXPORT AUDIT REPORT (CSV FORMAT) ───────────────────────────────────────
 router.get('/export/csv', protect, collegeScope, async (req, res) => {
   try {
+    const isSuperAdmin = req.user.role === 'Super Admin';
     const isPrivileged = ['Admin', 'Super Admin', 'Sub Admin', 'Accounts', 'Principal'].includes(req.user.role);
-    const tenantId = req.collegeId || req.user.tenantId || 'COL001';
+    const tenantId = req.collegeId || (req.user && (req.user.tenantId || req.user.collegeId));
     const { type, category, status, startDate, endDate, referrerId } = req.query;
 
     if (type === 'incentives') {
-      const incQuery = { tenantId };
+      const incQuery = {};
+      if (!isSuperAdmin && tenantId) {
+        incQuery.$or = [{ tenantId }, { collegeId: tenantId }];
+      }
       if (!isPrivileged) {
         incQuery.earnedBy = req.user._id;
       } else if (referrerId) {
@@ -3537,7 +3572,10 @@ router.get('/export/csv', protect, collegeScope, async (req, res) => {
       return res.status(200).send(csvContent);
     }
 
-    const query = { tenantId };
+    const query = {};
+    if (!isSuperAdmin && tenantId) {
+      query.$or = [{ tenantId }, { collegeId: tenantId }];
+    }
     if (!isPrivileged) {
       query.submittedBy = req.user._id;
     } else if (referrerId) {

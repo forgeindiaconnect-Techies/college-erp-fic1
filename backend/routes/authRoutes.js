@@ -61,7 +61,7 @@ router.post('/login', async (req, res) => {
         { referenceId: { $regex: new RegExp(`^${searchIdentifier}$`, 'i') } },
         { studentId: { $regex: new RegExp(`^${searchIdentifier}$`, 'i') } }
       ]
-    });
+    }).setOptions({ skipTenant: true });
     if (!user) {
       // Auto-provision if demo Librarian credentials
       if (email.trim().toLowerCase() === 'meena@gmail.com') {
@@ -205,7 +205,7 @@ router.post('/login', async (req, res) => {
 router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
   try {
-    const user = await User.findOne({ email: email?.trim().toLowerCase() });
+    const user = await User.findOne({ email: email?.trim().toLowerCase() }).setOptions({ skipTenant: true });
     if (!user) {
       return res.status(404).json({ message: 'No account registered with this email address' });
     }
@@ -269,13 +269,13 @@ router.post('/register-college', async (req, res) => {
       return res.status(400).json({ message: `The email '${normalizedEmail}' is already used by another college. Please provide a unique admin email.` });
     }
 
-    const existingUser = await User.findOne({ email: normalizedEmail });
+    const existingUser = await User.findOne({ email: normalizedEmail }).setOptions({ skipTenant: true });
     if (existingUser) {
       return res.status(400).json({ message: `The email '${normalizedEmail}' is already registered to an active account. Please use a different email or log in.` });
     }
     
     if (normalizedPrincipalEmail) {
-      const existingPrincipalUser = await User.findOne({ email: normalizedPrincipalEmail });
+      const existingPrincipalUser = await User.findOne({ email: normalizedPrincipalEmail }).setOptions({ skipTenant: true });
       if (existingPrincipalUser) {
         return res.status(400).json({ message: `The principal email '${normalizedPrincipalEmail}' is already registered to another account.` });
       }

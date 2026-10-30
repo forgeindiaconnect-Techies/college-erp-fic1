@@ -56,13 +56,22 @@ router.get('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'St
 // Purge all student records
 router.all('/purge-all', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'Accounts'), collegeScope, async (req, res) => {
   try {
-    const students = await Student.find({});
+    const targetCollegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId;
+    const purgeFilter = (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system')
+      ? { $or: [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }] }
+      : {};
+
+    const students = await Student.find(purgeFilter);
     const emails = students.map(s => s.email).filter(Boolean);
     const ids = students.map(s => s.id).filter(Boolean);
 
-    await Student.deleteMany({});
+    await Student.deleteMany(purgeFilter);
     if (emails.length > 0) {
-      await User.deleteMany({ email: { $in: emails }, role: 'Student' });
+      const userPurgeFilter = { email: { $in: emails }, role: 'Student' };
+      if (req.user?.role !== 'Super Admin' && targetCollegeId && targetCollegeId !== 'system') {
+        userPurgeFilter.$or = [{ collegeId: targetCollegeId }, { tenantId: targetCollegeId }];
+      }
+      await User.deleteMany(userPurgeFilter);
     }
     if (ids.length > 0) {
       try {
@@ -103,15 +112,7 @@ router.get('/:id', protect, collegeScope, async (req, res) => {
           {
             $or: [
               { collegeId: targetCollegeId },
-              { tenantId: targetCollegeId },
-              { collegeId: 'COL001' },
-              { tenantId: 'COL001' },
-              { collegeId: { $exists: false } },
-              { tenantId: { $exists: false } },
-              { collegeId: null },
-              { tenantId: null },
-              { collegeId: 'unassigned_college' },
-              { tenantId: 'unassigned_college' }
+              { tenantId: targetCollegeId }
             ]
           }
         ]

@@ -31,8 +31,9 @@ export default function PersonalReferrals() {
   const businessCatalogPath = `/${rootRole}/business-referral`;
 
   const [searchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') || 'my-referrals';
-  const [mainView, setMainView] = useState(initialTab === 'direct-lead' ? 'my-referrals' : initialTab); // 'my-referrals' | 'opportunities' | 'my-applications'
+  const rawTab = searchParams.get('tab');
+  const initialTab = rawTab === 'leaderboard' ? 'leaderboard' : 'my-referrals';
+  const [mainView, setMainView] = useState(initialTab); // 'my-referrals' | 'leaderboard'
   const [oppCategory, setOppCategory] = useState('Insurance'); // 'Insurance' | 'Credit Card' | 'Bank Account' | 'Job Referral'
   const [publishedOpps, setPublishedOpps] = useState([]);
   const [myApplications, setMyApplications] = useState([]);
@@ -528,49 +529,7 @@ export default function PersonalReferrals() {
             <span>My Referrals ({referrals.length})</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setMainView('opportunities')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
-              border: mainView === 'opportunities' ? '1px solid #2563eb' : '1px solid transparent',
-              background: mainView === 'opportunities' ? '#eff6ff' : 'transparent',
-              fontWeight: 800,
-              fontSize: '0.85rem',
-              color: mainView === 'opportunities' ? '#1d4ed8' : '#64748b',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Award size={16} />
-            <span>Browse Published Opportunities ({publishedOpps.length})</span>
-          </button>
 
-          <button
-            type="button"
-            onClick={() => setMainView('my-applications')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
-              border: mainView === 'my-applications' ? '1px solid #2563eb' : '1px solid transparent',
-              background: mainView === 'my-applications' ? '#eff6ff' : 'transparent',
-              fontWeight: 800,
-              fontSize: '0.85rem',
-              color: mainView === 'my-applications' ? '#1d4ed8' : '#64748b',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <CheckCircle2 size={16} />
-            <span>My Applications Tracking ({myApplications.length})</span>
-          </button>
 
           <button
             type="button"
