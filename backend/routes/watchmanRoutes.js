@@ -4752,8 +4752,18 @@ const syncCampusPeopleFromDirectory = async (tenantId) => {
     // 1. Sync Students from Student collection
     const students = await Student.find({}).limit(150).lean();
     for (const s of students) {
-      if (!s.id && !s.rollNumber) continue;
-      const pid = (s.id || s.rollNumber).toUpperCase().trim();
+      const pid = String(
+        s.id ||
+        s.rollNumber ||
+        s.rollNo ||
+        s.registerNo ||
+        s.admissionNumber ||
+        s.admissionNo ||
+        s.idNumber ||
+        ''
+      ).toUpperCase().trim();
+      if (!pid) continue;
+
       const activeEntry = await StudentCampusEntry.findOne({
         studentId: pid,
         status: 'Inside Campus'
@@ -4767,7 +4777,7 @@ const syncCampusPeopleFromDirectory = async (tenantId) => {
             personType: 'Student',
             phone: s.phone || s.mobile || '',
             email: s.email || '',
-            department: s.dept || s.department || 'Computer Science',
+            department: s.dept || s.department || 'General',
             designation: s.semester ? `Semester ${s.semester}` : 'Student',
             currentStatus: activeEntry ? 'Inside Campus' : 'Outside Campus',
             lastEntryTime: activeEntry ? activeEntry.checkInTime : null,
@@ -4784,7 +4794,12 @@ const syncCampusPeopleFromDirectory = async (tenantId) => {
     // 2. Sync Staff & HOD from Staff collection
     const staffDocs = await Staff.find({}).limit(50).lean();
     for (const st of staffDocs) {
-      const pid = (st.employeeId || `STF-${st._id.toString().slice(-6)}`).toUpperCase().trim();
+      const pid = String(
+        st.employeeId ||
+        st.id ||
+        st.staffId ||
+        `STF-${st._id.toString().slice(-6)}`
+      ).toUpperCase().trim();
       const isHod = /hod|head of department/i.test(st.designation || '') || /hod/i.test(st.role || '');
       await CampusPerson.updateOne(
         { personId: pid },
@@ -4795,7 +4810,7 @@ const syncCampusPeopleFromDirectory = async (tenantId) => {
             personType: isHod ? 'HOD' : 'Staff',
             phone: st.phone || st.mobile || '',
             email: st.email || '',
-            department: st.department || 'General',
+            department: st.department || st.dept || 'General',
             designation: st.designation || (isHod ? 'Head of Department' : 'Faculty'),
             currentStatus: 'Outside Campus',
             collegeId: tenantId || 'COL001',
@@ -4811,7 +4826,12 @@ const syncCampusPeopleFromDirectory = async (tenantId) => {
       role: { $in: ['Staff', 'HOD', 'Principal', 'Librarian', 'Faculty'] }
     }).limit(50).lean();
     for (const st of staffMembers) {
-      const pid = (st.referenceId || st.employeeId || `STF-${st._id.toString().slice(-4)}`).toUpperCase().trim();
+      const pid = String(
+        st.referenceId ||
+        st.employeeId ||
+        st.id ||
+        `STF-${st._id.toString().slice(-4)}`
+      ).toUpperCase().trim();
       const isHod = st.role === 'HOD' || /hod|head/i.test(st.department || '');
       await CampusPerson.updateOne(
         { personId: pid },
@@ -4952,7 +4972,9 @@ const handleLookupCampusPerson = async (req, res) => {
       let personFilter = {
         $or: [
           { personId: exactRegex },
-          { personId: rawQuery }
+          { personId: rawQuery },
+          { id: exactRegex },
+          { id: rawQuery }
         ]
       };
       if (isGateScanner) {
@@ -4974,30 +4996,42 @@ const handleLookupCampusPerson = async (req, res) => {
       const student = await Student.findOne({
         $or: [
           { id: exactRegex },
-          { rollNumber: exactRegex },
           { id: rawQuery },
+          { rollNumber: exactRegex },
           { rollNumber: rawQuery },
+          { rollNo: exactRegex },
+          { rollNo: rawQuery },
+          { registerNo: exactRegex },
+          { registerNo: rawQuery },
+          { admissionNumber: exactRegex },
+          { admissionNumber: rawQuery },
+          { admissionNo: exactRegex },
+          { admissionNo: rawQuery },
+          { idNumber: exactRegex },
+          { idNumber: rawQuery },
           { phone: rawQuery },
           { mobile: rawQuery }
         ]
       }).lean();
 
       if (student) {
-        const pId = (student.id || student.rollNumber).toUpperCase();
+        const pId = String(student.id || student.rollNumber || student.rollNo || student.registerNo || student.admissionNo || student.admissionNumber || `STU-${student._id.toString().slice(-4)}`).toUpperCase().trim();
         person = await CampusPerson.findOneAndUpdate(
           { personId: pId },
           {
-            $setOnInsert: {
+            $set: {
               personId: pId,
               name: student.name,
               personType: 'Student',
               phone: student.phone || student.mobile || '',
               email: student.email || '',
-              department: student.dept || student.department || 'Computer Science',
+              department: student.dept || student.department || 'General',
               designation: student.semester ? `Semester ${student.semester}` : 'Student',
-              currentStatus: 'Outside Campus',
               collegeId: tenantId,
               tenantId
+            },
+            $setOnInsert: {
+              currentStatus: 'Outside Campus'
             }
           },
           { upsert: true, new: true }
@@ -5014,21 +5048,23 @@ const handleLookupCampusPerson = async (req, res) => {
           role: 'Student'
         }).lean();
         if (userStudent) {
-          const pId = (userStudent.studentId || userStudent.referenceId || `STU-${userStudent._id.toString().slice(-4)}`).toUpperCase();
+          const pId = String(userStudent.studentId || userStudent.referenceId || `STU-${userStudent._id.toString().slice(-4)}`).toUpperCase().trim();
           person = await CampusPerson.findOneAndUpdate(
             { personId: pId },
             {
-              $setOnInsert: {
+              $set: {
                 personId: pId,
                 name: userStudent.name,
                 personType: 'Student',
                 phone: userStudent.phone || '',
                 email: userStudent.email || '',
-                department: userStudent.department || 'Computer Science',
+                department: userStudent.department || 'General',
                 designation: 'Student',
-                currentStatus: 'Outside Campus',
                 collegeId: tenantId,
                 tenantId
+              },
+              $setOnInsert: {
+                currentStatus: 'Outside Campus'
               }
             },
             { upsert: true, new: true }
@@ -5043,6 +5079,10 @@ const handleLookupCampusPerson = async (req, res) => {
         $or: [
           { employeeId: exactRegex },
           { employeeId: rawQuery },
+          { id: exactRegex },
+          { id: rawQuery },
+          { staffId: exactRegex },
+          { staffId: rawQuery },
           { phone: rawQuery },
           { mobile: rawQuery },
           { email: exactRegex }
@@ -5051,21 +5091,23 @@ const handleLookupCampusPerson = async (req, res) => {
 
       if (staff) {
         const isHod = /hod|head of department/i.test(staff.designation || '') || /hod/i.test(staff.role || '');
-        const pId = (staff.employeeId || `STF-${staff._id.toString().slice(-6)}`).toUpperCase();
+        const pId = String(staff.employeeId || staff.id || staff.staffId || `STF-${staff._id.toString().slice(-6)}`).toUpperCase().trim();
         person = await CampusPerson.findOneAndUpdate(
           { personId: pId },
           {
-            $setOnInsert: {
+            $set: {
               personId: pId,
               name: staff.name,
               personType: isHod ? 'HOD' : 'Staff',
               phone: staff.phone || staff.mobile || '',
               email: staff.email || '',
-              department: staff.department || 'General',
+              department: staff.department || staff.dept || 'General',
               designation: staff.designation || (isHod ? 'Head of Department' : 'Faculty'),
-              currentStatus: 'Outside Campus',
               collegeId: tenantId,
               tenantId
+            },
+            $setOnInsert: {
+              currentStatus: 'Outside Campus'
             }
           },
           { upsert: true, new: true }
@@ -5077,17 +5119,19 @@ const handleLookupCampusPerson = async (req, res) => {
             { referenceId: rawQuery },
             { employeeId: exactRegex },
             { employeeId: rawQuery },
+            { id: exactRegex },
+            { id: rawQuery },
             { email: exactRegex }
           ],
           role: { $in: ['Staff', 'HOD', 'Principal', 'Faculty', 'Librarian'] }
         }).lean();
         if (userStaff) {
           const isHod = userStaff.role === 'HOD' || /hod|head/i.test(userStaff.department || '');
-          const pId = (userStaff.referenceId || userStaff.employeeId || `STF-${userStaff._id.toString().slice(-4)}`).toUpperCase();
+          const pId = String(userStaff.referenceId || userStaff.employeeId || userStaff.id || `STF-${userStaff._id.toString().slice(-4)}`).toUpperCase().trim();
           person = await CampusPerson.findOneAndUpdate(
             { personId: pId },
             {
-              $setOnInsert: {
+              $set: {
                 personId: pId,
                 name: userStaff.name,
                 personType: isHod ? 'HOD' : 'Staff',
@@ -5095,9 +5139,11 @@ const handleLookupCampusPerson = async (req, res) => {
                 email: userStaff.email || '',
                 department: userStaff.department || 'General',
                 designation: userStaff.role,
-                currentStatus: 'Outside Campus',
                 collegeId: tenantId,
                 tenantId
+              },
+              $setOnInsert: {
+                currentStatus: 'Outside Campus'
               }
             },
             { upsert: true, new: true }

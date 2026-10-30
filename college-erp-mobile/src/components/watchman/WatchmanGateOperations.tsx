@@ -90,38 +90,40 @@ export default function WatchmanGateOperations({
         if (key) map.set(key, p);
       });
 
-      if (staffDirRes.status === 'fulfilled' && Array.isArray(staffDirRes.value)) {
-        staffDirRes.value.forEach((s: any) => {
-          const key = (s.staffId || s.id || s.employeeId || '').toUpperCase();
-          if (key && !map.has(key)) {
-            const isHod = /hod|head/i.test(s.designation || '') || /hod/i.test(s.role || '');
-            map.set(key, {
-              ...s,
-              personId: key,
-              name: s.name || s.staffName,
-              personType: isHod ? 'HOD' : 'Staff',
-              department: s.department || s.dept || 'General',
-              currentStatus: s.currentStatus || 'Outside Campus',
-            });
-          }
-        });
-      }
+      const staffList = staffDirRes.status === 'fulfilled'
+        ? (Array.isArray(staffDirRes.value?.data) ? staffDirRes.value.data : Array.isArray(staffDirRes.value) ? staffDirRes.value : [])
+        : [];
+      staffList.forEach((s: any) => {
+        const key = (s.staffId || s.id || s.employeeId || '').toUpperCase();
+        if (key && !map.has(key)) {
+          const isHod = /hod|head/i.test(s.designation || '') || /hod/i.test(s.role || '');
+          map.set(key, {
+            ...s,
+            personId: key,
+            name: s.name || s.staffName,
+            personType: isHod ? 'HOD' : 'Staff',
+            department: s.department || s.dept || 'General',
+            currentStatus: s.currentStatus || 'Outside Campus',
+          });
+        }
+      });
 
-      if (stuScansRes.status === 'fulfilled' && Array.isArray(stuScansRes.value)) {
-        stuScansRes.value.forEach((st: any) => {
-          const key = (st.studentId || st.rollNo || st.id || '').toUpperCase();
-          if (key && !map.has(key)) {
-            map.set(key, {
-              ...st,
-              personId: key,
-              name: st.studentName || st.name,
-              personType: 'Student',
-              department: st.department || 'General',
-              currentStatus: st.currentStatus || 'Outside Campus',
-            });
-          }
-        });
-      }
+      const scanList = stuScansRes.status === 'fulfilled'
+        ? (Array.isArray(stuScansRes.value?.data) ? stuScansRes.value.data : Array.isArray(stuScansRes.value) ? stuScansRes.value : [])
+        : [];
+      scanList.forEach((st: any) => {
+        const key = (st.studentId || st.rollNo || st.id || '').toUpperCase();
+        if (key && !map.has(key)) {
+          map.set(key, {
+            ...st,
+            personId: key,
+            name: st.studentName || st.name,
+            personType: 'Student',
+            department: st.department || 'General',
+            currentStatus: st.currentStatus || 'Outside Campus',
+          });
+        }
+      });
 
       setMembersList(Array.from(map.values()));
     } catch (err) {
@@ -226,21 +228,64 @@ export default function WatchmanGateOperations({
   // ----------------------------------------------------------------------
   const handleSelectMember = async (person: any) => {
     if (!person) return;
-    const pId = person.personId || person.id || person.rollNo || person.staffId;
-    setSelectedMember(person);
+    const pId = String(
+      person.personId ||
+      person.id ||
+      person.rollNo ||
+      person.rollNumber ||
+      person.registerNo ||
+      person.staffId ||
+      person.employeeId ||
+      person._id ||
+      ''
+    ).trim();
+
+    if (!pId) return;
+
+    // Immediately bind the selected person to show their own pass without delay or fallback
+    const resolvedPerson = {
+      ...person,
+      personId: person.personId || person.rollNo || person.staffId || person.employeeId || person.id || pId,
+      name: person.name,
+      department: person.department || person.dept || 'General',
+      personType: person.personType || 'Student',
+      currentStatus: person.currentStatus || person.status || 'Outside Campus',
+    };
+    setSelectedMember(resolvedPerson);
     setMovementRemarks('');
     setMemberMovements([]);
 
     try {
       setLoadingMovements(true);
-      // Fetch movements for this person
+      // Fetch movements & clearance records strictly for this person
       const res = await apiGet<any>(`watchman/campus-people/lookup/${encodeURIComponent(pId)}?module=gate_operations`);
       if (res?.success && res?.person) {
-        setSelectedMember(res.person);
-        setMemberMovements(res.movements || []);
+        // Enforce identity verification: DO NOT overwrite with another person's record
+        const returnedId = String(
+          res.person.personId ||
+          res.person.id ||
+          res.person.rollNo ||
+          res.person.staffId ||
+          res.person.employeeId ||
+          ''
+        ).toUpperCase().trim();
+        const targetId = pId.toUpperCase().trim();
+        const namesMatch = res.person.name && person.name && res.person.name.trim().toLowerCase() === person.name.trim().toLowerCase();
+
+        if (returnedId === targetId || namesMatch) {
+          setSelectedMember({
+            ...resolvedPerson,
+            ...res.person,
+            personId: res.person.personId || pId,
+            name: res.person.name || person.name,
+          });
+          setMemberMovements(Array.isArray(res.movements) ? res.movements : []);
+        } else {
+          console.warn(`[WatchmanGateOperations] Lookup returned mismatched person ${returnedId} (${res.person.name}) instead of targeted ${targetId} (${person.name}). Retaining selected member.`);
+        }
       }
     } catch (e) {
-      // Keep selectedMember from local state if network fetch fails
+      // Retain selectedMember from local tapped state if network lookup fails
     } finally {
       setLoadingMovements(false);
     }
@@ -374,14 +419,20 @@ export default function WatchmanGateOperations({
             {m.phone ? ` • 📞 ${m.phone}` : ''}
           </Text>
 
-          {/* Status Badge */}
-          <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {/* Status Badge & Tap to view pass */}
+          <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={[styles.statusPill, isInside ? styles.statusPillInside : styles.statusPillOutside]}>
               <Text style={[styles.statusPillText, isInside ? styles.statusPillTextInside : styles.statusPillTextOutside]}>
                 {isInside ? '● INSIDE' : '○ OUTSIDE'}
               </Text>
             </View>
-            <Text style={{ fontSize: 11, color: '#3B82F6', fontWeight: '700' }}>Tap to view pass ➔</Text>
+            <TouchableOpacity
+              onPress={() => handleSelectMember(m)}
+              activeOpacity={0.7}
+              style={{ paddingVertical: 2, paddingHorizontal: 4 }}
+            >
+              <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '800' }}>Tap to view pass ➔</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -664,12 +715,25 @@ export default function WatchmanGateOperations({
           <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modalHeaderTitle}>Security Clearance & Pass</Text>
-                <Text style={{ fontSize: 12, color: '#64748B' }}>
-                  {selectedMember.personType} • {selectedMember.personId}
-                </Text>
-              </View>
+              {(() => {
+                const personCode = String(
+                  selectedMember.personId ||
+                  selectedMember.rollNo ||
+                  selectedMember.rollNumber ||
+                  selectedMember.staffId ||
+                  selectedMember.employeeId ||
+                  selectedMember.id ||
+                  ''
+                ).trim();
+                return (
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modalHeaderTitle}>Security Clearance & Pass</Text>
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>
+                      {selectedMember.personType} • {personCode}
+                    </Text>
+                  </View>
+                );
+              })()}
               <TouchableOpacity onPress={() => setSelectedMember(null)} style={styles.closeBtn}>
                 <Text style={styles.closeBtnText}>✕ Close</Text>
               </TouchableOpacity>
@@ -711,12 +775,19 @@ export default function WatchmanGateOperations({
               {/* Digital QR Pass Code Image */}
               <View style={styles.qrPassContainer}>
                 {(() => {
-                  const personCode = selectedMember.personId || selectedMember.id;
+                  const personCode = String(
+                    selectedMember.personId ||
+                    selectedMember.rollNo ||
+                    selectedMember.rollNumber ||
+                    selectedMember.staffId ||
+                    selectedMember.employeeId ||
+                    selectedMember.id ||
+                    selectedMember._id ||
+                    ''
+                  ).trim();
+                  const pType = (selectedMember.personType || 'student').toLowerCase();
                   const webBase = getCurrentBaseUrl().replace('/api', '').replace(':5000', ':5173');
-                  const rawVerify = selectedMember.verifyUrl || '';
-                  const verifyPassUrl = (rawVerify && !rawVerify.includes('localhost') && !rawVerify.includes('127.0.0.1'))
-                    ? rawVerify
-                    : `${webBase}/verify-gate-pass?code=${encodeURIComponent(personCode)}`;
+                  const verifyPassUrl = `${webBase}/verify-gate-pass?code=${encodeURIComponent(personCode)}&type=${encodeURIComponent(pType)}`;
                   const qrUri = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(verifyPassUrl)}`;
 
                   return (
@@ -726,7 +797,7 @@ export default function WatchmanGateOperations({
                         style={styles.qrPassImage}
                         resizeMode="contain"
                       />
-                      <Text style={styles.qrPassCodeText}>{selectedMember.personId}</Text>
+                      <Text style={styles.qrPassCodeText}>{personCode}</Text>
                       <Text style={styles.qrPassHint}>Official Digital Security Pass</Text>
 
                       <TouchableOpacity
@@ -783,9 +854,32 @@ export default function WatchmanGateOperations({
 
               {/* Details Info Grid */}
               <View style={styles.detailsGrid}>
+                {(() => {
+                  const personCode = String(
+                    selectedMember.personId ||
+                    selectedMember.rollNo ||
+                    selectedMember.rollNumber ||
+                    selectedMember.staffId ||
+                    selectedMember.employeeId ||
+                    selectedMember.id ||
+                    ''
+                  ).trim();
+                  return (
+                    <>
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>ID / ROLL NUMBER</Text>
+                        <Text style={styles.detailValue}>{personCode || '—'}</Text>
+                      </View>
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>DEPARTMENT</Text>
+                        <Text style={styles.detailValue}>{selectedMember.department || 'General'}</Text>
+                      </View>
+                    </>
+                  );
+                })()}
                 <View style={styles.detailItem}>
                   <Text style={styles.detailLabel}>CONTACT PHONE</Text>
-                  <Text style={styles.detailValue}>📞 {selectedMember.phone || '—'}</Text>
+                  <Text style={styles.detailValue}>📞 {selectedMember.phone || selectedMember.mobile || '—'}</Text>
                 </View>
                 <View style={styles.detailItem}>
                   <Text style={styles.detailLabel}>VEHICLE #</Text>

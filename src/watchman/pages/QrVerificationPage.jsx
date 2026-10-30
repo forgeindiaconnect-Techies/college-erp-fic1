@@ -954,17 +954,11 @@ const QrVerificationPage = () => {
               if (activeMode === 'members_scanner') {
                 if (identifiedPerson) {
                   setShowFullDashboard(false);
-                } else if (membersList && membersList.length > 0) {
-                  handleSelectMemberCard(membersList[0]);
-                  setShowFullDashboard(false);
                 } else {
-                  setErrorMsg('Please select a member from the directory or enter their ID to view pass.');
+                  setErrorMsg('Please select a member from the directory or search their ID to view their pass.');
                 }
               } else {
                 if (visitorResult) {
-                  setShowFullDashboard(false);
-                } else if (visitorsList && visitorsList.length > 0) {
-                  handleSelectVisitorCard(visitorsList[0]);
                   setShowFullDashboard(false);
                 } else {
                   setErrorMsg('Please select a visitor or enter their Pass # to view pass.');
