@@ -77,7 +77,7 @@ type LeaveRequest = {
   endDate: string;
   days: number;
   reason: string;
-  status: 'Approved' | 'Pending' | 'Rejected';
+  status: 'Approved' | 'Pending' | 'Rejected' | 'Pending HOD Approval' | 'Pending Principal Approval' | string;
 };
 
 export default function ParentDashboard({ user, onLogout }: Props) {
