@@ -467,6 +467,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
   },
+  disbursedTagText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
   tagGreen: {
     backgroundColor: '#DCFCE7',
   },
