@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getStudents, createStudent, updateStudent, deleteStudent, getDepartments } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
+import { cleanPhoneInput, cleanEmailInput, getMobileValidationError, getEmailValidationError } from '../../utils/validationHelper';
 import './StudentManagement.css';
 
 const SEMESTERS  = ['Sem 1','Sem 2','Sem 3','Sem 4','Sem 5','Sem 6','Sem 7','Sem 8'];
@@ -171,13 +172,19 @@ const StudentManagement = () => {
   const validate = () => {
     const e = {};
     if (!form.name || !form.name.trim())       e.name       = 'Name is required';
-    if (!form.email || !form.email.trim())      e.email      = 'Email is required';
+    const emailErr = getEmailValidationError(form.email, 'Student Email');
+    if (emailErr) e.email = emailErr;
     if (form.phone && form.phone.trim()) {
-      const clean = form.phone.trim().replace(/\D/g, '');
-      const phone10 = clean.length > 10 ? clean.slice(-10) : clean;
-      if (!/^[6-9]\d{9}$/.test(phone10)) {
-        e.phone = 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9';
-      }
+      const phoneErr = getMobileValidationError(form.phone, 'Mobile number');
+      if (phoneErr) e.phone = phoneErr;
+    }
+    if (form.fatherPhone && form.fatherPhone.trim()) {
+      const fatherErr = getMobileValidationError(form.fatherPhone, 'Father mobile number');
+      if (fatherErr) e.fatherPhone = fatherErr;
+    }
+    if (form.guardianPhone && form.guardianPhone.trim()) {
+      const guardianErr = getMobileValidationError(form.guardianPhone, 'Guardian mobile number');
+      if (guardianErr) e.guardianPhone = guardianErr;
     }
     if (!form.dept)              e.dept       = 'Select a department';
     if (!form.sem)               e.sem        = 'Select a semester';
@@ -260,7 +267,8 @@ const StudentManagement = () => {
     value: form[key],
     onChange: e => {
       let val = e.target.value;
-      if (key === 'email' || key.toLowerCase().includes('email')) val = val.toLowerCase();
+      if (key === 'phone' || key.toLowerCase().includes('phone')) val = cleanPhoneInput(val);
+      if (key === 'email' || key.toLowerCase().includes('email')) val = cleanEmailInput(val);
       setForm(f => ({ ...f, [key]: val }));
     },
   });
@@ -576,7 +584,7 @@ const StudentManagement = () => {
                   {/* Email */}
                   <div className={`fld ${formErrors.email ? 'fld-error' : ''}`}>
                     <label><Mail size={13}/> Email Address <span className="req">*</span></label>
-                    <input type="email" placeholder="student@college.edu" {...field('email')} />
+                    <input type="email" placeholder="student@college.edu" autoCapitalize="none" style={{ textTransform: 'lowercase' }} {...field('email')} />
                     {formErrors.email && <span className="err-msg">{formErrors.email}</span>}
                   </div>
 
@@ -590,7 +598,7 @@ const StudentManagement = () => {
                   {/* Phone */}
                   <div className={`fld ${formErrors.phone ? 'fld-error' : ''}`}>
                     <label><Phone size={13}/> Phone Number</label>
-                    <input type="tel" placeholder="10-digit mobile number" maxLength={10} {...field('phone')} />
+                    <input type="tel" placeholder="10-digit mobile number" maxLength={10} inputMode="numeric" {...field('phone')} />
                     {formErrors.phone && <span className="err-msg">{formErrors.phone}</span>}
                   </div>
 

@@ -32,6 +32,53 @@ interface Props {
   hideHeader?: boolean;
 }
 
+/**
+ * Assigns dense ranks to referral performers handling equal/tied scores correctly
+ * without skipping ranks (e.g. 1st, 1st, 2nd, 3rd...)
+ */
+export const assignDenseRanks = (list: any[]) => {
+  const sortedRaw = [...list].sort((a, b) => {
+    const sA = Number(a.successfulReferrals) || 0;
+    const sB = Number(b.successfulReferrals) || 0;
+    if (sB !== sA) return sB - sA;
+
+    const eA = Number(a.earnedIncentive) || 0;
+    const eB = Number(b.earnedIncentive) || 0;
+    if (eB !== eA) return eB - eA;
+
+    const tA = Number(a.totalReferrals) || 0;
+    const tB = Number(b.totalReferrals) || 0;
+    if (tB !== tA) return tB - tA;
+
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  const scoreCounts: Record<string, number> = {};
+  sortedRaw.forEach((p) => {
+    const key = `${Number(p.successfulReferrals) || 0}_${Number(p.earnedIncentive) || 0}`;
+    scoreCounts[key] = (scoreCounts[key] || 0) + 1;
+  });
+
+  let currentRank = 1;
+  return sortedRaw.map((p, idx) => {
+    const key = `${Number(p.successfulReferrals) || 0}_${Number(p.earnedIncentive) || 0}`;
+    if (idx > 0) {
+      const prev = sortedRaw[idx - 1];
+      const prevKey = `${Number(prev.successfulReferrals) || 0}_${Number(prev.earnedIncentive) || 0}`;
+      if (key !== prevKey) {
+        currentRank += 1;
+      }
+    }
+    const isTied = (scoreCounts[key] || 1) > 1;
+    return {
+      ...p,
+      rank: currentRank,
+      isTied,
+      rankTitle: currentRank === 1 ? '1st Place' : currentRank === 2 ? '2nd Place' : currentRank === 3 ? '3rd Place' : `${currentRank}th Place`,
+    };
+  });
+};
+
 export default function ReferralHub({ user, initialCategory, initialScreen = 'home', onBack, hideHeader }: Props) {
   const [currentScreen, setCurrentScreen] = useState<ActiveScreen>(initialCategory ? 'category' : initialScreen);
   const [selectedCategory, setSelectedCategory] = useState<ReferralCategory>(initialCategory || 'Credit Card');
@@ -200,7 +247,8 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
           : Array.isArray(topPerformersRes)
           ? topPerformersRes
           : [];
-        setTopPerformers(pList);
+        const rankedList = assignDenseRanks(pList);
+        setTopPerformers(rankedList);
         if (d?.stats) {
           setTopPerformersStats(d.stats);
         } else if (topPerformersRes.stats) {
@@ -382,6 +430,11 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
             <Text style={styles.compactPerfName} numberOfLines={1}>
               {performer.name}
             </Text>
+            {performer.isTied && (
+              <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, marginLeft: 4, borderWidth: 1, borderColor: '#FDE68A' }}>
+                <Text style={{ fontSize: 9, fontWeight: '800', color: '#B45309' }}>TIED #{rankNum}</Text>
+              </View>
+            )}
             {isCurrentUser && (
               <View style={styles.youBadge}>
                 <Text style={styles.youBadgeText}>YOU</Text>
@@ -1432,9 +1485,11 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
           {/* Current User Personal Performance Summary Card */}
           <View style={styles.myRankCard}>
             <View style={styles.myRankHeaderRow}>
-              <View style={styles.myRankPill}>
-                <Text style={styles.myRankPillText}>
-                  {currentUserPerformer?.rank ? `🏆 CAMPUS RANK #${currentUserPerformer.rank}` : 'YOUR REFERRAL STANDING'}
+              <View style={[styles.myRankPill, currentUserPerformer?.rank === 1 && { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' }]}>
+                <Text style={[styles.myRankPillText, currentUserPerformer?.rank === 1 && { color: '#B45309' }]}>
+                  {currentUserPerformer?.rank
+                    ? `🏆 CAMPUS RANK #${currentUserPerformer.rank}${currentUserPerformer.isTied ? ' (TIED)' : ''}`
+                    : 'YOUR REFERRAL STANDING'}
                 </Text>
               </View>
               <Text style={styles.myRankRoleBadge}>{user?.role || 'Member'}</Text>
@@ -1442,10 +1497,14 @@ export default function ReferralHub({ user, initialCategory, initialScreen = 'ho
 
             <View style={styles.myRankBodyRow}>
               <View style={styles.myRankStatItem}>
-                <Text style={styles.myRankStatVal}>
-                  {currentUserPerformer?.rank ? `#${currentUserPerformer.rank}` : (stats.successfulCount > 0 ? 'Rank Queued' : 'Unranked')}
+                <Text style={[styles.myRankStatVal, currentUserPerformer?.rank === 1 && { color: '#D97706' }]}>
+                  {currentUserPerformer?.rank
+                    ? `#${currentUserPerformer.rank}${currentUserPerformer.isTied ? ' (Tied)' : ''}`
+                    : (stats.successfulCount > 0 ? 'Rank Queued' : 'Unranked')}
                 </Text>
-                <Text style={styles.myRankStatLabel}>Current Rank</Text>
+                <Text style={styles.myRankStatLabel}>
+                  {currentUserPerformer?.isTied ? 'Current Rank (Tied)' : 'Current Rank'}
+                </Text>
               </View>
               <View style={styles.myRankDivider} />
               <View style={styles.myRankStatItem}>

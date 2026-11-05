@@ -66,7 +66,8 @@ const VisitorEntryPage = () => {
 
   const handleChange = (e) => {
     let { name, value, type, checked } = e.target;
-    if (name === 'email') value = value.toLowerCase();
+    if (name === 'email') value = cleanEmailInput(value);
+    if (name === 'phone') value = cleanPhoneInput(value);
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     if (error) setError('');
   };
@@ -77,11 +78,17 @@ const VisitorEntryPage = () => {
       setError('Visitor full name, 10-digit mobile number, and person to meet are mandatory.');
       return;
     }
-    const cleanVPhone = formData.phone.trim().replace(/\D/g, '');
-    const vPhone10 = cleanVPhone.length > 10 ? cleanVPhone.slice(-10) : cleanVPhone;
-    if (!/^[6-9]\d{9}$/.test(vPhone10)) {
-      setError('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9');
+    const phoneErr = getMobileValidationError(formData.phone, 'Mobile number');
+    if (phoneErr) {
+      setError(phoneErr);
       return;
+    }
+    if (formData.email && formData.email.trim()) {
+      const emailErr = getEmailValidationError(formData.email, 'Visitor Email');
+      if (emailErr) {
+        setError(emailErr);
+        return;
+      }
     }
 
     const payload = {

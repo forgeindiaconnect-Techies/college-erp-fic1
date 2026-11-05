@@ -139,7 +139,9 @@ const ForgotPassword = () => {
                       type="email"
                       placeholder="Enter your registered email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                    autoCapitalize="none"
+                    style={{ textTransform: 'lowercase' }}
+                    onChange={(e) => setEmail(e.target.value.toLowerCase().trim())}
                       required
                     />
                   </div>

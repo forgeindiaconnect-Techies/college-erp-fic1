@@ -12,6 +12,7 @@ import {
 import ModalSelect from './ModalSelect';
 import DynamicFieldSection, { DynamicFieldDef } from './DynamicFieldSection';
 import { apiPost, type MobileUser } from '../../services/api';
+import { cleanPhoneInput, cleanEmailInput, getMobileValidationError, getEmailValidationError } from '../../utils/validationHelper';
 
 interface Props {
   user: MobileUser;
@@ -177,12 +178,8 @@ export default function CreditCardReferralForm({
     if (!applicantName.trim()) {
       errs.applicantName = 'Applicant full name is required.';
     }
-    const cleanDigits = applicantPhone.replace(/\D/g, '');
-    if (!cleanDigits) {
-      errs.applicantPhone = 'Mobile number is required.';
-    } else if (!/^[6-9]\d{9}$/.test(cleanDigits)) {
-      errs.applicantPhone = 'Enter a valid 10-digit Indian mobile number.';
-    }
+    const phoneErr = getMobileValidationError(applicantPhone, 'Mobile number');
+    if (phoneErr) errs.applicantPhone = phoneErr;
     if (applicantEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(applicantEmail.trim())) {
       errs.applicantEmail = 'Enter a valid email address.';
     }
@@ -271,7 +268,7 @@ export default function CreditCardReferralForm({
       setSubmitting(true);
       setGeneralError(null);
 
-      const cleanPhone = applicantPhone.replace(/\D/g, '').slice(-10);
+      const cleanPhone = applicantPhone.replace(/\D/g, '');
       const summaryText = `${applicantName.trim()} - ${bankName} (${cardProduct})`;
       const consentTimestamp = new Date().toISOString();
       const consentNoticeVersion = formConfig?.generalSettings?.consentNoticeVersion || 'v2.4-FIC-CC-CONSENT';

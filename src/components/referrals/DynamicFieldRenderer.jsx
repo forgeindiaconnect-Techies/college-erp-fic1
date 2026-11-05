@@ -70,7 +70,9 @@ function SingleDynamicField({
             className={`dfr-input ${error ? 'dfr-error' : ''}`}
             placeholder={placeholder || 'name@example.com'}
             value={value || ''}
-            onChange={handleChange}
+            onChange={(e) => notifyChange(e.target.value.toLowerCase().replace(/[^a-z0-9@._+-]/g, ''))}
+            autoCapitalize="none"
+            style={{ textTransform: 'lowercase' }}
             disabled={disabled}
           />
         );
@@ -83,6 +85,8 @@ function SingleDynamicField({
               type="tel"
               id={`field-${fieldKey}`}
               maxLength={10}
+              inputMode="numeric"
+              pattern="[6-9][0-9]{9}"
               className="dfr-phone-input"
               placeholder={placeholder || '10-digit mobile number'}
               value={value || ''}

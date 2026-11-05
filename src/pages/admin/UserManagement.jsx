@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Search, Users, Eye, EyeOff } from 'lucide-react';
 import { createUser, getUsers, deleteUser } from '../../api/index';
+import { cleanPhoneInput, cleanEmailInput, getMobileValidationError, getEmailValidationError } from '../../utils/validationHelper';
 import './UserManagementCommon.css';
 
 const ROLES = [
@@ -51,9 +52,15 @@ export default function UserManagement() {
   }, []);
 
   const handleChange = (e) => {
+    let val = e.target.value;
+    if (e.target.name === 'phone') {
+      val = cleanPhoneInput(val);
+    } else if (e.target.name === 'email') {
+      val = cleanEmailInput(val);
+    }
     setForm({
       ...form,
-      [e.target.name]: e.target.value
+      [e.target.name]: val
     });
   };
 
@@ -65,15 +72,16 @@ export default function UserManagement() {
       return;
     }
 
-    if (!form.email.trim()) {
-      alert('Please enter the email.');
+    const emailErr = getEmailValidationError(form.email, 'Email address');
+    if (emailErr) {
+      alert(emailErr);
       return;
     }
+
     if (form.phone && form.phone.trim()) {
-      const clean = form.phone.trim().replace(/\D/g, '');
-      const phone10 = clean.length > 10 ? clean.slice(-10) : clean;
-      if (!/^[6-9]\d{9}$/.test(phone10)) {
-        alert('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9');
+      const phoneErr = getMobileValidationError(form.phone, 'Mobile number');
+      if (phoneErr) {
+        alert(phoneErr);
         return;
       }
     }
@@ -211,9 +219,11 @@ export default function UserManagement() {
                 <input
                   name="email"
                   type="email"
-                  placeholder="Email / Username"
+                  placeholder="email@college.edu"
                   value={form.email}
                   onChange={handleChange}
+                  autoCapitalize="none"
+                  style={{ textTransform: 'lowercase' }}
                   required
                   className="mgmt-form-input"
                 />
@@ -257,7 +267,10 @@ export default function UserManagement() {
                 <label>Phone Number</label>
                 <input
                   name="phone"
-                  placeholder="Phone Number"
+                  type="tel"
+                  placeholder="10-digit mobile number"
+                  maxLength={10}
+                  inputMode="numeric"
                   value={form.phone}
                   onChange={handleChange}
                   className="mgmt-form-input"

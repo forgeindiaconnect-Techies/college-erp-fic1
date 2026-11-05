@@ -1,3 +1,4 @@
+import { validateMobileNumber, validateEmail, normalizeEmail, cleanMobileNumber } from '../utils/validationHelper.js';
 import express from 'express';
 import Staff from '../models/Staff.js';
 import { protect, authorize, departmentScope, requirePermission, collegeScope, checkSubscription } from '../middleware/authMiddleware.js';
@@ -307,12 +308,9 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), r
     staffData.email = staffData.email.trim().toLowerCase();
   }
   if (staffData.phone) {
-    const clean = String(staffData.phone).trim().replace(/\D/g, '');
-    const p10 = clean.length > 10 ? clean.slice(-10) : clean;
-    if (!/^[6-9]\d{9}$/.test(p10)) {
-      return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
-    }
-    staffData.phone = p10;
+    const pVal = validateMobileNumber(staffData.phone, 'Mobile number', false);
+    if (!pVal.isValid) return res.status(400).json({ message: pVal.message });
+    staffData.phone = pVal.cleaned;
   }
   if (isHOD) {
     staffData.status = 'Pending Approval';
@@ -456,12 +454,9 @@ router.put('/:id/approve', protect, authorize('Admin', 'Principal'), collegeScop
 
     if (req.body.email) req.body.email = req.body.email.trim().toLowerCase();
     if (req.body.phone) {
-      const clean = String(req.body.phone).trim().replace(/\D/g, '');
-      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
-      if (!/^[6-9]\d{9}$/.test(p10)) {
-        return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
-      }
-      req.body.phone = p10;
+      const pVal = validateMobileNumber(req.body.phone, 'Mobile number', false);
+      if (!pVal.isValid) return res.status(400).json({ message: pVal.message });
+      req.body.phone = pVal.cleaned;
     }
     const updatedStaff = await Staff.findOneAndUpdate(
       query,

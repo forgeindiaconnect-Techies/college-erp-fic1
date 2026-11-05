@@ -26,6 +26,52 @@ function formatRupee(amount) {
   return `₹${num.toLocaleString('en-IN')}`;
 }
 
+/**
+ * Assigns dense ranks to performers handling equal scores correctly (1st, 1st, 2nd, 3rd...)
+ */
+export function assignDenseRanks(list) {
+  const sortedRaw = [...list].sort((a, b) => {
+    const sA = Number(a.successfulReferrals) || 0;
+    const sB = Number(b.successfulReferrals) || 0;
+    if (sB !== sA) return sB - sA;
+
+    const eA = Number(a.earnedIncentive) || 0;
+    const eB = Number(b.earnedIncentive) || 0;
+    if (eB !== eA) return eB - eA;
+
+    const tA = Number(a.totalReferrals) || 0;
+    const tB = Number(b.totalReferrals) || 0;
+    if (tB !== tA) return tB - tA;
+
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  const scoreCounts = {};
+  sortedRaw.forEach((p) => {
+    const key = `${Number(p.successfulReferrals) || 0}_${Number(p.earnedIncentive) || 0}`;
+    scoreCounts[key] = (scoreCounts[key] || 0) + 1;
+  });
+
+  let currentRank = 1;
+  return sortedRaw.map((p, idx) => {
+    const key = `${Number(p.successfulReferrals) || 0}_${Number(p.earnedIncentive) || 0}`;
+    if (idx > 0) {
+      const prev = sortedRaw[idx - 1];
+      const prevKey = `${Number(prev.successfulReferrals) || 0}_${Number(prev.earnedIncentive) || 0}`;
+      if (key !== prevKey) {
+        currentRank += 1;
+      }
+    }
+    const isTied = (scoreCounts[key] || 1) > 1;
+    return {
+      ...p,
+      rank: currentRank,
+      isTied,
+      rankTitle: currentRank === 1 ? '1st Place' : currentRank === 2 ? '2nd Place' : currentRank === 3 ? '3rd Place' : `${currentRank}th Place`,
+    };
+  });
+}
+
 export default function TopReferralPerformers({ collegeId = null, title = "Top Referral Performers", subtitle }) {
   const [performers, setPerformers] = useState([]);
   const [stats, setStats] = useState({ totalPerformers: 0, totalVerifiedReferrals: 0, totalEarnedIncentives: 0 });
@@ -46,7 +92,8 @@ export default function TopReferralPerformers({ collegeId = null, title = "Top R
 
       const res = await getTopReferralPerformers(params);
       if (res && res.data && res.data.success) {
-        setPerformers(Array.isArray(res.data.data) ? res.data.data : []);
+        const rawList = Array.isArray(res.data.data) ? res.data.data : [];
+        setPerformers(assignDenseRanks(rawList));
         if (res.data.stats) {
           setStats(res.data.stats);
         }
@@ -195,20 +242,26 @@ export default function TopReferralPerformers({ collegeId = null, title = "Top R
           {topThree.length > 0 && !searchQuery && (
             <div className="trp-podium-grid">
               {topThree.map((performer, idx) => {
-                const rankNum = idx + 1;
+                const rankNum = performer.rank || idx + 1;
+                const isTied = Boolean(performer.isTied);
                 const medalIcon = rankNum === 1 ? '🥇' : rankNum === 2 ? '🥈' : '🥉';
-                const rankTitle = rankNum === 1 ? '1st Place' : rankNum === 2 ? '2nd Place' : '3rd Place';
+                const rankTitle = performer.rankTitle || (rankNum === 1 ? '1st Place' : rankNum === 2 ? '2nd Place' : '3rd Place');
 
                 return (
-                  <div key={performer.userId || idx} className={`trp-podium-card rank-${rankNum}`}>
+                  <div key={performer.userId || idx} className={`trp-podium-card rank-${Math.min(rankNum, 3)}`}>
                     <div>
                       <div className="trp-podium-header">
                         <span className="trp-rank-badge">
                           <span>{medalIcon}</span>
                           <span>{rankTitle}</span>
+                          {isTied && (
+                            <span style={{ fontSize: '0.65rem', background: '#fef3c7', color: '#b45309', padding: '1px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid #fde68a', fontWeight: 800 }}>
+                              TIED
+                            </span>
+                          )}
                         </span>
                         <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                          #{performer.rank || rankNum} Ranked
+                          #{rankNum} Ranked {isTied ? '(Tied)' : ''}
                         </span>
                       </div>
 
@@ -263,8 +316,9 @@ export default function TopReferralPerformers({ collegeId = null, title = "Top R
               <tbody>
                 {filteredPerformers.map((p, index) => {
                   const rank = p.rank || index + 1;
+                  const isTied = Boolean(p.isTied);
                   const rankClass = rank === 1 ? 'top-1' : rank === 2 ? 'top-2' : rank === 3 ? 'top-3' : '';
-                  const rankDisplay = rank === 1 ? '🥇 1' : rank === 2 ? '🥈 2' : rank === 3 ? '🥉 3' : rank;
+                  const rankDisplay = rank === 1 ? `🥇 1${isTied ? ' (Tied)' : ''}` : rank === 2 ? `🥈 2${isTied ? ' (Tied)' : ''}` : rank === 3 ? `🥉 3${isTied ? ' (Tied)' : ''}` : `${rank}${isTied ? ' (Tied)' : ''}`;
                   const categoriesList = Array.isArray(p.categories)
                     ? p.categories
                     : (typeof p.categories === 'object' && p.categories !== null)

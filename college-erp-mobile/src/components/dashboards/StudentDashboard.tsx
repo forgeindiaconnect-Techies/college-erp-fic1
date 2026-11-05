@@ -23,6 +23,7 @@ import QuickAccessGrid from './QuickAccessGrid';
 import HighlightCard from './HighlightCard';
 import StudentPlacementModule from '../placement/StudentPlacementModule';
 import MobileNotificationCenter from '../notifications/MobileNotificationCenter';
+import { formatDueDateAndTime } from '../../utils/validationHelper';
 
 type Props = {
   user: MobileUser;
@@ -756,7 +757,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
           subject: 'Pooja',
           faculty: 'RENUKA',
           description: 'Please submit solution before the cut-off date.',
-          dueDate: '2026-12-01T00:00:00.000Z',
+          dueDate: '2026-12-01T23:59:00.000Z',
           status: 'Pending',
         },
         {
@@ -765,7 +766,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
           subject: 'TAMIL',
           faculty: 'RENUKA',
           description: 'Complete whatever i have given the notes ',
-          dueDate: '2026-10-10T00:00:00.000Z',
+          dueDate: '2026-10-10T23:59:00.000Z',
           status: 'Pending',
         },
         {
@@ -774,7 +775,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
           subject: 'TAMIL',
           faculty: 'RENUKA',
           description: 'Complete exercises and submit solution before the due date.',
-          dueDate: '2026-10-15T00:00:00.000Z',
+          dueDate: '2026-10-15T23:59:00.000Z',
           status: 'Pending',
         },
       ];
@@ -2030,7 +2031,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
                   {/* Summary Card with Semester Selector */}
                   <View style={styles.card}>
                     <View style={styles.cardHeaderRow}>
-                      <View>
+                      <View style={{ flex: 1, marginRight: 10 }}>
                         <Text style={styles.cardHeaderTitle}>🎓 Academic Performance</Text>
                         <Text style={styles.sectionSubtitle}>Score sheets, continuous assessments and semester results</Text>
                       </View>
@@ -2072,7 +2073,7 @@ export default function StudentDashboard({ user, onLogout }: Props) {
                   {/* Registered Courses Score Sheet */}
                   <View style={styles.card}>
                     <View style={styles.cardHeaderRow}>
-                      <Text style={styles.cardHeaderTitle}>Registered Courses Score Sheet</Text>
+                      <Text style={[styles.cardHeaderTitle, { flex: 1, marginRight: 8 }]}>Registered Courses Score Sheet</Text>
                       <View style={styles.semTagBadge}>
                         <Text style={styles.semTagBadgeText}>{selectedMarksSem}</Text>
                       </View>
@@ -2291,11 +2292,17 @@ export default function StudentDashboard({ user, onLogout }: Props) {
 
                           {/* Footer: Due Date & Action */}
                           <View style={styles.assignmentCardFooterRow}>
-                            <View style={styles.assignmentDueDateCol}>
-                              <Text style={styles.assignmentDueDateText}>
-                                📅 Due Date: <Text style={{ fontWeight: '700', color: '#334155' }}>{a.dueDate}</Text>
-                              </Text>
-                            </View>
+                            {(() => {
+                              const due = formatDueDateAndTime(a.dueDate);
+                              return (
+                                <View style={styles.assignmentDueDateCol}>
+                                  <Text style={styles.assignmentDueDateText}>
+                                    📅 Due: <Text style={{ fontWeight: '700', color: due.isOverdue ? '#DC2626' : '#1E293B' }}>{due.dateStr}</Text>
+                                    {'  '}⏰ <Text style={{ fontWeight: '700', color: '#1E293B' }}>{due.timeStr}</Text>
+                                  </Text>
+                                </View>
+                              );
+                            })()}
 
                             {isPending ? (
                               <TouchableOpacity
@@ -4039,6 +4046,31 @@ export default function StudentDashboard({ user, onLogout }: Props) {
             <Text style={styles.modalTitle}>Submit Assignment Solution</Text>
             <Text style={styles.modalSubtitle}>{selectedAssignment?.title} • {selectedAssignment?.subject}</Text>
 
+            {(() => {
+              const due = formatDueDateAndTime(selectedAssignment?.dueDate);
+              return (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: due.isOverdue ? '#FEF2F2' : '#F0FDF4',
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: due.isOverdue ? '#FECDD3' : '#BBF7D0',
+                  marginVertical: 10,
+                }}>
+                  <Text style={{ fontSize: 12, color: due.isOverdue ? '#991B1B' : '#166534', fontWeight: '700' }}>
+                    📅 Due: {due.dateStr}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: due.isOverdue ? '#991B1B' : '#166534', fontWeight: '700' }}>
+                    ⏰ Cut-off: {due.timeStr}
+                  </Text>
+                </View>
+              );
+            })()}
+
             <Text style={styles.inputLabel}>File Name / Attachment Reference *</Text>
             <TextInput
               style={styles.modalInput}
@@ -5644,15 +5676,20 @@ const styles = StyleSheet.create({
   cgpaBadge: {
     backgroundColor: '#EFF6FF',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#BFDBFE',
+    alignSelf: 'flex-start',
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cgpaBadgeText: {
     fontSize: 13,
     fontWeight: '800',
     color: '#1D4ED8',
+    textAlign: 'center',
   },
   markCardItem: {
     backgroundColor: '#F8FAFC',

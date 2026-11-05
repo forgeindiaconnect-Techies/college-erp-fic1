@@ -396,6 +396,8 @@ const autoSeedIfEmpty = async () => {
         { name: 'Karthick (Placement Officer)', email: 'karthick@gmail.com', password: 'karthick', role: 'Placement', department: 'Training & Placement Officer', referenceId: 'PLC-001', phone: '9878987678', tenantId: 'COL004-3190860', collegeId: 'COL004-3190860' },
         { name: 'Dr. Suresh Kumar (Placement Officer)', email: 'placement@college.edu', password: 'password123', role: 'Placement', department: 'Training & Placement Cell', referenceId: 'PLC-001', tenantId: 'COL004-3190860', collegeId: 'COL004-3190860' },
         { name: 'John Doe (Student)', email: 'john@college.edu', password: 'password123', role: 'Student', referenceId: 'CS2022001', studentId: 'CS2022001', department: 'Computer Science', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Dhanush', email: 'dhanush@gmail.com', password: 'dhanush', role: 'Admin', tenantId: 'COL001', collegeId: 'COL001' },
+        { name: 'Natrajan (Staff)', email: 'natrajan@gmail.com', password: 'natrajan', role: 'Staff', department: 'Computer Science', referenceId: 'STF010', subjects: ['Data Structures', 'RDBMS'], tenantId: 'COL001', collegeId: 'COL001' },
         { name: 'Mr. Robert Doe (Parent)', email: 'parent_john@college.edu', password: 'password123', role: 'Parent', referenceId: 'CS2022001', parentOf: 'John Doe', studentId: 'CS2022001', department: 'Computer Science', tenantId: 'COL001', collegeId: 'COL001' },
       ];
 

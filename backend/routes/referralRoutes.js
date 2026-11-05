@@ -409,18 +409,49 @@ const getTopPerformersHandler = async (req, res) => {
       delete p._hasIncentiveRecords;
     });
 
-    const sortedPerformers = Object.values(performersMap)
+    const sortedRaw = Object.values(performersMap)
       .filter((p) => p.totalReferrals > 0)
       .sort((a, b) => {
-        if (b.successfulReferrals !== a.successfulReferrals) {
-          return b.successfulReferrals - a.successfulReferrals;
+        const sA = Number(a.successfulReferrals) || 0;
+        const sB = Number(b.successfulReferrals) || 0;
+        if (sB !== sA) return sB - sA;
+
+        const eA = Number(a.earnedIncentive) || 0;
+        const eB = Number(b.earnedIncentive) || 0;
+        if (eB !== eA) return eB - eA;
+
+        const tA = Number(a.totalReferrals) || 0;
+        const tB = Number(b.totalReferrals) || 0;
+        if (tB !== tA) return tB - tA;
+
+        return (a.name || '').localeCompare(b.name || '');
+      });
+
+    // Compute dense ranking for equal performances (without skipping ranks)
+    const scoreCounts = {};
+    sortedRaw.forEach((p) => {
+      const key = `${Number(p.successfulReferrals) || 0}_${Number(p.earnedIncentive) || 0}`;
+      scoreCounts[key] = (scoreCounts[key] || 0) + 1;
+    });
+
+    let currentRank = 1;
+    const sortedPerformers = sortedRaw.map((p, idx) => {
+      const key = `${Number(p.successfulReferrals) || 0}_${Number(p.earnedIncentive) || 0}`;
+      if (idx > 0) {
+        const prev = sortedRaw[idx - 1];
+        const prevKey = `${Number(prev.successfulReferrals) || 0}_${Number(prev.earnedIncentive) || 0}`;
+        if (key !== prevKey) {
+          currentRank += 1;
         }
-        return b.earnedIncentive - a.earnedIncentive;
-      })
-      .map((p, idx) => ({
+      }
+      const isTied = (scoreCounts[key] || 1) > 1;
+      return {
         ...p,
-        rank: idx + 1,
-      }));
+        rank: currentRank,
+        isTied,
+        rankTitle: currentRank === 1 ? '1st Place' : currentRank === 2 ? '2nd Place' : currentRank === 3 ? '3rd Place' : `${currentRank}th Place`,
+      };
+    });
 
     res.json({
       success: true,

@@ -1,3 +1,4 @@
+import { validateMobileNumber, validateEmail, normalizeEmail, cleanMobileNumber } from '../utils/validationHelper.js';
 import express from 'express';
 import Student from '../models/Student.js';
 import mongoose from 'mongoose';
@@ -213,12 +214,13 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
   // Mobile number validation and duplicate check
   const rawPhone = (req.body.phone || req.body.mobile || req.body.contactNumber || '').trim();
   let cleanPhone = rawPhone.replace(/\D/g, '');
-  let phone10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
-
+  let phone10 = cleanPhone;
   if (rawPhone) {
-    if (!/^[6-9]\d{9}$/.test(phone10)) {
-      return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+    const pVal = validateMobileNumber(rawPhone, 'Mobile number', false);
+    if (!pVal.isValid) {
+      return res.status(400).json({ message: pVal.message });
     }
+    phone10 = pVal.cleaned;
 
     // Check duplicate mobile number
     const duplicatePhoneStudent = await Student.findOne({
@@ -805,10 +807,11 @@ router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 
     const rawPhone = (req.body.phone || req.body.mobile || req.body.contactNumber || '').trim();
     if (rawPhone) {
       const cleanPhone = rawPhone.replace(/\D/g, '');
-      const phone10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
-      if (!/^[6-9]\d{9}$/.test(phone10)) {
-        return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
-      }
+      const pVal = validateMobileNumber(rawPhone, 'Mobile number', false);
+    if (!pVal.isValid) {
+      return res.status(400).json({ message: pVal.message });
+    }
+    const phone10 = pVal.cleaned;
 
       // Check if another student has this mobile number
       const duplicatePhoneStudent = await Student.findOne({

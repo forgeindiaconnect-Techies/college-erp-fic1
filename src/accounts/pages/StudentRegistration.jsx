@@ -42,6 +42,7 @@ import {
   createFee
 } from '../../api/index';
 import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
+import { cleanPhoneInput, cleanEmailInput, isValidMobile, getMobileValidationError, isValidEmail, getEmailValidationError } from '../../utils/validationHelper';
 import './StudentRegistration.css';
 
 const getDepartmentDegree = (deptName) => {
@@ -258,10 +259,7 @@ const StudentRegistration = () => {
       }
 
       // If initial form is blank, select first active department if available
-      if (field === 'email' || field === 'fatherEmail' || field === 'guardianEmail') {
-      value = (value || '').toLowerCase();
-    }
-    setForm(prev => {
+      setForm(prev => {
         const activeDept = prev.dept || (loadedDepts.length > 0 ? loadedDepts[0].name : '');
         const autoRegId = prev.id || generateStudentRegNo(activeDept, fetchedStudents);
         return {
@@ -541,8 +539,15 @@ const StudentRegistration = () => {
 
   // Field change handler
   const handleChange = (field, value) => {
+    let sanitizedVal = value;
+    if (field === 'phone' || field === 'fatherPhone' || field === 'motherPhone' || field === 'guardianPhone') {
+      sanitizedVal = cleanPhoneInput(value);
+    } else if (field === 'email' || field === 'fatherEmail' || field === 'guardianEmail') {
+      sanitizedVal = cleanEmailInput(value);
+    }
+
     setForm(prev => {
-      const updated = { ...prev, [field]: value };
+      const updated = { ...prev, [field]: sanitizedVal };
 
       if (field === 'firstName' || field === 'midName' || field === 'lastName') {
         const parts = [
@@ -684,28 +689,33 @@ const StudentRegistration = () => {
       return;
     }
     if (form.phone && form.phone.trim()) {
-      const clean = form.phone.trim().replace(/\D/g, '');
-      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
-      if (!/^[6-9]\d{9}$/.test(p10)) {
-        setErrorMsg('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9.');
+      const phoneErr = getMobileValidationError(form.phone, 'Mobile number');
+      if (phoneErr) {
+        setErrorMsg(phoneErr);
         setActiveStep(1);
         return;
       }
     }
     if (form.fatherPhone && form.fatherPhone.trim()) {
-      const clean = form.fatherPhone.trim().replace(/\D/g, '');
-      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
-      if (!/^[6-9]\d{9}$/.test(p10)) {
-        setErrorMsg('Father mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9.');
+      const fatherErr = getMobileValidationError(form.fatherPhone, 'Father mobile number');
+      if (fatherErr) {
+        setErrorMsg(fatherErr);
         setActiveStep(1);
         return;
       }
     }
     if (form.guardianPhone && form.guardianPhone.trim()) {
-      const clean = form.guardianPhone.trim().replace(/\D/g, '');
-      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
-      if (!/^[6-9]\d{9}$/.test(p10)) {
-        setErrorMsg('Guardian mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9.');
+      const guardianErr = getMobileValidationError(form.guardianPhone, 'Guardian mobile number');
+      if (guardianErr) {
+        setErrorMsg(guardianErr);
+        setActiveStep(1);
+        return;
+      }
+    }
+    if (form.email && form.email.trim()) {
+      const emailErr = getEmailValidationError(form.email, 'Student Email');
+      if (emailErr) {
+        setErrorMsg(emailErr);
         setActiveStep(1);
         return;
       }
@@ -1313,6 +1323,8 @@ const StudentRegistration = () => {
                     type="tel" 
                     className="erp-input" 
                     placeholder="10-digit mobile"
+                    maxLength={10}
+                    inputMode="numeric"
                     value={form.fatherPhone} 
                     onChange={(e) => handleChange('fatherPhone', e.target.value)} 
                   />
@@ -1346,6 +1358,8 @@ const StudentRegistration = () => {
                     type="tel" 
                     className="erp-input" 
                     placeholder="10-digit mobile"
+                    maxLength={10}
+                    inputMode="numeric"
                     value={form.motherPhone} 
                     onChange={(e) => handleChange('motherPhone', e.target.value)} 
                   />
@@ -1377,7 +1391,9 @@ const StudentRegistration = () => {
                   <input 
                     type="tel" 
                     className="erp-input" 
-                    placeholder="Student Mobile"
+                    placeholder="10-digit mobile"
+                    maxLength={10}
+                    inputMode="numeric"
                     value={form.phone} 
                     onChange={(e) => handleChange('phone', e.target.value)} 
                   />
@@ -1389,6 +1405,8 @@ const StudentRegistration = () => {
                     type="email" 
                     className="erp-input" 
                     placeholder="student@college.edu"
+                    autoCapitalize="none"
+                    style={{ textTransform: 'lowercase' }}
                     value={form.email} 
                     onChange={(e) => handleChange('email', e.target.value)} 
                   />

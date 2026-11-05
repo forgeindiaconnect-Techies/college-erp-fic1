@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { apiPost } from '../../services/api';
+import { cleanPhoneInput, getMobileValidationError } from '../../utils/validationHelper';
 
 const VEHICLE_TYPES = [
   'Two Wheeler',
@@ -120,11 +121,10 @@ export default function WatchmanVehicleEntryModal({
       return;
     }
     if (driverPhone.trim()) {
-      const clean = driverPhone.replace(/\D/g, '');
-      const phone10 = clean.length > 10 ? clean.slice(-10) : clean;
-      if (!/^[6-9]\d{9}$/.test(phone10)) {
-        setErrorMsg('Driver phone must be a valid 10-digit number starting with 6, 7, 8, or 9.');
-        Alert.alert('Invalid Mobile Number', 'Driver phone must be a valid 10-digit number starting with 6, 7, 8, or 9.');
+      const phoneErr = getMobileValidationError(driverPhone, 'Driver phone');
+      if (phoneErr) {
+        setErrorMsg(phoneErr);
+        Alert.alert('Invalid Mobile Number', phoneErr);
         return;
       }
     }
@@ -278,8 +278,7 @@ export default function WatchmanVehicleEntryModal({
                 placeholderTextColor="#94a3b8"
                 keyboardType="phone-pad"
                 value={driverPhone}
-                onChangeText={setDriverPhone}
-                maxLength={15}
+                onChangeText={(t) => setDriverPhone(cleanPhoneInput(t))} maxLength={10}
               />
             </View>
 

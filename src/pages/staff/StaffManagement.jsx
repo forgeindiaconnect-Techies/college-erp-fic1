@@ -3,6 +3,7 @@ import { Search, Plus, Filter, MoreVertical, Edit2, Trash2, Mail, Phone, Clock, 
 import { getStaff, createStaff, updateStaff, deleteStaff, approveStaff, getSubjects, getDepartments } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
 import CustomSelect from '../../components/CustomSelect';
+import { cleanPhoneInput, cleanEmailInput, getMobileValidationError, getEmailValidationError } from '../../utils/validationHelper';
 import './StaffManagement.css';
 
 const EMPTY_FORM = { name: '', email: '', phone: '', dept: '', designation: 'Assistant Prof.', workload: '', attendance: '95', status: 'Active' };
@@ -78,11 +79,15 @@ const StaffManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const emailErr = getEmailValidationError(form.email, 'Staff Email');
+    if (emailErr) {
+      alert(emailErr);
+      return;
+    }
     if (form.phone && form.phone.trim()) {
-      const clean = form.phone.trim().replace(/\D/g, '');
-      const phone10 = clean.length > 10 ? clean.slice(-10) : clean;
-      if (!/^[6-9]\d{9}$/.test(phone10)) {
-        alert('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9');
+      const phoneErr = getMobileValidationError(form.phone, 'Mobile number');
+      if (phoneErr) {
+        alert(phoneErr);
         return;
       }
     }
@@ -314,9 +319,11 @@ const StaffManagement = () => {
                     placeholder="staff@college.edu" 
                     value={form.email || ''} 
                     onChange={e => {
-                      const val = e.target.value;
-                      setForm(prev => ({ ...prev, email: val.toLowerCase() }));
+                      const val = cleanEmailInput(e.target.value);
+                      setForm(prev => ({ ...prev, email: val }));
                     }}
+                    autoCapitalize="none"
+                    style={{ textTransform: 'lowercase' }}
                     autoComplete="off"
                   />
                 </div>
@@ -340,9 +347,11 @@ const StaffManagement = () => {
                     placeholder="10-digit number" 
                     value={form.phone || ''} 
                     onChange={e => {
-                      const val = e.target.value;
+                      const val = cleanPhoneInput(e.target.value);
                       setForm(prev => ({ ...prev, phone: val }));
                     }}
+                    maxLength={10}
+                    inputMode="numeric"
                     autoComplete="off"
                   />
                 </div>

@@ -163,6 +163,24 @@ const UnifiedLogin = () => {
       // Local fallback for offline provisioned demo roles (e.g., Meena Librarian, Placement)
       const cleanEmailLower = cleanEmail.toLowerCase();
 
+      // Dhanush Admin Fallback
+      if (cleanEmailLower === 'dhanush@gmail.com' && (cleanPassword === 'dhanush' || cleanPassword === 'password123')) {
+        const fallbackAdmin = {
+          _id: 'ADM-DHANUSH-001',
+          name: 'Dhanush',
+          email: 'dhanush@gmail.com',
+          role: 'Admin',
+          tenantId: 'COL001',
+          collegeId: 'COL001',
+          token: 'mock-dhanush-token'
+        };
+        const dest = applySession(fallbackAdmin);
+        if (dest) {
+          navigate(dest);
+          return;
+        }
+      }
+
       // Librarian Fallback
       if (cleanEmailLower.includes('meena') || cleanEmailLower.includes('lib')) {
         let foundLibrarian = null;

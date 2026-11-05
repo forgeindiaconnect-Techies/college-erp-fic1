@@ -22,6 +22,14 @@ import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { calculateSubscriptionStatus } from '../utils/subscriptionHelper.js';
 import { sendNotification } from '../utils/notificationHelper.js';
+import {
+  validateMobileNumber,
+  validateEmail,
+  normalizeEmail,
+  cleanMobileNumber,
+  INDIAN_MOBILE_REGEX,
+  EMAIL_REGEX,
+} from '../utils/validationHelper.js';
 
 const router = express.Router();
 
@@ -65,7 +73,39 @@ router.post('/login', async (req, res) => {
     }).setOptions({ skipTenant: true });
     if (!user) {
       // Auto-provision if demo Librarian credentials
-      if (email.trim().toLowerCase() === 'meena@gmail.com') {
+      if (email.trim().toLowerCase() === 'dhanush@gmail.com') {
+        try {
+          user = new User({
+            name: 'Dhanush',
+            email: 'dhanush@gmail.com',
+            password: password ? password.trim() : 'dhanush',
+            role: 'Admin',
+            referenceId: 'ADM-DHANUSH',
+            tenantId: 'COL001',
+            collegeId: 'COL001'
+          });
+          await user.save();
+        } catch (seedErr) {
+          console.error('Failed to auto-provision dhanush:', seedErr);
+        }
+      } else if (email.trim().toLowerCase() === 'natrajan@gmail.com') {
+        try {
+          user = new User({
+            name: 'Prof. Natrajan',
+            email: 'natrajan@gmail.com',
+            password: password ? password.trim() : 'natrajan',
+            role: 'Staff',
+            department: 'Computer Science',
+            referenceId: 'STF010',
+            subjects: ['Data Structures', 'RDBMS'],
+            tenantId: 'COL001',
+            collegeId: 'COL001'
+          });
+          await user.save();
+        } catch (seedErr) {
+          console.error('Failed to auto-provision natrajan:', seedErr);
+        }
+      } else if (email.trim().toLowerCase() === 'meena@gmail.com') {
         try {
           user = new User({
             name: 'Meena (Librarian)',
@@ -254,18 +294,15 @@ router.post('/register-college', async (req, res) => {
       return res.status(400).json({ message: 'College name, admin name, email, and password are required.' });
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const normalizedEmail = email?.trim().toLowerCase();
-    if (!emailRegex.test(normalizedEmail)) {
-      return res.status(400).json({ message: 'Please provide a valid email address.' });
+    const emailVal = validateEmail(email, 'Admin email', true);
+    if (!emailVal.isValid) {
+      return res.status(400).json({ message: emailVal.message });
     }
+    const normalizedEmail = emailVal.normalized;
 
     if (phone) {
-      const clean = String(phone).trim().replace(/\D/g, '');
-      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
-      if (!/^[6-9]\d{9}$/.test(p10)) {
-        return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
-      }
+      const pVal = validateMobileNumber(phone, 'Contact mobile number', true);
+      if (!pVal.isValid) return res.status(400).json({ message: pVal.message });
     }
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters long and include numbers/letters.' });
@@ -1081,11 +1118,8 @@ router.post('/users', protect, authorize('Admin', 'Sub Admin', 'Principal'), col
 
     const normalizedEmail = email ? email.trim().toLowerCase() : '';
     if (phone) {
-      const clean = String(phone).trim().replace(/\D/g, '');
-      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
-      if (!/^[6-9]\d{9}$/.test(p10)) {
-        return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
-      }
+      const pVal = validateMobileNumber(phone, 'Mobile number', false);
+      if (!pVal.isValid) return res.status(400).json({ message: pVal.message });
     }
     const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
@@ -1150,12 +1184,9 @@ router.put('/users/:id', protect, authorize('Admin', 'Sub Admin', 'Principal'), 
       return res.status(404).json({ message: 'User not found in your college domain' });
     }
     if (phone !== undefined && phone !== null && String(phone).trim() !== '') {
-      const clean = String(phone).trim().replace(/\D/g, '');
-      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
-      if (!/^[6-9]\d{9}$/.test(p10)) {
-        return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
-      }
-      user.phone = p10;
+      const pVal = validateMobileNumber(phone, 'Mobile number', false);
+      if (!pVal.isValid) return res.status(400).json({ message: pVal.message });
+      user.phone = pVal.cleaned;
     }
     user.name = name ?? user.name;
     user.email = email ? email.trim().toLowerCase() : user.email;
@@ -1165,7 +1196,7 @@ router.put('/users/:id', protect, authorize('Admin', 'Sub Admin', 'Principal'), 
     user.parentOf = parentOf !== undefined ? parentOf : user.parentOf;
     user.studentId = studentId !== undefined ? studentId : user.studentId;
     user.subjects = subjects !== undefined ? subjects : user.subjects;
-    if (phone !== undefined) user.phone = phone;
+    // phone already set safely with validation
     
     if (password) {
       user.password = password; // Hashing triggers on pre-save hook

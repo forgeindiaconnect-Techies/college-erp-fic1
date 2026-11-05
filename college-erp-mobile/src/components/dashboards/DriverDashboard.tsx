@@ -2273,38 +2273,44 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                   </View>
 
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>Operational Tasks</Text>
+                    <View style={{ flex: 1, marginRight: 10 }}>
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>Operational Tasks</Text>
+                      <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>Assigned bus maintenance & defect work</Text>
+                    </View>
                     <TouchableOpacity
                       style={{
                         backgroundColor: '#1E3A8A',
-                        paddingHorizontal: 12,
-                        paddingVertical: 7,
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
                         borderRadius: 8,
                         flexDirection: 'row',
                         alignItems: 'center',
-                        gap: 4,
+                        gap: 5,
                       }}
                       onPress={() => setShowIssueModal(true)}
+                      activeOpacity={0.8}
                     >
                       <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>+ Report Defect</Text>
                     </TouchableOpacity>
                   </View>
 
                   {/* Filter Pills */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
                     {(['All', 'Pending', 'In Progress', 'Resolved'] as const).map((f) => (
                       <TouchableOpacity
                         key={f}
                         style={{
+                          height: 32,
                           paddingHorizontal: 14,
-                          paddingVertical: 6,
-                          borderRadius: 20,
+                          borderRadius: 16,
                           backgroundColor: taskFilter === f ? '#1E3A8A' : '#FFFFFF',
-                          marginRight: 8,
                           borderWidth: 1,
                           borderColor: taskFilter === f ? '#1E3A8A' : '#E2E8F0',
+                          justifyContent: 'center',
+                          alignItems: 'center',
                         }}
                         onPress={() => setTaskFilter(f)}
+                        activeOpacity={0.7}
                       >
                         <Text
                           style={{
@@ -2454,12 +2460,26 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                             {task.desc}
                           </Text>
 
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          {/* Meta Specs: Assigned & Priority */}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              backgroundColor: '#F8FAFC',
+                              borderRadius: 8,
+                              paddingHorizontal: 10,
+                              paddingVertical: 7,
+                              marginBottom: 8,
+                              borderWidth: 1,
+                              borderColor: '#F1F5F9',
+                            }}
+                          >
                             <Text style={{ fontSize: 11, color: '#64748B' }}>
-                              Assigned: <Text style={{ fontWeight: '700', color: '#1E3A8A' }}>{task.assignedTo || 'Unassigned'}</Text>
+                              👤 Assigned: <Text style={{ fontWeight: '700', color: '#1E3A8A' }}>{task.assignedTo || 'Unassigned'}</Text>
                             </Text>
-                            <Text style={{ fontSize: 11, color: '#94A3B8' }}>
-                              Priority: <Text style={{ fontWeight: '700' }}>{task.priority}</Text>
+                            <Text style={{ fontSize: 11, color: '#64748B' }}>
+                              ⚡ Priority: <Text style={{ fontWeight: '700', color: '#0F172A' }}>{task.priority || 'Normal'}</Text>
                             </Text>
                           </View>
 
@@ -2483,12 +2503,24 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                             </View>
                           )}
 
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 8 }}>
-                            <Text style={{ fontSize: 11, color: '#94A3B8' }}>
-                              {task.date ? new Date(task.date).toLocaleDateString() : 'Recent'}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              borderTopWidth: 1,
+                              borderTopColor: '#F1F5F9',
+                              paddingTop: 8,
+                              marginTop: 2,
+                              flexWrap: 'wrap',
+                              gap: 8,
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '500' }}>
+                              📅 {task.date ? new Date(task.date).toLocaleDateString() : 'Recent'}
                             </Text>
 
-                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                               {isPending && (
                                 <TouchableOpacity
                                   style={{
@@ -2512,7 +2544,7 @@ export default function DriverDashboard({ user, onLogout }: Props) {
 
                               {isInProgress && (
                                 isSafety && !task.isMaintenance ? (
-                                  <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}>
+                                  <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: '#FDE68A' }}>
                                     <Text style={{ fontSize: 10, fontWeight: '700', color: '#B45309' }}>Inspection Active</Text>
                                   </View>
                                 ) : (
@@ -2557,7 +2589,21 @@ export default function DriverDashboard({ user, onLogout }: Props) {
                               )}
 
                               {isResolved && (task.isMaintenance || task.acknowledgedByDriver) && (
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#10B981' }}>✓ Completed & Cleared</Text>
+                                <View
+                                  style={{
+                                    backgroundColor: '#ECFDF5',
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 5,
+                                    borderRadius: 6,
+                                    borderWidth: 1,
+                                    borderColor: '#A7F3D0',
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#059669' }}>✓ Completed & Cleared</Text>
+                                </View>
                               )}
 
                               {!task.isMaintenance && (

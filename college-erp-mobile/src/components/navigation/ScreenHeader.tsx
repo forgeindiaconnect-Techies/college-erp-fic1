@@ -1,11 +1,13 @@
 import React from 'react';
 import {
   Alert,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Shadows, Spacing, Radius, Typography } from '../../constants/designSystem';
 
 export type ScreenHeaderProps = {
@@ -94,6 +96,8 @@ export default function ScreenHeader({
   onNotificationsPress,
   rightAction,
 }: ScreenHeaderProps) {
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? 14 : 8);
   const initials = avatarText || userName.substring(0, 2).toUpperCase() || 'U';
 
   const handleLogout = () => {
@@ -115,7 +119,7 @@ export default function ScreenHeader({
 
   if (showBack) {
     return (
-      <View style={styles.headerContainerInner}>
+      <View style={[styles.headerContainerInner, { paddingTop: topInset + 6 }]}>
         <View style={styles.headerInnerRow}>
           {/* Back Button with comfortable 44px touch target */}
           <TouchableOpacity
@@ -174,7 +178,7 @@ export default function ScreenHeader({
 
   // Home Dashboard Header (Clean Institutional Branding + Action Bell & Avatar)
   return (
-    <View style={styles.headerContainerHome}>
+    <View style={[styles.headerContainerHome, { paddingTop: topInset + 6 }]}>
       <View style={styles.headerHomeRow}>
         {/* Institutional Crest Branding */}
         <View style={styles.collegeBrandRow}>

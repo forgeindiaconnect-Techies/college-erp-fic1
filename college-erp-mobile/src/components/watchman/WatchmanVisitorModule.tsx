@@ -15,6 +15,7 @@ import {
   Linking,
 } from 'react-native';
 import { apiGet, apiPost, getCurrentBaseUrl, type MobileUser } from '../../services/api';
+import { cleanPhoneInput, getMobileValidationError } from '../../utils/validationHelper';
 
 type Props = {
   user: MobileUser;
@@ -322,12 +323,12 @@ export default function WatchmanVisitorModule({
       Alert.alert('Validation Error', 'Please enter visitor full name.');
       return;
     }
-    const cleanPhone = formPhone.replace(/\D/g, '');
-    const phone10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
-    if (!/^[6-9]\d{9}$/.test(phone10)) {
-      Alert.alert('Validation Error', 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9.');
+    const phoneErr = getMobileValidationError(formPhone, 'Visitor Mobile');
+    if (phoneErr) {
+      Alert.alert('Validation Error', phoneErr);
       return;
     }
+    
     if (!formPersonToMeet.trim()) {
       Alert.alert('Validation Error', 'Please specify host / person to meet.');
       return;
@@ -337,7 +338,7 @@ export default function WatchmanVisitorModule({
       setFormSubmitting(true);
       const payload = {
         name: formName.trim(),
-        phone: cleanPhone,
+        phone: formPhone.trim().replace(/\D/g, ''),
         purpose: formPurpose,
         personToMeet: formPersonToMeet.trim(),
         department: formDepartment,
@@ -408,7 +409,7 @@ export default function WatchmanVisitorModule({
       setPreSubmitting(true);
       const payload = {
         name: preName.trim(),
-        phone: cleanPhone,
+        phone: formPhone.trim().replace(/\D/g, ''),
         purpose: prePurpose,
         personToMeet: preHost.trim(),
         department: preDept,
@@ -962,7 +963,7 @@ export default function WatchmanVisitorModule({
               placeholder="e.g. 98402 12345"
               placeholderTextColor="#94A3B8"
               value={formPhone}
-              onChangeText={setFormPhone}
+              onChangeText={(t) => setFormPhone(cleanPhoneInput(t))} maxLength={10}
               keyboardType="phone-pad"
             />
 

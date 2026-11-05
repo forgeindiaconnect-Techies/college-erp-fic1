@@ -6,6 +6,7 @@ import {
   View,
 } from 'react-native';
 import ModalSelect from './ModalSelect';
+import { cleanPhoneInput, cleanEmailInput } from '../../utils/validationHelper';
 
 export interface DynamicFieldDef {
   fieldKey: string;
@@ -98,7 +99,13 @@ export default function DynamicFieldSection({
               placeholder={f.placeholder || `Enter ${f.label || key}`}
               placeholderTextColor="#94A3B8"
               value={val}
-              onChangeText={(t) => onChange(key, t)}
+              onChangeText={(t) => {
+                let sanitized = t;
+                if (isPhone) sanitized = cleanPhoneInput(t);
+                else if (isEmail) sanitized = cleanEmailInput(t);
+                onChange(key, sanitized);
+              }}
+              maxLength={isPhone ? 10 : undefined}
               keyboardType={
                 isNumeric
                   ? 'numeric'
@@ -109,6 +116,7 @@ export default function DynamicFieldSection({
                   : 'default'
               }
               autoCapitalize={isEmail ? 'none' : 'sentences'}
+              autoCorrect={!isEmail}
               multiline={isTextArea}
               numberOfLines={isTextArea ? 3 : 1}
             />

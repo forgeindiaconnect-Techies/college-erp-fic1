@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, X, Heart, Mail, Phone, User, Link2, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { getUsers, getStudents, createUser, updateUser, deleteUser } from '../../api/index';
+import { cleanPhoneInput, cleanEmailInput, getMobileValidationError, getEmailValidationError } from '../../utils/validationHelper';
 import './ParentsManagement.css';
 
 const ParentsManagement = () => {
@@ -48,7 +49,12 @@ const ParentsManagement = () => {
   const validate = () => {
     const e = {};
     if (!form.name.trim()) e.name = 'Name is required';
-    if (!form.email.trim()) e.email = 'Email is required';
+    const emailErr = getEmailValidationError(form.email, 'Parent Email');
+    if (emailErr) e.email = emailErr;
+    if (form.phone && form.phone.trim()) {
+      const phoneErr = getMobileValidationError(form.phone, 'Mobile number');
+      if (phoneErr) e.phone = phoneErr;
+    }
     if (!editTarget && !form.password) e.password = 'Password is required';
     if (!form.parentOf) e.parentOf = 'Select linked student';
     return e;
@@ -312,7 +318,9 @@ const ParentsManagement = () => {
                     required 
                     placeholder="parent@gmail.com" 
                     value={form.email} 
-                    onChange={e => setForm({ ...form, email: e.target.value })} 
+                    onChange={e => setForm({ ...form, email: cleanEmailInput(e.target.value) })}
+                    autoCapitalize="none"
+                    style={{ textTransform: 'lowercase' }} 
                   />
                   {formErrors.email && <span className="text-danger text-xs">{formErrors.email}</span>}
                 </div>
@@ -322,7 +330,9 @@ const ParentsManagement = () => {
                   <input 
                     placeholder="e.g. 9845123456" 
                     value={form.phone} 
-                    onChange={e => setForm({ ...form, phone: e.target.value })} 
+                    onChange={e => setForm({ ...form, phone: cleanPhoneInput(e.target.value) })}
+                    maxLength={10}
+                    inputMode="numeric" 
                   />
                 </div>
 

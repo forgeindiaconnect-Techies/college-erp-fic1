@@ -28,6 +28,12 @@ import {
   Check
 } from 'lucide-react';
 import { registerCollege, createRegistrationOrder } from '../api';
+import {
+  cleanPhoneInput,
+  cleanEmailInput,
+  getMobileValidationError,
+  getEmailValidationError
+} from '../utils/validationHelper';
 import './GetAccess.css';
 
 const SUBSCRIPTION_PLANS = [
@@ -147,10 +153,21 @@ const GetAccess = () => {
   // Check if current visitor has Super Admin session
   const isSuperAdminSession = !!sessionStorage.getItem('superadmin_token');
 
-  // Form input changes
+  // Form input changes with automatic sanitization
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    let sanitizedValue = value;
+
+    // Automatic email lowercase conversion
+    if (name === 'email' || name === 'principalEmail') {
+      sanitizedValue = cleanEmailInput(value);
+    }
+    // Strict 10-digit Indian phone sanitization (digits only, max 10)
+    else if (name === 'phone') {
+      sanitizedValue = cleanPhoneInput(value);
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: sanitizedValue }));
     if (formErrors[name]) {
       setFormErrors((prev) => ({ ...prev, [name]: '' }));
     }
@@ -177,8 +194,6 @@ const GetAccess = () => {
   // Step 1 Form Validation
   const validateStep1 = () => {
     const errors = {};
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRegex = /^[0-9]{10,15}$/;
 
     if (!formData.collegeName.trim()) {
       errors.collegeName = 'College or institution name is required.';
@@ -188,16 +203,14 @@ const GetAccess = () => {
       errors.adminName = 'Administrator name is required.';
     }
 
-    if (!formData.email.trim()) {
-      errors.email = 'Admin email address is required.';
-    } else if (!emailRegex.test(formData.email.trim())) {
-      errors.email = 'Please enter a valid email address.';
+    const emailErr = getEmailValidationError(formData.email, 'Admin email');
+    if (emailErr) {
+      errors.email = emailErr;
     }
 
-    if (!formData.phone.trim()) {
-      errors.phone = 'Contact phone number is required.';
-    } else if (!phoneRegex.test(formData.phone.replace(/[^0-9]/g, ''))) {
-      errors.phone = 'Please enter a valid phone number (min 10 digits).';
+    const phoneErr = getMobileValidationError(formData.phone, 'Contact mobile number');
+    if (phoneErr) {
+      errors.phone = phoneErr;
     }
 
     if (!formData.password) {
@@ -207,8 +220,11 @@ const GetAccess = () => {
     }
 
     if (showPrincipalFields) {
-      if (formData.principalEmail && !emailRegex.test(formData.principalEmail.trim())) {
-        errors.principalEmail = 'Please enter a valid principal email address.';
+      if (formData.principalEmail) {
+        const principalEmailErr = getEmailValidationError(formData.principalEmail, 'Principal email');
+        if (principalEmailErr) {
+          errors.principalEmail = principalEmailErr;
+        }
       }
       if (formData.principalPassword && formData.principalPassword.length < 6) {
         errors.principalPassword = 'Principal password must be at least 6 characters.';
@@ -598,6 +614,10 @@ const GetAccess = () => {
                         placeholder="admin@institution.edu"
                         value={formData.email}
                         onChange={handleChange}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck="false"
+                        style={{ textTransform: 'lowercase' }}
                         required
                       />
                     </div>
@@ -618,6 +638,9 @@ const GetAccess = () => {
                         placeholder="e.g. 9876543210"
                         value={formData.phone}
                         onChange={handleChange}
+                        maxLength={10}
+                        inputMode="numeric"
+                        pattern="[6-9][0-9]{9}"
                         required
                       />
                     </div>
@@ -719,6 +742,10 @@ const GetAccess = () => {
                                 placeholder="principal@institution.edu"
                                 value={formData.principalEmail}
                                 onChange={handleChange}
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck="false"
+                                style={{ textTransform: 'lowercase' }}
                               />
                             </div>
                             {formErrors.principalEmail && (

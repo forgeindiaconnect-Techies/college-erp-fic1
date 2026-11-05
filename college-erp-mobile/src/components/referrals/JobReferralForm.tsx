@@ -11,6 +11,7 @@ import {
 import ModalSelect from './ModalSelect';
 import DynamicFieldSection, { DynamicFieldDef } from './DynamicFieldSection';
 import { apiPost, type MobileUser } from '../../services/api';
+import { cleanPhoneInput, cleanEmailInput, getMobileValidationError, getEmailValidationError } from '../../utils/validationHelper';
 
 interface Props {
   user: MobileUser;
@@ -229,12 +230,8 @@ export default function JobReferralForm({
     if (!candidateName.trim()) {
       errs.candidateName = 'Candidate full name is required.';
     }
-    const cleanDigits = candidatePhone.replace(/\D/g, '');
-    if (!cleanDigits) {
-      errs.candidatePhone = 'Mobile number is required.';
-    } else if (!/^[6-9]\d{9}$/.test(cleanDigits)) {
-      errs.candidatePhone = 'Enter a valid 10-digit Indian mobile number.';
-    }
+    const phoneErr = getMobileValidationError(candidatePhone, 'Candidate Mobile');
+    if (phoneErr) errs.candidatePhone = phoneErr;
     if (!candidateEmail.trim()) {
       errs.candidateEmail = 'Candidate email is required for interview scheduling.';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidateEmail.trim())) {
@@ -328,7 +325,7 @@ export default function JobReferralForm({
       setSubmitting(true);
       setGeneralError(null);
 
-      const cleanPhone = candidatePhone.replace(/\D/g, '').slice(-10);
+      const cleanPhone = candidatePhone.replace(/\D/g, '');
       const summaryText = `${candidateName.trim()} - ${companyName} (${jobRole})`;
       const consentTimestamp = new Date().toISOString();
       const consentNoticeVersion = formConfig?.generalSettings?.consentNoticeVersion || 'v1.2-FIC-JOB-CONSENT';

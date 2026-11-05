@@ -26,6 +26,10 @@ const staffSchema = new mongoose.Schema({
 
 staffSchema.pre('save', function() {
   if (this.email) this.email = this.email.trim().toLowerCase();
+  if (this.phone) {
+    const d = String(this.phone).trim().replace(/\D/g, '');
+    this.phone = (d.length === 12 && d.startsWith('91')) ? d.slice(2) : ((d.length === 11 && d.startsWith('0')) ? d.slice(1) : d);
+  }
 });
 
 // Compound unique index: same staff ID / email is allowed across different colleges

@@ -1,3 +1,4 @@
+import { validateMobileNumber, validateEmail, normalizeEmail, cleanMobileNumber } from '../utils/validationHelper.js';
 import express from 'express';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
@@ -576,11 +577,11 @@ router.post('/', protect, authorize('Admin', 'Super Admin'), async (req, res) =>
     if (!name || !email || !password || !phone) {
       return res.status(400).json({ success: false, message: 'Name, phone, email, and password are required' });
     }
-    const cleanWmn = String(phone).trim().replace(/\D/g, '');
-    const wmn10 = cleanWmn.length > 10 ? cleanWmn.slice(-10) : cleanWmn;
-    if (!/^[6-9]\d{9}$/.test(wmn10)) {
-      return res.status(400).json({ success: false, message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+    const pVal = validateMobileNumber(phone, 'Watchman phone number', true);
+    if (!pVal.isValid) {
+      return res.status(400).json({ success: false, message: pVal.message });
     }
+    const wmn10 = pVal.cleaned;
 
     const tenantId = getTenant(req);
 
@@ -1027,11 +1028,11 @@ const handleVisitorEntry = async (req, res) => {
     if (!name || !phone || !purpose || !personToMeet) {
       return res.status(400).json({ success: false, message: 'Name, phone, purpose, and person to meet are required' });
     }
-    const cleanPhone = String(phone).trim().replace(/\D/g, '');
-    const phone10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
-    if (!/^[6-9]\d{9}$/.test(phone10)) {
-      return res.status(400).json({ success: false, message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+    const pVal = validateMobileNumber(phone, 'Visitor phone number', true);
+    if (!pVal.isValid) {
+      return res.status(400).json({ success: false, message: pVal.message });
     }
+    const phone10 = pVal.cleaned;
 
     const tenantId = getTenant(req) || req.user?.collegeId || 'COL001';
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -1701,11 +1702,11 @@ router.post('/visitors/pre-register', protect, authorize('Watchman', 'Admin', 'S
         message: 'Name, phone number, purpose of visit, and host / person to meet are required.'
       });
     }
-    const cleanPrePhone = String(phone).trim().replace(/\D/g, '');
-    const prePhone10 = cleanPrePhone.length > 10 ? cleanPrePhone.slice(-10) : cleanPrePhone;
-    if (!/^[6-9]\d{9}$/.test(prePhone10)) {
-      return res.status(400).json({ success: false, message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+    const pVal = validateMobileNumber(phone, 'Pre-registered phone number', true);
+    if (!pVal.isValid) {
+      return res.status(400).json({ success: false, message: pVal.message });
     }
+    const prePhone10 = pVal.cleaned;
 
     const count = await VisitorLog.countDocuments();
     const visitorId = `V-${Date.now().toString().slice(-4)}${Math.floor(100 + Math.random() * 900)}`;
@@ -5284,11 +5285,11 @@ router.post('/campus-people', protect, authorize('Watchman', 'Admin', 'Super Adm
       return res.status(400).json({ success: false, message: 'Person Name is required' });
     }
     if (phone && String(phone).trim()) {
-      const cleanCp = String(phone).trim().replace(/\D/g, '');
-      const cp10 = cleanCp.length > 10 ? cleanCp.slice(-10) : cleanCp;
-      if (!/^[6-9]\d{9}$/.test(cp10)) {
-        return res.status(400).json({ success: false, message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
-      }
+      const pVal = validateMobileNumber(phone, 'Phone number', false);
+    if (!pVal.isValid) {
+      return res.status(400).json({ success: false, message: pVal.message });
+    }
+    const cp10 = pVal.cleaned;
     }
 
     const tenantId = getTenant(req);

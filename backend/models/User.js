@@ -36,7 +36,16 @@ const userSchema = new mongoose.Schema({
   phone: {
     type: String,
     default: null,
-    trim: true
+    trim: true,
+    validate: {
+      validator: function(v) {
+        if (!v) return true;
+        const d = String(v).trim().replace(/\D/g, '');
+        const p10 = (d.length === 12 && d.startsWith('91')) ? d.slice(2) : ((d.length === 11 && d.startsWith('0')) ? d.slice(1) : d);
+        return /^[6-9]\d{9}$/.test(p10);
+      },
+      message: 'Mobile number must contain exactly 10 digits starting with 6, 7, 8, or 9'
+    }
   },
   wardenType: {
     type: String,
@@ -70,7 +79,14 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Hash password and sync college identifiers before saving
-userSchema.pre('save', async function() {
+userSchema.pre('save', async function () {
+  if (this.email) {
+    this.email = this.email.trim().toLowerCase();
+  }
+  if (this.phone) {
+    const d = String(this.phone).trim().replace(/\D/g, '');
+    this.phone = (d.length === 12 && d.startsWith('91')) ? d.slice(2) : ((d.length === 11 && d.startsWith('0')) ? d.slice(1) : d);
+  }
   if (!this.collegeId && this.tenantId) {
     this.collegeId = this.tenantId;
   }

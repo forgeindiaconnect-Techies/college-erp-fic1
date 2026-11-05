@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { apiPost, type MobileUser } from '../../services/api';
+import { cleanPhoneInput, cleanEmailInput, getMobileValidationError, getEmailValidationError } from '../../utils/validationHelper';
 
 export type PersonType = 'Student' | 'Staff' | 'HOD' | 'Visitor';
 
@@ -175,11 +176,17 @@ export default function WatchmanRegisterPersonModal({
       setErrorMsg('Contact Mobile Number is required.');
       return;
     }
-    const cleanDigits = phone.trim().replace(/\D/g, '');
-    const phone10 = cleanDigits.length > 10 ? cleanDigits.slice(-10) : cleanDigits;
-    if (!/^[6-9]\d{9}$/.test(phone10)) {
-      setErrorMsg('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9.');
+    const phoneErr = getMobileValidationError(phone, 'Contact Mobile Number');
+    if (phoneErr) {
+      setErrorMsg(phoneErr);
       return;
+    }
+    if (email && email.trim()) {
+      const emailErr = getEmailValidationError(email, 'Email address');
+      if (emailErr) {
+        setErrorMsg(emailErr);
+        return;
+      }
     }
 
     try {
@@ -191,7 +198,7 @@ export default function WatchmanRegisterPersonModal({
         name: name.trim(),
         personType,
         personId: personId.trim() || undefined,
-        phone: phone.trim().replace(/\D/g, '').slice(-10),
+        phone: phone.trim().replace(/\D/g, ''),
         email: email.trim().toLowerCase(),
         department,
         designation: designation.trim() || (personType === 'HOD' ? 'Head of Department' : personType === 'Staff' ? 'Faculty' : personType === 'Student' ? 'Student' : 'Visitor'),
@@ -561,9 +568,9 @@ export default function WatchmanRegisterPersonModal({
                     placeholder="e.g. 9840123456"
                     placeholderTextColor="#94A3B8"
                     keyboardType="phone-pad"
-                    maxLength={15}
                     value={phone}
-                    onChangeText={setPhone}
+                    onChangeText={(t) => setPhone(cleanPhoneInput(t))}
+                    maxLength={10}
                   />
                 </View>
 

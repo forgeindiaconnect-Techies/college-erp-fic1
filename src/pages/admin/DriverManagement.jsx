@@ -9,6 +9,7 @@ import {
   deleteTransportDriver, getTransportVehicles, getTransportRoutes 
 } from '../../api/index';
 import useRealtimeSync, { emitERPDataUpdate } from '../../hooks/useRealtimeSync';
+import { cleanPhoneInput, cleanEmailInput, getMobileValidationError, getEmailValidationError } from '../../utils/validationHelper';
 import './DriverManagement.css';
 
 const EMPTY_FORM = { 
@@ -502,7 +503,9 @@ const DriverManagement = () => {
                       type="email"
                       placeholder="e.g. driver@college.edu"
                       value={form.email}
-                      onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
+                      onChange={(e) => setForm(prev => ({ ...prev, email: cleanEmailInput(e.target.value) }))}
+                        autoCapitalize="none"
+                        style={{ textTransform: 'lowercase' }}
                       required
                     />
                   </div>
@@ -536,7 +539,9 @@ const DriverManagement = () => {
                       type="text"
                       placeholder="e.g. 9876543210"
                       value={form.phone}
-                      onChange={(e) => setForm(prev => ({ ...prev, phone: e.target.value }))}
+                      onChange={(e) => setForm(prev => ({ ...prev, phone: cleanPhoneInput(e.target.value) }))}
+                        maxLength={10}
+                        inputMode="numeric"
                       required
                     />
                   </div>

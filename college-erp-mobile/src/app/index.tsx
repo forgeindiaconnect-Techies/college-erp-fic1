@@ -37,51 +37,87 @@ import WatchmanDashboard from '../components/dashboards/WatchmanDashboard';
 // ── Screen and Image Scale Calculations for Exact 1:1 Reference ──
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const LOGIN_REF_IMAGE = require('../../assets/images/login_reference.jpg');
-const loginAsset = Image.resolveAssetSource(LOGIN_REF_IMAGE);
-const IMG_RATIO =
-  loginAsset && loginAsset.width && loginAsset.height
-    ? loginAsset.height / loginAsset.width
-    : 844 / 390;
-const SCALED_IMG_HEIGHT = SCREEN_WIDTH * IMG_RATIO;
-const TOP_BANNER_HEIGHT = Math.round(SCALED_IMG_HEIGHT * 0.282);
-const TOP_OFFSET = Math.round(SCALED_IMG_HEIGHT * 0.042);
-const BOTTOM_IMG_OFFSET =
-  Platform.OS === 'android'
-    ? Math.round(SCALED_IMG_HEIGHT * 0.018)
-    : Math.round(SCALED_IMG_HEIGHT * 0.012);
-const BOTTOM_SECTION_HEIGHT = Math.round(SCALED_IMG_HEIGHT * 0.245);
+const SUPERADMIN_BG_IMAGE = require('../../assets/images/superadmin_bg_reference.jpg');
+
+// Crop the top 54px of the reference mockup so the fake status bar (9:41, wifi, battery) is 100% removed
+const STATUS_BAR_CROP = Math.round(SCREEN_WIDTH * (54 / 501));
+// Height of the hero banner after cropping top status bar, showing full "Super Admin Panel" badge + organic wave
+const HERO_BANNER_HEIGHT = Math.round(SCREEN_WIDTH * ((455 - 54) / 501));
 
 // ── Sleek Minimal Vector Outline Icons (Exact Match to Reference Mockup) ──
-function OutlineMailIcon({ focused }: { focused?: boolean }) {
-  const strokeColor = focused ? '#2878E5' : '#64748B';
+function OutlineUserIcon({ focused }: { focused?: boolean }) {
+  const strokeColor = focused ? '#1D4ED8' : '#2563EB';
   return (
-    <View style={iconStyles.envelopeBox}>
-      <View style={[iconStyles.envelopeBody, { borderColor: strokeColor }]} />
-      <View style={[iconStyles.envelopeFlap, { borderColor: strokeColor }]} />
+    <View style={{ width: 22, height: 22, marginRight: 10, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 8.5, height: 8.5, borderRadius: 4.25, borderWidth: 1.6, borderColor: strokeColor, marginBottom: 1.5 }} />
+      <View style={{ width: 16, height: 7, borderTopLeftRadius: 8, borderTopRightRadius: 8, borderWidth: 1.6, borderBottomWidth: 0, borderColor: strokeColor }} />
     </View>
   );
 }
 
 function OutlineLockIcon({ focused }: { focused?: boolean }) {
-  const strokeColor = focused ? '#2878E5' : '#64748B';
+  const strokeColor = focused ? '#1D4ED8' : '#2563EB';
   return (
-    <View style={iconStyles.lockContainer}>
-      <View style={[iconStyles.lockShackle, { borderColor: strokeColor }]} />
-      <View style={[iconStyles.lockBody, { borderColor: strokeColor }]}>
-        <View style={[iconStyles.lockKeyhole, { backgroundColor: strokeColor }]} />
+    <View style={{ width: 22, height: 22, marginRight: 10, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 9, height: 7, borderTopLeftRadius: 4.5, borderTopRightRadius: 4.5, borderWidth: 1.6, borderBottomWidth: 0, borderColor: strokeColor, marginBottom: -1 }} />
+      <View style={{ width: 15, height: 11, borderRadius: 2.5, borderWidth: 1.6, borderColor: strokeColor, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+        <View style={{ width: 2, height: 3.5, backgroundColor: strokeColor, borderRadius: 1 }} />
       </View>
     </View>
   );
 }
 
 function OutlineEyeIcon({ active }: { active?: boolean }) {
-  const strokeColor = '#64748B';
+  const strokeColor = '#94A3B8';
   return (
-    <View style={iconStyles.eyeContainer}>
-      <View style={[iconStyles.eyeOutline, { borderColor: strokeColor }]}>
-        <View style={[iconStyles.eyePupil, { backgroundColor: strokeColor }]} />
+    <View style={{ width: 24, height: 20, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 18, height: 12, borderRadius: 9, borderWidth: 1.6, borderColor: strokeColor, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: strokeColor }} />
       </View>
-      {!active && <View style={[iconStyles.eyeSlash, { backgroundColor: strokeColor }]} />}
+      {!active && <View style={{ position: 'absolute', width: 20, height: 1.6, backgroundColor: strokeColor, transform: [{ rotate: '-45deg' }] }} />}
+    </View>
+  );
+}
+
+function CircleArrowIcon() {
+  return (
+    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+      <Text style={{ color: '#1E5BF8', fontSize: 13, fontWeight: '900', marginTop: -1 }}>→</Text>
+    </View>
+  );
+}
+
+function WatermarkCrownShield() {
+  return (
+    <View style={styles.watermarkCrownShieldBox}>
+      {/* 5 Tip Dots */}
+      <View style={{ width: 34, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+        <View style={{ width: 4.5, height: 4.5, borderRadius: 2.25, backgroundColor: '#FFFFFF', marginTop: 4 }} />
+        <View style={{ width: 4.5, height: 4.5, borderRadius: 2.25, backgroundColor: '#FFFFFF', marginTop: 1 }} />
+        <View style={{ width: 5.5, height: 5.5, borderRadius: 2.75, backgroundColor: '#FFFFFF', marginTop: -3 }} />
+        <View style={{ width: 4.5, height: 4.5, borderRadius: 2.25, backgroundColor: '#FFFFFF', marginTop: 1 }} />
+        <View style={{ width: 4.5, height: 4.5, borderRadius: 2.25, backgroundColor: '#FFFFFF', marginTop: 4 }} />
+      </View>
+      {/* 5 Spikes */}
+      <View style={{ width: 32, height: 13, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <View style={{ width: 4, height: 8, backgroundColor: '#FFFFFF', borderTopLeftRadius: 2, borderTopRightRadius: 2 }} />
+        <View style={{ width: 4.5, height: 11, backgroundColor: '#FFFFFF', borderTopLeftRadius: 2.25, borderTopRightRadius: 2.25 }} />
+        <View style={{ width: 5.5, height: 14, backgroundColor: '#FFFFFF', borderTopLeftRadius: 2.75, borderTopRightRadius: 2.75 }} />
+        <View style={{ width: 4.5, height: 11, backgroundColor: '#FFFFFF', borderTopLeftRadius: 2.25, borderTopRightRadius: 2.25 }} />
+        <View style={{ width: 4, height: 8, backgroundColor: '#FFFFFF', borderTopLeftRadius: 2, borderTopRightRadius: 2 }} />
+      </View>
+      {/* Crown base horizontal bar */}
+      <View style={{ width: 34, height: 3.5, backgroundColor: '#FFFFFF', borderRadius: 2, marginTop: 2 }} />
+    </View>
+  );
+}
+
+function SleekShieldIcon() {
+  return (
+    <View style={styles.shieldPill}>
+      <View style={styles.shieldVectorShape}>
+        <Text style={styles.shieldCheckText}>✓</Text>
+      </View>
     </View>
   );
 }
@@ -287,10 +323,10 @@ export default function MobileApp() {
       if (!user.role) {
         throw new Error('Authenticated account does not have a designated campus role. Please contact administration.');
       }
-      const MOBILE_ALLOWED_ROLES = ['Staff', 'Student', 'Driver', 'Watchman', 'Parent'];
-      if (!MOBILE_ALLOWED_ROLES.includes(user.role)) {
+      const MOBILE_ALLOWED_ROLES = ['Staff', 'Student', 'Driver', 'Watchman', 'Parent', 'Super Admin', 'Admin'];
+      if (!MOBILE_ALLOWED_ROLES.map(r => r.toLowerCase()).includes(user.role.toLowerCase())) {
         await logoutUser();
-        throw new Error(`Access Denied: The Mobile Application is strictly restricted to Staff, Student, Driver, Watchman, and Parent accounts. Your role (${user.role}) is not authorized on mobile. Please log in via the Web Portal.`);
+        throw new Error(`Access Denied: The Mobile Application is strictly restricted to Staff, Student, Driver, Watchman, Parent, and Super Admin accounts. Your role (${user.role}) is not authorized on mobile. Please log in via the Web Portal.`);
       }
 
       // 3. Set authenticated state (triggers automatic role-based navigation)
@@ -396,6 +432,52 @@ export default function MobileApp() {
             return <StaffDashboard user={currentUser} onLogout={handleLogout} />;
           }
 
+          // 6. Super Admin / Admin Console View
+          if (rawRole === 'super admin' || rawRole === 'admin') {
+            return (
+              <ScrollView contentContainerStyle={styles.superAdminConsoleContainer}>
+                <View style={styles.superAdminConsoleHeader}>
+                  <View style={styles.superAdminCrownBox}>
+                    <Text style={{ fontSize: 28 }}>👑</Text>
+                  </View>
+                  <Text style={styles.superAdminConsoleTitle}>Super Admin Console</Text>
+                  <Text style={styles.superAdminConsoleSub}>
+                    Enterprise Multi-Tenant Root • {currentUser.name || 'Administrator'}
+                  </Text>
+                </View>
+
+                <View style={styles.superAdminKpiGrid}>
+                  <View style={styles.superAdminKpiCard}>
+                    <Text style={styles.superAdminKpiLabel}>Session Security</Text>
+                    <Text style={[styles.superAdminKpiVal, { color: '#059669' }]}>Root Active</Text>
+                    <Text style={styles.superAdminKpiHint}>256-Bit TLS End-to-End Encrypted</Text>
+                  </View>
+
+                  <View style={styles.superAdminKpiCard}>
+                    <Text style={styles.superAdminKpiLabel}>Mobile Ecosystem</Text>
+                    <Text style={[styles.superAdminKpiVal, { color: '#2563EB' }]}>5 Roles Live</Text>
+                    <Text style={styles.superAdminKpiHint}>Staff, Student, Driver, Watchman, Parent</Text>
+                  </View>
+                </View>
+
+                <View style={styles.superAdminInfoBox}>
+                  <Text style={styles.superAdminInfoTitle}>🛡️ Enterprise Management Console</Text>
+                  <Text style={styles.superAdminInfoText}>
+                    Full college ERP institution provisioning, database migration, fee billing configurations, and academic syllabus setups can also be accessed via the Enterprise Web Portal.
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.primaryActionButton}
+                  onPress={handleLogout}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.primaryActionButtonText}>Sign Out Super Admin Session</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            );
+          }
+
           // Unassigned / Unrecognized Role Security Safeguard
           return (
             <ScrollView contentContainerStyle={styles.unsupportedRoleContainer}>
@@ -427,10 +509,10 @@ export default function MobileApp() {
     );
   }
 
-  // ── Premium College ERP Mobile App Login Screen ──
+  // ── Premium College ERP Super Admin Mobile App Login Screen ──
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={styles.superAdminSafeArea} edges={['top', 'left', 'right']}>
+      <StatusBar style="light" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
@@ -440,60 +522,69 @@ export default function MobileApp() {
         <ScrollView
           ref={scrollViewRef}
           style={{ flex: 1 }}
-          contentContainerStyle={styles.loginScrollContainer}
+          contentContainerStyle={styles.superAdminScrollContainer}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           bounces={false}
           overScrollMode="never"
         >
-          {/* ── Top Branding Section (Exact 1:1 Reference Mockup Header) ── */}
-          <View style={[styles.topHeaderContainer, { height: TOP_BANNER_HEIGHT }]}>
+          {/* ── Top Hero Banner (Campus Architecture, Crest, and Super Admin Badge) ── */}
+          <View style={[styles.superAdminHeroBanner, { height: HERO_BANNER_HEIGHT }]}>
             <Image
-              source={LOGIN_REF_IMAGE}
+              source={SUPERADMIN_BG_IMAGE}
               style={{
                 width: SCREEN_WIDTH,
-                height: SCALED_IMG_HEIGHT,
+                height: Math.round(SCREEN_WIDTH * (728 / 501)),
                 position: 'absolute',
-                top: -TOP_OFFSET,
+                top: -STATUS_BAR_CROP,
                 left: 0,
               }}
               resizeMode="cover"
             />
           </View>
 
-          <Animated.View style={{ opacity: fadeAnim, width: '100%', flex: 1, justifyContent: 'center' }}>
-            {/* ── Login Form Section (Dominant & Centered) ── */}
-            <View style={styles.formContainer}>
-              <Text style={styles.formHeading}>Welcome Back!</Text>
-              <Text style={styles.formSubtitle}>Sign in to your college account</Text>
+          {/* ── Floating White Login Card (All 4 Corners Rounded, Exact Image 1) ── */}
+          <View style={styles.superAdminCardContainer}>
+            {/* Soft Light-Blue Watermark Shield with 5-Point Crown (Top-Right) */}
+            <WatermarkCrownShield />
 
-              {/* Error Alert Banner */}
-              {errorMessage ? (
-                <View style={styles.errorAlert}>
-                  <Text style={styles.errorAlertIcon}>⚠️</Text>
-                  <Text style={styles.errorAlertText}>{errorMessage}</Text>
-                  <TouchableOpacity
-                    onPress={() => setErrorMessage(null)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Text style={styles.errorDismissText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
+            {/* Welcome Heading */}
+            <View style={styles.welcomeBox}>
+              <Text style={styles.welcomeHeading}>Welcome Back!</Text>
+              <Text style={styles.welcomeSubheading}>
+                Sign in to access the Super Admin Dashboard
+              </Text>
+            </View>
 
-              {/* Input 1: Email ID */}
+            {/* Error Alert Banner */}
+            {errorMessage ? (
+              <View style={styles.superAdminErrorAlert}>
+                <Text style={styles.errorAlertIcon}>⚠️</Text>
+                <Text style={styles.errorAlertText}>{errorMessage}</Text>
+                <TouchableOpacity
+                  onPress={() => setErrorMessage(null)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.errorDismissText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {/* ── Form Fields ── */}
+            <View style={styles.superAdminFormFields}>
+              {/* Field 1: Admin Email ID */}
               <View
                 style={[
-                  styles.roundedInputContainer,
-                  emailFocused && styles.roundedInputFocused,
-                  !email && errorMessage && styles.roundedInputError,
+                  styles.superAdminInputWrapper,
+                  emailFocused && styles.superAdminInputFocused,
+                  !email && errorMessage ? styles.superAdminInputError : null,
                 ]}
               >
-                <OutlineMailIcon focused={emailFocused} />
+                <OutlineUserIcon focused={emailFocused} />
                 <TextInput
                   ref={emailInputRef}
-                  style={styles.roundedTextInput}
-                  placeholder="Email ID"
+                  style={styles.superAdminTextInput}
+                  placeholder="Admin Email ID"
                   placeholderTextColor="#94A3B8"
                   value={email}
                   onChangeText={(val) => {
@@ -508,8 +599,8 @@ export default function MobileApp() {
                   returnKeyType="next"
                   onSubmitEditing={() => passwordInputRef.current?.focus()}
                   blurOnSubmit={false}
-                  cursorColor="#123B70"
-                  selectionColor="#D0E4FF"
+                  cursorColor="#1D4ED8"
+                  selectionColor="#DBEAFE"
                 />
                 {email.length > 0 && !isSubmitting && (
                   <TouchableOpacity
@@ -521,19 +612,18 @@ export default function MobileApp() {
                 )}
               </View>
 
-              {/* Input 2: Password */}
+              {/* Field 2: Password */}
               <View
                 style={[
-                  styles.roundedInputContainer,
-                  { marginTop: 16 },
-                  passwordFocused && styles.roundedInputFocused,
-                  !password && errorMessage && styles.roundedInputError,
+                  styles.superAdminInputWrapper,
+                  passwordFocused && styles.superAdminInputFocused,
+                  !password && errorMessage ? styles.superAdminInputError : null,
                 ]}
               >
                 <OutlineLockIcon focused={passwordFocused} />
                 <TextInput
                   ref={passwordInputRef}
-                  style={styles.roundedTextInput}
+                  style={[styles.superAdminTextInput, { paddingRight: 38 }]}
                   placeholder="Password"
                   placeholderTextColor="#94A3B8"
                   value={password}
@@ -548,22 +638,31 @@ export default function MobileApp() {
                   autoCorrect={false}
                   returnKeyType="done"
                   onSubmitEditing={handleLogin}
-                  cursorColor="#123B70"
-                  selectionColor="#D0E4FF"
+                  cursorColor="#1D4ED8"
+                  selectionColor="#DBEAFE"
                 />
                 <TouchableOpacity
-                  style={styles.eyeToggleBtn}
+                  style={styles.superAdminEyeBtn}
                   onPress={() => setShowPassword((prev) => !prev)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  accessibilityRole="button"
-                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                 >
                   <OutlineEyeIcon active={showPassword} />
                 </TouchableOpacity>
               </View>
 
-              {/* Forgot Password Right-Aligned Link */}
-              <View style={styles.forgotPasswordRow}>
+              {/* Options Row: Remember Me & Forgot Password? */}
+              <View style={styles.superAdminOptionsRow}>
+                <TouchableOpacity
+                  style={styles.superAdminCheckboxContainer}
+                  onPress={() => setRememberMe(!rememberMe)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.superAdminCheckbox, rememberMe && styles.superAdminCheckboxActive]}>
+                    {rememberMe && <Text style={styles.superAdminCheckmark}>✓</Text>}
+                  </View>
+                  <Text style={styles.superAdminRememberLabel}>Remember Me</Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity
                   onPress={() => {
                     setForgotEmail(email);
@@ -573,48 +672,70 @@ export default function MobileApp() {
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   activeOpacity={0.75}
                 >
-                  <Text style={styles.forgotPasswordLinkText}>Forgot Password?</Text>
+                  <Text style={styles.superAdminForgotLink}>Forgot Password?</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Royal Blue Full-Width Login Button */}
+              {/* Sign In Button with Circle Arrow */}
               <TouchableOpacity
                 style={[
-                  styles.primaryLoginBtn,
-                  isSubmitting && styles.primaryLoginBtnDisabled,
+                  styles.superAdminSignInBtn,
+                  isSubmitting && styles.superAdminSignInBtnDisabled,
                 ]}
                 onPress={handleLogin}
                 disabled={isSubmitting}
                 activeOpacity={0.88}
               >
                 {isSubmitting ? (
-                  <View style={styles.loginLoadingRow}>
+                  <View style={styles.superAdminBtnContentRow}>
                     <ActivityIndicator size="small" color="#FFFFFF" />
-                    <Text style={styles.primaryLoginBtnText}>Signing in...</Text>
+                    <Text style={styles.superAdminSignInBtnText}>Signing in...</Text>
                   </View>
                 ) : (
-                  <View style={styles.loginBtnContentRow}>
-                    <Text style={styles.primaryLoginBtnText}>Login</Text>
-                    <Text style={styles.loginBtnArrowIcon}>→</Text>
+                  <View style={styles.superAdminBtnContentRow}>
+                    <CircleArrowIcon />
+                    <Text style={styles.superAdminSignInBtnText}>Sign In</Text>
                   </View>
                 )}
               </TouchableOpacity>
             </View>
-          </Animated.View>
 
-          {/* ── Bottom Educational Illustration (Exact 1:1 Reference Mockup Bottom) ── */}
-          <View style={[styles.bottomIllustrationContainer, { height: BOTTOM_SECTION_HEIGHT }]}>
-            <Image
-              source={LOGIN_REF_IMAGE}
-              style={{
-                width: SCREEN_WIDTH,
-                height: SCALED_IMG_HEIGHT,
-                position: 'absolute',
-                bottom: BOTTOM_IMG_OFFSET,
-                left: 0,
-              }}
-              resizeMode="cover"
-            />
+            {/* ── Secure Access Section ── */}
+            <View style={styles.secureAccessContainer}>
+              <View style={styles.secureAccessDividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>Secure Access</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <View style={styles.secureAccessCard}>
+                <SleekShieldIcon />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.secureCardTitle}>College ERP Platform</Text>
+                  <Text style={styles.secureCardSubtitle}>Trusted • Secure • Scalable</Text>
+                </View>
+                <View style={styles.skylineGraphic}>
+                  <View style={[styles.skylineBar, { height: 8 }]} />
+                  <View style={[styles.skylineBar, { height: 15 }]} />
+                  <View style={[styles.skylineBar, { height: 22, backgroundColor: '#60A5FA' }]} />
+                  <View style={[styles.skylineBar, { height: 12 }]} />
+                  <View style={[styles.skylineBar, { height: 18 }]} />
+                  <View style={[styles.skylineBar, { height: 26, width: 3, backgroundColor: '#3B82F6' }]} />
+                  <View style={[styles.skylineBar, { height: 14 }]} />
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* ── Bottom Layered Waves & Copyright (Outside Card, Exact Image 1) ── */}
+          <View style={styles.bottomWavesSection}>
+            <View style={styles.cyanWaveLeft} />
+            <View style={styles.cyanWaveRight} />
+            <View style={styles.waveLayerDeepBlue}>
+              <Text style={styles.copyrightText}>
+                © 2026 College ERP. All rights reserved.
+              </Text>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1108,5 +1229,409 @@ const styles = StyleSheet.create({
     height: 44,
     fontSize: 14,
     color: '#111827',
+  },
+
+  /* ── Super Admin Login Screen Styles (Exact Match to Image 2) ── */
+  superAdminSafeArea: {
+    flex: 1,
+    backgroundColor: '#072B6B',
+  },
+  superAdminScrollContainer: {
+    flexGrow: 1,
+    backgroundColor: '#072B6B',
+  },
+  superAdminHeroBanner: {
+    width: '100%',
+    overflow: 'hidden',
+    backgroundColor: '#072B6B',
+    position: 'relative',
+  },
+
+  /* Full Width White Card (Seamless Edge-to-Edge with Organic Curve, Exact Match to Image 1) */
+  superAdminCardContainer: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 24,
+    marginTop: -8,
+    shadowColor: '#072B6B',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+    position: 'relative',
+  },
+  watermarkCrownShieldBox: {
+    position: 'absolute',
+    top: 14,
+    right: 20,
+    width: 68,
+    height: 76,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
+    borderBottomLeftRadius: 34,
+    borderBottomRightRadius: 34,
+    backgroundColor: '#E0EDFD',
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.95,
+    paddingTop: 4,
+  },
+
+  welcomeBox: {
+    marginBottom: 18,
+    paddingRight: 72,
+  },
+  welcomeHeading: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#0F265C',
+    letterSpacing: -0.4,
+  },
+  welcomeSubheading: {
+    fontSize: 12.5,
+    fontWeight: '500',
+    color: '#5B6F88',
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  superAdminErrorAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+    gap: 8,
+  },
+
+  /* Form Fields */
+  superAdminFormFields: {
+    gap: 14,
+  },
+  superAdminInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.2,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 50,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  superAdminInputFocused: {
+    borderColor: '#2563EB',
+    borderWidth: 1.6,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  superAdminInputError: {
+    borderColor: '#DC2626',
+  },
+  superAdminTextInput: {
+    flex: 1,
+    fontSize: 13.5,
+    fontWeight: '500',
+    color: '#0F172A',
+  },
+  superAdminEyeBtn: {
+    padding: 6,
+  },
+  superAdminOptionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  superAdminCheckboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  superAdminCheckbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    borderWidth: 1.6,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  superAdminCheckboxActive: {
+    backgroundColor: '#1E5BF8',
+    borderColor: '#1E5BF8',
+  },
+  superAdminCheckmark: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 12,
+  },
+  superAdminRememberLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  superAdminForgotLink: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1E5BF8',
+  },
+
+  /* Button */
+  superAdminSignInBtn: {
+    backgroundColor: '#1E5BF8',
+    borderRadius: 14,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#1E5BF8',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
+    marginTop: 6,
+  },
+  superAdminSignInBtnDisabled: {
+    opacity: 0.7,
+  },
+  superAdminBtnContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  superAdminSignInBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+
+  /* Secure Access Section */
+  secureAccessContainer: {
+    marginTop: 18,
+    marginBottom: 14,
+  },
+  secureAccessDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dividerText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    paddingHorizontal: 10,
+  },
+  secureAccessCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F7FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  shieldPill: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shieldVectorShape: {
+    width: 16,
+    height: 18,
+    borderTopLeftRadius: 7,
+    borderTopRightRadius: 7,
+    borderBottomLeftRadius: 7,
+    borderBottomRightRadius: 7,
+    borderWidth: 1.8,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shieldCheckText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '900',
+    marginTop: -1,
+  },
+  secureCardTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F265C',
+  },
+  secureCardSubtitle: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#2563EB',
+    marginTop: 1,
+  },
+  skylineGraphic: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 2,
+    opacity: 0.35,
+  },
+  skylineBar: {
+    width: 4,
+    backgroundColor: '#93C5FD',
+    borderRadius: 1,
+  },
+
+  /* Bottom Waves Section (Outside Card on Deep Blue Screen Background, Exact Image 1) */
+  bottomWavesSection: {
+    width: '100%',
+    position: 'relative',
+    marginTop: 14,
+    overflow: 'hidden',
+  },
+  cyanWaveLeft: {
+    position: 'absolute',
+    top: -4,
+    left: -20,
+    width: 140,
+    height: 40,
+    backgroundColor: '#38BDF8',
+    opacity: 0.88,
+    borderTopRightRadius: 44,
+    borderBottomRightRadius: 28,
+    transform: [{ rotate: '-6deg' }],
+  },
+  cyanWaveRight: {
+    position: 'absolute',
+    top: -2,
+    right: -20,
+    width: 130,
+    height: 38,
+    backgroundColor: '#0284C7',
+    opacity: 0.8,
+    borderTopLeftRadius: 44,
+    borderBottomLeftRadius: 28,
+    transform: [{ rotate: '6deg' }],
+  },
+  waveLayerDeepBlue: {
+    backgroundColor: '#072B6B',
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  copyrightText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#BAE6FD',
+    letterSpacing: 0.4,
+  },
+
+  /* Super Admin Console Dashboard View */
+  superAdminConsoleContainer: {
+    flexGrow: 1,
+    padding: 20,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  superAdminConsoleHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  superAdminCrownBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  superAdminConsoleTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  superAdminConsoleSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  superAdminKpiGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    marginBottom: 16,
+  },
+  superAdminKpiCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  superAdminKpiLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  superAdminKpiVal: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginVertical: 4,
+  },
+  superAdminKpiHint: {
+    fontSize: 10,
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
+  superAdminInfoBox: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    borderRadius: 12,
+    padding: 14,
+    width: '100%',
+    marginBottom: 20,
+  },
+  superAdminInfoTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1D4ED8',
+    marginBottom: 4,
+  },
+  superAdminInfoText: {
+    fontSize: 11,
+    color: '#3B82F6',
+    lineHeight: 16,
   },
 });

@@ -26,6 +26,7 @@ import HighlightCard from './HighlightCard';
 import DailyDutyAttendanceCard from '../common/DailyDutyAttendanceCard';
 import StaffPlacementModule from '../placement/StaffPlacementModule';
 import MobileNotificationCenter from '../notifications/MobileNotificationCenter';
+import { formatDueDateAndTime } from '../../utils/validationHelper';
 
 type Props = {
   user: MobileUser;
@@ -529,7 +530,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   const [marksViewMode, setMarksViewMode] = useState<'cia' | 'semester'>('cia');
   const [selectedMarksSemester, setSelectedMarksSemester] = useState('Semester 2');
   const [selectedMarksSubject, setSelectedMarksSubject] = useState('TAMIL');
-  const [selectedMarksSection, setSelectedMarksSection] = useState('All');
+  const [selectedMarksSection, setSelectedMarksSection] = useState('A');
   const [availableMarksSubjects, setAvailableMarksSubjects] = useState<string[]>(['TAMIL']);
   const [studentMarksData, setStudentMarksData] = useState<StudentMarksMap>({});
   const [marksSearch, setMarksSearch] = useState('');
@@ -541,6 +542,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
   const [newAssignTitle, setNewAssignTitle] = useState('');
   const [newAssignSubject, setNewAssignSubject] = useState('');
   const [newAssignDueDate, setNewAssignDueDate] = useState('');
+  const [newAssignDueTime, setNewAssignDueTime] = useState('11:59 PM');
   const [newAssignDesc, setNewAssignDesc] = useState('');
   const [submittingAssignment, setSubmittingAssignment] = useState(false);
 
@@ -1581,12 +1583,52 @@ export default function StaffDashboard({ user, onLogout }: Props) {
     }
     try {
       setSubmittingAssignment(true);
+
+      // Resolve combined Due Date & Time
+      let resolvedDueDate: string;
+      try {
+        const rawDate = newAssignDueDate.trim();
+        const rawTime = newAssignDueTime.trim() || '11:59 PM';
+
+        let targetDateStr = rawDate;
+        if (!targetDateStr) {
+          const future = new Date(Date.now() + 7 * 86400000);
+          const y = future.getFullYear();
+          const m = String(future.getMonth() + 1).padStart(2, '0');
+          const d = String(future.getDate()).padStart(2, '0');
+          targetDateStr = `${y}-${m}-${d}`;
+        } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(targetDateStr)) {
+          const [d, m, y] = targetDateStr.split('/');
+          targetDateStr = `${y}-${m}-${d}`;
+        }
+
+        let hours = 23;
+        let minutes = 59;
+        const timeMatch = rawTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+        if (timeMatch) {
+          let h = parseInt(timeMatch[1], 10);
+          const m = parseInt(timeMatch[2], 10);
+          const meridian = (timeMatch[3] || '').toUpperCase();
+          if (meridian === 'PM' && h < 12) h += 12;
+          if (meridian === 'AM' && h === 12) h = 0;
+          hours = Math.min(23, Math.max(0, h));
+          minutes = Math.min(59, Math.max(0, m));
+        }
+
+        const dateObj = new Date(`${targetDateStr}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
+        resolvedDueDate = isNaN(dateObj.getTime())
+          ? new Date(`${targetDateStr}T23:59:00`).toISOString()
+          : dateObj.toISOString();
+      } catch {
+        resolvedDueDate = new Date(Date.now() + 7 * 86400000).toISOString();
+      }
+
       const payload = {
         title: newAssignTitle.trim(),
         subject: newAssignSubject.trim(),
         department: faculty.dept,
         semester: 'Sem 6',
-        dueDate: newAssignDueDate.trim() || new Date(Date.now() + 7 * 86400000).toISOString(),
+        dueDate: resolvedDueDate,
         description: newAssignDesc.trim() || 'Please submit solution before the cut-off date.',
         faculty: faculty.name,
       };
@@ -1596,6 +1638,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       setNewAssignTitle('');
       setNewAssignSubject('');
       setNewAssignDueDate('');
+      setNewAssignDueTime('11:59 PM');
       setNewAssignDesc('');
       Alert.alert('Assignment Created', 'The coursework has been assigned to students.');
       loadData();
@@ -3066,7 +3109,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                                       activeOpacity={0.8}
                                       onPress={() => handleOpenStartClass(slot, pIdx + 1)}
                                     >
-                                      <Text style={styles.modernClassStartBtnText}>▶ Start Class</Text>
+                                      <Text style={styles.modernClassStartBtnText} numberOfLines={1}>▶ Start Class</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
@@ -3079,7 +3122,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                                         setAcademicsTab('attendance');
                                       }}
                                     >
-                                      <Text style={styles.modernClassActionBtnText}>📝 Attendance</Text>
+                                      <Text style={styles.modernClassActionBtnText} numberOfLines={1}>📝 Attendance</Text>
                                     </TouchableOpacity>
                                   </View>
                                 </View>
@@ -3707,7 +3750,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                   <View style={styles.filterRowCompact}>
                     <Text style={styles.filterCompactLabel}>Section:</Text>
                     <View style={{ flexDirection: 'row', gap: 6 }}>
-                      {['All', 'A', 'B'].map((sec) => (
+                      {['A', 'B', 'All'].map((sec) => (
                         <TouchableOpacity
                           key={sec}
                           style={[styles.sectionFilterChip, selectedMarksSection === sec && styles.sectionFilterChipActive]}
@@ -3981,11 +4024,16 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                             {item.subject || faculty.dept}
                           </Text>
                         </View>
-                        <View style={styles.assignmentDuePill}>
-                          <Text style={styles.assignmentDuePillText}>
-                            📅 Due: {item.dueDate ? new Date(item.dueDate).toLocaleDateString('en-GB') : 'Upcoming'}
-                          </Text>
-                        </View>
+                        {(() => {
+                          const due = formatDueDateAndTime(item.dueDate);
+                          return (
+                            <View style={[styles.assignmentDuePill, due.isOverdue && styles.assignmentDuePillOverdue]}>
+                              <Text style={[styles.assignmentDuePillText, due.isOverdue && styles.assignmentDuePillTextOverdue]}>
+                                📅 {due.dateStr} • ⏰ {due.timeStr}
+                              </Text>
+                            </View>
+                          );
+                        })()}
                       </View>
 
                       <Text style={styles.assignmentTitleText}>{item.title}</Text>
@@ -5582,13 +5630,46 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               onChangeText={setNewAssignSubject}
             />
 
-            <Text style={styles.inputLabel}>Due Date</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. 2026-10-31"
-              value={newAssignDueDate}
-              onChangeText={setNewAssignDueDate}
-            />
+            <View style={styles.modalDualInputRow}>
+              <View style={styles.modalDualInputCol}>
+                <Text style={styles.inputLabel}>Due Date *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="YYYY-MM-DD"
+                  value={newAssignDueDate}
+                  onChangeText={setNewAssignDueDate}
+                />
+              </View>
+
+              <View style={styles.modalDualInputCol}>
+                <Text style={styles.inputLabel}>Due Time</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. 11:59 PM"
+                  value={newAssignDueTime}
+                  onChangeText={setNewAssignDueTime}
+                />
+              </View>
+            </View>
+
+            {/* Quick Time Selector Chips */}
+            <View style={styles.quickTimeChipRow}>
+              {['11:59 PM', '05:00 PM', '09:00 AM'].map((timePreset) => {
+                const isActive = newAssignDueTime.trim().toLowerCase() === timePreset.toLowerCase();
+                return (
+                  <TouchableOpacity
+                    key={timePreset}
+                    style={[styles.quickTimeChip, isActive && styles.quickTimeChipActive]}
+                    onPress={() => setNewAssignDueTime(timePreset)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.quickTimeChipText, isActive && styles.quickTimeChipTextActive]}>
+                      ⏰ {timePreset}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
             <Text style={styles.inputLabel}>Description / Instructions</Text>
             <TextInput
@@ -5703,15 +5784,13 @@ export default function StaffDashboard({ user, onLogout }: Props) {
 
               <Text style={styles.inputLabel}>Select Category *</Text>
               <View style={styles.supportCategoriesGrid}>
-                {SUPPORT_CATEGORIES.map((cat, idx) => {
+                {SUPPORT_CATEGORIES.map((cat) => {
                   const active = supportType === cat.id;
-                  const isLastFull = idx === SUPPORT_CATEGORIES.length - 1;
                   return (
                     <TouchableOpacity
                       key={cat.id}
                       style={[
                         styles.supportCategoryTile,
-                        isLastFull && styles.supportCategoryTileFull,
                         active && { borderColor: cat.color, backgroundColor: cat.bg },
                       ]}
                       onPress={() => setSupportType(cat.id)}
@@ -7084,31 +7163,67 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }} contentContainerStyle={{ paddingBottom: 10 }}>
-                <View style={[styles.specGrid, { marginVertical: 10 }]}>
-                  <View style={styles.specItem}>
-                    <Text style={styles.specLabel}>Due Date</Text>
-                    <Text style={[styles.specValue, { color: '#DC2626', fontWeight: '800' }]}>
-                      {selectedAssignmentDetails?.dueDate || 'Standard Term'}
-                    </Text>
-                  </View>
-                  <View style={styles.specItem}>
-                    <Text style={styles.specLabel}>Enrolled Submissions</Text>
-                    <Text style={[styles.specValue, { color: '#2563EB', fontWeight: '800' }]}>
-                      {students.length} Scholars
-                    </Text>
-                  </View>
-                </View>
+              {(() => {
+                const dueInfo = formatDueDateAndTime(selectedAssignmentDetails?.dueDate);
+                return (
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }} contentContainerStyle={{ paddingBottom: 10 }}>
+                    {/* Primary Due Date & Due Time 2-Column Aligned Grid */}
+                    <View style={styles.modalDualSpecRow}>
+                      <View style={styles.modalSpecBox}>
+                        <View style={styles.modalSpecLabelRow}>
+                          <Text style={styles.modalSpecIcon}>📅</Text>
+                          <Text style={styles.modalSpecLabel}>Due Date</Text>
+                        </View>
+                        <Text style={[styles.modalSpecValue, { color: '#DC2626' }]}>
+                          {dueInfo.dateStr}
+                        </Text>
+                      </View>
 
-                <Text style={[styles.sectionMinorTitle, { marginTop: 6, marginBottom: 4 }]}>
-                  Assignment Instructions & Objectives
-                </Text>
-                <View style={[styles.serviceCardBox, { padding: 12, backgroundColor: '#F8FAFC' }]}>
-                  <Text style={{ fontSize: 12, color: '#334155', lineHeight: 18 }}>
-                    {selectedAssignmentDetails?.description || 'Complete the assigned problem set and submit the solution PDF before the institutional due date.'}
-                  </Text>
-                </View>
-              </ScrollView>
+                      <View style={styles.modalSpecBox}>
+                        <View style={styles.modalSpecLabelRow}>
+                          <Text style={styles.modalSpecIcon}>⏰</Text>
+                          <Text style={styles.modalSpecLabel}>Due Time</Text>
+                        </View>
+                        <Text style={[styles.modalSpecValue, { color: '#0F172A' }]}>
+                          {dueInfo.timeStr}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Secondary Metrics Row: Enrolled Submissions & Submission Cut-off Status */}
+                    <View style={[styles.modalDualSpecRow, { marginTop: 8 }]}>
+                      <View style={styles.modalSpecBox}>
+                        <View style={styles.modalSpecLabelRow}>
+                          <Text style={styles.modalSpecIcon}>👥</Text>
+                          <Text style={styles.modalSpecLabel}>Enrolled Submissions</Text>
+                        </View>
+                        <Text style={[styles.modalSpecValue, { color: '#2563EB' }]}>
+                          {students.length} Scholars
+                        </Text>
+                      </View>
+
+                      <View style={styles.modalSpecBox}>
+                        <View style={styles.modalSpecLabelRow}>
+                          <Text style={styles.modalSpecIcon}>📌</Text>
+                          <Text style={styles.modalSpecLabel}>Cut-off Status</Text>
+                        </View>
+                        <Text style={[styles.modalSpecValue, { color: dueInfo.isOverdue ? '#DC2626' : '#16A34A' }]}>
+                          {dueInfo.isOverdue ? 'Overdue / Closed' : 'Active / Open'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={[styles.sectionMinorTitle, { marginTop: 14, marginBottom: 6 }]}>
+                      Assignment Instructions & Objectives
+                    </Text>
+                    <View style={[styles.serviceCardBox, { padding: 12, backgroundColor: '#F8FAFC', borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0' }]}>
+                      <Text style={{ fontSize: 13, color: '#334155', lineHeight: 20 }}>
+                        {selectedAssignmentDetails?.description || 'Complete the assigned problem set and submit the solution PDF before the institutional due date.'}
+                      </Text>
+                    </View>
+                  </ScrollView>
+                );
+              })()}
 
               <TouchableOpacity
                 style={[styles.liveCloseBtn, { marginTop: 8 }]}
@@ -8473,6 +8588,84 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
+  // ASSIGNMENT SPEC GRID & DUAL INPUT ROW
+  modalDualSpecRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalSpecBox: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  modalSpecLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  modalSpecIcon: {
+    fontSize: 12,
+  },
+  modalSpecLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  modalSpecValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  modalDualInputRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalDualInputCol: {
+    flex: 1,
+  },
+  quickTimeChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+    marginTop: 2,
+  },
+  quickTimeChip: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  quickTimeChipActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#3B82F6',
+  },
+  quickTimeChipText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  quickTimeChipTextActive: {
+    color: '#1D4ED8',
+    fontWeight: '700',
+  },
+  assignmentDuePillOverdue: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECDD3',
+  },
+  assignmentDuePillTextOverdue: {
+    color: '#DC2626',
+  },
+
   // EMPTY STATE
   emptyStateContainer: {
     alignItems: 'center',
@@ -8539,16 +8732,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 10,
+    paddingVertical: 11,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
-    minHeight: 46,
+    minHeight: 48,
   },
   supportCategoryTileFull: {
-    width: '100%',
+    width: '48.5%',
   },
   supportCategoryTitle: {
     fontSize: 12,
@@ -8567,13 +8760,13 @@ const styles = StyleSheet.create({
     width: '48.5%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 11,
     paddingHorizontal: 8,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
-    minHeight: 44,
+    minHeight: 48,
   },
   complaintCategoryTileActive: {
     borderColor: '#EF4444',
@@ -8598,7 +8791,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    height: 42,
     borderRadius: 8,
     backgroundColor: '#F1F5F9',
     borderWidth: 1.5,
@@ -8630,31 +8823,38 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-    marginTop: 8,
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 16,
+    width: '100%',
   },
   modalCancel: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
     backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   modalCancelText: {
     color: '#475569',
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
   },
   modalSubmit: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 8,
+    flex: 1.3,
+    height: 46,
+    borderRadius: 10,
     backgroundColor: '#1E3A8A',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalSubmitText: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
   },
   pageHeaderBanner: {
     backgroundColor: '#FFFFFF',
@@ -9142,15 +9342,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modernClassActionBtn: {
+    flex: 1,
     backgroundColor: '#1E3A8A',
     paddingVertical: 10,
-    borderRadius: 10,
+    paddingHorizontal: 8,
+    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
   },
   modernClassActionBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
+    textAlign: 'center',
   },
   noClassCard: {
     backgroundColor: '#FFFFFF',
@@ -9475,19 +9684,23 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#64748B',
-    marginBottom: 4,
+    marginBottom: 6,
     textAlign: 'center',
+    height: 16,
+    lineHeight: 16,
   },
   ciaNumericInput: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
     borderRadius: 8,
-    height: 44,
+    height: 46,
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '800',
     color: '#0F172A',
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
   ciaCalcSummaryBar: {
     flexDirection: 'row',
@@ -9522,7 +9735,7 @@ const styles = StyleSheet.create({
   semInputsRow: {
     flexDirection: 'row',
     gap: 12,
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 8,
   },
   semCol: {
@@ -9532,17 +9745,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#64748B',
-    marginBottom: 4,
+    marginBottom: 6,
     textAlign: 'center',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
+    height: 16,
+    lineHeight: 16,
   },
   semInternalInfoBox: {
     backgroundColor: '#EFF6FF',
     borderWidth: 1.5,
     borderColor: '#BFDBFE',
     borderRadius: 8,
-    height: 44,
+    height: 46,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -9563,19 +9778,23 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#64748B',
-    marginBottom: 4,
+    marginBottom: 6,
     textAlign: 'center',
+    height: 16,
+    lineHeight: 16,
   },
   semNumericInput: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
     borderRadius: 8,
-    height: 44,
+    height: 46,
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '800',
     color: '#0F172A',
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
   semTotalBar: {
     flexDirection: 'row',
@@ -9679,13 +9898,16 @@ const styles = StyleSheet.create({
   },
   modernClassActionRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
+    gap: 10,
+    marginTop: 10,
+    alignItems: 'center',
+    width: '100%',
   },
   modernClassStartBtn: {
     flex: 1,
     backgroundColor: '#059669',
     paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -9699,6 +9921,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '800',
+    textAlign: 'center',
   },
 
   // ----------------------------------------------------------------------

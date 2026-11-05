@@ -13,6 +13,7 @@ import {
   deleteWatchman
 } from '../../api/index';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
+import { cleanPhoneInput, cleanEmailInput, getMobileValidationError, getEmailValidationError } from '../../utils/validationHelper';
 import './AdminWatchmanManagement.css';
 
 const GATES = [
@@ -102,10 +103,14 @@ const AdminWatchmanManagement = () => {
       showToast('Please fill in Name, Phone, Email, and Password', 'error');
       return;
     }
-    const cleanWmnP = (form.phone || '').trim().replace(/\D/g, '');
-    const wmnP10 = cleanWmnP.length > 10 ? cleanWmnP.slice(-10) : cleanWmnP;
-    if (!/^[6-9]\d{9}$/.test(wmnP10)) {
-      showToast('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9', 'error');
+    const phoneErr = getMobileValidationError(form.phone, 'Mobile number');
+    if (phoneErr) {
+      showToast(phoneErr, 'error');
+      return;
+    }
+    const emailErr = getEmailValidationError(form.email, 'Watchman Email');
+    if (emailErr) {
+      showToast(emailErr, 'error');
       return;
     }
 
@@ -136,10 +141,16 @@ const AdminWatchmanManagement = () => {
     e.preventDefault();
     if (!selectedWatchman?._id) return;
     if (form.phone) {
-      const clean = (form.phone || '').trim().replace(/\D/g, '');
-      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
-      if (!/^[6-9]\d{9}$/.test(p10)) {
-        showToast('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9', 'error');
+      const phoneErr = getMobileValidationError(form.phone, 'Mobile number');
+      if (phoneErr) {
+        showToast(phoneErr, 'error');
+        return;
+      }
+    }
+    if (form.email) {
+      const emailErr = getEmailValidationError(form.email, 'Watchman Email');
+      if (emailErr) {
+        showToast(emailErr, 'error');
         return;
       }
     }
@@ -686,7 +697,7 @@ const AdminWatchmanManagement = () => {
                         className="wmn-form-input"
                         placeholder="10-digit mobile number"
                         value={form.phone}
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                        onChange={(e) => setForm({ ...form, phone: cleanPhoneInput(e.target.value) })} maxLength={10} inputMode="numeric"
                         required
                       />
                     </div>
@@ -698,7 +709,7 @@ const AdminWatchmanManagement = () => {
                         className="wmn-form-input"
                         placeholder="guard@college.edu"
                         value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value.toLowerCase() })}
+                        onChange={(e) => setForm({ ...form, email: cleanEmailInput(e.target.value) })} autoCapitalize="none" style={{ textTransform: 'lowercase' }}
                         required
                       />
                     </div>
@@ -819,7 +830,7 @@ const AdminWatchmanManagement = () => {
                       type="tel"
                       className="wmn-form-input"
                       value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                      onChange={(e) => setForm({ ...form, phone: cleanPhoneInput(e.target.value) })} maxLength={10} inputMode="numeric"
                       required
                     />
                   </div>
