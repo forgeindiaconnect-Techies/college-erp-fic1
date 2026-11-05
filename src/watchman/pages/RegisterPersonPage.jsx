@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { registerCampusPerson, recordCampusIn } from '../../api';
 import { getGatePassUrl, getQrCodeImageUrl } from '../../utils/qrPassHelper';
+import { cleanPhoneInput, cleanEmailInput, getMobileValidationError, getEmailValidationError } from '../../utils/validationHelper';
 import '../watchman.css';
 
 const DEPARTMENTS = [

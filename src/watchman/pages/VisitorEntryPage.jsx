@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { recordVisitorEntry, recordVisitorCampusIn } from '../../api/index';
 import { getGatePassUrl, getQrCodeImageUrl } from '../../utils/qrPassHelper';
+import { cleanPhoneInput, cleanEmailInput, getMobileValidationError, getEmailValidationError } from '../../utils/validationHelper';
 import '../watchman.css';
 
 const PURPOSES = [
