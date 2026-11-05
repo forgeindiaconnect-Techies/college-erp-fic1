@@ -65,7 +65,8 @@ const VisitorEntryPage = () => {
   const [successNotice, setSuccessNotice] = useState('');
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    let { name, value, type, checked } = e.target;
+    if (name === 'email') value = value.toLowerCase();
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     if (error) setError('');
   };
@@ -74,6 +75,12 @@ const VisitorEntryPage = () => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.phone.trim() || !formData.personToMeet.trim()) {
       setError('Visitor full name, 10-digit mobile number, and person to meet are mandatory.');
+      return;
+    }
+    const cleanVPhone = formData.phone.trim().replace(/\D/g, '');
+    const vPhone10 = cleanVPhone.length > 10 ? cleanVPhone.slice(-10) : cleanVPhone;
+    if (!/^[6-9]\d{9}$/.test(vPhone10)) {
+      setError('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9');
       return;
     }
 

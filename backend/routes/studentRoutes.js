@@ -206,7 +206,7 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
   const collegeId = req.collegeId || req.user?.tenantId || req.user?.collegeId || 'unassigned_college';
   const autoStudentId = req.body.id || req.body.admissionNo || `STU-${Date.now().toString().slice(-6)}`;
   const autoStudentName = req.body.name || [req.body.firstName, req.body.lastName].filter(Boolean).join(' ') || 'Student';
-  const autoStudentEmail = (req.body.email && req.body.email.trim()) || `${autoStudentId.toLowerCase().replace(/[^a-z0-9]/g, '')}@student.college.edu`;
+  const autoStudentEmail = (req.body.email && req.body.email.trim().toLowerCase()) || `${autoStudentId.toLowerCase().replace(/[^a-z0-9]/g, '')}@student.college.edu`;
   const autoStudentDept = req.body.dept || req.body.department || 'General';
   const autoStudentSem = String(req.body.sem || req.body.semester || 'Sem 1');
 
@@ -216,8 +216,8 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 'A
   let phone10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
 
   if (rawPhone) {
-    if (cleanPhone.length < 10 || cleanPhone.length > 13) {
-      return res.status(400).json({ message: 'Invalid mobile number. Please enter a valid 10-digit mobile number.' });
+    if (!/^[6-9]\d{9}$/.test(phone10)) {
+      return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
     }
 
     // Check duplicate mobile number
@@ -806,8 +806,8 @@ router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 
     if (rawPhone) {
       const cleanPhone = rawPhone.replace(/\D/g, '');
       const phone10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
-      if (cleanPhone.length < 10 || cleanPhone.length > 13) {
-        return res.status(400).json({ message: 'Invalid mobile number. Please enter a valid 10-digit mobile number.' });
+      if (!/^[6-9]\d{9}$/.test(phone10)) {
+        return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
       }
 
       // Check if another student has this mobile number
@@ -836,6 +836,9 @@ router.put('/:id', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD', 
       req.body.mobile = rawPhone;
     }
 
+    if (req.body.email) req.body.email = req.body.email.trim().toLowerCase();
+    if (req.body.fatherEmail) req.body.fatherEmail = req.body.fatherEmail.trim().toLowerCase();
+    if (req.body.guardianEmail) req.body.guardianEmail = req.body.guardianEmail.trim().toLowerCase();
     const updatedStudent = await Student.findOneAndUpdate(
       query,
       req.body,

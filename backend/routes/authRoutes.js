@@ -30,7 +30,7 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET || 'IgfxpfmQCMxSPaU0T4EyhcLU'
 });
 
-const generateToken = (userOrId) => {
+const generateToken = (userOrId, extraPayload = {}) => {
   const secret = process.env.JWT_SECRET || 'fallback_secret_key';
   if (typeof userOrId === 'object' && userOrId !== null) {
     const id = userOrId._id ? userOrId._id.toString() : userOrId.id;
@@ -40,10 +40,11 @@ const generateToken = (userOrId) => {
       userId: id,
       role: userOrId.role,
       collegeId: colId,
-      tenantId: colId
+      tenantId: colId,
+      ...extraPayload
     }, secret, { expiresIn: '30d' });
   }
-  return jwt.sign({ id: userOrId, userId: userOrId }, secret, {
+  return jwt.sign({ id: userOrId, userId: userOrId, ...extraPayload }, secret, {
     expiresIn: '30d',
   });
 };
@@ -107,6 +108,16 @@ router.post('/login', async (req, res) => {
 
     // 3. Password Check
     if (await user.matchPassword(password)) {
+      // Mobile Application RBAC: Only Staff, Student, Driver, Watchman, Parent are permitted
+      const isMobileClient = req.headers['x-client-platform'] === 'mobile' || req.body.clientType === 'mobile' || req.body.platform === 'mobile';
+      const MOBILE_ALLOWED_ROLES = ['Staff', 'Student', 'Driver', 'Watchman', 'Parent'];
+      if (isMobileClient && !MOBILE_ALLOWED_ROLES.includes(user.role)) {
+        console.warn(`[auth/login] Mobile login rejected: Role '${user.role}' is not permitted on mobile application.`);
+        return res.status(403).json({
+          success: false,
+          message: `Access Denied: The College ERP Mobile Application is accessible strictly to Staff, Student, Driver, Watchman, and Parent roles. Your account role (${user.role}) must use the Web Portal.`
+        });
+      }
       // Async Activity Log
       ActivityLog.create({
         userId: user._id.toString(),
@@ -189,7 +200,7 @@ router.post('/login', async (req, res) => {
         permissions: user.permissions || [],
         subscription: subscriptionDetails,
         collegeName: collegeName,
-        token: generateToken(user),
+        token: generateToken(user, isMobileClient ? { clientPlatform: 'mobile' } : {}),
       });
     } else {
       console.error(`[auth/login] Login failed: Password mismatch for user: ${email.trim()}`);
@@ -249,6 +260,13 @@ router.post('/register-college', async (req, res) => {
       return res.status(400).json({ message: 'Please provide a valid email address.' });
     }
 
+    if (phone) {
+      const clean = String(phone).trim().replace(/\D/g, '');
+      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
+      if (!/^[6-9]\d{9}$/.test(p10)) {
+        return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+      }
+    }
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters long and include numbers/letters.' });
     }
@@ -1061,11 +1079,19 @@ router.post('/users', protect, authorize('Admin', 'Sub Admin', 'Principal'), col
       }
     }
 
-    const existing = await User.findOne({ email });
+    const normalizedEmail = email ? email.trim().toLowerCase() : '';
+    if (phone) {
+      const clean = String(phone).trim().replace(/\D/g, '');
+      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
+      if (!/^[6-9]\d{9}$/.test(p10)) {
+        return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+      }
+    }
+    const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       return res.status(400).json({ message: 'User with this email already exists' });
     }
-    const user = new User({ name, email, password, role, department, referenceId, parentOf, studentId, subjects, phone, wardenType, tenantId });
+    const user = new User({ name, email: normalizedEmail, password, role, department, referenceId, parentOf, studentId, subjects, phone, wardenType, tenantId });
     const saved = await user.save();
 
     const collegeId = tenantId || req.collegeId || req.user?.collegeId || 'unassigned_college';
@@ -1123,8 +1149,16 @@ router.put('/users/:id', protect, authorize('Admin', 'Sub Admin', 'Principal'), 
     if (!user) {
       return res.status(404).json({ message: 'User not found in your college domain' });
     }
+    if (phone !== undefined && phone !== null && String(phone).trim() !== '') {
+      const clean = String(phone).trim().replace(/\D/g, '');
+      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
+      if (!/^[6-9]\d{9}$/.test(p10)) {
+        return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+      }
+      user.phone = p10;
+    }
     user.name = name ?? user.name;
-    user.email = email ?? user.email;
+    user.email = email ? email.trim().toLowerCase() : user.email;
     user.role = role ?? user.role;
     user.department = department !== undefined ? department : user.department;
     user.referenceId = referenceId !== undefined ? referenceId : user.referenceId;

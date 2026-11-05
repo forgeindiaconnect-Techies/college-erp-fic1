@@ -3,8 +3,8 @@ import mongoose from 'mongoose';
 const studentSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  phone: { type: String },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  phone: { type: String, trim: true },
   photoUrl: { type: String, default: '' },
   dept: { type: String, required: true },
   sem: { type: String, required: true },
@@ -86,11 +86,11 @@ const studentSchema = new mongoose.Schema({
   motherName: { type: String },
   fatherOccupation: { type: String },
   yearlyIncome: { type: String },
-  fatherPhone: { type: String },
-  fatherEmail: { type: String },
+  fatherPhone: { type: String, trim: true },
+  fatherEmail: { type: String, lowercase: true, trim: true },
   guardianName: { type: String },
-  guardianPhone: { type: String },
-  guardianEmail: { type: String },
+  guardianPhone: { type: String, trim: true },
+  guardianEmail: { type: String, lowercase: true, trim: true },
   guardianAddress: { type: String },
   community: { type: String },
   caste: { type: String },
@@ -165,5 +165,10 @@ const studentSchema = new mongoose.Schema({
   tenantId: { type: String }
 }, { timestamps: true, strict: false });
 
-export default mongoose.model('Student', studentSchema);
+studentSchema.pre('save', function() {
+  if (this.email) this.email = this.email.trim().toLowerCase();
+  if (this.fatherEmail) this.fatherEmail = this.fatherEmail.trim().toLowerCase();
+  if (this.guardianEmail) this.guardianEmail = this.guardianEmail.trim().toLowerCase();
+});
 
+export default mongoose.model('Student', studentSchema);

@@ -114,7 +114,7 @@ const UnifiedLogin = () => {
     setLoading(true);
     setError('');
 
-    const cleanEmail = (email || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
     const cleanPassword = (password || '').trim();
 
     if (!cleanEmail || !cleanPassword) {
@@ -353,7 +353,7 @@ const UnifiedLogin = () => {
                       autoComplete="off"
                       placeholder="Enter your email or username"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => setEmail(e.target.value.toLowerCase())}
                       required
                     />
                   </div>

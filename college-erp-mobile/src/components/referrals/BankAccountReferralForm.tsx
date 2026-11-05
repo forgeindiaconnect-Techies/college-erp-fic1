@@ -318,7 +318,7 @@ export default function BankAccountReferralForm({
         formData: {
           applicantName: applicantName.trim(),
           applicantPhone: cleanPhone,
-          applicantEmail: applicantEmail.trim(),
+          applicantEmail: applicantEmail.trim().toLowerCase(),
           applicantType,
           city: city.trim(),
           branchCity: city.trim(),
@@ -341,7 +341,7 @@ export default function BankAccountReferralForm({
           referralSource,
           applicantName: applicantName.trim(),
           applicantPhone: cleanPhone,
-          applicantEmail: applicantEmail.trim(),
+          applicantEmail: applicantEmail.trim().toLowerCase(),
           applicantType,
           city: city.trim(),
           branchCity: city.trim(),
@@ -483,7 +483,7 @@ export default function BankAccountReferralForm({
               autoCapitalize="none"
               value={applicantEmail}
               onChangeText={(t) => {
-                setApplicantEmail(t);
+                setApplicantEmail(t.toLowerCase());
                 if (errors.applicantEmail) setErrors({ ...errors, applicantEmail: '' });
               }}
             />

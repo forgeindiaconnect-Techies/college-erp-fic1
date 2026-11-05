@@ -246,10 +246,14 @@ const StaffMarks = () => {
     // 2. Semester match
     const semMatch = deptMatch.filter(s => isSameSem(s.semester || s.sem, targetSem));
 
-    // 3. Section match if specific section selected
+    // 3. Section match if specific section selected (Strict Section Isolation)
     if (targetSection !== 'All') {
-      const secMatch = semMatch.filter(s => String(s.section || '').toUpperCase() === targetSection.toUpperCase());
-      if (secMatch.length > 0) return secMatch;
+      const secMatch = semMatch.filter(s => {
+        const sSec = String(s.section || '').replace(/^(SEC|SECTION)\s*/i, '').trim().toUpperCase();
+        const targetSec = targetSection.replace(/^(SEC|SECTION)\s*/i, '').trim().toUpperCase();
+        return sSec === targetSec;
+      });
+      return secMatch;
     }
 
     if (semMatch.length > 0) return semMatch;

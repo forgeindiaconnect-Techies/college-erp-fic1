@@ -86,6 +86,14 @@ const VehicleRegisterPage = () => {
       showToast('Vehicle registration number and driver name are required', 'error');
       return;
     }
+    if (form.driverPhone && form.driverPhone.trim()) {
+      const clean = form.driverPhone.trim().replace(/\D/g, '');
+      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
+      if (!/^[6-9]\d{9}$/.test(p10)) {
+        showToast('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9', 'error');
+        return;
+      }
+    }
 
     try {
       setSubmitting(true);

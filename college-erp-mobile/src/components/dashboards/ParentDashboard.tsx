@@ -81,6 +81,22 @@ type LeaveRequest = {
 };
 
 export default function ParentDashboard({ user, onLogout }: Props) {
+  if (user?.role !== 'Parent') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#F8FAFC' }}>
+        <Text style={{ fontSize: 22, fontWeight: '800', color: '#DC2626', marginBottom: 8 }}>Access Denied</Text>
+        <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 20 }}>
+          This dashboard is strictly reserved for Parent accounts. Your current role is "{user?.role || 'Unauthorized'}".
+        </Text>
+        <TouchableOpacity
+          onPress={onLogout}
+          style={{ paddingVertical: 12, paddingHorizontal: 24, backgroundColor: '#0284C7', borderRadius: 8 }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Sign Out & Switch Account</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
   // 5 Main Fixed Bottom Tabs
   const [activeTab, setActiveTab] = useState<MainNavTab>('home');
   const [academicsSubTab, setAcademicsSubTab] = useState<ParentAcademicsSubTab>('attendance');

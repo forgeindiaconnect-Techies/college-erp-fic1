@@ -258,7 +258,10 @@ const StudentRegistration = () => {
       }
 
       // If initial form is blank, select first active department if available
-      setForm(prev => {
+      if (field === 'email' || field === 'fatherEmail' || field === 'guardianEmail') {
+      value = (value || '').toLowerCase();
+    }
+    setForm(prev => {
         const activeDept = prev.dept || (loadedDepts.length > 0 ? loadedDepts[0].name : '');
         const autoRegId = prev.id || generateStudentRegNo(activeDept, fetchedStudents);
         return {
@@ -679,6 +682,33 @@ const StudentRegistration = () => {
       setErrorMsg('Student First Name is required.');
       setActiveStep(1);
       return;
+    }
+    if (form.phone && form.phone.trim()) {
+      const clean = form.phone.trim().replace(/\D/g, '');
+      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
+      if (!/^[6-9]\d{9}$/.test(p10)) {
+        setErrorMsg('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9.');
+        setActiveStep(1);
+        return;
+      }
+    }
+    if (form.fatherPhone && form.fatherPhone.trim()) {
+      const clean = form.fatherPhone.trim().replace(/\D/g, '');
+      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
+      if (!/^[6-9]\d{9}$/.test(p10)) {
+        setErrorMsg('Father mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9.');
+        setActiveStep(1);
+        return;
+      }
+    }
+    if (form.guardianPhone && form.guardianPhone.trim()) {
+      const clean = form.guardianPhone.trim().replace(/\D/g, '');
+      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
+      if (!/^[6-9]\d{9}$/.test(p10)) {
+        setErrorMsg('Guardian mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9.');
+        setActiveStep(1);
+        return;
+      }
     }
 
     try {

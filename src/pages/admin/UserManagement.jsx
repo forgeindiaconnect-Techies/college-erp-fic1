@@ -69,6 +69,14 @@ export default function UserManagement() {
       alert('Please enter the email.');
       return;
     }
+    if (form.phone && form.phone.trim()) {
+      const clean = form.phone.trim().replace(/\D/g, '');
+      const phone10 = clean.length > 10 ? clean.slice(-10) : clean;
+      if (!/^[6-9]\d{9}$/.test(phone10)) {
+        alert('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9');
+        return;
+      }
+    }
 
     if (!form.password.trim()) {
       alert('Please enter the password.');

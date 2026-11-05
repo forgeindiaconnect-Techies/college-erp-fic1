@@ -4,11 +4,14 @@ const securityVehicleLogSchema = new mongoose.Schema({
   vehicleLogId: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    trim: true
   },
   vehicleNumber: {
     type: String,
-    required: true
+    required: true,
+    trim: true,
+    uppercase: true
   },
   vehicleType: {
     type: String,
@@ -17,11 +20,13 @@ const securityVehicleLogSchema = new mongoose.Schema({
   },
   driverName: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   driverPhone: {
     type: String,
-    default: ''
+    default: '',
+    trim: true
   },
   purpose: {
     type: String,
@@ -30,7 +35,8 @@ const securityVehicleLogSchema = new mongoose.Schema({
   },
   destination: {
     type: String,
-    default: 'Campus Parking'
+    default: 'Campus Parking',
+    trim: true
   },
   entryTime: {
     type: Date,
@@ -59,7 +65,8 @@ const securityVehicleLogSchema = new mongoose.Schema({
   },
   notes: {
     type: String,
-    default: ''
+    default: '',
+    trim: true
   },
   collegeId: {
     type: String,

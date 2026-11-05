@@ -102,6 +102,12 @@ const AdminWatchmanManagement = () => {
       showToast('Please fill in Name, Phone, Email, and Password', 'error');
       return;
     }
+    const cleanWmnP = (form.phone || '').trim().replace(/\D/g, '');
+    const wmnP10 = cleanWmnP.length > 10 ? cleanWmnP.slice(-10) : cleanWmnP;
+    if (!/^[6-9]\d{9}$/.test(wmnP10)) {
+      showToast('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9', 'error');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -129,6 +135,14 @@ const AdminWatchmanManagement = () => {
   const handleEditWatchman = async (e) => {
     e.preventDefault();
     if (!selectedWatchman?._id) return;
+    if (form.phone) {
+      const clean = (form.phone || '').trim().replace(/\D/g, '');
+      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
+      if (!/^[6-9]\d{9}$/.test(p10)) {
+        showToast('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9', 'error');
+        return;
+      }
+    }
 
     try {
       setSubmitting(true);
@@ -684,7 +698,7 @@ const AdminWatchmanManagement = () => {
                         className="wmn-form-input"
                         placeholder="guard@college.edu"
                         value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        onChange={(e) => setForm({ ...form, email: e.target.value.toLowerCase() })}
                         required
                       />
                     </div>

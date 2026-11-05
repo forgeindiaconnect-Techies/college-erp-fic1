@@ -119,6 +119,15 @@ export default function WatchmanVehicleEntryModal({
       Alert.alert('Required Field', 'Please enter the driver name.');
       return;
     }
+    if (driverPhone.trim()) {
+      const clean = driverPhone.replace(/\D/g, '');
+      const phone10 = clean.length > 10 ? clean.slice(-10) : clean;
+      if (!/^[6-9]\d{9}$/.test(phone10)) {
+        setErrorMsg('Driver phone must be a valid 10-digit number starting with 6, 7, 8, or 9.');
+        Alert.alert('Invalid Mobile Number', 'Driver phone must be a valid 10-digit number starting with 6, 7, 8, or 9.');
+        return;
+      }
+    }
 
     // Client-side quick check against currently inside vehicles
     const alreadyInside = currentInsideVehicles.find(

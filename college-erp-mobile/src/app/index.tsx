@@ -281,11 +281,16 @@ export default function MobileApp() {
       setErrorMessage(null);
 
       // 1. Authenticate with trusted backend API
-      const user = await loginUser(trimmedEmail, trimmedPassword);
+      const user = await loginUser(trimmedEmail.toLowerCase(), trimmedPassword);
 
       // 2. Validate role returned by the trusted authenticated response
       if (!user.role) {
         throw new Error('Authenticated account does not have a designated campus role. Please contact administration.');
+      }
+      const MOBILE_ALLOWED_ROLES = ['Staff', 'Student', 'Driver', 'Watchman', 'Parent'];
+      if (!MOBILE_ALLOWED_ROLES.includes(user.role)) {
+        await logoutUser();
+        throw new Error(`Access Denied: The Mobile Application is strictly restricted to Staff, Student, Driver, Watchman, and Parent accounts. Your role (${user.role}) is not authorized on mobile. Please log in via the Web Portal.`);
       }
 
       // 3. Set authenticated state (triggers automatic role-based navigation)
@@ -329,7 +334,7 @@ export default function MobileApp() {
     try {
       setIsSubmittingForgot(true);
       setForgotFeedback(null);
-      const msg = await requestPasswordReset(forgotEmail.trim());
+      const msg = await requestPasswordReset(forgotEmail.trim().toLowerCase());
       setForgotFeedback({ type: 'success', message: msg });
     } catch (err: any) {
       setForgotFeedback({
@@ -386,25 +391,8 @@ export default function MobileApp() {
             return <WatchmanDashboard user={currentUser} onLogout={handleLogout} />;
           }
 
-          // 5. Staff, Faculty, HOD, Principal, Admin & Associated Roles Dashboard
-          if (
-            rawRole === 'staff' ||
-            rawRole === 'faculty' ||
-            rawRole === 'teacher' ||
-            rawRole === 'hod' ||
-            rawRole === 'principal' ||
-            rawRole === 'admin' ||
-            rawRole === 'superadmin' ||
-            rawRole === 'super admin' ||
-            rawRole === 'sub admin' ||
-            rawRole === 'librarian' ||
-            rawRole === 'library' ||
-            rawRole === 'accounts' ||
-            rawRole === 'hostel' ||
-            rawRole === 'placement' ||
-            rawRole === 'placement officer' ||
-            rawRole === 'placement cell'
-          ) {
+          // 5. Staff Dashboard (STRICTLY for Staff only)
+          if (rawRole === 'staff') {
             return <StaffDashboard user={currentUser} onLogout={handleLogout} />;
           }
 
@@ -422,7 +410,7 @@ export default function MobileApp() {
                 <Text style={styles.unsupportedBadgeText}>Detected Role: {currentUser.role}</Text>
               </View>
               <Text style={styles.unsupportedSubtext}>
-                No native mobile dashboard module is configured for this specific security role. Please log in using an authorized student, parent, staff, watchman, or driver account.
+                The College ERP Mobile Application is accessible strictly to Staff, Student, Driver, Watchman, and Parent accounts. Accounts belonging to Admin, Super Admin, Principal, Accounts Officer, HOD, Librarian, Placement Officer, or any other role must use the Web Portal.
               </Text>
 
               <TouchableOpacity
@@ -509,7 +497,7 @@ export default function MobileApp() {
                   placeholderTextColor="#94A3B8"
                   value={email}
                   onChangeText={(val) => {
-                    setEmail(val);
+                    setEmail(val.toLowerCase());
                     if (errorMessage) setErrorMessage(null);
                   }}
                   onFocus={() => setEmailFocused(true)}
@@ -685,7 +673,7 @@ export default function MobileApp() {
                   placeholderTextColor="#94A3B8"
                   value={forgotEmail}
                   onChangeText={(val) => {
-                    setForgotEmail(val);
+                    setForgotEmail(val.toLowerCase());
                     setForgotFeedback(null);
                   }}
                   autoCapitalize="none"

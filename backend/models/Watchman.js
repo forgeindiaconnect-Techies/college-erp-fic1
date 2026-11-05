@@ -9,23 +9,29 @@ const watchmanSchema = new mongoose.Schema({
   employeeId: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    trim: true
   },
   name: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   phone: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   email: {
     type: String,
-    required: true
+    required: true,
+    lowercase: true,
+    trim: true
   },
   address: {
     type: String,
-    default: ''
+    default: '',
+    trim: true
   },
   shift: {
     type: String,
@@ -46,9 +52,9 @@ const watchmanSchema = new mongoose.Schema({
     default: Date.now
   },
   emergencyContact: {
-    name: { type: String, default: '' },
-    phone: { type: String, default: '' },
-    relation: { type: String, default: '' }
+    name: { type: String, default: '', trim: true },
+    phone: { type: String, default: '', trim: true },
+    relation: { type: String, default: '', trim: true }
   },
   collegeId: {
     type: String,
@@ -59,5 +65,9 @@ const watchmanSchema = new mongoose.Schema({
     default: 'COL001'
   }
 }, { timestamps: true });
+
+watchmanSchema.pre('save', function() {
+  if (this.email) this.email = this.email.trim().toLowerCase();
+});
 
 export default mongoose.models.Watchman || mongoose.model('Watchman', watchmanSchema);

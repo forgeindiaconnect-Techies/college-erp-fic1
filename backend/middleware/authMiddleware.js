@@ -57,6 +57,16 @@ export const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'Not authorized, user not found' });
       }
 
+      // Mobile RBAC: If request originated from Mobile App, enforce permitted 5 roles
+      const isMobileReq = decoded.clientPlatform === 'mobile' || req.headers['x-client-platform'] === 'mobile';
+      const MOBILE_ALLOWED_ROLES = ['Staff', 'Student', 'Driver', 'Watchman', 'Parent'];
+      if (isMobileReq && !MOBILE_ALLOWED_ROLES.includes(req.user.role)) {
+        return res.status(403).json({
+          success: false,
+          message: `Access Denied: Mobile Application APIs are restricted to Staff, Student, Driver, Watchman, and Parent roles only. Role '${req.user.role}' is unauthorized.`
+        });
+      }
+
       // Scope tenant context immediately upon authentication
       const store = context.getStore();
       if (req.user.role === 'Super Admin') {

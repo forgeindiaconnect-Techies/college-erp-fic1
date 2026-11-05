@@ -1,3 +1,15 @@
+export const isValidIndianMobile = (phone: string): boolean => {
+  if (!phone) return false;
+  const digits = String(phone).replace(/\D/g, '');
+  const phone10 = digits.length > 10 ? digits.slice(-10) : digits;
+  return /^[6-9]\d{9}$/.test(phone10);
+};
+
+export const normalizeEmail = (email: string): string => {
+  if (!email) return '';
+  return String(email).trim().toLowerCase();
+};
+
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
@@ -218,6 +230,7 @@ async function fetchWithFailover(
 ): Promise<Response> {
   const primaryUrl = await getApiBaseUrl();
   const cleanPath = path.replace(/^\/+/, '');
+  init.headers = { ...init.headers, 'X-Client-Platform': 'mobile' };
 
   try {
     const controller = new AbortController();
@@ -227,6 +240,22 @@ async function fetchWithFailover(
       ...init,
       signal: controller.signal,
     }).finally(() => clearTimeout(timeoutId));
+
+    // If local endpoint returns 404 or server error (e.g. wrong process or proxy on port 5000), try cloud fallback
+    const contentType = res.headers.get('content-type') || '';
+    if (
+      (!res.ok || contentType.includes('text/html')) &&
+      primaryUrl !== CLOUD_API_URL &&
+      process.env.EXPO_PUBLIC_API_URL
+    ) {
+      console.warn(`[API] Host ${primaryUrl} returned ${res.status} (${contentType}). Trying cloud fallback: ${CLOUD_API_URL}`);
+      try {
+        const cloudRes = await fetch(`${CLOUD_API_URL}/${cleanPath}`, init);
+        return cloudRes;
+      } catch {
+        return res;
+      }
+    }
 
     return res;
   } catch (primaryErr: any) {
@@ -261,14 +290,25 @@ export async function loginUser(
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      'X-Client-Platform': 'mobile',
     },
     body: JSON.stringify({
       email: email.trim(),
       password: password.trim(),
+      clientType: 'mobile',
     }),
   });
 
-  const data = (await response.json()) as LoginResponse;
+  const rawText = await response.text();
+  let data: LoginResponse;
+  try {
+    data = JSON.parse(rawText) as LoginResponse;
+  } catch {
+    if (!response.ok) {
+      throw new Error(`Server returned HTTP ${response.status} (${response.statusText || 'Error'}). Please check backend connection.`);
+    }
+    throw new Error('Server returned an invalid non-JSON response.');
+  }
 
   if (!response.ok) {
     let friendlyMessage = data.message || 'Login failed. Please verify your credentials.';
@@ -280,6 +320,12 @@ export async function loginUser(
 
   if (!data.token || !data.role) {
     throw new Error('Authentication error: The server response is missing a valid security token or role.');
+  }
+
+  // Strict Mobile Role Verification: only Staff, Student, Driver, Watchman, Parent are allowed
+  const MOBILE_ALLOWED_ROLES = ['Staff', 'Student', 'Driver', 'Watchman', 'Parent'];
+  if (!MOBILE_ALLOWED_ROLES.includes(data.role)) {
+    throw new Error(`Access Denied: The College ERP Mobile Application is strictly restricted to Staff, Student, Driver, Watchman, and Parent accounts. Your role (${data.role}) must log in using the Web Portal.`);
   }
 
   // Purge any stale tokens before writing new credentials
@@ -342,7 +388,13 @@ export async function requestPasswordReset(email: string): Promise<string> {
     }),
   });
 
-  const data = await response.json();
+  const rawText = await response.text();
+  let data: any = {};
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    data = { message: rawText };
+  }
   if (!response.ok) {
     throw new Error(data.message || 'Unable to send reset instructions. Please check your email.');
   }

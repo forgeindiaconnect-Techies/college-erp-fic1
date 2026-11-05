@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -410,10 +410,44 @@ const getGradeLetter = (score: number) => {
 };
 
 export default function StaffDashboard({ user, onLogout }: Props) {
+  if (user?.role !== 'Staff') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#F8FAFC' }}>
+        <Text style={{ fontSize: 22, fontWeight: '800', color: '#DC2626', marginBottom: 8 }}>Access Denied</Text>
+        <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 20 }}>
+          This dashboard is strictly reserved for Staff accounts. Your current role is "{user?.role || 'Unauthorized'}".
+        </Text>
+        <TouchableOpacity
+          onPress={onLogout}
+          style={{ paddingVertical: 12, paddingHorizontal: 24, backgroundColor: '#0284C7', borderRadius: 8 }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Sign Out & Switch Account</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
   // Bottom Bar Navigation
   const [activeTab, setActiveTab] = useState<MainNavTab>('home');
   const [academicsTab, setAcademicsTab] = useState<StaffAcademicsTab>('timetable');
   const [moreSection, setMoreSection] = useState<StaffMoreSection>('profile');
+  const subTabsScrollRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (activeTab === 'academics') {
+      const tabOffsets: Record<StaffAcademicsTab, number> = {
+        timetable: 0,
+        duty: 110,
+        attendance: 210,
+        marks: 330,
+        assignments: 440,
+        myclass: 560,
+      };
+      const offset = tabOffsets[academicsTab] ?? 0;
+      setTimeout(() => {
+        subTabsScrollRef.current?.scrollTo({ x: Math.max(0, offset - 24), animated: true });
+      }, 80);
+    }
+  }, [academicsTab, activeTab]);
 
   // Loading & Refreshing States
   const [loading, setLoading] = useState(true);
@@ -711,19 +745,23 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       );
       const activePool = deptStudents.length > 0 ? deptStudents : rawStudents;
 
-      const parsedStudents: StudentItem[] = activePool.map((s: any, idx: number) => ({
-        id: s._id || s.id || s.rollNo || String(idx),
-        name: s.name || s.fullName || s.studentName || 'Student Scholar',
-        rollNo: s.rollNo || s.registerNo || s.id || `CS2026-${String(idx + 1).padStart(3, '0')}`,
-        dept: s.dept || s.department || deptName,
-        sem: s.sem || s.semester || 'Semester 2',
-        section: s.section || 'A',
-        attendancePct: Number(s.attendance || s.attendancePct || 85),
-        cgpa: Number(s.cgpa || 8.5),
-        feeStatus: s.feeStatus || s.paymentStatus || 'Paid',
-        phone: s.phone || '+91 98765 43210',
-        email: s.email || '',
-      }));
+      const parsedStudents: StudentItem[] = activePool.map((s: any, idx: number) => {
+        const rawSec = s.section ? String(s.section).replace(/^(SEC|SECTION)\s*/i, '').trim().toUpperCase() : '';
+        const assignedSec = rawSec || (idx % 2 === 0 ? 'A' : 'B');
+        return {
+          id: s._id || s.id || s.rollNo || String(idx),
+          name: s.name || s.fullName || s.studentName || 'Student Scholar',
+          rollNo: s.rollNo || s.registerNo || s.id || `CS2026-${String(idx + 1).padStart(3, '0')}`,
+          dept: s.dept || s.department || deptName,
+          sem: s.sem || s.semester || 'Semester 2',
+          section: assignedSec,
+          attendancePct: Number(s.attendance || s.attendancePct || 85),
+          cgpa: Number(s.cgpa || 8.5),
+          feeStatus: s.feeStatus || s.paymentStatus || 'Paid',
+          phone: s.phone || '+91 98765 43210',
+          email: s.email || '',
+        };
+      });
       setStudents(parsedStudents);
 
       // Populate Attendance Roster
@@ -1244,8 +1282,13 @@ export default function StaffDashboard({ user, onLogout }: Props) {
       const pool = deptMatch.length > 0 ? deptMatch : allStudents;
       const semMatch = pool.filter((s) => isSameSem(s.sem, sem));
       const semPool = semMatch.length > 0 ? semMatch : pool;
-      const secMatch = sec === 'All' ? semPool : semPool.filter((s) => String(s.section || '').toUpperCase() === sec.toUpperCase());
-      const activeStudents = secMatch.length > 0 ? secMatch : semPool;
+      const activeStudents = sec === 'All'
+        ? semPool
+        : semPool.filter((s) => {
+            const sSec = String(s.section || '').replace(/^(SEC|SECTION)\s*/i, '').trim().toUpperCase();
+            const targetSec = sec.replace(/^(SEC|SECTION)\s*/i, '').trim().toUpperCase();
+            return sSec === targetSec;
+          });
 
       // Find matching attendance in saved records for this date, subject, period
       const matchingSaved = (attList || []).filter((r: any) => {
@@ -2380,10 +2423,13 @@ export default function StaffDashboard({ user, onLogout }: Props) {
     const semMatch = pool.filter((s) => isSameSem(s.sem, selectedMarksSemester));
     const semPool = semMatch.length > 0 ? semMatch : pool;
 
-    const secMatch = selectedMarksSection === 'All'
+    const secPool = selectedMarksSection === 'All'
       ? semPool
-      : semPool.filter((s) => String(s.section || '').toUpperCase() === selectedMarksSection.toUpperCase());
-    const secPool = secMatch.length > 0 ? secMatch : semPool;
+      : semPool.filter((s) => {
+          const sSec = String(s.section || '').replace(/^(SEC|SECTION)\s*/i, '').trim().toUpperCase();
+          const targetSec = selectedMarksSection.replace(/^(SEC|SECTION)\s*/i, '').trim().toUpperCase();
+          return sSec === targetSec;
+        });
 
     if (!marksSearch.trim()) return secPool;
     const q = marksSearch.toLowerCase().trim();
@@ -2785,7 +2831,12 @@ export default function StaffDashboard({ user, onLogout }: Props) {
 
             {/* Academics Sub-Tabs Header Switcher */}
             <View style={styles.subTabsContainer}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subTabsScroll}>
+              <ScrollView
+                ref={subTabsScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.subTabsScroll}
+              >
                 {[
                   { id: 'timetable', label: 'Class Timetable', icon: '⏰' },
                   { id: 'duty', label: 'Exam Duty', icon: '🛡️' },
@@ -3753,7 +3804,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                                     keyboardType="numeric"
                                     maxLength={2}
                                     placeholder="0"
-                                    placeholderTextColor="#CBD5E1"
+                                    placeholderTextColor="#94A3B8"
                                     value={String(marks.cia1 ?? '')}
                                     onChangeText={(t) => handleUpdateCiaMark(s.id, 'cia1', t)}
                                   />
@@ -3766,7 +3817,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                                     keyboardType="numeric"
                                     maxLength={2}
                                     placeholder="0"
-                                    placeholderTextColor="#CBD5E1"
+                                    placeholderTextColor="#94A3B8"
                                     value={String(marks.cia2 ?? '')}
                                     onChangeText={(t) => handleUpdateCiaMark(s.id, 'cia2', t)}
                                   />
@@ -3779,7 +3830,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                                     keyboardType="numeric"
                                     maxLength={2}
                                     placeholder="0"
-                                    placeholderTextColor="#CBD5E1"
+                                    placeholderTextColor="#94A3B8"
                                     value={String(marks.cia3 ?? '')}
                                     onChangeText={(t) => handleUpdateCiaMark(s.id, 'cia3', t)}
                                   />
@@ -3798,22 +3849,24 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                               </View>
                             </View>
                           ) : (
-                            /* SEMESTER MODE INPUTS */
+                            /* SEMESTER MODE INPUTS: Symmetrical 50/50 Dual Columns */
                             <View>
                               <View style={styles.semInputsRow}>
-                                <View style={styles.semInternalInfoBox}>
-                                  <Text style={styles.semInternalInfoLabel}>INTERNAL (25)</Text>
-                                  <Text style={styles.semInternalInfoValue}>{internal} / 25</Text>
+                                <View style={styles.semCol}>
+                                  <Text style={styles.semColLabel}>INTERNAL (25)</Text>
+                                  <View style={styles.semInternalInfoBox}>
+                                    <Text style={styles.semInternalInfoValue}>{internal} / 25</Text>
+                                  </View>
                                 </View>
 
-                                <View style={styles.semExamInputCol}>
-                                  <Text style={styles.semExamInputLabel}>SEMESTER EXAM (/75)</Text>
+                                <View style={styles.semCol}>
+                                  <Text style={styles.semColLabel}>SEMESTER EXAM (/75)</Text>
                                   <TextInput
                                     style={styles.semNumericInput}
                                     keyboardType="numeric"
                                     maxLength={2}
                                     placeholder="0 - 75"
-                                    placeholderTextColor="#CBD5E1"
+                                    placeholderTextColor="#94A3B8"
                                     value={String(marks.semester ?? '')}
                                     onChangeText={(t) => handleUpdateSemMark(s.id, t)}
                                   />
@@ -5649,29 +5702,29 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               </View>
 
               <Text style={styles.inputLabel}>Select Category *</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                {SUPPORT_CATEGORIES.map((cat) => {
+              <View style={styles.supportCategoriesGrid}>
+                {SUPPORT_CATEGORIES.map((cat, idx) => {
                   const active = supportType === cat.id;
+                  const isLastFull = idx === SUPPORT_CATEGORIES.length - 1;
                   return (
                     <TouchableOpacity
                       key={cat.id}
                       style={[
-                        {
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          paddingVertical: 7,
-                          paddingHorizontal: 10,
-                          borderRadius: 8,
-                          borderWidth: 1.5,
-                          borderColor: active ? cat.color : '#E2E8F0',
-                          backgroundColor: active ? cat.bg : '#F8FAFC',
-                        },
+                        styles.supportCategoryTile,
+                        isLastFull && styles.supportCategoryTileFull,
+                        active && { borderColor: cat.color, backgroundColor: cat.bg },
                       ]}
                       onPress={() => setSupportType(cat.id)}
+                      activeOpacity={0.7}
                     >
-                      <Text style={{ fontSize: 14 }}>{cat.icon}</Text>
-                      <Text style={{ fontSize: 12, fontWeight: active ? '700' : '600', color: active ? cat.color : '#475569' }}>
+                      <Text style={{ fontSize: 16 }}>{cat.icon}</Text>
+                      <Text
+                        style={[
+                          styles.supportCategoryTitle,
+                          active && { color: cat.color, fontWeight: '700' },
+                        ]}
+                        numberOfLines={1}
+                      >
                         {cat.title}
                       </Text>
                     </TouchableOpacity>
@@ -5703,6 +5756,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                     ? 'e.g. FDP grant sponsorship, wellness session'
                     : 'e.g. Projector HDMI port, Wi-Fi router LH-101'
                 }
+                placeholderTextColor="#94A3B8"
                 value={supportSubject}
                 onChangeText={setSupportSubject}
               />
@@ -5714,6 +5768,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                     <TextInput
                       style={styles.modalInput}
                       placeholder="2026-10-27"
+                      placeholderTextColor="#94A3B8"
                       value={supportStartDate}
                       onChangeText={setSupportStartDate}
                     />
@@ -5723,6 +5778,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                     <TextInput
                       style={styles.modalInput}
                       placeholder="2026-10-28"
+                      placeholderTextColor="#94A3B8"
                       value={supportEndDate}
                       onChangeText={setSupportEndDate}
                     />
@@ -5744,6 +5800,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                         active && { backgroundColor: badgeColor, borderColor: badgeColor },
                       ]}
                       onPress={() => setSupportPriority(p)}
+                      activeOpacity={0.7}
                     >
                       <Text style={[styles.typeChipText, active && { color: '#FFFFFF', fontWeight: '800' }]}>{p}</Text>
                     </TouchableOpacity>
@@ -5755,6 +5812,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               <TextInput
                 style={[styles.modalInput, { height: 80, textAlignVertical: 'top' }]}
                 placeholder="Provide complete context, room number, or notes for the administrative officer..."
+                placeholderTextColor="#94A3B8"
                 multiline
                 value={supportDescription}
                 onChangeText={setSupportDescription}
@@ -5796,7 +5854,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               </View>
 
               <Text style={styles.inputLabel}>Department / Area Category *</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              <View style={styles.complaintCategoriesGrid}>
                 {[
                   'IT & Infrastructure',
                   'Academic Facilities',
@@ -5810,18 +5868,19 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                     <TouchableOpacity
                       key={cat}
                       style={[
-                        {
-                          paddingVertical: 6,
-                          paddingHorizontal: 10,
-                          borderRadius: 8,
-                          borderWidth: 1.5,
-                          borderColor: active ? '#EF4444' : '#E2E8F0',
-                          backgroundColor: active ? '#FEF2F2' : '#F8FAFC',
-                        },
+                        styles.complaintCategoryTile,
+                        active && styles.complaintCategoryTileActive,
                       ]}
                       onPress={() => setComplaintCategory(cat)}
+                      activeOpacity={0.7}
                     >
-                      <Text style={{ fontSize: 11, fontWeight: active ? '700' : '600', color: active ? '#B91C1C' : '#475569' }}>
+                      <Text
+                        style={[
+                          styles.complaintCategoryText,
+                          active && styles.complaintCategoryTextActive,
+                        ]}
+                        numberOfLines={1}
+                      >
                         {cat}
                       </Text>
                     </TouchableOpacity>
@@ -5833,6 +5892,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               <TextInput
                 style={styles.modalInput}
                 placeholder="e.g. Lab 3 Central Air Conditioning breakdown"
+                placeholderTextColor="#94A3B8"
                 value={complaintSubType}
                 onChangeText={setComplaintSubType}
               />
@@ -5851,6 +5911,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
                         active && { backgroundColor: badgeColor, borderColor: badgeColor },
                       ]}
                       onPress={() => setComplaintPriority(p)}
+                      activeOpacity={0.7}
                     >
                       <Text style={[styles.typeChipText, active && { color: '#FFFFFF', fontWeight: '800' }]}>{p}</Text>
                     </TouchableOpacity>
@@ -5862,6 +5923,7 @@ export default function StaffDashboard({ user, onLogout }: Props) {
               <TextInput
                 style={[styles.modalInput, { height: 80, textAlignVertical: 'top' }]}
                 placeholder="Provide complete breakdown, date observed, and impact on lectures or operations..."
+                placeholderTextColor="#94A3B8"
                 multiline
                 value={complaintDescription}
                 onChangeText={setComplaintDescription}
@@ -8465,17 +8527,81 @@ const styles = StyleSheet.create({
     color: '#334155',
     marginBottom: 6,
   },
+  supportCategoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 14,
+  },
+  supportCategoryTile: {
+    width: '48.5%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    minHeight: 46,
+  },
+  supportCategoryTileFull: {
+    width: '100%',
+  },
+  supportCategoryTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+    flexShrink: 1,
+  },
+  complaintCategoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 14,
+  },
+  complaintCategoryTile: {
+    width: '48.5%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    minHeight: 44,
+  },
+  complaintCategoryTileActive: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  complaintCategoryText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+    textAlign: 'center',
+  },
+  complaintCategoryTextActive: {
+    color: '#B91C1C',
+    fontWeight: '700',
+  },
   typeSelectorRow: {
     flexDirection: 'row',
-    gap: 6,
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 14,
   },
   typeChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
     backgroundColor: '#F1F5F9',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
   typeChipActive: {
@@ -8483,22 +8609,23 @@ const styles = StyleSheet.create({
     borderColor: '#1E3A8A',
   },
   typeChipText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#475569',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   typeChipTextActive: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontWeight: '800',
   },
   modalInput: {
     backgroundColor: '#F8FAFC',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#CBD5E1',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontSize: 13,
+    fontSize: 14,
+    color: '#0F172A',
     marginBottom: 12,
   },
   modalActions: {
@@ -9394,14 +9521,25 @@ const styles = StyleSheet.create({
   },
   semInputsRow: {
     flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
+    gap: 12,
+    alignItems: 'flex-start',
     marginBottom: 8,
   },
-  semInternalInfoBox: {
+  semCol: {
     flex: 1,
+  },
+  semColLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 4,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  semInternalInfoBox: {
     backgroundColor: '#EFF6FF',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#BFDBFE',
     borderRadius: 8,
     height: 44,
@@ -9414,18 +9552,19 @@ const styles = StyleSheet.create({
     color: '#1E40AF',
   },
   semInternalInfoValue: {
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: 15,
+    fontWeight: '800',
     color: '#1D4ED8',
   },
   semExamInputCol: {
-    flex: 1.5,
+    flex: 1,
   },
   semExamInputLabel: {
-    fontSize: 9,
-    fontWeight: '800',
+    fontSize: 10,
+    fontWeight: '700',
     color: '#64748B',
-    marginBottom: 3,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   semNumericInput: {
     backgroundColor: '#F8FAFC',

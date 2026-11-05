@@ -365,7 +365,7 @@ export default function JobReferralForm({
           applicantPhone: cleanPhone,
           candidatePhone: cleanPhone,
           applicantEmail: candidateEmail.trim(),
-          candidateEmail: candidateEmail.trim(),
+          candidateEmail: candidateEmail.trim().toLowerCase(),
           city: candidateCity.trim(),
           currentLocation: candidateCity.trim(),
           highestQualification,
@@ -395,7 +395,7 @@ export default function JobReferralForm({
           jobLocation,
           candidateName: candidateName.trim(),
           candidatePhone: cleanPhone,
-          candidateEmail: candidateEmail.trim(),
+          candidateEmail: candidateEmail.trim().toLowerCase(),
           candidateCity: candidateCity.trim(),
           highestQualification,
           experienceLevel,
@@ -539,7 +539,7 @@ export default function JobReferralForm({
               autoCapitalize="none"
               value={candidateEmail}
               onChangeText={(t) => {
-                setCandidateEmail(t);
+                setCandidateEmail(t.toLowerCase());
                 if (errors.candidateEmail) setErrors({ ...errors, candidateEmail: '' });
               }}
             />

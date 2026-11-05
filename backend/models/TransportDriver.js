@@ -16,29 +16,29 @@ const transportDriverSchema = new mongoose.Schema({
   tenantId: { type: String },
   
   // 1. Profile
-  name: { type: String, required: true },
+  name: { type: String, required: true, trim: true },
   photoUrl: { type: String },
   dob: { type: Date },
   gender: { type: String },
   bloodGroup: { type: String },
-  employeeId: { type: String },
+  employeeId: { type: String, trim: true },
   employmentType: { type: String },
   joiningDate: { type: Date },
 
   // 2. Contact Information
-  phone: { type: String, required: true }, // mobile
-  alternateMobile: { type: String },
-  email: { type: String },
-  address: { type: String },
-  city: { type: String },
-  state: { type: String },
-  pinCode: { type: String },
-  emergencyContactName: { type: String },
-  emergencyContactNumber: { type: String },
-  relationship: { type: String },
+  phone: { type: String, required: true, trim: true }, // mobile
+  alternateMobile: { type: String, trim: true },
+  email: { type: String, lowercase: true, trim: true },
+  address: { type: String, trim: true },
+  city: { type: String, trim: true },
+  state: { type: String, trim: true },
+  pinCode: { type: String, trim: true },
+  emergencyContactName: { type: String, trim: true },
+  emergencyContactNumber: { type: String, trim: true },
+  relationship: { type: String, trim: true },
 
   // 3. Driving Licence
-  license: { type: String, required: true }, // number
+  license: { type: String, required: true, trim: true }, // number
   licenseClass: { type: String }, // LMV, HMV
   licenseIssueDate: { type: Date },
   licenseExpiryDate: { type: Date },
@@ -79,5 +79,9 @@ const transportDriverSchema = new mongoose.Schema({
   payrollRef: { type: mongoose.Schema.Types.ObjectId, ref: 'Payroll' },
 
 }, { timestamps: true });
+
+transportDriverSchema.pre('save', function() {
+  if (this.email) this.email = this.email.trim().toLowerCase();
+});
 
 export default mongoose.models.TransportDriver || mongoose.model('TransportDriver', transportDriverSchema);

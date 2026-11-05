@@ -29,6 +29,7 @@ const campusPersonSchema = new mongoose.Schema({
   email: {
     type: String,
     default: '',
+    lowercase: true,
     trim: true
   },
   department: {
@@ -50,7 +51,8 @@ const campusPersonSchema = new mongoose.Schema({
   },
   idProofNumber: {
     type: String,
-    default: ''
+    default: '',
+    trim: true
   },
   photoUrl: {
     type: String,
@@ -88,5 +90,9 @@ const campusPersonSchema = new mongoose.Schema({
     index: true
   }
 }, { timestamps: true });
+
+campusPersonSchema.pre('save', function() {
+  if (this.email) this.email = this.email.trim().toLowerCase();
+});
 
 export default mongoose.models.CampusPerson || mongoose.model('CampusPerson', campusPersonSchema);

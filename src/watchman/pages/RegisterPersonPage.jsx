@@ -67,7 +67,9 @@ const RegisterPersonPage = () => {
   const [checkingIn, setCheckingIn] = useState(false);
 
   const handleInputChange = (field, val) => {
-    setFormData(prev => ({ ...prev, [field]: val }));
+    let finalVal = val;
+    if (field === 'email') finalVal = (val || '').toLowerCase();
+    setFormData(prev => ({ ...prev, [field]: finalVal }));
     if (error) setError('');
   };
 
@@ -100,6 +102,12 @@ const RegisterPersonPage = () => {
     }
     if (!formData.phone.trim()) {
       setError('Please provide a contact mobile number.');
+      return;
+    }
+    const cleanRpPhone = formData.phone.trim().replace(/\D/g, '');
+    const rpPhone10 = cleanRpPhone.length > 10 ? cleanRpPhone.slice(-10) : cleanRpPhone;
+    if (!/^[6-9]\d{9}$/.test(rpPhone10)) {
+      setError('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9');
       return;
     }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BackHandler, StyleSheet, View } from 'react-native';
+import { BackHandler, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { type MobileUser } from '../../services/api';
 import BottomTabBar, { type MainNavTab } from '../navigation/BottomTabBar';
 import ScreenHeader from '../navigation/ScreenHeader';
@@ -19,6 +19,22 @@ type Props = {
 };
 
 export default function WatchmanDashboard({ user, onLogout }: Props) {
+  if (user?.role !== 'Watchman') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#F8FAFC' }}>
+        <Text style={{ fontSize: 22, fontWeight: '800', color: '#DC2626', marginBottom: 8 }}>Access Denied</Text>
+        <Text style={{ fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 20 }}>
+          This dashboard is strictly reserved for Watchman accounts. Your current role is "{user?.role || 'Unauthorized'}".
+        </Text>
+        <TouchableOpacity
+          onPress={onLogout}
+          style={{ paddingVertical: 12, paddingHorizontal: 24, backgroundColor: '#0284C7', borderRadius: 8 }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Sign Out & Switch Account</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
   // 5 Main Navigation Destinations (Home, Gate Ops, Visitors, Logistics, Account)
   const [activeTab, setActiveTab] = useState<MainNavTab>('home');
   const [activeSubScreen, setActiveSubScreen] = useState<'leaves' | 'payroll' | null>(null);

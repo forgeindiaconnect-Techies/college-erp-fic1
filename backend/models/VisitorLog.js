@@ -13,15 +13,19 @@ const visitorLogSchema = new mongoose.Schema({
   },
   name: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   phone: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   email: {
     type: String,
-    default: ''
+    default: '',
+    lowercase: true,
+    trim: true
   },
   purpose: {
     type: String,
@@ -118,5 +122,9 @@ const visitorLogSchema = new mongoose.Schema({
     index: true
   }
 }, { timestamps: true });
+
+visitorLogSchema.pre('save', function() {
+  if (this.email) this.email = this.email.trim().toLowerCase();
+});
 
 export default mongoose.models.VisitorLog || mongoose.model('VisitorLog', visitorLogSchema);

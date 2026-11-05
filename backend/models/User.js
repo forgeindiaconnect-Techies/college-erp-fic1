@@ -7,7 +7,9 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    lowercase: true,
+    trim: true
   },
   password: {
     type: String,
@@ -20,7 +22,8 @@ const userSchema = new mongoose.Schema({
   },
   name: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   tenantId: {
     type: String,
@@ -32,7 +35,8 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    default: null
+    default: null,
+    trim: true
   },
   wardenType: {
     type: String,
@@ -73,6 +77,9 @@ userSchema.pre('save', async function() {
   if (!this.tenantId && this.collegeId) {
     this.tenantId = this.collegeId;
   }
+  if (this.email) {
+    this.email = this.email.trim().toLowerCase();
+  }
   if (!this.isModified('password')) return;
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
@@ -84,6 +91,3 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
 };
 
 export default mongoose.models.User || mongoose.model('User', userSchema);
-
-
-

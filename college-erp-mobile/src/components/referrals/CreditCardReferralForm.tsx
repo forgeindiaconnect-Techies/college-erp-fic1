@@ -297,7 +297,7 @@ export default function CreditCardReferralForm({
         formData: {
           applicantName: applicantName.trim(),
           applicantPhone: cleanPhone,
-          applicantEmail: applicantEmail.trim(),
+          applicantEmail: applicantEmail.trim().toLowerCase(),
           city: city.trim(),
           cardCategory,
           bankName,
@@ -319,7 +319,7 @@ export default function CreditCardReferralForm({
           cardCategory,
           applicantName: applicantName.trim(),
           applicantPhone: cleanPhone,
-          applicantEmail: applicantEmail.trim(),
+          applicantEmail: applicantEmail.trim().toLowerCase(),
           city: city.trim(),
           employmentType,
           monthlyIncome,
@@ -462,7 +462,7 @@ export default function CreditCardReferralForm({
               autoCapitalize="none"
               value={applicantEmail}
               onChangeText={(t) => {
-                setApplicantEmail(t);
+                setApplicantEmail(t.toLowerCase());
                 if (errors.applicantEmail) setErrors({ ...errors, applicantEmail: '' });
               }}
             />

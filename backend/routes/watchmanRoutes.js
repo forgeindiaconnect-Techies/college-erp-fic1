@@ -576,6 +576,11 @@ router.post('/', protect, authorize('Admin', 'Super Admin'), async (req, res) =>
     if (!name || !email || !password || !phone) {
       return res.status(400).json({ success: false, message: 'Name, phone, email, and password are required' });
     }
+    const cleanWmn = String(phone).trim().replace(/\D/g, '');
+    const wmn10 = cleanWmn.length > 10 ? cleanWmn.slice(-10) : cleanWmn;
+    if (!/^[6-9]\d{9}$/.test(wmn10)) {
+      return res.status(400).json({ success: false, message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+    }
 
     const tenantId = getTenant(req);
 
@@ -1022,6 +1027,11 @@ const handleVisitorEntry = async (req, res) => {
     if (!name || !phone || !purpose || !personToMeet) {
       return res.status(400).json({ success: false, message: 'Name, phone, purpose, and person to meet are required' });
     }
+    const cleanPhone = String(phone).trim().replace(/\D/g, '');
+    const phone10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
+    if (!/^[6-9]\d{9}$/.test(phone10)) {
+      return res.status(400).json({ success: false, message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+    }
 
     const tenantId = getTenant(req) || req.user?.collegeId || 'COL001';
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -1043,7 +1053,7 @@ const handleVisitorEntry = async (req, res) => {
       passNumber,
       name: name.trim(),
       phone: phone.trim(),
-      email: email ? email.trim() : '',
+      email: email ? email.trim().toLowerCase() : '',
       purpose: purpose.trim(),
       personToMeet: personToMeet.trim(),
       department: department || 'General',
@@ -1691,6 +1701,11 @@ router.post('/visitors/pre-register', protect, authorize('Watchman', 'Admin', 'S
         message: 'Name, phone number, purpose of visit, and host / person to meet are required.'
       });
     }
+    const cleanPrePhone = String(phone).trim().replace(/\D/g, '');
+    const prePhone10 = cleanPrePhone.length > 10 ? cleanPrePhone.slice(-10) : cleanPrePhone;
+    if (!/^[6-9]\d{9}$/.test(prePhone10)) {
+      return res.status(400).json({ success: false, message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+    }
 
     const count = await VisitorLog.countDocuments();
     const visitorId = `V-${Date.now().toString().slice(-4)}${Math.floor(100 + Math.random() * 900)}`;
@@ -2336,6 +2351,13 @@ router.post('/vehicles/entry', protect, authorize('Watchman', 'Admin', 'Super Ad
     }
     if (!rawDriver || !rawDriver.trim()) {
       return res.status(400).json({ success: false, message: 'Driver name is required' });
+    }
+    if (rawPhone && String(rawPhone).trim()) {
+      const cleanDriverP = String(rawPhone).trim().replace(/\D/g, '');
+      const driverP10 = cleanDriverP.length > 10 ? cleanDriverP.slice(-10) : cleanDriverP;
+      if (!/^[6-9]\d{9}$/.test(driverP10)) {
+        return res.status(400).json({ success: false, message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+      }
     }
 
     const cleanVehicleNumber = rawNumber.trim().toUpperCase();
@@ -5261,6 +5283,13 @@ router.post('/campus-people', protect, authorize('Watchman', 'Admin', 'Super Adm
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Person Name is required' });
     }
+    if (phone && String(phone).trim()) {
+      const cleanCp = String(phone).trim().replace(/\D/g, '');
+      const cp10 = cleanCp.length > 10 ? cleanCp.slice(-10) : cleanCp;
+      if (!/^[6-9]\d{9}$/.test(cp10)) {
+        return res.status(400).json({ success: false, message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+      }
+    }
 
     const tenantId = getTenant(req);
 
@@ -5286,7 +5315,7 @@ router.post('/campus-people', protect, authorize('Watchman', 'Admin', 'Super Adm
       existing.name = name.trim();
       existing.personType = personType || existing.personType;
       existing.phone = (phone || existing.phone || '').trim();
-      existing.email = (email || existing.email || '').trim();
+      existing.email = (email || existing.email || '').trim().toLowerCase();
       existing.department = (department || existing.department || 'General').trim();
       existing.designation = (designation || (personType === 'HOD' ? 'Head of Department' : personType === 'Staff' ? 'Faculty' : personType === 'Student' ? 'Student' : 'Campus Visitor')).trim();
       if (vehicleNumber) existing.vehicleNumber = vehicleNumber.trim().toUpperCase();
@@ -5299,7 +5328,7 @@ router.post('/campus-people', protect, authorize('Watchman', 'Admin', 'Super Adm
         name: name.trim(),
         personType: personType || 'Visitor',
         phone: (phone || '').trim(),
-        email: (email || '').trim(),
+        email: (email || '').trim().toLowerCase(),
         department: (department || 'General').trim(),
         designation: (designation || (personType === 'HOD' ? 'Head of Department' : personType === 'Staff' ? 'Faculty' : personType === 'Student' ? 'Student' : 'Campus Visitor')).trim(),
         vehicleNumber: (vehicleNumber || '').trim().toUpperCase(),

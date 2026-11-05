@@ -87,7 +87,7 @@ export default function UserProfileScreen({
             <Text style={styles.roleBadgeText}>{roleTitle.toUpperCase()}</Text>
           </View>
           <Text style={styles.userNameText}>{user.name}</Text>
-          <Text style={styles.userEmailText}>{user.email || 'No email registered'}</Text>
+          <Text style={styles.userEmailText}>{user.email ? user.email.toLowerCase() : 'No email registered'}</Text>
           <Text style={styles.collegeNameText}>
             {user.collegeName || user.tenantId || 'FIC Central College ERP'}
           </Text>

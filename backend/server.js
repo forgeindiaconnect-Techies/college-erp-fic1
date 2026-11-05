@@ -291,7 +291,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Expires', 'x-tenant-id', 'X-Tenant-Id']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Expires', 'x-tenant-id', 'X-Tenant-Id', 'x-client-platform', 'X-Client-Platform']
 }));
 app.use(express.json());
 app.use('/dashboards', express.static(path.join(__dirname, '../public/dashboards')));

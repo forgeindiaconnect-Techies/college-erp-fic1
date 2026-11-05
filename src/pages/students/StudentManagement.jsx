@@ -172,6 +172,13 @@ const StudentManagement = () => {
     const e = {};
     if (!form.name || !form.name.trim())       e.name       = 'Name is required';
     if (!form.email || !form.email.trim())      e.email      = 'Email is required';
+    if (form.phone && form.phone.trim()) {
+      const clean = form.phone.trim().replace(/\D/g, '');
+      const phone10 = clean.length > 10 ? clean.slice(-10) : clean;
+      if (!/^[6-9]\d{9}$/.test(phone10)) {
+        e.phone = 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9';
+      }
+    }
     if (!form.dept)              e.dept       = 'Select a department';
     if (!form.sem)               e.sem        = 'Select a semester';
     if (form.cgpa && (isNaN(form.cgpa) || +form.cgpa < 0 || +form.cgpa > 10))
@@ -251,7 +258,11 @@ const StudentManagement = () => {
 
   const field = (key) => ({
     value: form[key],
-    onChange: e => setForm(f => ({ ...f, [key]: e.target.value })),
+    onChange: e => {
+      let val = e.target.value;
+      if (key === 'email' || key.toLowerCase().includes('email')) val = val.toLowerCase();
+      setForm(f => ({ ...f, [key]: val }));
+    },
   });
 
   /* ══════════════════════════════════════════════════════════════ */
@@ -577,9 +588,10 @@ const StudentManagement = () => {
                   </div>
 
                   {/* Phone */}
-                  <div className="fld">
+                  <div className={`fld ${formErrors.phone ? 'fld-error' : ''}`}>
                     <label><Phone size={13}/> Phone Number</label>
                     <input type="tel" placeholder="10-digit mobile number" maxLength={10} {...field('phone')} />
+                    {formErrors.phone && <span className="err-msg">{formErrors.phone}</span>}
                   </div>
 
                   {/* Aadhar/ID Number */}

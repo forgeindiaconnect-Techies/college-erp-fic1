@@ -3,25 +3,31 @@ import mongoose from 'mongoose';
 const collegeSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   adminName: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   email: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    lowercase: true,
+    trim: true
   },
   phone: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   tenantId: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    trim: true
   },
   subscriptionPlan: {
     type: String,
@@ -67,7 +73,9 @@ const collegeSchema = new mongoose.Schema({
   },
   principalEmail: {
     type: String,
-    default: null
+    default: null,
+    lowercase: true,
+    trim: true
   },
   principalPassword: {
     type: String,
@@ -75,5 +83,10 @@ const collegeSchema = new mongoose.Schema({
   },
   collegeId: { type: String } 
 }, { timestamps: true });
+
+collegeSchema.pre('save', function() {
+  if (this.email) this.email = this.email.trim().toLowerCase();
+  if (this.principalEmail) this.principalEmail = this.principalEmail.trim().toLowerCase();
+});
 
 export default mongoose.models.College || mongoose.model('College', collegeSchema);

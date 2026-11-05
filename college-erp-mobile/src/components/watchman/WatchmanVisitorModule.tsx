@@ -323,8 +323,9 @@ export default function WatchmanVisitorModule({
       return;
     }
     const cleanPhone = formPhone.replace(/\D/g, '');
-    if (cleanPhone.length < 10) {
-      Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number.');
+    const phone10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
+    if (!/^[6-9]\d{9}$/.test(phone10)) {
+      Alert.alert('Validation Error', 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9.');
       return;
     }
     if (!formPersonToMeet.trim()) {
@@ -393,8 +394,9 @@ export default function WatchmanVisitorModule({
       return;
     }
     const cleanPhone = prePhone.replace(/\D/g, '');
-    if (cleanPhone.length < 10) {
-      Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number.');
+    const phone10 = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
+    if (!/^[6-9]\d{9}$/.test(phone10)) {
+      Alert.alert('Validation Error', 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9.');
       return;
     }
     if (!preHost.trim()) {

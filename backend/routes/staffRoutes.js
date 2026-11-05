@@ -303,6 +303,17 @@ router.post('/', protect, authorize('Admin', 'Sub Admin', 'Principal', 'HOD'), r
     staffData.collegeId = req.collegeId;
   }
 
+  if (staffData.email) {
+    staffData.email = staffData.email.trim().toLowerCase();
+  }
+  if (staffData.phone) {
+    const clean = String(staffData.phone).trim().replace(/\D/g, '');
+    const p10 = clean.length > 10 ? clean.slice(-10) : clean;
+    if (!/^[6-9]\d{9}$/.test(p10)) {
+      return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+    }
+    staffData.phone = p10;
+  }
   if (isHOD) {
     staffData.status = 'Pending Approval';
   }
@@ -443,6 +454,15 @@ router.put('/:id/approve', protect, authorize('Admin', 'Principal'), collegeScop
       };
     }
 
+    if (req.body.email) req.body.email = req.body.email.trim().toLowerCase();
+    if (req.body.phone) {
+      const clean = String(req.body.phone).trim().replace(/\D/g, '');
+      const p10 = clean.length > 10 ? clean.slice(-10) : clean;
+      if (!/^[6-9]\d{9}$/.test(p10)) {
+        return res.status(400).json({ message: 'Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9' });
+      }
+      req.body.phone = p10;
+    }
     const updatedStaff = await Staff.findOneAndUpdate(
       query,
       { status: 'Active' },

@@ -315,7 +315,7 @@ export default function InsuranceReferralForm({
         formData: {
           applicantName: applicantName.trim(),
           applicantPhone: cleanPhone,
-          applicantEmail: applicantEmail.trim(),
+          applicantEmail: applicantEmail.trim().toLowerCase(),
           city: city.trim(),
           provider,
           insurerName: provider,
@@ -349,7 +349,7 @@ export default function InsuranceReferralForm({
           referralSource,
           applicantName: applicantName.trim(),
           applicantPhone: cleanPhone,
-          applicantEmail: applicantEmail.trim(),
+          applicantEmail: applicantEmail.trim().toLowerCase(),
           applicantCity: city.trim(),
           partnerReferenceNumber: partnerRefNumber.trim(),
           applicantConsentGiven: true,
@@ -489,7 +489,7 @@ export default function InsuranceReferralForm({
               autoCapitalize="none"
               value={applicantEmail}
               onChangeText={(t) => {
-                setApplicantEmail(t);
+                setApplicantEmail(t.toLowerCase());
                 if (errors.applicantEmail) setErrors({ ...errors, applicantEmail: '' });
               }}
             />

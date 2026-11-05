@@ -175,8 +175,10 @@ export default function WatchmanRegisterPersonModal({
       setErrorMsg('Contact Mobile Number is required.');
       return;
     }
-    if (phone.trim().replace(/[^0-9]/g, '').length < 7) {
-      setErrorMsg('Please enter a valid phone number (at least 7 digits).');
+    const cleanDigits = phone.trim().replace(/\D/g, '');
+    const phone10 = cleanDigits.length > 10 ? cleanDigits.slice(-10) : cleanDigits;
+    if (!/^[6-9]\d{9}$/.test(phone10)) {
+      setErrorMsg('Mobile number must be a valid 10-digit number starting with 6, 7, 8, or 9.');
       return;
     }
 
@@ -189,8 +191,8 @@ export default function WatchmanRegisterPersonModal({
         name: name.trim(),
         personType,
         personId: personId.trim() || undefined,
-        phone: phone.trim(),
-        email: email.trim(),
+        phone: phone.trim().replace(/\D/g, '').slice(-10),
+        email: email.trim().toLowerCase(),
         department,
         designation: designation.trim() || (personType === 'HOD' ? 'Head of Department' : personType === 'Staff' ? 'Faculty' : personType === 'Student' ? 'Student' : 'Visitor'),
         batch,
@@ -577,7 +579,7 @@ export default function WatchmanRegisterPersonModal({
                     keyboardType="email-address"
                     autoCapitalize="none"
                     value={email}
-                    onChangeText={setEmail}
+                    onChangeText={(val) => setEmail(val.toLowerCase())}
                   />
                 </View>
 
